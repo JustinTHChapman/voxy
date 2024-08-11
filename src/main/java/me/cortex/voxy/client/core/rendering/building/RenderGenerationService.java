@@ -67,7 +67,7 @@ public class RenderGenerationService {
         synchronized (this.taskQueue) {
             task = this.taskQueue.removeFirst();
         }
-        long time = System.nanoTime();
+        long time = SectionUpdate.getTime();
         var section = task.sectionSupplier.get();
         if (section == null) {
             this.resultConsumer.accept(new SectionUpdate(task.position, time, BuiltSection.empty(task.position), (byte) 0));

@@ -61,15 +61,12 @@ layout(binding = 2, std430) restrict buffer QueueData {
     uint[] queue;
 } queue;
 */
-#line 1
 #import <voxy:lod/hierarchical/transform.glsl>
-#line 1
+
 #import <voxy:lod/hierarchical/node.glsl>
-#line 1
 
 //Contains all the screenspace computation
 #import <voxy:lod/hierarchical/screenspace.glsl>
-#line 58
 
 //If a request is successfully added to the RequestQueue, must update NodeData to mark that the node has been put into the request queue
 // to prevent it from being requested every frame and blocking the queue

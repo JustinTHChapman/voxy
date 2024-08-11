@@ -5,6 +5,7 @@ import me.cortex.voxy.common.storage.StorageBackend;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.RedstoneWireBlock;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
@@ -138,7 +139,7 @@ public class Mapper {
 
         bentries.stream().sorted(Comparator.comparing(a->a.id)).forEach(entry -> {
             if (this.biomeId2biomeEntry.size() != entry.id) {
-                throw new IllegalStateException("Biome entry not ordered");
+                throw new IllegalStateException("Biome entry not ordered. got " + entry.biome + " with id " + entry.id + " expected id " + this.biomeId2biomeEntry.size());
             }
             this.biomeId2biomeEntry.add(entry);
         });
@@ -162,7 +163,7 @@ public class Mapper {
     }
 
     private synchronized BiomeEntry registerNewBiome(String biome) {
-        BiomeEntry entry = new BiomeEntry(this.biome2biomeEntry.size(), biome);
+        BiomeEntry entry = new BiomeEntry(this.biomeId2biomeEntry.size(), biome);
         //this.biome2biomeEntry.put(biome, entry);
         this.biomeId2biomeEntry.add(entry);
 
@@ -248,7 +249,7 @@ public class Mapper {
                 continue;
             }
             if (this.blockId2stateEntry.indexOf(entry) != entry.id) {
-                throw new IllegalStateException("State Id NOT THE SAME, very critically bad");
+                throw new IllegalStateException("State Id NOT THE SAME, very critically bad. arr:" + this.blockId2stateEntry.indexOf(entry) + " entry: " + entry.id);
             }
             byte[] serialized = entry.serialize();
             ByteBuffer buffer = MemoryUtil.memAlloc(serialized.length);

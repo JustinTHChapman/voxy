@@ -55,7 +55,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool, this.sectionUpdateQueue::add, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
 
         positionFilterForwarder.setCallbacks(this.renderGen::enqueueTask, section -> {
-            long time = System.nanoTime();
+            long time = SectionUpdate.getTime();
             byte childExistence = section.getNonEmptyChildren();
 
             this.sectionUpdateQueue.add(new SectionUpdate(section.key, time, null, childExistence));

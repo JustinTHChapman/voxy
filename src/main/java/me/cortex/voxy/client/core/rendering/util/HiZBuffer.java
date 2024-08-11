@@ -107,8 +107,10 @@ public class HiZBuffer {
 
     public void free() {
         this.fb.free();
-        this.texture.free();
-        this.texture = null;
+        if (this.texture != null) {
+            this.texture.free();
+            this.texture = null;
+        }
         glDeleteSamplers(this.sampler);
         this.hiz.free();
     }

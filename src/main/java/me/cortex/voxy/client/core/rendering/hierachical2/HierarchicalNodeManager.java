@@ -1,7 +1,9 @@
 package me.cortex.voxy.client.core.rendering.hierachical2;
 
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.SectionPositionUpdateFilterer;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdate;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
@@ -16,6 +18,7 @@ public class HierarchicalNodeManager {
     public final int maxNodeCount;
     private final NodeStore nodeData;
     private final Long2IntOpenHashMap activeSectionMap = new Long2IntOpenHashMap();
+    private final IntOpenHashSet nodeUpdates = new IntOpenHashSet();
     private final ExpandingObjectAllocationList<LeafExpansionRequest> leafRequests = new ExpandingObjectAllocationList<>(LeafExpansionRequest[]::new);
     private final AbstractSectionGeometryManager geometryManager;
     private final SectionPositionUpdateFilterer updateFilterer;
@@ -52,48 +55,51 @@ public class HierarchicalNodeManager {
         }
         this.nodeData.markRequestInFlight(node);
 
-        long pos = this.nodeData.nodePosition(node);
 
         //2 branches, either its a leaf node -> emit a leaf request
         // or the nodes geometry must be empty (i.e. culled from the graph/tree) so add to tracker and watch
         if (this.nodeData.isLeafNode(node)) {
-            //TODO: the localNodeData should have a bitset of what children are definitely empty
-            // use that to msk the request, HOWEVER there is a race condition e.g.
-            // leaf node is requested and has only 1 child marked as non empty
-            // however then an update occures and a different child now becomes non empty,
-            // this will trigger a processBuildResult for parent
-            // so need to ensure that when that happens, if the parent has an inflight leaf expansion request
-            // for the leaf request to be updated to account for the new maybe child node
-            //  NOTE: a section can have empty geometry but some of its children might not, so need to mark and
-            //  submit a node at that level but with empty section, (specially marked) so that the traversal
-            //  can recurse into those children as needed
-
-            //Enqueue a leaf expansion request
-            var request = new LeafExpansionRequest(pos);
-            int requestId = this.leafRequests.put(request);
-
-            for (int i = 0; i < 8; i++) {
-                long childPos = makeChildPos(pos, i);
-                //Insert all the children into the tracking map with the node id
-                this.activeSectionMap.put(childPos, 0);
-            }
+            this.makeLeafRequest(node);
         } else {
             //Verify that the node section is not in the section store. if it is then it is a state desynchonization
             // Note that a section can be "empty" but some of its children might not be
         }
     }
 
-    public void processResult(SectionUpdate update) {
-        if (update.geometry() != null) {
-            if (!update.geometry().isEmpty()) {
-                HierarchicalOcclusionTraverser.HACKY_SECTION_COUNT++;
-                this.geometryManager.uploadSection(update.geometry());
-            } else {
-                update.geometry().free();
-            }
+    private void makeLeafRequest(int node, byte childExistence) {
+        long pos = this.nodeData.nodePosition(node);
+        //TODO: the localNodeData should have a bitset of what children are definitely empty
+        // use that to msk the request, HOWEVER there is a race condition e.g.
+        // leaf node is requested and has only 1 child marked as non empty
+        // however then an update occures and a different child now becomes non empty,
+        // this will trigger a processBuildResult for parent
+        // so need to ensure that when that happens, if the parent has an inflight leaf expansion request
+        // for the leaf request to be updated to account for the new maybe child node
+        //  NOTE: a section can have empty geometry but some of its children might not, so need to mark and
+        //  submit a node at that level but with empty section, (specially marked) so that the traversal
+        //  can recurse into those children as needed
+
+        //Enqueue a leaf expansion request
+        var request = new LeafExpansionRequest(pos);
+        int requestId = this.leafRequests.put(request);
+
+        for (int i = 0; i < 8; i++) {
+            long childPos = makeChildPos(pos, i);
+            //Insert all the children into the tracking map with the node id
+            this.activeSectionMap.put(childPos, 0);
         }
-        if (true)
-            return;
+    }
+
+
+    public void processResult(SectionUpdate update) {
+        //Need to handle cases
+        // geometry update, leaf node, leaf request node, internal node
+        //Child emptiness update!!! this is the hard bit
+        // if it is an internal node
+        // if emptiness adds node, need to then send a mesh request and wait
+        //  when mesh result, need to remove the old child allocation block and make a new block to fit the
+        //  new count of children
+
 
         int nodeId = this.activeSectionMap.get(update.position());
         if (nodeId == -1) {
@@ -104,12 +110,46 @@ public class HierarchicalNodeManager {
         } else {
             //Part of a request (top bit is set to 1)
             if ((nodeId&(1<<31))!=0) {
+                nodeId &= ~(1<<31);
+                var request = this.leafRequests.get(nodeId);
 
             } else {
-                //Not part of a request, just a node update,
-                // however could result in a reallocation if it needs to mark a child position as being possibly visible
+                //Not part of a request, just a node update, if node is currently a leaf node, it might have a
+                // leaf request associated with it, which might need an update if
 
             }
+        }
+    }
+
+
+
+
+    private int updateNodeGeometry(int node, BuiltSection geometry) {
+        int previousGeometry = -1;
+        int newGeometry = -1;
+        if (this.nodeData.hasGeometry(node)) {
+            previousGeometry = this.nodeData.getNodeGeometry(node);
+            if (!geometry.isEmpty()) {
+                newGeometry = this.geometryManager.uploadReplaceSection(previousGeometry, geometry);
+            } else {
+                this.geometryManager.removeSection(previousGeometry);
+            }
+        } else {
+            if (!geometry.isEmpty()) {
+                newGeometry = this.geometryManager.uploadSection(geometry);
+            }
+        }
+
+        if (previousGeometry != newGeometry) {
+            this.nodeData.setNodeGeometry(node, newGeometry);
+            this.nodeUpdates.add(node);
+        }
+        if (previousGeometry == newGeometry) {
+            return 0;//No change
+        } else if (previousGeometry == -1) {
+            return 1;//Became non-empty
+        } else {
+            return 2;//Became empty
         }
     }
 

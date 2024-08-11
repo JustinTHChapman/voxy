@@ -132,6 +132,9 @@ public class HierarchicalBitSet {
     public int getCount() {
         return this.cnt;
     }
+    public int getLimit() {
+        return this.limit;
+    }
 
     public boolean isSet(int idx) {
         return (this.D[idx>>6]&(1L<<(idx&0x3f)))!=0;
