@@ -68,11 +68,11 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
 
-
-        for (int x = -10; x <= 10; x++) {
-            for (int y = -3; y <= 3; y++) {
-                for (int z = -10; z <= 10; z++) {
-                    positionFilterForwarder.watch(0, x, y ,z);
+        final int H_WIDTH = 1;
+        for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
+            for (int y = -1; y <= 0; y++) {
+                for (int z = -H_WIDTH; z <= H_WIDTH; z++) {
+                    this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
                 }
             }
         }

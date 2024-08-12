@@ -1,7 +1,6 @@
 package me.cortex.voxy.client.core.rendering.hierachical2;
 
-//Request of the leaf node to expand
-class LeafExpansionRequest {
+class NodeChildRequest {
     //Child states contain micrometadata in the top bits
     // such as isEmpty, and isEmptyButEventuallyHasNonEmptyChild
     private final long nodePos;
@@ -11,13 +10,20 @@ class LeafExpansionRequest {
     private byte results;
     private byte mask;
 
-    LeafExpansionRequest(long nodePos) {
+    NodeChildRequest(long nodePos) {
         this.nodePos = nodePos;
+    }
+
+    public int getChildMeshResult(int childIdx) {
+        if ((this.mask&(1<<childIdx))==0) {
+            throw new IllegalStateException("Tried getting mesh result of child not in mask");
+        }
+        return this.childStates[childIdx];
     }
 
     public int putChildResult(int childIdx, int mesh) {
         if ((this.mask&(1<<childIdx))==0) {
-            throw new IllegalStateException("Tried putting child into leaf which doesnt match mask");
+            throw new IllegalStateException("Tried putting child into request which isnt in mask");
         }
         //Note the mesh can be -ve meaning empty mesh, but we should still mark that node as having a result
         boolean isFirstInsert = (this.results&(1<<childIdx))==0;

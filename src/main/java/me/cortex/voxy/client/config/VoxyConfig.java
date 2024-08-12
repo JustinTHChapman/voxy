@@ -50,7 +50,6 @@ public class VoxyConfig {
         return config;
     }
     public void save() {
-        //Unsafe, todo: fixme! needs to be atomic!
         try {
             Files.writeString(getConfigPath(), GSON.toJson(this));
         } catch (IOException e) {

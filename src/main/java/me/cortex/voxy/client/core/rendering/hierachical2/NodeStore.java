@@ -13,12 +13,17 @@ public final class NodeStore {
         this.allocationSet = new HierarchicalBitSet(maxNodeCount);
     }
 
+    private static int id2idx(int idx) {
+        return idx*LONGS_PER_NODE;
+    }
+
     public int allocate() {
         int id = this.allocationSet.allocateNext();
         if (id < 0) {
             throw new IllegalStateException("Failed to allocate node slot!");
         }
         this.ensureSized(id);
+        this.clear(id);
         return id;
     }
 
@@ -31,6 +36,9 @@ public final class NodeStore {
             throw new IllegalStateException("Failed to allocate " + count + " consecutive nodes!!");
         }
         this.ensureSized(id + (count-1));
+        for (int i = 0; i < count; i++) {
+            this.clear(id + i);
+        }
         return id;
     }
 
@@ -45,34 +53,49 @@ public final class NodeStore {
         }
     }
 
+    private void free(int nodeId) {
+        if (!this.allocationSet.free(nodeId)) {
+            throw new IllegalStateException("Node " + nodeId + " was not allocated!");
+        }
+
+    }
 
 
+
+    private void clear(int nodeId) {
+
+    }
+
+
+
+    public void setNodePosition(int node, long position) {
+        this.localNodeData[id2idx(node)] = position;
+    }
 
     public long nodePosition(int nodeId) {
-        return this.localNodeData[nodeId<<2];
+        return this.localNodeData[id2idx(nodeId)];
     }
 
     public boolean nodeExists(int nodeId) {
-        return false;
+        return this.allocationSet.isSet(nodeId);
     }
 
-
-    public boolean hasGeometry(int node) {
-        return false;
-    }
     public int getNodeGeometry(int node) {
-        return 0;
+        return -1;
     }
     public void setNodeGeometry(int node, int geometryId) {
 
     }
 
+    public void setNodeRequest(int node, int requestId) {
+
+    }
 
     public void markRequestInFlight(int nodeId) {
 
     }
 
-    public boolean nodeRequestInFlight(int nodeId) {
+    public boolean isNodeRequestInFlight(int nodeId) {
         return false;
     }
 
@@ -82,9 +105,21 @@ public final class NodeStore {
 
     public byte getNodeChildExistence(int nodeId) {return 0;}
 
+    public void setNodeChildExistence(int node, byte existence) {
+
+    }
+
+    public int getChildPtr(int nodeId) {
+        return -1;
+    }
+
+    public void setChildPtr(int nodeId, int ptr) {
+
+    }
 
     //Writes out a nodes data to the ptr in the compacted/reduced format
     public void writeNode(long ptr, int nodeId) {
 
     }
+
 }
