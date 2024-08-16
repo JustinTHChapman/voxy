@@ -40,6 +40,7 @@ public class HierarchicalOcclusionTraverser {
 
     }
 
+    public static int HACKY_SECTION_COUNT = 0;
     public void doTraversal(Viewport<?> viewport, int depthBuffer) {
         //Compute the mip chain
         this.hiZBuffer.buildMipChain(depthBuffer, viewport.width, viewport.height);
@@ -50,7 +51,6 @@ public class HierarchicalOcclusionTraverser {
         //Use a chain of glDispatchComputeIndirect (5 times) with alternating read/write buffers
         // TODO: swap to persistent gpu thread instead
 
-        /*
         if (HACKY_SECTION_COUNT != 0) {
             long uploadPtr = UploadStream.INSTANCE.upload(this.renderList, 0, HACKY_SECTION_COUNT*4L+4);
 
@@ -61,7 +61,6 @@ public class HierarchicalOcclusionTraverser {
 
             UploadStream.INSTANCE.commit();
         }
-         */
 
         this.downloadResetRequestQueue();
     }

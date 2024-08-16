@@ -6,7 +6,7 @@ import me.cortex.voxy.common.world.WorldSection;
 
 import java.util.function.LongConsumer;
 
-public class SectionPositionUpdateFilterer {
+public class SectionUpdateRouter {
     private static final int SLICES = 1<<2;
     public interface IChildUpdate {void accept(WorldSection section);}
 

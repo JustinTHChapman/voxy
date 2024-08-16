@@ -105,8 +105,10 @@ public class RenderGenerationService {
 
         byte childMask = section.getNonEmptyChildren();
         section.release();
-        //Time is the time at the start of the update
-        this.resultConsumer.accept(new SectionUpdate(section.key, time, mesh, childMask));
+        if (mesh != null) {
+            //Time is the time at the start of the update
+            this.resultConsumer.accept(new SectionUpdate(section.key, time, mesh, childMask));
+        }
     }
 
     public void enqueueTask(int lvl, int x, int y, int z) {

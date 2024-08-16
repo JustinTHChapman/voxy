@@ -66,4 +66,8 @@ class NodeChildRequest {
     public boolean isSatisfied() {
         return (this.results&this.mask)==this.mask;
     }
+
+    public long getPosition() {
+        return this.nodePos;
+    }
 }

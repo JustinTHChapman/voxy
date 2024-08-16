@@ -3,7 +3,7 @@ package me.cortex.voxy.client.core.rendering;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
-import me.cortex.voxy.client.core.rendering.building.SectionPositionUpdateFilterer;
+import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdate;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
@@ -47,7 +47,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<19, (1L<<30)-1024);
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
-        var positionFilterForwarder = new SectionPositionUpdateFilterer();
+        var positionFilterForwarder = new SectionUpdateRouter();
 
         this.nodeManager = new HierarchicalNodeManager(1<<21, this.sectionRenderer.getGeometryManager(), positionFilterForwarder);
 

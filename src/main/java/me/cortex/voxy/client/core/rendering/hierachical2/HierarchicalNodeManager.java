@@ -4,7 +4,7 @@ package me.cortex.voxy.client.core.rendering.hierachical2;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
-import me.cortex.voxy.client.core.rendering.building.SectionPositionUpdateFilterer;
+import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdate;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
 import me.cortex.voxy.client.core.util.ExpandingObjectAllocationList;
@@ -12,15 +12,17 @@ import me.cortex.voxy.common.world.WorldEngine;
 import me.jellysquid.mods.sodium.client.util.MathUtil;
 import org.lwjgl.system.MemoryUtil;
 
+import static me.cortex.voxy.client.core.rendering.hierachical2.NodeStore.EMPTY_GEOMETRY_ID;
+import static me.cortex.voxy.client.core.rendering.hierachical2.NodeStore.NODE_ID_MSK;
+
 //Contains no logic to interface with the gpu, nor does it contain any gpu buffers
 public class HierarchicalNodeManager {
-    public static final int NODE_MSK = ((1<<24)-1);
     private static final int NO_NODE = -1;
     private static final int SENTINAL_TOP_NODE_INFLIGHT = -2;
 
     private static final int ID_TYPE_MSK = (3<<30);
     private static final int ID_TYPE_NONE = 0;
-    private static final int ID_TYPE_LEAF = (2<<30);
+    private static final int ID_TYPE_REQUEST = (2<<30);
     private static final int ID_TYPE_TOP = (1<<30);
 
     public final int maxNodeCount;
@@ -33,9 +35,9 @@ public class HierarchicalNodeManager {
     private final ExpandingObjectAllocationList<NodeChildRequest> requests = new ExpandingObjectAllocationList<>(NodeChildRequest[]::new);
 
     private final AbstractSectionGeometryManager geometryManager;
-    private final SectionPositionUpdateFilterer updateFilterer;
+    private final SectionUpdateRouter updateRouter;
 
-    public HierarchicalNodeManager(int maxNodeCount, AbstractSectionGeometryManager geometryManager, SectionPositionUpdateFilterer updateFilterer) {
+    public HierarchicalNodeManager(int maxNodeCount, AbstractSectionGeometryManager geometryManager, SectionUpdateRouter updateRouter) {
         if (!MathUtil.isPowerOfTwo(maxNodeCount)) {
             throw new IllegalArgumentException("Max node count must be a power of 2");
         }
@@ -43,7 +45,7 @@ public class HierarchicalNodeManager {
             throw new IllegalArgumentException("Max node count cannot exceed 2^24");
         }
         this.activeSectionMap.defaultReturnValue(NO_NODE);
-        this.updateFilterer = updateFilterer;
+        this.updateRouter = updateRouter;
         this.maxNodeCount = maxNodeCount;
         this.nodeData = new NodeStore(maxNodeCount);
         this.geometryManager = geometryManager;
@@ -54,15 +56,13 @@ public class HierarchicalNodeManager {
             throw new IllegalArgumentException("Position already in node set: " + WorldEngine.pprintPos(position));
         }
         this.activeSectionMap.put(position, SENTINAL_TOP_NODE_INFLIGHT);
-        this.updateFilterer.watch(position);
+        this.updateRouter.watch(position);
     }
 
     public void removeTopLevelNode(long position) {
         if (!this.activeSectionMap.containsKey(position)) {
             throw new IllegalArgumentException("Position not in node set: " + WorldEngine.pprintPos(position));
         }
-
-
     }
 
     public void processRequestQueue(int count, long ptr) {
@@ -73,7 +73,7 @@ public class HierarchicalNodeManager {
     }
 
     private void processRequest(int op) {
-        int node = op&NODE_MSK;
+        int node = op& NODE_ID_MSK;
         if (!this.nodeData.nodeExists(node)) {
             throw new IllegalStateException("Tried processing a node that doesnt exist: " + node);
         }
@@ -109,12 +109,12 @@ public class HierarchicalNodeManager {
             long childPos = makeChildPos(pos, i);
             request.addChildRequirement(i);
             //Insert all the children into the tracking map with the node id
-            if (this.activeSectionMap.put(childPos, requestId|ID_TYPE_LEAF) != NO_NODE) {
+            if (this.activeSectionMap.put(childPos, requestId|ID_TYPE_REQUEST) != NO_NODE) {
                 throw new IllegalStateException("Leaf request creation failed to insert child into map as a mapping already existed for the node!");
             }
 
             //Watch and request the child node at the given position
-            if (!this.updateFilterer.watch(childPos)) {
+            if (!this.updateRouter.watch(childPos)) {
                 throw new IllegalStateException("Failed to watch childPos");
             }
         }
@@ -123,6 +123,64 @@ public class HierarchicalNodeManager {
     }
 
 
+    private void removeSectionInternal(long position) {
+        int node = this.activeSectionMap.remove(position);
+        if (node == NO_NODE) {
+            throw new IllegalArgumentException("Tried removing node but it didnt exist: " + WorldEngine.pprintPos(position));
+        }
+
+        if (node == SENTINAL_TOP_NODE_INFLIGHT) {
+            System.err.println("WARN: Removing inflight top level node: " + WorldEngine.pprintPos(position));
+            return;
+        } else {
+            int type = (node & ID_TYPE_MSK);
+            node &= ~ID_TYPE_MSK;
+            if (type == ID_TYPE_REQUEST) {
+                //TODO: THIS
+
+            } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
+                if (!this.nodeData.nodeExists(node)) {
+                    throw new IllegalStateException("Section in active map but not in node data");
+                }
+                if (this.nodeData.isNodeRequestInFlight(node)) {
+                    int requestId = this.nodeData.getNodeRequest(node);
+                    var request = this.requests.get(requestId);
+                    if (request.getPosition() != position) {
+                        throw new IllegalStateException("Position != request.position");
+                    }
+
+                    //Recurse into all child requests and remove them, free any geometry along the way
+                    //this.removeSectionInternal(position)
+                }
+
+                //Recurse into all allocated, children and remove
+                int children = this.nodeData.getChildPtr(node);
+                if (children != NO_NODE) {
+                    int count = Integer.bitCount(Byte.toUnsignedInt(this.nodeData.getNodeChildExistence(node)));
+                    for (int i = 0; i < count; i++) {
+                        int cid = children + i;
+                        if (!this.nodeData.nodeExists(cid)) {
+                            throw new IllegalStateException("Child node doesnt exist!");
+                        }
+                    }
+                }
+
+                int geometry = this.nodeData.getNodeGeometry(node);
+                if (geometry != EMPTY_GEOMETRY_ID) {
+                    this.geometryManager.removeSection(geometry);
+                }
+            }
+
+            //After its been removed, if its _not_ a top level node or inflight request but just a normal node,
+            // go up to parent and remove node from the parent allocation and free node id
+
+        }
+    }
+
+
+
+    //TODO: need to add a flag that says should do geometry uploads or something I.E. need to watch geometry
+    // and existance updates seperatly, since cull geometry
     public void processResult(SectionUpdate update) {
         //Need to handle cases
         // geometry update, leaf node, leaf request node, internal node
@@ -131,6 +189,9 @@ public class HierarchicalNodeManager {
         // if emptiness adds node, need to then send a mesh request and wait
         //  when mesh result, need to remove the old child allocation block and make a new block to fit the
         //  new count of children
+
+        //If the sections child existance bits fully empty, then the section should be removed
+
 
         final long position = update.position();
         final var geometryData = update.geometry();
@@ -164,10 +225,13 @@ public class HierarchicalNodeManager {
             } else {
                 int type = (nodeId & ID_TYPE_MSK);
                 nodeId &= ~ID_TYPE_MSK;
-                if (type == ID_TYPE_LEAF) {
-                    this.leafDataUpdate(nodeId, update);
+                if (type == ID_TYPE_REQUEST) {
+                    this.requestDataUpdate(nodeId, update);
                 } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
-                    //Not part of a request, just a node update
+                    //Not part of a request, just a node update,
+
+                    //NOTE! be aware that if its an existance update and there is a request attached, need to check if the updated
+                    // request becomes finished!!
                 } else {
                     throw new IllegalStateException("Should not reach here");
                 }
@@ -181,17 +245,33 @@ public class HierarchicalNodeManager {
         this.nodeData.setNodeChildExistence(node, childExistence);
     }
 
-    private void leafDataUpdate(int nodeId, SectionUpdate update) {
+    private void requestDataUpdate(int nodeId, SectionUpdate update) {
         var request = this.requests.get(nodeId);
+        //Update for section part of a request, the request may be a leaf request update or an inner node update
+
+
+        if (request.isSatisfied()) {
+            this.processFinishedNodeChildRequest(nodeId, request);
+        }
     }
 
 
+    //Process NodeChildRequest results
+    private void processFinishedNodeChildRequest(int parent, NodeChildRequest request) {
+        int children = this.nodeData.getChildPtr(parent);
+        if (children != NO_NODE) {
+            //There are children already part of this node, so need to reallocate all the children
+            int count = Integer.bitCount(Byte.toUnsignedInt(this.nodeData.getNodeChildExistence(parent)));
 
+        } else {
+
+        }
+    }
 
     private int updateNodeGeometry(int node, BuiltSection geometry) {
         int previousGeometry = this.nodeData.getNodeGeometry(node);
-        int newGeometry = -1;
-        if (previousGeometry != -1) {
+        int newGeometry = EMPTY_GEOMETRY_ID;
+        if (previousGeometry != EMPTY_GEOMETRY_ID) {
             if (!geometry.isEmpty()) {
                 newGeometry = this.geometryManager.uploadReplaceSection(previousGeometry, geometry);
             } else {
@@ -209,15 +289,11 @@ public class HierarchicalNodeManager {
         }
         if (previousGeometry == newGeometry) {
             return 0;//No change
-        } else if (previousGeometry == -1) {
+        } else if (previousGeometry == EMPTY_GEOMETRY_ID) {
             return 1;//Became non-empty
         } else {
             return 2;//Became empty
         }
-    }
-
-    private void createSingleNode() {
-
     }
 
     private static int getChildIdx(long pos) {

@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
+import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.util.BufferArena;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.util.HierarchicalBitSet;
@@ -64,6 +65,8 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
 
         //Invalidate the section id
         this.invalidatedSectionIds.add(newId);
+
+        HierarchicalOcclusionTraverser.HACKY_SECTION_COUNT = this.allocationSet.getCount();
         return newId;
     }
 
