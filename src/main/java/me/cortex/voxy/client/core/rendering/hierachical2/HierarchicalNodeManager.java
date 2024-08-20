@@ -5,10 +5,10 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
-import me.cortex.voxy.client.core.rendering.building.SectionUpdate;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
 import me.cortex.voxy.client.core.util.ExpandingObjectAllocationList;
 import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.common.world.WorldSection;
 import me.jellysquid.mods.sodium.client.util.MathUtil;
 import org.lwjgl.system.MemoryUtil;
 
@@ -56,7 +56,7 @@ public class HierarchicalNodeManager {
             throw new IllegalArgumentException("Position already in node set: " + WorldEngine.pprintPos(position));
         }
         this.activeSectionMap.put(position, SENTINAL_TOP_NODE_INFLIGHT);
-        this.updateRouter.watch(position);
+        this.updateRouter.watch(position, WorldEngine.UPDATE_FLAGS);
     }
 
     public void removeTopLevelNode(long position) {
@@ -64,64 +64,6 @@ public class HierarchicalNodeManager {
             throw new IllegalArgumentException("Position not in node set: " + WorldEngine.pprintPos(position));
         }
     }
-
-    public void processRequestQueue(int count, long ptr) {
-        for (int requestIndex = 0; requestIndex < count; requestIndex++) {
-            int op = MemoryUtil.memGetInt(ptr + (requestIndex * 4L));
-            this.processRequest(op);
-        }
-    }
-
-    private void processRequest(int op) {
-        int node = op& NODE_ID_MSK;
-        if (!this.nodeData.nodeExists(node)) {
-            throw new IllegalStateException("Tried processing a node that doesnt exist: " + node);
-        }
-        if (this.nodeData.isNodeRequestInFlight(node)) {
-            throw new IllegalStateException("Tried processing a node that already has a request in flight: " + node + " pos: " + WorldEngine.pprintPos(this.nodeData.nodePosition(node)));
-        }
-        this.nodeData.markRequestInFlight(node);
-
-
-        //2 branches, either its a leaf node -> emit a leaf request
-        // or the nodes geometry must be empty (i.e. culled from the graph/tree) so add to tracker and watch
-        if (this.nodeData.isLeafNode(node)) {
-            this.makeLeafRequest(node, this.nodeData.getNodeChildExistence(node));
-        } else {
-            //Verify that the node section is not in the section store. if it is then it is a state desynchonization
-            // Note that a section can be "empty" but some of its children might not be
-        }
-    }
-
-    private void makeLeafRequest(int node, byte childExistence) {
-        long pos = this.nodeData.nodePosition(node);
-
-        //Enqueue a leaf expansion request
-        var request = new NodeChildRequest(pos);
-        int requestId = this.requests.put(request);
-
-        //Only request against the childExistence mask, since the guarantee is that if childExistence bit is not set then that child is guaranteed to be empty
-        for (int i = 0; i < 8; i++) {
-            if ((childExistence&(1<<i))==0) {
-                //Dont watch or enqueue the child node cause it doesnt exist
-                continue;
-            }
-            long childPos = makeChildPos(pos, i);
-            request.addChildRequirement(i);
-            //Insert all the children into the tracking map with the node id
-            if (this.activeSectionMap.put(childPos, requestId|ID_TYPE_REQUEST) != NO_NODE) {
-                throw new IllegalStateException("Leaf request creation failed to insert child into map as a mapping already existed for the node!");
-            }
-
-            //Watch and request the child node at the given position
-            if (!this.updateRouter.watch(childPos)) {
-                throw new IllegalStateException("Failed to watch childPos");
-            }
-        }
-
-        this.nodeData.setNodeRequest(node, requestId);
-    }
-
 
     private void removeSectionInternal(long position) {
         int node = this.activeSectionMap.remove(position);
@@ -177,56 +119,102 @@ public class HierarchicalNodeManager {
         }
     }
 
+    public void processRequestQueue(int count, long ptr) {
+        for (int requestIndex = 0; requestIndex < count; requestIndex++) {
+            int op = MemoryUtil.memGetInt(ptr + (requestIndex * 4L));
+            this.processRequest(op);
+        }
+    }
+
+    private void processRequest(int op) {
+        int node = op& NODE_ID_MSK;
+        if (!this.nodeData.nodeExists(node)) {
+            throw new IllegalStateException("Tried processing a node that doesnt exist: " + node);
+        }
+        if (this.nodeData.isNodeRequestInFlight(node)) {
+            throw new IllegalStateException("Tried processing a node that already has a request in flight: " + node + " pos: " + WorldEngine.pprintPos(this.nodeData.nodePosition(node)));
+        }
+        this.nodeData.markRequestInFlight(node);
 
 
-    //TODO: need to add a flag that says should do geometry uploads or something I.E. need to watch geometry
-    // and existance updates seperatly, since cull geometry
-    public void processResult(SectionUpdate update) {
-        //Need to handle cases
-        // geometry update, leaf node, leaf request node, internal node
-        //Child emptiness update!!! this is the hard bit
-        // if it is an internal node
-        // if emptiness adds node, need to then send a mesh request and wait
-        //  when mesh result, need to remove the old child allocation block and make a new block to fit the
-        //  new count of children
+        //2 branches, either its a leaf node -> emit a leaf request
+        // or the nodes geometry must be empty (i.e. culled from the graph/tree) so add to tracker and watch
+        if (this.nodeData.isLeafNode(node)) {
+            this.makeLeafRequest(node, this.nodeData.getNodeChildExistence(node));
+        } else {
+            //Verify that the node section is not in the section store. if it is then it is a state desynchonization
+            // Note that a section can be "empty" but some of its children might not be
+        }
+    }
 
-        //If the sections child existance bits fully empty, then the section should be removed
+    private void makeLeafRequest(int node, byte childExistence) {
+        long pos = this.nodeData.nodePosition(node);
+
+        //Enqueue a leaf expansion request
+        var request = new NodeChildRequest(pos);
+        int requestId = this.requests.put(request);
+
+        //Only request against the childExistence mask, since the guarantee is that if childExistence bit is not set then that child is guaranteed to be empty
+        for (int i = 0; i < 8; i++) {
+            if ((childExistence&(1<<i))==0) {
+                //Dont watch or enqueue the child node cause it doesnt exist
+                continue;
+            }
+            long childPos = makeChildPos(pos, i);
+            request.addChildRequirement(i);
+            //Insert all the children into the tracking map with the node id
+            if (this.activeSectionMap.put(childPos, requestId|ID_TYPE_REQUEST) != NO_NODE) {
+                throw new IllegalStateException("Leaf request creation failed to insert child into map as a mapping already existed for the node!");
+            }
+
+            //Watch and request the child node at the given position
+            if (!this.updateRouter.watch(childPos, WorldEngine.UPDATE_FLAGS)) {
+                throw new IllegalStateException("Failed to watch childPos");
+            }
+        }
+
+        this.nodeData.setNodeRequest(node, requestId);
+    }
 
 
-        final long position = update.position();
-        final var geometryData = update.geometry();
+
+    public void processChildChange(long position, byte childExistence) {
         int nodeId = this.activeSectionMap.get(position);
         if (nodeId == NO_NODE) {
-            System.err.println("Received update for section " + WorldEngine.pprintPos(position) + " however section position not in active in map! discarding");
-            //Not tracked or mapped to a node!, discard it, it was probably in progress when it was removed from the map
-            if (geometryData != null) {
-                geometryData.free();
-            }
+            System.err.println("Received child change for section " + WorldEngine.pprintPos(position) + " however section position not in active in map! discarding");
         } else {
+
+        }
+    }
+
+    public void processGeometryResult(BuiltSection section) {
+        final long position = section.position;
+        int nodeId = this.activeSectionMap.get(position);
+        if (nodeId == NO_NODE) {
+            System.err.println("Received geometry for section " + WorldEngine.pprintPos(position) + " however section position not in active in map! discarding");
+            //Not tracked or mapped to a node!, discard it, it was probably in progress when it was removed from the map
+            section.free();
+        } else {
+            //TODO! need to not do this as it may have child data assocaited, should allocate when initally adding the TLN
             if (nodeId == SENTINAL_TOP_NODE_INFLIGHT) {
                 //Special state for top level nodes that are in flight
-                if (geometryData == null) {
-                    //FIXME: this is a bug, as the child existence could change and have an update sent, resulting in a desync
-                    System.err.println("Top level inflight node " + WorldEngine.pprintPos(position) + " got a child msk update but was still in flight! discarding update");
-                    return;
-                }
 
                 //Allocate a new node id
                 nodeId = this.nodeData.allocate();
                 this.activeSectionMap.put(position, nodeId|ID_TYPE_TOP);
                 int geometry = -1;
-                if (!geometryData.isEmpty()) {
-                    geometry = this.geometryManager.uploadSection(geometryData);
+                if (!section.isEmpty()) {
+                    geometry = this.geometryManager.uploadSection(section);
                 } else {
-                    geometryData.free();
+                    section.free();
                 }
-                this.fillNode(nodeId, position, geometry, update.childExistence());
+                this.fillNode(nodeId, position, geometry, (byte) 0);//INCORRECT
 
             } else {
                 int type = (nodeId & ID_TYPE_MSK);
                 nodeId &= ~ID_TYPE_MSK;
                 if (type == ID_TYPE_REQUEST) {
-                    this.requestDataUpdate(nodeId, update);
+                    this.requestDataUpdate(nodeId);
                 } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
                     //Not part of a request, just a node update,
 
@@ -245,7 +233,7 @@ public class HierarchicalNodeManager {
         this.nodeData.setNodeChildExistence(node, childExistence);
     }
 
-    private void requestDataUpdate(int nodeId, SectionUpdate update) {
+    private void requestDataUpdate(int nodeId) {
         var request = this.requests.get(nodeId);
         //Update for section part of a request, the request may be a leaf request update or an inner node update
 

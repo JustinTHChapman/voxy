@@ -1,77 +1,90 @@
 package me.cortex.voxy.client.core.rendering.building;
 
+import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 
 import java.util.function.LongConsumer;
 
+import static me.cortex.voxy.common.world.WorldEngine.UPDATE_TYPE_BLOCK_BIT;
+
 public class SectionUpdateRouter {
-    private static final int SLICES = 1<<2;
+    private static final int SLICES = 1<<3;
     public interface IChildUpdate {void accept(WorldSection section);}
 
-    private final LongOpenHashSet[] slices = new LongOpenHashSet[SLICES];
+    private final Long2ByteOpenHashMap[] slices = new Long2ByteOpenHashMap[SLICES];
     {
         for (int i = 0; i < this.slices.length; i++) {
-            this.slices[i] = new LongOpenHashSet();
+            this.slices[i] = new Long2ByteOpenHashMap();
         }
     }
 
-    private LongConsumer renderForwardTo;
+    private LongConsumer renderMeshGen;
     private IChildUpdate childUpdateCallback;
 
-    public void setCallbacks(LongConsumer forwardTo, IChildUpdate childUpdateCallback) {
-        if (this.renderForwardTo != null) {
+    public void setCallbacks(LongConsumer renderMeshGen, IChildUpdate childUpdateCallback) {
+        if (this.renderMeshGen != null) {
             throw new IllegalStateException();
         }
-        this.renderForwardTo = forwardTo;
+        this.renderMeshGen = renderMeshGen;
         this.childUpdateCallback = childUpdateCallback;
     }
 
-    public boolean watch(int lvl, int x, int y, int z) {
-        return this.watch(WorldEngine.getWorldSectionId(lvl, x, y, z));
+    public boolean watch(int lvl, int x, int y, int z, int types) {
+        return this.watch(WorldEngine.getWorldSectionId(lvl, x, y, z), types);
     }
 
-    public boolean watch(long position) {
+    public boolean watch(long position, int types) {
         var set = this.slices[getSliceIndex(position)];
-        boolean added;
+        byte delta = 0;
         synchronized (set) {
-            added = set.add(position);
+            byte current = 0;
+            if (set.containsKey(position)) {
+                current = set.get(position);
+            }
+            delta = (byte) ((current&types)^types);
+            current |= (byte) types;
+            set.put(position, current);
         }
-        if (added) {
+        if ((delta&UPDATE_TYPE_BLOCK_BIT)!=0) {
             //If we added it, immediately invoke for an update
-            this.renderForwardTo.accept(position);
+            this.renderMeshGen.accept(position);
         }
-        return added;
+        return delta!=0;
     }
 
-    public boolean unwatch(int lvl, int x, int y, int z) {
-        return this.unwatch(WorldEngine.getWorldSectionId(lvl, x, y, z));
+    public boolean unwatch(int lvl, int x, int y, int z, int types) {
+        return this.unwatch(WorldEngine.getWorldSectionId(lvl, x, y, z), types);
     }
 
-    public boolean unwatch(long position) {
+    public boolean unwatch(long position, int types) {
         var set = this.slices[getSliceIndex(position)];
         synchronized (set) {
-            return set.remove(position);
+            byte current = set.get(position);
+            byte delta = (byte) (current&types);
+            current &= (byte) ~types;
+            if (current == 0) {
+                set.remove(position);
+            }
+            return delta!=0;
         }
     }
 
-    public void maybeForward(WorldSection section, int type) {
+    public void forward(WorldSection section, int type) {
         final long position = section.key;
         var set = this.slices[getSliceIndex(position)];
-        boolean contains;
+        byte types = 0;
         synchronized (set) {
-            contains = set.contains(position);
+            types = set.getOrDefault(position, (byte)0);
         }
-        if (contains) {
-            if (type == 3) {//If its both, propagate to the render service
-                this.renderForwardTo.accept(position);
-            } else {
-                if (type == 2) {//If its only a existance update
-                    this.childUpdateCallback.accept(section);
-                } else {//If its only a geometry update
-                    this.renderForwardTo.accept(position);
-                }
+        if (types!=0) {
+            if ((type&WorldEngine.UPDATE_TYPE_CHILD_EXISTENCE_BIT)!=0) {
+                this.childUpdateCallback.accept(section);
+            }
+            if ((type& UPDATE_TYPE_BLOCK_BIT)!=0) {
+                this.renderMeshGen.accept(section.key);
             }
         }
     }

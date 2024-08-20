@@ -23,13 +23,13 @@ public class RenderGenerationService {
 
     private final WorldEngine world;
     private final ModelBakerySubsystem modelBakery;
-    private final Consumer<SectionUpdate> resultConsumer;
+    private final Consumer<BuiltSection> resultConsumer;
     private final boolean emitMeshlets;
 
     private final ServiceSlice threads;
 
 
-    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, Consumer<SectionUpdate> consumer, boolean emitMeshlets) {
+    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, Consumer<BuiltSection> consumer, boolean emitMeshlets) {
         this.emitMeshlets = emitMeshlets;
         this.world = world;
         this.modelBakery = modelBakery;
@@ -67,10 +67,10 @@ public class RenderGenerationService {
         synchronized (this.taskQueue) {
             task = this.taskQueue.removeFirst();
         }
-        long time = SectionUpdate.getTime();
+        //long time = BuiltSection.getTime();
         var section = task.sectionSupplier.get();
         if (section == null) {
-            this.resultConsumer.accept(new SectionUpdate(task.position, time, BuiltSection.empty(task.position), (byte) 0));
+            this.resultConsumer.accept(BuiltSection.empty(task.position));
             return;
         }
         section.assertNotFree();
@@ -103,11 +103,9 @@ public class RenderGenerationService {
             }
         }
 
-        byte childMask = section.getNonEmptyChildren();
         section.release();
-        if (mesh != null) {
-            //Time is the time at the start of the update
-            this.resultConsumer.accept(new SectionUpdate(section.key, time, mesh, childMask));
+        if (mesh != null) {//If the mesh is null it means it didnt finish, so dont submit
+            this.resultConsumer.accept(mesh);
         }
     }
 

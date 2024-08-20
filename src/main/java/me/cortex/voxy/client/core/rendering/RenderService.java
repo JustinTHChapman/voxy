@@ -2,9 +2,9 @@ package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
+import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
-import me.cortex.voxy.client.core.rendering.building.SectionUpdate;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
@@ -12,13 +12,14 @@ import me.cortex.voxy.client.core.rendering.section.IUsesMeshlets;
 import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.util.MessageQueue;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.world.WorldSection;
 import net.minecraft.client.render.Camera;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedDeque;
 
 import static org.lwjgl.opengl.GL42.*;
 
@@ -37,7 +38,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     private final ModelBakerySubsystem modelService;
     private final RenderGenerationService renderGen;
 
-    private final ConcurrentLinkedDeque<SectionUpdate> sectionUpdateQueue = new ConcurrentLinkedDeque<>();
+    private final MessageQueue<WorldSection> sectionUpdateQueue;
+    private final MessageQueue<BuiltSection> geometryUpdateQueue;
 
     public RenderService(WorldEngine world, ServiceThreadPool serviceThreadPool) {
         this.modelService = new ModelBakerySubsystem(world.getMapper());
@@ -47,23 +49,25 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<19, (1L<<30)-1024);
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
-        var positionFilterForwarder = new SectionUpdateRouter();
+        var router = new SectionUpdateRouter();
 
-        this.nodeManager = new HierarchicalNodeManager(1<<21, this.sectionRenderer.getGeometryManager(), positionFilterForwarder);
+        this.nodeManager = new HierarchicalNodeManager(1<<21, this.sectionRenderer.getGeometryManager(), router);
+
+        this.sectionUpdateQueue = new MessageQueue<>(section -> {
+            byte childExistence = section.getNonEmptyChildren();
+            section.release();//TODO: move this to another thread (probably a service job to free, this is because freeing can cause a DB save which should not happen on the render thread)
+            this.nodeManager.processChildChange(section.key, childExistence);
+        });
+        this.geometryUpdateQueue = new MessageQueue<>(this.nodeManager::processGeometryResult);
 
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
-        this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool, this.sectionUpdateQueue::add, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
+        this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool, this.geometryUpdateQueue::push, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
 
-        positionFilterForwarder.setCallbacks(this.renderGen::enqueueTask, section -> {
-            long time = SectionUpdate.getTime();
-            byte childExistence = section.getNonEmptyChildren();
-
-            this.sectionUpdateQueue.add(new SectionUpdate(section.key, time, null, childExistence));
-        });
+        router.setCallbacks(this.renderGen::enqueueTask, this.sectionUpdateQueue::push);
 
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);
 
-        world.setDirtyCallback(positionFilterForwarder::maybeForward);
+        world.setDirtyCallback(router::forward);
 
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
@@ -107,10 +111,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         //TODO: Need to find a proper way to fix this (if there even is one)
         if (true /* firstInvocationThisFrame */) {
             DownloadStream.INSTANCE.tick();
-            //Process the build results here (this is done atomically/on the render thread)
-            while (!this.sectionUpdateQueue.isEmpty()) {
-                this.nodeManager.processResult(this.sectionUpdateQueue.poll());
-            }
+
+            this.sectionUpdateQueue.consume();
+            this.geometryUpdateQueue.consume();
         }
         UploadStream.INSTANCE.tick();
 
@@ -139,8 +142,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.sectionRenderer.free();
         this.traversal.free();
         //Release all the unprocessed built geometry
-        this.sectionUpdateQueue.forEach(update -> {if(update.geometry()!=null)update.geometry().free();});
-        this.sectionUpdateQueue.clear();
+        this.geometryUpdateQueue.clear(BuiltSection::free);
     }
 
     public Viewport<?> getViewport() {

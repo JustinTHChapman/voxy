@@ -14,7 +14,7 @@ public class ServiceSlice extends TrackedObject {
     final int weightPerJob;
     volatile boolean alive = true;
     private final ServiceThreadPool threadPool;
-    private final Supplier<Runnable> workerGenerator;
+    private Supplier<Runnable> workerGenerator;
     final Semaphore jobCount = new Semaphore(0);
     private final Runnable[] runningCtxs;
     private final AtomicInteger activeCount = new AtomicInteger();
@@ -25,9 +25,13 @@ public class ServiceSlice extends TrackedObject {
         this.threadPool = threadPool;
         this.condition = condition;
         this.runningCtxs = new Runnable[threadPool.getThreadCount()];
-        this.workerGenerator = workerGenerator;
         this.name = name;
         this.weightPerJob = weightPerJob;
+        this.setWorkerGenerator(workerGenerator);
+    }
+
+    protected void setWorkerGenerator(Supplier<Runnable> workerGenerator) {
+        this.workerGenerator = workerGenerator;
     }
 
     boolean doRun(int threadIndex) {
