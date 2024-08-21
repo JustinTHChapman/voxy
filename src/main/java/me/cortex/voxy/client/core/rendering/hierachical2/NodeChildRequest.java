@@ -6,6 +6,7 @@ class NodeChildRequest {
     private final long nodePos;
 
     private final int[] childStates = new int[]{-1,-1,-1,-1,-1,-1,-1,-1};
+    private final byte[] childChildExistence = new byte[]{(byte) 0,(byte) 0,(byte) 0,(byte) 0,(byte) 0,(byte) 0,(byte) 0,(byte) 0};
 
     private byte results;
     private byte mask;
@@ -19,6 +20,13 @@ class NodeChildRequest {
             throw new IllegalStateException("Tried getting mesh result of child not in mask");
         }
         return this.childStates[childIdx];
+    }
+
+    public void putChildChildExistence(int childIdx, byte childExistence) {
+        if ((this.mask&(1<<childIdx))==0) {
+            throw new IllegalStateException("Tried putting child into request which isnt in mask");
+        }
+        this.childChildExistence[childIdx] = childExistence;
     }
 
     public int putChildResult(int childIdx, int mesh) {

@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering.hierachical2;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
@@ -17,10 +18,48 @@ import static me.cortex.voxy.client.core.rendering.hierachical2.NodeStore.NODE_I
 
 //Contains no logic to interface with the gpu, nor does it contain any gpu buffers
 public class HierarchicalNodeManager {
+    /**
+     * Rough explanation to help with confusion,
+     * All leaf nodes (i.e. nodes that have no children currently existing), all have a geometry node attached (if its non empty)
+     *  note! on the gpu, it does not need the child ptr unless it tries to go down, that is, when creating/uploading to gpu
+     *  dont strictly need all child nodes
+     * Internal nodes are nodes that have children and parents, they themself may or may not have geometry attached
+     * Top level nodes, dont have parents but other than that inherit all the properties of internal nodes
+     *
+     * The way the traversal works is as follows
+     *  Top level nodes are source nodes, they are the inital queue
+     *  * For each node in the queue, compute the screenspace size of the node, check against the hiz buffer
+     *  * If the node is < rendering screensize
+     *      * If the node has geometry and not empty
+     *          * Queue the geometry for rendering
+     *      * If the node is missing geometry and is marked as not empty
+     *          * Attempt to put node ID into request queue
+     *          * If node has children
+     *              * put children into traversal queue
+     *          * Else
+     *              * Technically an error state, as we should _always_ either have children or geometry
+     *      * Else
+     *          * Dont do anything as section is explicit empty render data
+     *  * Else if node is > rendering screensize, need to subdivide
+     *      * If Child ptr is not empty (i.e. is an internal node)
+     *          * Enqueue children into traversal queue
+     *      * If child ptr is empty (i.e. is leaf node) and is not base LoD level
+     *          * Attempt to put node ID into request queue
+     *          * If node has geometry, or is explicitly marked as empty render data
+     *              * Queue own geometry (if non empty)
+     *          * Else
+     *              * Technically an error state, as a leaf node should always have geometry (or marked as empty geometry data)
+     */
+
+    //WARNING! need to solve a section geometry which is empty having its geometry removed, cause its empty
+    // so it wont send a request back cpu side
+
+
+
     private static final int NO_NODE = -1;
-    private static final int SENTINAL_TOP_NODE_INFLIGHT = -2;
 
     private static final int ID_TYPE_MSK = (3<<30);
+    private static final int ID_TYPE_LEAF = (3<<30);
     private static final int ID_TYPE_NONE = 0;
     private static final int ID_TYPE_REQUEST = (2<<30);
     private static final int ID_TYPE_TOP = (1<<30);
@@ -55,7 +94,10 @@ public class HierarchicalNodeManager {
         if (this.activeSectionMap.containsKey(position)) {
             throw new IllegalArgumentException("Position already in node set: " + WorldEngine.pprintPos(position));
         }
-        this.activeSectionMap.put(position, SENTINAL_TOP_NODE_INFLIGHT);
+
+        int id = this.nodeData.allocate();
+        this.nodeData.setNodePosition(id, position);
+        this.activeSectionMap.put(position, id|ID_TYPE_TOP);
         this.updateRouter.watch(position, WorldEngine.UPDATE_FLAGS);
     }
 
@@ -71,54 +113,50 @@ public class HierarchicalNodeManager {
             throw new IllegalArgumentException("Tried removing node but it didnt exist: " + WorldEngine.pprintPos(position));
         }
 
-        if (node == SENTINAL_TOP_NODE_INFLIGHT) {
-            System.err.println("WARN: Removing inflight top level node: " + WorldEngine.pprintPos(position));
-            return;
-        } else {
-            int type = (node & ID_TYPE_MSK);
-            node &= ~ID_TYPE_MSK;
-            if (type == ID_TYPE_REQUEST) {
-                //TODO: THIS
+        int type = (node & ID_TYPE_MSK);
+        node &= ~ID_TYPE_MSK;
+        if (type == ID_TYPE_REQUEST) {
+            //TODO: THIS
 
-            } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
-                if (!this.nodeData.nodeExists(node)) {
-                    throw new IllegalStateException("Section in active map but not in node data");
+        } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
+            if (!this.nodeData.nodeExists(node)) {
+                throw new IllegalStateException("Section in active map but not in node data");
+            }
+            if (this.nodeData.isNodeRequestInFlight(node)) {
+                int requestId = this.nodeData.getNodeRequest(node);
+                var request = this.requests.get(requestId);
+                if (request.getPosition() != position) {
+                    throw new IllegalStateException("Position != request.position");
                 }
-                if (this.nodeData.isNodeRequestInFlight(node)) {
-                    int requestId = this.nodeData.getNodeRequest(node);
-                    var request = this.requests.get(requestId);
-                    if (request.getPosition() != position) {
-                        throw new IllegalStateException("Position != request.position");
+
+                //Recurse into all child requests and remove them, free any geometry along the way
+                //this.removeSectionInternal(position)
+            }
+
+            //Recurse into all allocated, children and remove
+            int children = this.nodeData.getChildPtr(node);
+            if (children != NO_NODE) {
+                int count = Integer.bitCount(Byte.toUnsignedInt(this.nodeData.getNodeChildExistence(node)));
+                for (int i = 0; i < count; i++) {
+                    int cid = children + i;
+                    if (!this.nodeData.nodeExists(cid)) {
+                        throw new IllegalStateException("Child node doesnt exist!");
                     }
-
-                    //Recurse into all child requests and remove them, free any geometry along the way
-                    //this.removeSectionInternal(position)
-                }
-
-                //Recurse into all allocated, children and remove
-                int children = this.nodeData.getChildPtr(node);
-                if (children != NO_NODE) {
-                    int count = Integer.bitCount(Byte.toUnsignedInt(this.nodeData.getNodeChildExistence(node)));
-                    for (int i = 0; i < count; i++) {
-                        int cid = children + i;
-                        if (!this.nodeData.nodeExists(cid)) {
-                            throw new IllegalStateException("Child node doesnt exist!");
-                        }
-                    }
-                }
-
-                int geometry = this.nodeData.getNodeGeometry(node);
-                if (geometry != EMPTY_GEOMETRY_ID) {
-                    this.geometryManager.removeSection(geometry);
                 }
             }
 
-            //After its been removed, if its _not_ a top level node or inflight request but just a normal node,
-            // go up to parent and remove node from the parent allocation and free node id
-
+            int geometry = this.nodeData.getNodeGeometry(node);
+            if (geometry != EMPTY_GEOMETRY_ID) {
+                this.geometryManager.removeSection(geometry);
+            }
         }
+
+        //After its been removed, if its _not_ a top level node or inflight request but just a normal node,
+        // go up to parent and remove node from the parent allocation and free node id
+
     }
 
+    //============================================================================================================================================
     public void processRequestQueue(int count, long ptr) {
         for (int requestIndex = 0; requestIndex < count; requestIndex++) {
             int op = MemoryUtil.memGetInt(ptr + (requestIndex * 4L));
@@ -178,12 +216,27 @@ public class HierarchicalNodeManager {
 
 
 
+    //============================================================================================================================================
     public void processChildChange(long position, byte childExistence) {
+        if (childExistence == 0) {
+            Voxy.logError("Section at " + WorldEngine.pprintPos(position) + " had empty child existence!!");
+        }
         int nodeId = this.activeSectionMap.get(position);
         if (nodeId == NO_NODE) {
             System.err.println("Received child change for section " + WorldEngine.pprintPos(position) + " however section position not in active in map! discarding");
         } else {
-
+            int type = (nodeId & ID_TYPE_MSK);
+            nodeId &= ~ID_TYPE_MSK;
+            if (type == ID_TYPE_REQUEST) {
+                //Doesnt result in an invalidation as we must wait for geometry?
+                this.requests.get(nodeId).putChildResult(getChildIdx(position), childExistence);
+            } else if (type == ID_TYPE_LEAF || type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
+                //For all the types, if there is a request attatched, need to update the request data (and update the associated sections in the activeSectionMap)
+                // if there isnt a current request, and there are nodes that got added, create a request
+                //if any children dont exist anymore, need to delete them
+            } else {
+                throw new IllegalStateException("Should not reach here");
+            }
         }
     }
 
@@ -195,42 +248,19 @@ public class HierarchicalNodeManager {
             //Not tracked or mapped to a node!, discard it, it was probably in progress when it was removed from the map
             section.free();
         } else {
-            //TODO! need to not do this as it may have child data assocaited, should allocate when initally adding the TLN
-            if (nodeId == SENTINAL_TOP_NODE_INFLIGHT) {
-                //Special state for top level nodes that are in flight
+            int type = (nodeId & ID_TYPE_MSK);
+            nodeId &= ~ID_TYPE_MSK;
+            if (type == ID_TYPE_REQUEST) {
+                this.requestDataUpdate(nodeId);
+            } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
+                //Not part of a request, just a node update,
 
-                //Allocate a new node id
-                nodeId = this.nodeData.allocate();
-                this.activeSectionMap.put(position, nodeId|ID_TYPE_TOP);
-                int geometry = -1;
-                if (!section.isEmpty()) {
-                    geometry = this.geometryManager.uploadSection(section);
-                } else {
-                    section.free();
-                }
-                this.fillNode(nodeId, position, geometry, (byte) 0);//INCORRECT
-
+                //NOTE! be aware that if its an existance update and there is a request attached, need to check if the updated
+                // request becomes finished!!
             } else {
-                int type = (nodeId & ID_TYPE_MSK);
-                nodeId &= ~ID_TYPE_MSK;
-                if (type == ID_TYPE_REQUEST) {
-                    this.requestDataUpdate(nodeId);
-                } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
-                    //Not part of a request, just a node update,
-
-                    //NOTE! be aware that if its an existance update and there is a request attached, need to check if the updated
-                    // request becomes finished!!
-                } else {
-                    throw new IllegalStateException("Should not reach here");
-                }
+                throw new IllegalStateException("Should not reach here");
             }
         }
-    }
-
-    private void fillNode(int node, long position, int geometry, byte childExistence) {
-        this.nodeData.setNodePosition(node, position);
-        this.nodeData.setNodeGeometry(node, geometry);
-        this.nodeData.setNodeChildExistence(node, childExistence);
     }
 
     private void requestDataUpdate(int nodeId) {
@@ -283,6 +313,8 @@ public class HierarchicalNodeManager {
             return 2;//Became empty
         }
     }
+
+    //============================================================================================================================================
 
     private static int getChildIdx(long pos) {
         int x = WorldEngine.getX(pos);

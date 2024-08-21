@@ -12,6 +12,8 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.minecraft.client.world.ClientWorld;
 
+import java.util.Arrays;
+
 public class Voxy implements ClientModInitializer {
     public static final String VERSION;
 
@@ -38,5 +40,10 @@ public class Voxy implements ClientModInitializer {
 
     public static void breakpoint() {
         int breakpoint = 0;
+    }
+
+
+    public static void logError(Object... args) {
+        System.err.println(Arrays.toString(args));
     }
 }
