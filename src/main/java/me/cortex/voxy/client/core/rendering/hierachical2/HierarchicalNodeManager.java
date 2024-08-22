@@ -8,6 +8,7 @@ import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
 import me.cortex.voxy.client.core.util.ExpandingObjectAllocationList;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.jellysquid.mods.sodium.client.util.MathUtil;
@@ -219,7 +220,7 @@ public class HierarchicalNodeManager {
     //============================================================================================================================================
     public void processChildChange(long position, byte childExistence) {
         if (childExistence == 0) {
-            Voxy.logError("Section at " + WorldEngine.pprintPos(position) + " had empty child existence!!");
+            Logger.logError("Section at " + WorldEngine.pprintPos(position) + " had empty child existence!!");
         }
         int nodeId = this.activeSectionMap.get(position);
         if (nodeId == NO_NODE) {

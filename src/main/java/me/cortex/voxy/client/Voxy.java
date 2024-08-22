@@ -3,6 +3,7 @@ package me.cortex.voxy.client;
 import me.cortex.voxy.client.core.VoxelCore;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.client.terrain.WorldImportCommand;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.Serialization;
 import me.cortex.voxy.common.storage.compressors.ZSTDCompressor;
 import me.cortex.voxy.common.storage.config.StorageConfig;
@@ -40,10 +41,5 @@ public class Voxy implements ClientModInitializer {
 
     public static void breakpoint() {
         int breakpoint = 0;
-    }
-
-
-    public static void logError(Object... args) {
-        System.err.println(Arrays.toString(args));
     }
 }

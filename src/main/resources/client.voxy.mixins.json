@@ -3,6 +3,7 @@
   "package": "me.cortex.voxy.client.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "chunky.MixinFabricWorld",
     "joml.AccessFrustumIntersection",
     "minecraft.MixinClientChunkManager",
     "minecraft.MixinDebugHud",
@@ -16,8 +17,5 @@
   ],
   "injectors": {
     "defaultRequire": 1
-  },
-  "mixins": [
-    "chunky.MixinFabricWorld"
-  ]
+  }
 }
