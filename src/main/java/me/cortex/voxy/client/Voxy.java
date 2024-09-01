@@ -16,14 +16,6 @@ import net.minecraft.client.world.ClientWorld;
 import java.util.Arrays;
 
 public class Voxy implements ClientModInitializer {
-    public static final String VERSION;
-
-    static {
-        ModContainer mod = (ModContainer) FabricLoader.getInstance().getModContainer("voxy").orElseThrow(NullPointerException::new);
-        VERSION = mod.getMetadata().getVersion().getFriendlyString();
-        Serialization.init();
-    }
-
     @Override
     public void onInitializeClient() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {

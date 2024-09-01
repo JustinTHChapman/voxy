@@ -1,7 +1,9 @@
 #version 460 core
 
-//TODO: make this better than a single thread
-layout(local_size_x=32, local_size_y=1) in;
+//TODO: increase local size
+#define LOCAL_SIZE_BITS 5
+#define LOCAL_SIZE_MSK ((1<<LOCAL_SIZE_BITS)-1)
+layout(local_size_x=(1<<LOCAL_SIZE_BITS), local_size_y=1) in;
 
 #import <voxy:lod/hierarchical/binding_points.glsl>
 #line 7
@@ -26,11 +28,6 @@ layout(binding = SCENE_UNIFORM_INDEX, std140) uniform SceneUniform {
     float decendSSS;
 };
 
-layout(binding = NODE_QUEUE_INDEX, std430) restrict buffer NodeQueue {
-    uint  nodeQueueSize;
-    uint[] nodeQueue;
-};
-
 layout(binding = REQUEST_QUEUE_INDEX, std430) restrict buffer RequestQueue {
     uint requestQueueIndex;
     uint[] requestQueue;
@@ -39,6 +36,11 @@ layout(binding = REQUEST_QUEUE_INDEX, std430) restrict buffer RequestQueue {
 layout(binding = RENDER_QUEUE_INDEX, std430) restrict buffer RenderQueue {
     uint renderQueueIndex;
     uint[] renderQueue;
+};
+
+layout(binding = NODE_QUEUE_INDEX, std430) restrict buffer NodeQueue {
+    uint  nodeQueueSize;
+    uint[] nodeQueue;
 };
 
 layout(binding = NEXT_NODE_QUEUE_INDEX, std430) restrict buffer NextNodeQueue {
@@ -102,6 +104,7 @@ void enqueueChildren(in UnpackedNode node) {
     uint children = getChildCount(node);
     uint ptr = getChildPtr(node);
     uint widx = atomicAdd(nextNodeQueueIndex, children);
+
     for (int i = 0; i < children; i++) {
         nextNodeQueue[widx+i] = ptr+i;
     }

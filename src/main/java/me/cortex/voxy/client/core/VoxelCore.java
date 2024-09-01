@@ -11,6 +11,7 @@ import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.ClientBossBar;
 import net.minecraft.client.render.Camera;
@@ -150,7 +151,7 @@ public class VoxelCore {
     public void addDebugInfo(List<String> debug) {
         debug.add("");
         debug.add("");
-        debug.add("Voxy Core: " + Voxy.VERSION);
+        debug.add("Voxy Core: " + VoxyCommon.MOD_VERSION);
         /*
         debug.add("Ingest service tasks: " + this.world.ingestService.getTaskCount());
         debug.add("Saving service tasks: " + this.world.savingService.getTaskCount());

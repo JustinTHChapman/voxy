@@ -78,4 +78,8 @@ class NodeChildRequest {
     public long getPosition() {
         return this.nodePos;
     }
+
+    public byte getMsk() {
+        return this.mask;
+    }
 }

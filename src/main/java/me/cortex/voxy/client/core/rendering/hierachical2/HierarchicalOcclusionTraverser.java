@@ -23,10 +23,16 @@ public class HierarchicalOcclusionTraverser {
 
     private final GlBuffer nodeBuffer;
     private final GlBuffer uniformBuffer = new GlBuffer(1024).zero();
-    private final GlBuffer renderList = new GlBuffer(100_000 * 4 + 4).zero();//100k sections max to render
+    private final GlBuffer renderList = new GlBuffer(100_000 * 4 + 4).zero();//100k sections max to render, TODO: Maybe move to render service or somewhere else
+
+    private final GlBuffer scratchBuffer = new GlBuffer(1024).zero();//Scratch utility buffer for small things to get the ordering right and memory overall
+    //Scratch queues for node traversal
+    private final GlBuffer scratchQueueA = new GlBuffer(10_000*4).zero();
+    private final GlBuffer scratchQueueB = new GlBuffer(10_000*4).zero();
+
+
 
     private final HiZBuffer hiZBuffer = new HiZBuffer();
-
 
 
     public HierarchicalOcclusionTraverser(HierarchicalNodeManager nodeManager, int requestBufferCount) {
@@ -40,7 +46,6 @@ public class HierarchicalOcclusionTraverser {
 
     }
 
-    public static int HACKY_SECTION_COUNT = 0;
     public void doTraversal(Viewport<?> viewport, int depthBuffer) {
         //Compute the mip chain
         this.hiZBuffer.buildMipChain(depthBuffer, viewport.width, viewport.height);
@@ -51,16 +56,7 @@ public class HierarchicalOcclusionTraverser {
         //Use a chain of glDispatchComputeIndirect (5 times) with alternating read/write buffers
         // TODO: swap to persistent gpu thread instead
 
-        if (HACKY_SECTION_COUNT != 0) {
-            long uploadPtr = UploadStream.INSTANCE.upload(this.renderList, 0, HACKY_SECTION_COUNT*4L+4);
 
-            MemoryUtil.memPutInt(uploadPtr, HACKY_SECTION_COUNT);
-            for (int i = 1; i < HACKY_SECTION_COUNT+1; i++) {
-                MemoryUtil.memPutInt(uploadPtr + 4L * i, i - 1);
-            }
-
-            UploadStream.INSTANCE.commit();
-        }
 
         this.downloadResetRequestQueue();
     }
@@ -98,5 +94,6 @@ public class HierarchicalOcclusionTraverser {
         this.nodeBuffer.free();
         this.uniformBuffer.free();
         this.renderList.free();
+        this.scratchBuffer.free();
     }
 }

@@ -62,13 +62,17 @@ public class SectionUpdateRouter {
     public boolean unwatch(long position, int types) {
         var set = this.slices[getSliceIndex(position)];
         synchronized (set) {
+            if (!set.containsKey(position)) {
+                throw new IllegalStateException("Section pos not in map!! " + WorldEngine.pprintPos(position));
+            }
             byte current = set.get(position);
             byte delta = (byte) (current&types);
             current &= (byte) ~types;
             if (current == 0) {
                 set.remove(position);
+                return true;
             }
-            return delta!=0;
+            return false;
         }
     }
 

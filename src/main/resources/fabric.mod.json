@@ -2,6 +2,10 @@
   "schemaVersion": 1,
   "id": "voxy",
   "version": "${version}",
+  "custom": {
+    "commit": "${commit}",
+    "buildtime": "${buildtime}"
+  },
   "name": "Voxy",
   "description": "Far distance rendering mod utilising LoDs",
   "authors": [
@@ -21,6 +25,9 @@
     ],
     "modmenu": [
       "me.cortex.voxy.client.config.VoxyConfigScreenFactory"
+    ],
+    "main": [
+      "me.cortex.voxy.commonImpl.VoxyCommon"
     ]
   },
   "mixins": [

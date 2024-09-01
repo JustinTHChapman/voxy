@@ -22,11 +22,23 @@ repositories {
     maven { url "https://maven.terraformersmc.com/releases/" }
 }
 
+
+def gitCommitHash = { ->
+    def stdout = new ByteArrayOutputStream()
+    exec {
+        commandLine 'git', 'rev-parse', '--short', 'HEAD'
+        standardOutput = stdout
+    }
+    return stdout.toString().trim()
+}
+def buildtime = System.currentTimeSeconds()
+
 processResources {
-    inputs.property "version", project.version
+    inputs.properties("version": project.version, "commit": gitCommitHash, "buildtime": buildtime)
+
     archivesBaseName = "voxy"
     filesMatching("fabric.mod.json") {
-        expand "version": project.version
+        expand "commit": gitCommitHash, "version": project.version, "buildtime": buildtime
     }
 }
 

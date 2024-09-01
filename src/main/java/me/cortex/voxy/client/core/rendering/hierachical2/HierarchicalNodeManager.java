@@ -3,14 +3,12 @@ package me.cortex.voxy.client.core.rendering.hierachical2;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
 import me.cortex.voxy.client.core.util.ExpandingObjectAllocationList;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.common.world.WorldSection;
 import me.jellysquid.mods.sodium.client.util.MathUtil;
 import org.lwjgl.system.MemoryUtil;
 
@@ -52,10 +50,16 @@ public class HierarchicalNodeManager {
      *              * Technically an error state, as a leaf node should always have geometry (or marked as empty geometry data)
      */
 
-    //WARNING! need to solve a section geometry which is empty having its geometry removed, cause its empty
-    // so it wont send a request back cpu side
-
-
+    //There are a few properties of the class that can be used for verification
+    // a position cannot be both in a request and have an associated node, it must be none, in a request or a node
+    // leaf nodes cannot have a childptr
+    // updateRouter tracking child events should be the same set as activeSectionMap
+    // any allocated indices in requests are not finished/are in flight
+    // for all requests there must be an associated and valid node in the activeSectionMap
+    // for all requests the parent node must exist and cannot be ID_TYPE_REQUEST
+    // for all inner nodes, if there are no requests the children nodes must match the nodes childExistence bitset
+    //  if there is a request, it should be the delta to get from the old children to the new children
+    // no node can have an empty childExistence (except for top level nodes)
 
     private static final int NO_NODE = -1;
 
@@ -229,12 +233,82 @@ public class HierarchicalNodeManager {
             int type = (nodeId & ID_TYPE_MSK);
             nodeId &= ~ID_TYPE_MSK;
             if (type == ID_TYPE_REQUEST) {
-                //Doesnt result in an invalidation as we must wait for geometry?
+                //Doesnt result in an invalidation as we must wait for geometry to create a child
                 this.requests.get(nodeId).putChildResult(getChildIdx(position), childExistence);
             } else if (type == ID_TYPE_LEAF || type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
-                //For all the types, if there is a request attatched, need to update the request data (and update the associated sections in the activeSectionMap)
-                // if there isnt a current request, and there are nodes that got added, create a request
-                //if any children dont exist anymore, need to delete them
+                //ALSO: TODO: HERE: if a child is removed, need to remove it and all children accociated
+
+                //If its an inner node and doesnt have an inflight request, create an empty request, this will get autofilled by the following part
+                if (type == ID_TYPE_NONE) {
+
+                }
+                //If its a top level node, it needs a request? aswell
+
+                //If its a leaf node, its fine, dont need to create a request, only need to update the node msk
+
+
+                if (this.nodeData.isNodeRequestInFlight(nodeId)) {
+                    int reqId = this.nodeData.getNodeRequest(nodeId);
+                    var request = this.requests.get(reqId);
+                    byte reqMsk = request.getMsk();
+                    if (reqMsk != childExistence) {
+                        //Only need to change if its not the same
+                        byte toRem = (byte) ((~childExistence)&reqMsk);
+                        if (toRem != 0) {
+                            //Remove nodes from the request
+                            for (int i = 0; i < 8; i++) {//TODO: swap out for numberOfTrailingZeros loop thing
+                                if ((toRem&(i<<1))==0) continue;
+                                int geometry = request.removeAndUnRequire(i);
+                                long cpos = makeChildPos(position, i);
+                                //Remove from update router and activeSectionMap
+                                int cid = this.activeSectionMap.remove(cpos);
+                                if ((cid&ID_TYPE_MSK)!=ID_TYPE_REQUEST || (cid&~ID_TYPE_MSK)!=reqId) {
+                                    throw new IllegalStateException(WorldEngine.pprintPos(position)+" " + i + " " + cid + " " + reqId);
+                                }
+                                ///Remove all from update router
+                                if (!this.updateRouter.unwatch(cpos, WorldEngine.UPDATE_FLAGS)) {
+                                    throw new IllegalStateException();
+                                }
+                                //Release geometry if it had any
+                                if (geometry != -1) {
+                                    this.geometryManager.removeSection(geometry);
+                                }
+                            }
+                        }
+
+                        byte toAdd = (byte) ((~reqMsk)&childExistence);
+
+                        //This also needs to be with respect to the nodes current childexistance status as some sections are already watched/have nodes, dont change those
+                        toAdd &= (byte) ~this.nodeData.getNodeChildExistence(nodeId);
+
+                        if (toAdd != 0) {
+                            //Add nodes to the request that dont exist in the node already
+                            for (int i = 0; i < 8; i++) {//TODO: swap out for numberOfTrailingZeros loop thing
+                                if ((toAdd & (i << 1)) == 0) continue;
+                                request.addChildRequirement(i);
+                                long cpos = makeChildPos(position, i);
+                                int prev = this.activeSectionMap.put(cpos, ID_TYPE_REQUEST|reqId);
+                                if (prev!=-1) {
+                                    throw new IllegalStateException("Child is already mapped to a node id " + WorldEngine.pprintPos(cpos) + " " + reqId + " " + prev);
+                                }
+                                if (!this.updateRouter.watch(cpos, WorldEngine.UPDATE_FLAGS)) {
+                                    throw new IllegalStateException("Couldn't watch chunk section");
+                                }
+                            }
+                        }
+
+                        if (request.getMsk() != childExistence) {
+                            throw new IllegalStateException();
+                        }
+
+                        //If the request is satisfied after changes, consume it
+                        if (request.isSatisfied()) {
+                            this.consumeFinishedNodeChildRequest(nodeId, request);
+                        }
+                    }
+                }
+
+                //Need to update the node itself, only if the node has children does it need to update the child ptr information tho
             } else {
                 throw new IllegalStateException("Should not reach here");
             }
@@ -252,38 +326,24 @@ public class HierarchicalNodeManager {
             int type = (nodeId & ID_TYPE_MSK);
             nodeId &= ~ID_TYPE_MSK;
             if (type == ID_TYPE_REQUEST) {
-                this.requestDataUpdate(nodeId);
-            } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
-                //Not part of a request, just a node update,
-
-                //NOTE! be aware that if its an existance update and there is a request attached, need to check if the updated
-                // request becomes finished!!
+                var request = this.requests.get(nodeId);
+                //Update for section part of a request, the request may be a leaf request update or an inner node update
+                int child = getChildIdx(position);
+                int prev = request.putChildResult(child, this.geometryManager.uploadSection(section));
+                if (prev != -1) {
+                    this.geometryManager.removeSection(prev);
+                }
+                if (request.isSatisfied()) {
+                    this.consumeFinishedNodeChildRequest(nodeId, request);
+                }
+            } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP || type == ID_TYPE_LEAF) {
+                //Update the node geometry, and enqueue if it changed
+                if (this.updateNodeGeometry(nodeId, section) != 0) {//TODO: might need to mark the node as empty geometry or something
+                    this.nodeUpdates.add(nodeId);
+                }
             } else {
                 throw new IllegalStateException("Should not reach here");
             }
-        }
-    }
-
-    private void requestDataUpdate(int nodeId) {
-        var request = this.requests.get(nodeId);
-        //Update for section part of a request, the request may be a leaf request update or an inner node update
-
-
-        if (request.isSatisfied()) {
-            this.processFinishedNodeChildRequest(nodeId, request);
-        }
-    }
-
-
-    //Process NodeChildRequest results
-    private void processFinishedNodeChildRequest(int parent, NodeChildRequest request) {
-        int children = this.nodeData.getChildPtr(parent);
-        if (children != NO_NODE) {
-            //There are children already part of this node, so need to reallocate all the children
-            int count = Integer.bitCount(Byte.toUnsignedInt(this.nodeData.getNodeChildExistence(parent)));
-
-        } else {
-
         }
     }
 
@@ -304,7 +364,6 @@ public class HierarchicalNodeManager {
 
         if (previousGeometry != newGeometry) {
             this.nodeData.setNodeGeometry(node, newGeometry);
-            this.nodeUpdates.add(node);
         }
         if (previousGeometry == newGeometry) {
             return 0;//No change
@@ -312,6 +371,18 @@ public class HierarchicalNodeManager {
             return 1;//Became non-empty
         } else {
             return 2;//Became empty
+        }
+    }
+
+    //Process NodeChildRequest results
+    private void consumeFinishedNodeChildRequest(int nodeId, NodeChildRequest request) {
+        int children = this.nodeData.getChildPtr(nodeId);
+        if (children != NO_NODE) {
+            //There are children already part of this node, so need to reallocate all the children
+            int count = Integer.bitCount(Byte.toUnsignedInt(this.nodeData.getNodeChildExistence(nodeId)));
+
+        } else {
+
         }
     }
 
