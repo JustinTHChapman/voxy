@@ -20,10 +20,19 @@ public class VoxyCommon implements ModInitializer {
         IS_DEDICATED_SERVER = FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER;
 
         Serialization.init();
+
     }
 
     @Override
     public void onInitialize() {
         //this.serviceThreadPool = new ServiceThreadPool(VoxyConfig.CONFIG.serviceThreads);
+
+        //TODO: need to have a common config with server/client configs deriving from it
+        // maybe server/client extend it? or something? cause like client needs server config (at least partially sometimes)
+        // but server doesnt need client config
+    }
+
+    public static void breakpoint() {
+        int breakpoint = 0;
     }
 }

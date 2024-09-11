@@ -24,14 +24,10 @@ public class Voxy implements ClientModInitializer {
     }
 
 
-    private static final ContextSelectionSystem selector = new ContextSelectionSystem();
+    private static final ContextSelectionSystem SELECTOR = new ContextSelectionSystem();
 
     public static VoxelCore createVoxelCore(ClientWorld world) {
-        var selection = selector.getBestSelectionOrCreate(world);
+        var selection = SELECTOR.getBestSelectionOrCreate(world);
         return new VoxelCore(selection);
-    }
-
-    public static void breakpoint() {
-        int breakpoint = 0;
     }
 }

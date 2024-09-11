@@ -3,7 +3,8 @@
 //TODO: increase local size
 #define LOCAL_SIZE_BITS 5
 #define LOCAL_SIZE_MSK ((1<<LOCAL_SIZE_BITS)-1)
-layout(local_size_x=(1<<LOCAL_SIZE_BITS), local_size_y=1) in;
+#define LOCAL_SIZE (1<<LOCAL_SIZE_BITS)
+layout(local_size_x=LOCAL_SIZE) in;//, local_size_y=1
 
 #import <voxy:lod/hierarchical/binding_points.glsl>
 #line 7
@@ -55,14 +56,6 @@ layout(binding = DEBUG_RENDER_NODE_INDEX, std430) restrict buffer DebugRenderNod
 };
 #endif
 
-/*
-layout(binding = 2, std430) restrict buffer QueueData {
-    uint tail;
-    uint head;
-    uint top;
-    uint[] queue;
-} queue;
-*/
 #import <voxy:lod/hierarchical/transform.glsl>
 
 #import <voxy:lod/hierarchical/node.glsl>

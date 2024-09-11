@@ -1,18 +1,20 @@
 package me.cortex.voxy.client.core.rendering.hierachical2;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.shader.Shader;
+import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import org.lwjgl.system.MemoryUtil;
 
+import static me.cortex.voxy.client.core.rendering.PrintfDebugUtil.PRINTF_object;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
 import static org.lwjgl.opengl.GL30.GL_R32UI;
 import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
 import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BARRIER_BIT;
-import static org.lwjgl.opengl.GL43.glDispatchComputeIndirect;
 import static org.lwjgl.opengl.GL45.nglClearNamedBufferSubData;
 
 public class HierarchicalOcclusionTraverser {
@@ -34,6 +36,10 @@ public class HierarchicalOcclusionTraverser {
 
     private final HiZBuffer hiZBuffer = new HiZBuffer();
 
+    private final Shader traversal = Shader.make(PRINTF_object)
+            .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/traversal.comp")
+            .compile();
+
 
     public HierarchicalOcclusionTraverser(HierarchicalNodeManager nodeManager, int requestBufferCount) {
         this.nodeManager = nodeManager;
@@ -46,12 +52,19 @@ public class HierarchicalOcclusionTraverser {
 
     }
 
+    private void bindings() {
+
+    }
+
     public void doTraversal(Viewport<?> viewport, int depthBuffer) {
         //Compute the mip chain
         this.hiZBuffer.buildMipChain(depthBuffer, viewport.width, viewport.height);
 
         this.uploadUniform(viewport);
         UploadStream.INSTANCE.commit();
+
+        this.traversal.bind();
+        this.bindings();
 
         //Use a chain of glDispatchComputeIndirect (5 times) with alternating read/write buffers
         // TODO: swap to persistent gpu thread instead
@@ -89,6 +102,7 @@ public class HierarchicalOcclusionTraverser {
     }
 
     public void free() {
+        this.traversal.free();
         this.requestBuffer.free();
         this.hiZBuffer.free();
         this.nodeBuffer.free();

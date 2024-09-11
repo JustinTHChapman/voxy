@@ -66,7 +66,7 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
         //Invalidate the section id
         this.invalidatedSectionIds.add(newId);
 
-        HierarchicalOcclusionTraverser.HACKY_SECTION_COUNT = this.allocationSet.getCount();
+        //HierarchicalOcclusionTraverser.HACKY_SECTION_COUNT = this.allocationSet.getCount();
         return newId;
     }
 

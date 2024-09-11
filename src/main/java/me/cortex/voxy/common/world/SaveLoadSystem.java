@@ -16,11 +16,13 @@ public class SaveLoadSystem {
     public static final boolean VERIFY_HASH_ON_LOAD = System.getProperty("voxy.verifySectionOnLoad", "true").equals("true");
     public static final int BIGGEST_SERIALIZED_SECTION_SIZE = 32 * 32 * 32 * 8 * 2 + 8;
 
-    public static int lin2z(int i) {
+    public static int lin2z(int i) {//y,z,x
         int x = i&0x1F;
         int y = (i>>10)&0x1F;
         int z = (i>>5)&0x1F;
         return Integer.expand(x,0b1001001001001)|Integer.expand(y,0b10010010010010)|Integer.expand(z,0b100100100100100);
+
+        //zyxzyxzyxzyxzyx
     }
 
     public static int z2lin(int i) {

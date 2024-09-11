@@ -11,17 +11,18 @@ import java.util.function.Supplier;
 // it is probably better anyway
 public class ServiceThreadPool {
     private volatile boolean running = true;
-    private final Thread[] workers;
+    private Thread[] workers = new Thread[0];
     private final Semaphore jobCounter = new Semaphore(0);
 
     private volatile ServiceSlice[] serviceSlices = new ServiceSlice[0];
     private final AtomicLong totalJobWeight = new AtomicLong();
     private final ThreadGroup threadGroup;
 
-    public ServiceThreadPool(int workers) {
+    public ServiceThreadPool(int threadCount) {
         this.threadGroup = new ThreadGroup("Service job workers");
-        this.workers = new Thread[workers];
-        for (int i = 0; i < workers; i++) {
+
+        this.workers = new Thread[threadCount];
+        for (int i = 0; i < threadCount; i++) {
             int threadId = i;
             var worker = new Thread(this.threadGroup, ()->this.worker(threadId));
             worker.setDaemon(false);
@@ -215,4 +216,29 @@ public class ServiceThreadPool {
     public int getThreadCount() {
         return this.workers.length;
     }
+
+    /*
+    public void setThreadCount(int threadCount) {
+        if (threadCount == this.workers.length) {
+            return;//No change
+        }
+
+        if (threadCount < this.workers.length) {
+            //Need to remove workers
+        } else {
+            //Need to add new workers
+        }
+
+        this.workers = new Thread[threadCount];
+        for (int i = 0; i < workers; i++) {
+            int threadId = i;
+            var worker = new Thread(this.threadGroup, ()->this.worker(threadId));
+            worker.setDaemon(false);
+            worker.setName("Service worker #" + i);
+            worker.start();
+            worker.setUncaughtExceptionHandler(this::handleUncaughtException);
+            this.workers[i]  = worker;
+        }
+    }
+     */
 }
