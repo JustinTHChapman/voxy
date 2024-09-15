@@ -18,7 +18,6 @@ public class VoxyCommon implements ModInitializer {
         var commit = mod.getMetadata().getCustomValue("commit").getAsString();
         MOD_VERSION = version+"-"+commit;
         IS_DEDICATED_SERVER = FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER;
-
         Serialization.init();
 
     }

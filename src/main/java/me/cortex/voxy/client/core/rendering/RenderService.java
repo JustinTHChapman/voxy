@@ -72,6 +72,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
 
+        /*
         final int H_WIDTH = 1;
         for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
             for (int y = -1; y <= 0; y++) {
@@ -80,7 +81,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
                 }
             }
         }
-
+         */
     }
 
     public void setup(Camera camera) {

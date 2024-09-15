@@ -56,6 +56,14 @@ public class Shader extends TrackedObject {
             return this;
         }
 
+        //Useful for inline setting (such as debug)
+        public Builder defineIf(String name, boolean condition) {
+            if (condition) {
+                this.defines.put(name, "");
+            }
+            return this;
+        }
+
         public Builder define(String name, int value) {
             this.defines.put(name, Integer.toString(value));
             return this;

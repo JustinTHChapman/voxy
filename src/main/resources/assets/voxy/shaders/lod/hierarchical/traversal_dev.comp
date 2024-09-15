@@ -1,0 +1,16 @@
+#version 460 core
+
+//TODO: increase local size
+#define LOCAL_SIZE_MSK ((1<<LOCAL_SIZE_BITS)-1)
+#define LOCAL_SIZE (1<<LOCAL_SIZE_BITS)
+layout(local_size_x=LOCAL_SIZE) in;//, local_size_y=1
+#import <voxy:lod/hierarchical/queue.glsl>
+
+void main() {
+    uint node = getCurrentNode();
+    if (node != SENTINAL_OUT_OF_BOUNDS) {
+        printf("GID:%d, NODE %d, %d, AA, %d, %d, %d, %d", gl_GlobalInvocationID.x, node, queueIdx, nodeQueueMetadata[queueIdx].x, nodeQueueMetadata[queueIdx].y, nodeQueueMetadata[queueIdx].z, nodeQueueMetadata[queueIdx].w);
+        pushNodesInit(1);
+        pushNode(node);
+    }
+}

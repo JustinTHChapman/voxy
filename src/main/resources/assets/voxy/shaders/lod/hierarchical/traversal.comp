@@ -63,23 +63,6 @@ layout(binding = DEBUG_RENDER_NODE_INDEX, std430) restrict buffer DebugRenderNod
 //Contains all the screenspace computation
 #import <voxy:lod/hierarchical/screenspace.glsl>
 
-//If a request is successfully added to the RequestQueue, must update NodeData to mark that the node has been put into the request queue
-// to prevent it from being requested every frame and blocking the queue
-
-
-//Once a suitable render section is found, it is put into the RenderQueue, or if its not availbe its put into the RequestQueue
-// and its children are rendered instead if it has them avalible
-
-//NOTE: EXPERIMENT: INSTEAD OF PERSISTENT THREADS
-//TODO: since we know the tree depth is worst case 5, we can just do an indirect dispatch 5 times one for each layer
-// issues with this approach, barriers and waiting for one to finish before the otehr can be executed
-// advantages, MUCH SIMPLER, no shader barriers needed really , issue is need a flipflip queue but thats ok,
-// also ensures the gpu is full of work capacity
-// this might be what i do to start with since its much easier to do
-// not sure
-
-
-
 void addRequest(inout UnpackedNode node) {
     if (!hasRequested(node)) {
         //printf("Request %d %d %d %d", node.nodeId, node.flags, node.meshPtr, node.childPtr);
@@ -172,6 +155,8 @@ void main() {
 
 
 /*
+Persistent threading
+
 //Thread 0 grabs a batch when empty
 void main() {
     while (true) {
@@ -179,3 +164,23 @@ void main() {
     }
 }
 */
+
+
+
+
+//If a request is successfully added to the RequestQueue, must update NodeData to mark that the node has been put into the request queue
+// to prevent it from being requested every frame and blocking the queue
+
+
+//Once a suitable render section is found, it is put into the RenderQueue, or if its not availbe its put into the RequestQueue
+// and its children are rendered instead if it has them avalible
+
+//NOTE: EXPERIMENT: INSTEAD OF PERSISTENT THREADS
+//TODO: since we know the tree depth is worst case 5, we can just do an indirect dispatch 5 times one for each layer
+// issues with this approach, barriers and waiting for one to finish before the otehr can be executed
+// advantages, MUCH SIMPLER, no shader barriers needed really , issue is need a flipflip queue but thats ok,
+// also ensures the gpu is full of work capacity
+// this might be what i do to start with since its much easier to do
+// not sure
+
+

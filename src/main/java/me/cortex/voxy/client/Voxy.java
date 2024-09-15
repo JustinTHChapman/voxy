@@ -16,6 +16,11 @@ import net.minecraft.client.world.ClientWorld;
 import java.util.Arrays;
 
 public class Voxy implements ClientModInitializer {
+    public static final boolean SHADER_DEBUG;
+    static {
+        SHADER_DEBUG = System.getProperty("voxy.shaderDebug", "false").equals("true");
+    }
+
     @Override
     public void onInitializeClient() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {

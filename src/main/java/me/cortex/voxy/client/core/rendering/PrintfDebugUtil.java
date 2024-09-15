@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering;
 
+import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.core.gl.shader.IShaderProcessor;
 import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 
@@ -7,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class PrintfDebugUtil {
-    public static final boolean ENABLE_PRINTF_DEBUGGING = System.getProperty("voxy.enableShaderDebugPrintf", "false").equals("true");
+    public static final boolean ENABLE_PRINTF_DEBUGGING = System.getProperty("voxy.enableShaderDebugPrintf", "false").equals("true") || Voxy.SHADER_DEBUG;
 
     private static final List<String> printfQueue2 = new ArrayList<>();
     private static final List<String> printfQueue = new ArrayList<>();
@@ -44,6 +45,12 @@ public final class PrintfDebugUtil {
         if (ENABLE_PRINTF_DEBUGGING) {
             out.add("Printf Queue: ");
             out.addAll(printfQueue2);
+        }
+    }
+
+    public static void bind() {
+        if (ENABLE_PRINTF_DEBUGGING) {
+            PRINTF_object.bind();
         }
     }
 }

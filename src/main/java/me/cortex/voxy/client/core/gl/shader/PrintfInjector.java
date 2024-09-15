@@ -163,7 +163,7 @@ public class PrintfInjector implements IShaderProcessor {
 
             for (int i = 0; i < types.size(); i++) {
                 subCode.append("printfOutputStruct.stream[printfWriteIndex+").append(i+1).append("]=");
-                if (types.get(i) == 'd' || types.get(i) == 'i') {
+                if (types.get(i) == 'd') {
                     subCode.append("uint(").append(argVals.get(i)).append(")");
                 } else if (types.get(i) == 'f') {
                     subCode.append("floatBitsToUint(").append(argVals.get(i)).append(")");
@@ -207,7 +207,7 @@ public class PrintfInjector implements IShaderProcessor {
             parsePrintfTypes(fmt, types);
             Object[] args = new Object[types.size()];
             for (int i = 0; i < types.size(); i++) {
-                if (types.get(i) == 'd' || types.get(i) == 'i') {
+                if (types.get(i) == 'd') {
                     args[i] = MemoryUtil.memGetInt(ptr);
                     ptr += 4;
                     cnt++;
