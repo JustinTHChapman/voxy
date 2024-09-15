@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.world.other.Mapper;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -13,7 +14,8 @@ import java.nio.ByteBuffer;
 import static org.lwjgl.util.zstd.Zstd.*;
 
 public class SaveLoadSystem {
-    public static final boolean VERIFY_HASH_ON_LOAD = System.getProperty("voxy.verifySectionOnLoad", "true").equals("true");
+    public static final boolean VERIFY_HASH_ON_LOAD  = VoxyCommon.isVerificationFlagOn("verifySectionHash");
+    public static final boolean VERIFY_MEMORY_ACCESS = VoxyCommon.isVerificationFlagOn("verifyMemoryAccess");
     public static final int BIGGEST_SERIALIZED_SECTION_SIZE = 32 * 32 * 32 * 8 * 2 + 8;
 
     public static int lin2z(int i) {//y,z,x
@@ -86,12 +88,15 @@ public class SaveLoadSystem {
 
     public static boolean deserialize(WorldSection section, MemoryBuffer data) {
         long ptr = data.address;
-        long key = MemoryUtil.memGetLong(ptr); ptr += 8;
+        long key = MemoryUtil.memGetLong(ptr); ptr += 8; if (VERIFY_MEMORY_ACCESS && data.size<=(ptr-data.address)) throw new IllegalStateException("Memory access OOB");
 
-        long metadata = MemoryUtil.memGetLong(ptr); ptr += 8;
+        long metadata = MemoryUtil.memGetLong(ptr); ptr += 8; if (VERIFY_MEMORY_ACCESS && data.size<=(ptr-data.address)) throw new IllegalStateException("Memory access OOB");
         section.nonEmptyChildren = (byte) (metadata&0xFF);
 
-        int lutLen = MemoryUtil.memGetInt(ptr); ptr += 4;
+        int lutLen = MemoryUtil.memGetInt(ptr); ptr += 4; if (VERIFY_MEMORY_ACCESS && data.size<=(ptr-data.address)) throw new IllegalStateException("Memory access OOB");
+        if (lutLen > 32*32*32) {
+            throw new IllegalStateException("lutLen impossibly large, max size should be 32768 but got size " + lutLen);
+        }
         long[] lut = new long[lutLen];
         long hash = 0;
         if (VERIFY_HASH_ON_LOAD) {
@@ -99,7 +104,7 @@ public class SaveLoadSystem {
             hash ^= metadata; hash *= 1242629872171L;
         }
         for (int i = 0; i < lutLen; i++) {
-            lut[i] = MemoryUtil.memGetLong(ptr); ptr += 8;
+            lut[i] = MemoryUtil.memGetLong(ptr); ptr += 8; if (VERIFY_MEMORY_ACCESS && data.size<=(ptr-data.address)) throw new IllegalStateException("Memory access OOB");
             if (VERIFY_HASH_ON_LOAD) {
                 hash *= 1230987149811L;
                 hash += 12831;
@@ -115,7 +120,7 @@ public class SaveLoadSystem {
 
         int nonEmptyBlockCount = 0;
         for (int i = 0; i < section.data.length; i++) {
-            long state = lut[MemoryUtil.memGetShort(ptr)]; ptr += 2;
+            long state = lut[MemoryUtil.memGetShort(ptr)]; ptr += 2; if (VERIFY_MEMORY_ACCESS && data.size<=(ptr-data.address)) throw new IllegalStateException("Memory access OOB");
             nonEmptyBlockCount += Mapper.isAir(state)?0:1;
             section.data[z2lin(i)] = state;
         }
@@ -131,7 +136,7 @@ public class SaveLoadSystem {
             }
             hash ^= pHash;
 
-            long expectedHash = MemoryUtil.memGetLong(ptr); ptr += 8;
+            long expectedHash = MemoryUtil.memGetLong(ptr); ptr += 8; if (VERIFY_MEMORY_ACCESS && data.size<(ptr-data.address)) throw new IllegalStateException("Memory access OOB");
             if (expectedHash != hash) {
                 //throw new IllegalStateException("Hash mismatch got: " + hash + " expected: " + expectedHash);
                 System.err.println("Hash mismatch got: " + hash + " expected: " + expectedHash + " removing region");

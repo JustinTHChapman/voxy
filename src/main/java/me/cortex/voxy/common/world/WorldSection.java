@@ -2,6 +2,7 @@ package me.cortex.voxy.common.world;
 
 
 import me.cortex.voxy.client.Voxy;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.util.Pair;
 
 import java.lang.invoke.MethodHandles;
@@ -14,7 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 //Represents a loaded world section at a specific detail level
 // holds a 32x32x32 region of detail
 public final class WorldSection {
-    public static final boolean VERIFY_WORLD_SECTION_EXECUTION = System.getProperty("voxy.verifyWorldSectionExecution", "true").equals("true");
+    public static final boolean VERIFY_WORLD_SECTION_EXECUTION = VoxyCommon.isVerificationFlagOn("verifyWorldSectionExecution");
 
 
     private static final VarHandle ATOMIC_STATE_HANDLE;

@@ -1,10 +1,8 @@
 package me.cortex.voxy.commonImpl;
 
 import me.cortex.voxy.common.config.Serialization;
-import me.cortex.voxy.common.thread.ServiceThreadPool;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.ModInitializer;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 
@@ -33,5 +31,12 @@ public class VoxyCommon implements ModInitializer {
 
     public static void breakpoint() {
         int breakpoint = 0;
+    }
+
+
+    //This is hardcoded like this because people do not understand what they are doing
+    private static final boolean GlobalVerificationDisableOverride = false;//System.getProperty("voxy.verificationDisableOverride", "false").equals("true");
+    public static boolean isVerificationFlagOn(String name) {
+        return (!GlobalVerificationDisableOverride) && System.getProperty("voxy."+name, "true").equals("true");
     }
 }

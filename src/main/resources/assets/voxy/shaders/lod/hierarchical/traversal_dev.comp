@@ -8,7 +8,7 @@ layout(local_size_x=LOCAL_SIZE) in;//, local_size_y=1
 
 void main() {
     uint node = getCurrentNode();
-    if (node != SENTINAL_OUT_OF_BOUNDS) {
+    if (node != SENTINAL_OUT_OF_BOUNDS && queueIdx != 4) {
         printf("GID:%d, NODE %d, %d, AA, %d, %d, %d, %d", gl_GlobalInvocationID.x, node, queueIdx, nodeQueueMetadata[queueIdx].x, nodeQueueMetadata[queueIdx].y, nodeQueueMetadata[queueIdx].z, nodeQueueMetadata[queueIdx].w);
         pushNodesInit(1);
         pushNode(node);
