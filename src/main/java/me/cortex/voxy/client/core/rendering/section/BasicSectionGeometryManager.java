@@ -73,7 +73,7 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
     @Override
     public void removeSection(int id) {
         if (!this.allocationSet.free(id)) {
-            throw new IllegalStateException("Id was not already allocated");
+            throw new IllegalStateException("Id was not already allocated. id: " + id);
         }
         var oldMetadata = this.sectionMetadata.set(id, null);
         this.geometry.free(oldMetadata.geometryPtr);

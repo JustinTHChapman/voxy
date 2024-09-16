@@ -65,9 +65,9 @@ public class HierarchicalNodeManager {
 
     private static final int ID_TYPE_MSK = (3<<30);
     private static final int ID_TYPE_LEAF = (3<<30);
-    private static final int ID_TYPE_NONE = 0;
+    private static final int ID_TYPE_INNER = 0;
     private static final int ID_TYPE_REQUEST = (2<<30);
-    private static final int ID_TYPE_TOP = (1<<30);
+    //private static final int ID_TYPE_TOP = (1<<30);
 
     public final int maxNodeCount;
     private final IntOpenHashSet nodeUpdates = new IntOpenHashSet();
@@ -102,7 +102,7 @@ public class HierarchicalNodeManager {
 
         int id = this.nodeData.allocate();
         this.nodeData.setNodePosition(id, position);
-        this.activeSectionMap.put(position, id|ID_TYPE_TOP);
+        this.activeSectionMap.put(position, id|ID_TYPE_LEAF);//ID_TYPE_TOP
         this.updateRouter.watch(position, WorldEngine.UPDATE_FLAGS);
     }
 
@@ -123,7 +123,7 @@ public class HierarchicalNodeManager {
         if (type == ID_TYPE_REQUEST) {
             //TODO: THIS
 
-        } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
+        } else if (type == ID_TYPE_INNER) {// || type == ID_TYPE_TOP
             if (!this.nodeData.nodeExists(node)) {
                 throw new IllegalStateException("Section in active map but not in node data");
             }
@@ -235,14 +235,24 @@ public class HierarchicalNodeManager {
             if (type == ID_TYPE_REQUEST) {
                 //Doesnt result in an invalidation as we must wait for geometry to create a child
                 this.requests.get(nodeId).putChildResult(getChildIdx(position), childExistence);
-            } else if (type == ID_TYPE_LEAF || type == ID_TYPE_NONE || type == ID_TYPE_TOP) {
+            } else if (type == ID_TYPE_LEAF || type == ID_TYPE_INNER) {// || type == ID_TYPE_TOP
+                if (this.nodeData.getNodeChildExistence(nodeId) == childExistence) {
+                    //Dont need to update the internal state since it is the same
+                    return;
+                }
+
                 //ALSO: TODO: HERE: if a child is removed, need to remove it and all children accociated
 
                 //If its an inner node and doesnt have an inflight request, create an empty request, this will get autofilled by the following part
-                if (type == ID_TYPE_NONE) {
+                if (type == ID_TYPE_INNER) {
 
                 }
-                //If its a top level node, it needs a request? aswell
+                //If its a top level node, it needs a request? aswell, no no it doesnt :tm: what could do tho, is if it has a request in progress, update it (already handled)
+                // _or_ if the top level node has a child ptr then also handle it??
+                // the issue is that top nodes probably need an extra state like "shouldMakeChildren" or something
+                // cause if a top level node, that has no children, requests a decent from the gpu
+                // but there are no children so no decent is made, if a child update is added to that section,
+                // the update will be ignored since the cpu doesnt know the gpu still wants it
 
                 //If its a leaf node, its fine, dont need to create a request, only need to update the node msk
 
@@ -336,7 +346,7 @@ public class HierarchicalNodeManager {
                 if (request.isSatisfied()) {
                     this.consumeFinishedNodeChildRequest(nodeId, request);
                 }
-            } else if (type == ID_TYPE_NONE || type == ID_TYPE_TOP || type == ID_TYPE_LEAF) {
+            } else if (type == ID_TYPE_INNER || type == ID_TYPE_LEAF) {//type == ID_TYPE_TOP ||
                 //Update the node geometry, and enqueue if it changed
                 if (this.updateNodeGeometry(nodeId, section) != 0) {//TODO: might need to mark the node as empty geometry or something
                     this.nodeUpdates.add(nodeId);

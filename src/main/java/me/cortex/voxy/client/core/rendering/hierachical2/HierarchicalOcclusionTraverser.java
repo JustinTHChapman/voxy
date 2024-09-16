@@ -5,10 +5,14 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.PrintfDebugUtil;
+import me.cortex.voxy.client.core.rendering.hierarchical.NodeManager;
 import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import net.minecraft.util.math.MathHelper;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 
 import static me.cortex.voxy.client.core.rendering.PrintfDebugUtil.PRINTF_object;
@@ -39,17 +43,30 @@ public class HierarchicalOcclusionTraverser {
     private static final int LOCAL_WORK_SIZE_BITS = 5;
     private static final int MAX_ITERATIONS = 5;
 
-    private static final int NODE_QUEUE_INDEX_BINDING = 1;
-    private static final int NODE_QUEUE_META_BINDING = 2;
-    private static final int NODE_QUEUE_SOURCE_BINDING = 3;
-    private static final int NODE_QUEUE_SINK_BINDING = 4;
+    private static int BINDING_COUNTER = 1;
+    private static final int SCENE_UNIFORM_BINDING = BINDING_COUNTER++;
+    private static final int REQUEST_QUEUE_BINDING = BINDING_COUNTER++;
+    private static final int RENDER_QUEUE_BINDING = BINDING_COUNTER++;
+    private static final int NODE_DATA_BINDING = BINDING_COUNTER++;
+    private static final int NODE_QUEUE_INDEX_BINDING = BINDING_COUNTER++;
+    private static final int NODE_QUEUE_META_BINDING = BINDING_COUNTER++;
+    private static final int NODE_QUEUE_SOURCE_BINDING = BINDING_COUNTER++;
+    private static final int NODE_QUEUE_SINK_BINDING = BINDING_COUNTER++;
 
     private final HiZBuffer hiZBuffer = new HiZBuffer();
+    private final int hizSampler = glGenSamplers();
 
     private final Shader traversal = Shader.make(PRINTF_object)
             .defineIf("DEBUG", Voxy.SHADER_DEBUG)
             .define("MAX_ITERATIONS", MAX_ITERATIONS)
             .define("LOCAL_SIZE_BITS", LOCAL_WORK_SIZE_BITS)
+
+            .define("HIZ_BINDING", 0)
+
+            .define("SCENE_UNIFORM_BINDING", SCENE_UNIFORM_BINDING)
+            .define("REQUEST_QUEUE_BINDING", REQUEST_QUEUE_BINDING)
+            .define("RENDER_QUEUE_BINDING", RENDER_QUEUE_BINDING)
+            .define("NODE_DATA_BINDING", NODE_DATA_BINDING)
 
             .define("NODE_QUEUE_INDEX_BINDING", NODE_QUEUE_INDEX_BINDING)
             .define("NODE_QUEUE_META_BINDING", NODE_QUEUE_META_BINDING)
@@ -65,15 +82,52 @@ public class HierarchicalOcclusionTraverser {
         this.requestBuffer = new GlBuffer(requestBufferCount*4L+1024).zero();//The 1024 is to assist with race condition issues
         this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).zero();
         this.maxRequestCount = requestBufferCount;
+
+
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
     }
 
     private void uploadUniform(Viewport<?> viewport) {
+        long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 1024);
+        int sx = MathHelper.floor(viewport.cameraX)>>5;
+        int sy = MathHelper.floor(viewport.cameraY)>>5;
+        int sz = MathHelper.floor(viewport.cameraZ)>>5;
 
+        new Matrix4f(viewport.projection).mul(viewport.modelView).getToAddress(ptr); ptr += 4*4*4;
+
+        MemoryUtil.memPutInt(ptr, sx); ptr += 4;
+        MemoryUtil.memPutInt(ptr, sy); ptr += 4;
+        MemoryUtil.memPutInt(ptr, sz); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.width); ptr += 4;
+
+        var innerTranslation = new Vector3f((float) (viewport.cameraX-(sx<<5)), (float) (viewport.cameraY-(sy<<5)), (float) (viewport.cameraZ-(sz<<5)));
+        innerTranslation.getToAddress(ptr); ptr += 4*3;
+
+        MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
+
+        MemoryUtil.memPutInt(ptr, NodeManager.REQUEST_QUEUE_SIZE); ptr += 4;
+        MemoryUtil.memPutInt(ptr, 1000000); ptr += 4;
+
+        //Screen space size for descending
+        MemoryUtil.memPutFloat(ptr, 64*64); ptr += 4;
     }
 
     private void bindings() {
+        glBindBufferBase(GL_UNIFORM_BUFFER, SCENE_UNIFORM_BINDING, this.uniformBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, REQUEST_QUEUE_BINDING, this.requestBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_QUEUE_BINDING, this.renderList.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, NODE_DATA_BINDING, this.nodeBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, NODE_QUEUE_META_BINDING, this.queueMetaBuffer.id);
         glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.queueMetaBuffer.id);
+
+        //Bind the hiz buffer
+        glBindSampler(0, this.hizSampler);
+        glBindTextureUnit(0, this.hiZBuffer.getHizTextureId());
     }
 
     public void doTraversal(Viewport<?> viewport, int depthBuffer) {
@@ -190,5 +244,6 @@ public class HierarchicalOcclusionTraverser {
         this.queueMetaBuffer.free();
         this.scratchQueueA.free();
         this.scratchQueueB.free();
+        glDeleteSamplers(this.hizSampler);
     }
 }

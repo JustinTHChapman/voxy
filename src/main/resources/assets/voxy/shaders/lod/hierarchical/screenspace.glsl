@@ -12,7 +12,7 @@
 // substantually for performance (for both persistent threads and incremental)
 
 
-layout(binding = HIZ_BINDING_INDEX) uniform sampler2DShadow hizDepthSampler;
+layout(binding = HIZ_BINDING) uniform sampler2DShadow hizDepthSampler;
 
 //TODO: maybe do spher bounds aswell? cause they have different accuracies but are both over estimates (liberals (non conservative xD))
 // so can do &&
@@ -27,9 +27,10 @@ vec2 size;
 void setupScreenspace(in UnpackedNode node) {
     //TODO: Need to do aabb size for the nodes, it must be an overesimate of all the children
 
-    Transform transform = transforms[getTransformIndex(node)];
 
     /*
+    Transform transform = transforms[getTransformIndex(node)];
+
     vec3 point = VP*(((transform.transform*vec4((node.pos<<node.lodLevel) - transform.originPos.xyz, 1))
                     + (transform.worldPos.xyz-camChunkPos))-camSubChunk);
                     */

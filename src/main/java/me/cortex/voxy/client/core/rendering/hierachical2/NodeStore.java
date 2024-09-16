@@ -82,7 +82,7 @@ public final class NodeStore {
     private void clear(int nodeId) {
         int idx = id2idx(nodeId);
         this.localNodeData[idx] = -1;//Position
-        this.localNodeData[idx+1] = 0;
+        this.localNodeData[idx+1] = GEOMETRY_ID_MSK|(((long)NODE_ID_MSK)<<24);
         this.localNodeData[idx+2] = 0;
         this.localNodeData[idx+3] = 0;
     }

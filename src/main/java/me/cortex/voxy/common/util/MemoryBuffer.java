@@ -43,4 +43,8 @@ public class MemoryBuffer extends TrackedObject {
 
         return new MemoryBuffer(this.address, size);
     }
+
+
+    //TODO: create like Long(offset) -> value at offset
+    // methods for get and set, that way can have a single unifed system to ensure memory access bounds
 }

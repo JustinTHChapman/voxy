@@ -4,11 +4,29 @@
 #define LOCAL_SIZE_MSK ((1<<LOCAL_SIZE_BITS)-1)
 #define LOCAL_SIZE (1<<LOCAL_SIZE_BITS)
 layout(local_size_x=LOCAL_SIZE) in;//, local_size_y=1
+
 #import <voxy:lod/hierarchical/queue.glsl>
+#import <voxy:lod/hierarchical/node.glsl>
+#import <voxy:lod/hierarchical/screenspace.glsl>
+
+SIMPLE_QUEUE(requestQueue, REQUEST_QUEUE_BINDING);
+SIMPLE_QUEUE(renderQueue, RENDER_QUEUE_BINDING);
+
+/*
+layout(binding = REQUEST_QUEUE_INDEX, std430) restrict buffer RequestQueue {
+    uint requestQueueIndex;
+    uint[] requestQueue;
+};
+
+layout(binding = RENDER_QUEUE_INDEX, std430) restrict buffer RenderQueue {
+    uint renderQueueIndex;
+    uint[] renderQueue;
+};*/
+
 
 void main() {
     uint node = getCurrentNode();
-    if (node != SENTINAL_OUT_OF_BOUNDS && queueIdx != 4) {
+    if (node != SENTINAL_OUT_OF_BOUNDS) {
         printf("GID:%d, NODE %d, %d, AA, %d, %d, %d, %d", gl_GlobalInvocationID.x, node, queueIdx, nodeQueueMetadata[queueIdx].x, nodeQueueMetadata[queueIdx].y, nodeQueueMetadata[queueIdx].z, nodeQueueMetadata[queueIdx].w);
         pushNodesInit(1);
         pushNode(node);
