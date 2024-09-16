@@ -63,7 +63,10 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
         this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool, this.geometryUpdateQueue::push, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
 
-        router.setCallbacks(this.renderGen::enqueueTask, this.sectionUpdateQueue::push);
+        router.setCallbacks(this.renderGen::enqueueTask, section -> {
+            section.acquire();
+            this.sectionUpdateQueue.push(section);
+        });
 
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);
 
@@ -72,7 +75,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
 
-        
+
         final int H_WIDTH = 1;
         for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
             for (int y = -1; y <= 0; y++) {

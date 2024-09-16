@@ -111,7 +111,7 @@ public class HierarchicalOcclusionTraverser {
         MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
 
         MemoryUtil.memPutInt(ptr, NodeManager.REQUEST_QUEUE_SIZE); ptr += 4;
-        MemoryUtil.memPutInt(ptr, 1000000); ptr += 4;
+        MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;//TODO maybe move this to a #define
 
         //Screen space size for descending
         MemoryUtil.memPutFloat(ptr, 64*64); ptr += 4;
@@ -141,10 +141,16 @@ public class HierarchicalOcclusionTraverser {
         this.bindings();
         PrintfDebugUtil.bind();
 
+
         this.traverseInternal(1);
 
 
         this.downloadResetRequestQueue();
+
+
+        //Bind the hiz buffer
+        glBindSampler(0, 0);
+        glBindTextureUnit(0, 0);
     }
 
     private void traverseInternal(int initialQueueSize) {
@@ -156,6 +162,10 @@ public class HierarchicalOcclusionTraverser {
             glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
             glPixelStorei(GL_UNPACK_SKIP_IMAGES, 0);
         }
+
+        //Clear the render output counter
+        nglClearNamedBufferSubData(this.renderList.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+
 
         int firstDispatchSize = (initialQueueSize+(1<<LOCAL_WORK_SIZE_BITS)-1)>>LOCAL_WORK_SIZE_BITS;
         /*

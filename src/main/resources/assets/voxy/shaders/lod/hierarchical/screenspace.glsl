@@ -85,6 +85,6 @@ bool isCulledByHiz() {
 
 //Returns if we should decend into its children or not
 bool shouldDecend() {
-    //printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(screenW), float(screenH));
-    return (size.x*size.y*screenW*screenH) > decendSSS;
+    printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(screenW), float(screenH));
+    return (size.x*size.y*screenW*screenH) > minSSS;
 }
