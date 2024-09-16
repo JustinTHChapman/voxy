@@ -75,7 +75,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
 
-
+        //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(0, 0,0,0));
+        this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
+        /*
         final int H_WIDTH = 1;
         for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
             for (int y = -1; y <= 0; y++) {
@@ -83,7 +85,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
                     this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
                 }
             }
-        }
+        }*/
     }
 
     public void setup(Camera camera) {
@@ -117,6 +119,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
             this.sectionUpdateQueue.consume();
             this.geometryUpdateQueue.consume();
+           if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
+               UploadStream.INSTANCE.commit();
+           }
         }
         UploadStream.INSTANCE.tick();
 

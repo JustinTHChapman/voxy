@@ -244,6 +244,10 @@ public class HierarchicalOcclusionTraverser {
         }
     }
 
+    public GlBuffer getNodeBuffer() {
+        return this.nodeBuffer;
+    }
+
     public void free() {
         this.traversal.free();
         this.requestBuffer.free();

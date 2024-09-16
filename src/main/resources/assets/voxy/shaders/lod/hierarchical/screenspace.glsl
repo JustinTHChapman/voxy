@@ -70,6 +70,7 @@ void setupScreenspace(in UnpackedNode node) {
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
+    //printf("Cull point (%f %f %f)x(%f %f %f)", maxBB.x, maxBB.y, maxBB.z, minBB.x, minBB.y, minBB.z);
     return any(lessThanEqual(maxBB, vec3(-1f, -1f, 0f))) || any(lessThanEqual(vec3(1f, 1f, 1f), minBB));
 }
 

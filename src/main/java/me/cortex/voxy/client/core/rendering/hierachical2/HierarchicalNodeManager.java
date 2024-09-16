@@ -3,9 +3,11 @@ package me.cortex.voxy.client.core.rendering.hierachical2;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
+import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.core.util.ExpandingObjectAllocationList;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -102,7 +104,7 @@ public class HierarchicalNodeManager {
 
         int id = this.nodeData.allocate();
         this.nodeData.setNodePosition(id, position);
-        this.activeSectionMap.put(position, id|ID_TYPE_LEAF);//ID_TYPE_TOP
+        this.activeSectionMap.put(position, id|ID_TYPE_LEAF); this.nodeData.setNodeType(id, ID_TYPE_LEAF); //ID_TYPE_TOP
         this.updateRouter.watch(position, WorldEngine.UPDATE_FLAGS);
     }
 
@@ -182,7 +184,8 @@ public class HierarchicalNodeManager {
 
         //2 branches, either its a leaf node -> emit a leaf request
         // or the nodes geometry must be empty (i.e. culled from the graph/tree) so add to tracker and watch
-        if (this.nodeData.isLeafNode(node)) {
+        int type = this.nodeData.getNodeType(node);
+        if (type == ID_TYPE_LEAF) {
             this.makeLeafRequest(node, this.nodeData.getNodeChildExistence(node));
         } else {
             //Verify that the node section is not in the section store. if it is then it is a state desynchonization
@@ -190,6 +193,8 @@ public class HierarchicalNodeManager {
         }
     }
 
+    //TODO: FIXME: so there is a fundamental issue with this, if the gpu requests from cpu before childExistance is set
+    // then everything explodes cause it wont get notified or updated
     private void makeLeafRequest(int node, byte childExistence) {
         long pos = this.nodeData.nodePosition(node);
 
@@ -205,6 +210,7 @@ public class HierarchicalNodeManager {
             }
             long childPos = makeChildPos(pos, i);
             request.addChildRequirement(i);
+
             //Insert all the children into the tracking map with the node id
             if (this.activeSectionMap.put(childPos, requestId|ID_TYPE_REQUEST) != NO_NODE) {
                 throw new IllegalStateException("Leaf request creation failed to insert child into map as a mapping already existed for the node!");
@@ -297,7 +303,7 @@ public class HierarchicalNodeManager {
                                 if ((toAdd & (i << 1)) == 0) continue;
                                 request.addChildRequirement(i);
                                 long cpos = makeChildPos(position, i);
-                                int prev = this.activeSectionMap.put(cpos, ID_TYPE_REQUEST|reqId);
+                                int prev = this.activeSectionMap.put(cpos, reqId|ID_TYPE_REQUEST);
                                 if (prev!=-1) {
                                     throw new IllegalStateException("Child is already mapped to a node id " + WorldEngine.pprintPos(cpos) + " " + reqId + " " + prev);
                                 }
@@ -386,15 +392,39 @@ public class HierarchicalNodeManager {
 
     //Process NodeChildRequest results
     private void consumeFinishedNodeChildRequest(int nodeId, NodeChildRequest request) {
+        //TODO:!!! NOTE: DONT
+
         int children = this.nodeData.getChildPtr(nodeId);
         if (children != NO_NODE) {
-            //There are children already part of this node, so need to reallocate all the children
+            //There are children already part of this node, so need to reallocate all the children which is _really_ bad as it can cause so many desyncs
+            // between gpu and cpu its not even funny
+
+            //TODO: what will need to be done is a fence be created, and to not release the ids until the gpu is done with them??
+            // that _might :tm:_ help with preventing desyncs???
+            // the issue is like a request right, sends id to cpu, that id might have changed and everything then proceeds to explode
+
             int count = Integer.bitCount(Byte.toUnsignedInt(this.nodeData.getNodeChildExistence(nodeId)));
 
         } else {
 
         }
     }
+
+    //============================================================================================
+
+    public boolean writeChanges(GlBuffer nodeBuffer) {
+        //TODO: use like compute based copy system or something
+        // since microcopies are bad
+        if (this.nodeUpdates.isEmpty()) {
+            return false;
+        }
+        for (int i : this.nodeUpdates) {
+            this.nodeData.writeNode(UploadStream.INSTANCE.upload(nodeBuffer, i*16L, 16L), i);
+        }
+        this.nodeUpdates.clear();
+        return true;
+    }
+
 
     //============================================================================================================================================
 

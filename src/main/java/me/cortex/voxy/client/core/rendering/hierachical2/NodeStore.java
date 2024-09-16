@@ -1,13 +1,15 @@
 package me.cortex.voxy.client.core.rendering.hierachical2;
 
 import me.cortex.voxy.common.util.HierarchicalBitSet;
+import org.lwjgl.system.MemoryUtil;
 
 public final class NodeStore {
     public static final int EMPTY_GEOMETRY_ID = -1;
     public static final int NODE_ID_MSK = ((1<<24)-1);
     public static final int REQUEST_ID_MSK = ((1<<16)-1);
     public static final int GEOMETRY_ID_MSK = (1<<24)-1;
-    public static final int MAX_GEOMETRY_ID = GEOMETRY_ID_MSK-1;
+    public static final int MAX_GEOMETRY_ID = GEOMETRY_ID_MSK-2;
+    public static final int ABSENT_GEOMETRY_ID = GEOMETRY_ID_MSK-1;//Value for if want to clear geometry and make gpu request it if its needed
     private static final int SENTINEL_EMPTY_GEOMETRY_ID = GEOMETRY_ID_MSK;
     private static final int SENTINEL_NULL_NODE_ID = NODE_ID_MSK -1;
     private static final int SENTINEL_REQUEST_ID = REQUEST_ID_MSK -1;
@@ -167,8 +169,17 @@ public final class NodeStore {
         return ((this.localNodeData[id2idx(nodeId)+1]>>63)&1)!=0;
     }
 
-    public boolean isLeafNode(int nodeId) {
-        return ((this.localNodeData[id2idx(nodeId)+1]>>62)&1)!=0;
+    public int getNodeType(int nodeId) {
+        return (int)((this.localNodeData[id2idx(nodeId)+1]>>61)&3)<<30;
+    }
+
+    public void setNodeType(int nodeId, int type) {
+        type >>>= 30;
+        int idx = id2idx(nodeId)+1;
+        long data = this.localNodeData[idx];
+        data &= ~(3L<<61);
+        data |= ((long)type)<<61;
+        this.localNodeData[idx] = data;
     }
 
     public byte getNodeChildExistence(int nodeId) {
@@ -184,9 +195,48 @@ public final class NodeStore {
         this.localNodeData[idx] = data;
     }
 
+    public int getChildPtrCount(int nodeId) {
+        long data = this.localNodeData[id2idx(nodeId)+1];
+        return (int) ((data>>56)&0x7);
+    }
+
+    public void setChildPtrCount(int nodeId, int count) {
+        if (count <= 0 || count>8) throw new IllegalArgumentException("Count: " + count);
+        int idx = id2idx(nodeId)+1;
+        long data = this.localNodeData[idx];
+        data &= ~(7L<<56);
+        data |= ((long) (count - 1)) <<56;
+        this.localNodeData[idx] = data;
+    }
+
     //Writes out a nodes data to the ptr in the compacted/reduced format
     public void writeNode(long ptr, int nodeId) {
+        long pos = this.nodePosition(nodeId);
+        MemoryUtil.memPutInt(ptr, (int) (pos>>32)); ptr += 4;
+        MemoryUtil.memPutInt(ptr, (int) pos); ptr += 4;
 
+        int z = 0;
+        int w = 0;
+
+        short flags = 0;
+        flags |= (short) (this.getChildPtrCount(nodeId)<<2);
+
+        {
+            int geometry = this.getNodeGeometry(nodeId);
+            if (geometry == -1) {
+                z |= 0xFFFFFF-1;//This is a special case, which basically says to the renderer that the geometry is empty (not that it doesnt exist)
+            } else {
+                z |= geometry&0xFFFFFF;//TODO: check and ensure bounds
+            }
+        }
+
+        w |= this.getChildPtr(nodeId)&0xFFFFFF;//TODO: check and ensure bounds
+
+        z |= (flags&0xFF)<<24;
+        w |= ((flags>>8)&0xFF)<<24;
+
+        MemoryUtil.memPutInt(ptr, z); ptr += 4;
+        MemoryUtil.memPutInt(ptr, w); ptr += 4;
     }
 
 }
