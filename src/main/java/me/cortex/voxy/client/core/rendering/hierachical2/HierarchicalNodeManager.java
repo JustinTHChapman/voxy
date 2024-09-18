@@ -230,7 +230,7 @@ public class HierarchicalNodeManager {
     //============================================================================================================================================
     public void processChildChange(long position, byte childExistence) {
         if (childExistence == 0) {
-            Logger.logError("Section at " + WorldEngine.pprintPos(position) + " had empty child existence!!");
+            Logger.error("Section at " + WorldEngine.pprintPos(position) + " had empty child existence!!");
         }
         int nodeId = this.activeSectionMap.get(position);
         if (nodeId == NO_NODE) {

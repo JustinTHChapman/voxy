@@ -1,0 +1,40 @@
+package me.cortex.voxy.client.core.rendering.hierachical2;
+
+class SingleNodeRequest {
+    private final long nodePos;
+    private int mesh;
+    private byte childExistence;
+    private int setMsk;
+
+    SingleNodeRequest(long nodePos) {
+        this.nodePos = nodePos;
+    }
+
+    public void setChildExistence(byte childExistence) {
+        this.setMsk |= 2;
+        this.childExistence = childExistence;
+    }
+
+    public int setMesh(int mesh) {
+        this.setMsk |= 1;
+        int prev = this.mesh;
+        this.mesh = mesh;
+        return prev;
+    }
+
+    public boolean isSatisfied() {
+        return this.setMsk == 3;
+    }
+
+    public long getPosition() {
+        return this.nodePos;
+    }
+
+    public int getMesh() {
+        return this.mesh;
+    }
+
+    public byte getChildExistence() {
+        return this.childExistence;
+    }
+}

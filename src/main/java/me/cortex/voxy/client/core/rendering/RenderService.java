@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
+import me.cortex.voxy.client.core.rendering.hierachical2.NodeManager2;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
 import me.cortex.voxy.client.core.rendering.section.IUsesMeshlets;
 import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
@@ -33,7 +34,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     private final ViewportSelector<?> viewportSelector;
     private final AbstractSectionRenderer<J, ?> sectionRenderer;
 
-    private final HierarchicalNodeManager nodeManager;
+    private final NodeManager2 nodeManager;
     private final HierarchicalOcclusionTraverser traversal;
     private final ModelBakerySubsystem modelService;
     private final RenderGenerationService renderGen;
@@ -51,7 +52,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
         var router = new SectionUpdateRouter();
 
-        this.nodeManager = new HierarchicalNodeManager(1<<21, this.sectionRenderer.getGeometryManager(), router);
+        this.nodeManager = new NodeManager2(1<<21, this.sectionRenderer.getGeometryManager(), router);
 
         this.sectionUpdateQueue = new MessageQueue<>(section -> {
             byte childExistence = section.getNonEmptyChildren();

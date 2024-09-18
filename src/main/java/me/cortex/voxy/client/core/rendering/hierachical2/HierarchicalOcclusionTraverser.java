@@ -27,7 +27,7 @@ import static org.lwjgl.opengl.GL45.*;
 
 // TODO: swap to persistent gpu threads instead of dispatching MAX_ITERATIONS of compute layers
 public class HierarchicalOcclusionTraverser {
-    private final HierarchicalNodeManager nodeManager;
+    private final NodeManager2 nodeManager;
 
     private final int maxRequestCount;
     private final GlBuffer requestBuffer;
@@ -77,7 +77,7 @@ public class HierarchicalOcclusionTraverser {
             .compile();
 
 
-    public HierarchicalOcclusionTraverser(HierarchicalNodeManager nodeManager, int requestBufferCount) {
+    public HierarchicalOcclusionTraverser(NodeManager2 nodeManager, int requestBufferCount) {
         this.nodeManager = nodeManager;
         this.requestBuffer = new GlBuffer(requestBufferCount*4L+1024).zero();//The 1024 is to assist with race condition issues
         this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).zero();
