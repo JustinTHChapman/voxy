@@ -120,6 +120,7 @@ public class VoxelCore {
         matrices.pop();
 
         var projection = computeProjectionMat();//RenderSystem.getProjectionMatrix();
+        //var projection = RenderSystem.getProjectionMatrix();
 
         var viewport = this.renderer.getViewport();
         viewport
@@ -135,6 +136,8 @@ public class VoxelCore {
         }
         //TODO: use the raw depth buffer texture instead
         //int boundDepthBuffer = glGetNamedFramebufferAttachmentParameteri(boundFB, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+
+        //TODO:FIXME!!! ??
         this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);
 
         this.renderer.renderFarAwayOpaque(viewport);

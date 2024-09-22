@@ -27,9 +27,12 @@ void addRequest(inout UnpackedNode node) {
     printf("Put node decend request");
     if (!hasRequested(node)) {
         if (requestQueueIndex.x < requestQueueMaxSize) {
-            //Mark node as having a request submitted to prevent duplicate submissions
-            requestQueue[atomicAdd(requestQueueIndex.x, 1)] = getRawPos(node);
-            markRequested(node);
+            uint atomRes = atomicAdd(requestQueueIndex.x, 1);
+            if (atomRes < requestQueueMaxSize) {
+                //Mark node as having a request submitted to prevent duplicate submissions
+                requestQueue[atomRes] = getRawPos(node);
+                markRequested(node);
+            }
         }
     }
 }

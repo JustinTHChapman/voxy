@@ -79,9 +79,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(0, 0,0,0));
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
 
-        final int H_WIDTH = 10;
+        final int H_WIDTH = 1;
         for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
-            for (int y = 0; y <= 0; y++) {
+            for (int y = -1; y <= 0; y++) {
                 for (int z = -H_WIDTH; z <= H_WIDTH; z++) {
                     this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
                 }
@@ -103,7 +103,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         //Hieracial is not an abstract thing but
         // the section renderer is as it might have different backends, but they all accept a buffer containing the section list
 
-        this.sectionRenderer.renderOpaque(viewport);
+
+        //this.sectionRenderer.renderOpaque(viewport);
 
 
         //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
@@ -131,6 +132,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_PIXEL_BUFFER_BARRIER_BIT);
 
         int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+        if (depthBuffer == 0) {
+            depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+        }
         this.traversal.doTraversal(viewport, depthBuffer);
 
         this.sectionRenderer.buildDrawCallsAndRenderTemporal(viewport, this.traversal.getRenderListBuffer());

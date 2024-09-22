@@ -10,6 +10,7 @@ import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.Logger;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -79,7 +80,7 @@ public class HierarchicalOcclusionTraverser {
 
     public HierarchicalOcclusionTraverser(NodeManager2 nodeManager, int requestBufferCount) {
         this.nodeManager = nodeManager;
-        this.requestBuffer = new GlBuffer(requestBufferCount*4L+1024).zero();//The 1024 is to assist with race condition issues
+        this.requestBuffer = new GlBuffer(requestBufferCount*8L+8).zero();
         this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).zero();
         this.maxRequestCount = requestBufferCount;
 
@@ -111,11 +112,11 @@ public class HierarchicalOcclusionTraverser {
 
         MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
 
-        MemoryUtil.memPutInt(ptr, NodeManager.REQUEST_QUEUE_SIZE); ptr += 4;
-        MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;//TODO maybe move this to a #define
+        MemoryUtil.memPutInt(ptr, NodeManager.REQUEST_QUEUE_SIZE); ptr += 4;//TODO maybe these to a #define
+        MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;
 
         //Screen space size for descending
-        MemoryUtil.memPutFloat(ptr, 128*128); ptr += 4;
+        MemoryUtil.memPutFloat(ptr, 64*64); ptr += 4;
     }
 
     private void bindings() {
@@ -240,8 +241,9 @@ public class HierarchicalOcclusionTraverser {
         if (count < 0 || count > 50000) {
             throw new IllegalStateException("Count unexpected extreme value: " + count);
         }
-        if (count > (this.requestBuffer.size()>>2)-1) {
-            throw new IllegalStateException("Count over max buffer size, desync expected, aborting");
+        if (count > (this.requestBuffer.size()>>3)-1) {
+            Logger.warn("Count over max buffer size, clamping, got count: " + count);
+            count = (int) ((this.requestBuffer.size()>>3)-1);
         }
         if (count > this.maxRequestCount) {
             System.err.println("Count larger than 'maxRequestCount', overflow captured. Overflowed by " + (count-this.maxRequestCount));
