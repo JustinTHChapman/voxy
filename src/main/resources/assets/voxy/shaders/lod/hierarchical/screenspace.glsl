@@ -64,14 +64,18 @@ void setupScreenspace(in UnpackedNode node) {
 
     //printf("Screenspace MIN: %f, %f, %f  MAX: %f, %f, %f", minBB.x,minBB.y,minBB.z, maxBB.x,maxBB.y,maxBB.z);
 
-    size = (maxBB.xy - minBB.xy)*0.5f;//We half it for implicit conversion to screenspace
+    //Convert to screenspace
+    maxBB = maxBB*0.5f+0.5f;
+    minBB = minBB*0.5f+0.5f;
+
+    size = (maxBB.xy - minBB.xy);//We half it for implicit conversion to screenspace
 
 }
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
     printf("Cull point (%f %f %f)x(%f %f %f)", maxBB.x, maxBB.y, maxBB.z, minBB.x, minBB.y, minBB.z);
-    return any(lessThanEqual(maxBB, vec3(-1.0f, -1.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), minBB));
+    return any(lessThanEqual(maxBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), minBB));
 }
 
 bool isCulledByHiz() {
