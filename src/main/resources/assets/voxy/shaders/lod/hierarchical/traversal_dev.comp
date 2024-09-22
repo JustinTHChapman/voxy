@@ -20,15 +20,15 @@ layout(binding = SCENE_UNIFORM_BINDING, std140) uniform SceneUniform {
 #import <voxy:lod/hierarchical/node.glsl>
 #import <voxy:lod/hierarchical/screenspace.glsl>
 
-SIMPLE_QUEUE(requestQueue, REQUEST_QUEUE_BINDING);
-SIMPLE_QUEUE(renderQueue, RENDER_QUEUE_BINDING);
+SIMPLE_QUEUE(uvec2, requestQueue, REQUEST_QUEUE_BINDING);
+SIMPLE_QUEUE(uint, renderQueue, RENDER_QUEUE_BINDING);
 
 void addRequest(inout UnpackedNode node) {
     printf("Put node decend request");
     if (!hasRequested(node)) {
-        if (requestQueueIndex < requestQueueMaxSize) {
+        if (requestQueueIndex.x < requestQueueMaxSize) {
             //Mark node as having a request submitted to prevent duplicate submissions
-            requestQueue[atomicAdd(requestQueueIndex, 1)] = getId(node);
+            requestQueue[atomicAdd(requestQueueIndex.x, 1)] = getRawPos(node);
             markRequested(node);
         }
     }

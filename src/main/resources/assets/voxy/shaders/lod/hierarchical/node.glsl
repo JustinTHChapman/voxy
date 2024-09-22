@@ -16,6 +16,8 @@ layout(binding = NODE_DATA_BINDING, std430) restrict buffer NodeData {
 struct UnpackedNode {
     uint nodeId;
 
+    uvec2 rawPos;
+
     ivec3 pos;
     uint lodLevel;
 
@@ -32,7 +34,7 @@ void unpackNode(out UnpackedNode node, uint nodeId) {
     uvec4 compactedNode = nodes[nodeId];
     node.nodeId = nodeId;
     node.lodLevel = compactedNode.x >> 28;
-
+    node.rawPos = compactedNode.xy;
     {
         int y = ((int(compactedNode.x)<<4)>>24);
         int x = (int(compactedNode.y)<<4)>>8;
@@ -82,6 +84,10 @@ uint getChildCount(in UnpackedNode node) {
 
 uint getChildPtr(in UnpackedNode node) {
     return node.childPtr;
+}
+
+uvec2 getRawPos(in UnpackedNode node) {
+    return node.rawPos;
 }
 
 /*

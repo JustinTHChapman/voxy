@@ -240,7 +240,14 @@ public class HierarchicalOcclusionTraverser {
             System.err.println("Count larger than 'maxRequestCount', overflow captured. Overflowed by " + (count-this.maxRequestCount));
         }
         if (count != 0) {
-            this.nodeManager.processRequestQueue(count, ptr + 4);
+            //this.nodeManager.processRequestQueue(count, ptr + 8);
+
+            //It just felt more appropriate putting the loop here
+            for (int requestIndex = 0; requestIndex < count; requestIndex++) {
+                long pos = ((long)MemoryUtil.memGetInt(ptr))<<32; ptr += 4;
+                pos |= Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr)); ptr += 4;
+                this.nodeManager.processRequest(pos);
+            }
         }
     }
 

@@ -49,9 +49,7 @@ void pushNode(uint nodeId) {
     nodeQueueSink[nodePushIndex++] = nodeId;
 }
 
-
-
-#define SIMPLE_QUEUE(name, bindingIndex) layout(binding = bindingIndex, std430) restrict buffer name##Struct { \
-    uint name##Index; \
-    uint[] name; \
+#define SIMPLE_QUEUE(type, name, bindingIndex) layout(binding = bindingIndex, std430) restrict buffer name##Struct { \
+    type name##Index; \
+    type##[] name; \
 };
