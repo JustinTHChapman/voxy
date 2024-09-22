@@ -21,7 +21,7 @@ public abstract class AbstractSectionGeometryManager {
     public int uploadSection(BuiltSection section) {return this.uploadReplaceSection(-1, section);}
     public abstract int uploadReplaceSection(int oldId, BuiltSection section);
     public abstract void removeSection(int id);
-    void tick() {}
+    public void tick() {}
 
     public void free() {}
 }

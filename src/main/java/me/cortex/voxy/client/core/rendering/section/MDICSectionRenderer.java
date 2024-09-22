@@ -34,6 +34,7 @@ import static org.lwjgl.opengl.GL45.glCopyNamedBufferSubData;
 //Uses MDIC to render the sections
 public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryManager> {
     private final Shader terrainShader = Shader.make()
+            .defineIf("DEBUG_RENDER", false)
             .add(ShaderType.VERTEX, "voxy:lod/gl46/quads2.vert")
             .add(ShaderType.FRAGMENT, "voxy:lod/gl46/quads.frag")
             .compile();
@@ -119,11 +120,6 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     public void renderOpaque(MDICViewport viewport) {
         if (this.geometryManager.getSectionCount() == 0) return;
 
-
-
-        //Tick the geometry manager to upload all invalidated metadata changes to the gpu before invoking the command gen shader
-        this.geometryManager.tick();
-
         this.uploadUniformBuffer(viewport);
 
         //TODO compute the draw calls
@@ -193,7 +189,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     @Override
     public void addDebug(List<String> lines) {
         super.addDebug(lines);
-        lines.add("NC/GS: " + this.geometryManager.getSectionCount() + "/" + (this.geometryManager.getGeometryUsed()/(1024*1024)));//Node count/geometry size (MB)
+        lines.add("SC/GS: " + this.geometryManager.getSectionCount() + "/" + (this.geometryManager.getGeometryUsed()/(1024*1024)));//section count/geometry size (MB)
     }
 
     @Override

@@ -42,4 +42,8 @@ public class ExpandingObjectAllocationList<T> {
         }
         return this.objects[index];
     }
+
+    public int count() {
+        return this.bitSet.getCount();
+    }
 }

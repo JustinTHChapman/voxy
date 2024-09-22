@@ -77,16 +77,16 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
 
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(0, 0,0,0));
-        this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
-        /*
-        final int H_WIDTH = 1;
+        //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
+
+        final int H_WIDTH = 10;
         for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
-            for (int y = -1; y <= 0; y++) {
+            for (int y = 0; y <= 0; y++) {
                 for (int z = -H_WIDTH; z <= H_WIDTH; z++) {
                     this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
                 }
             }
-        }*/
+        }
     }
 
     public void setup(Camera camera) {
@@ -120,9 +120,11 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
             this.sectionUpdateQueue.consume();
             this.geometryUpdateQueue.consume();
-           if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
-               UploadStream.INSTANCE.commit();
-           }
+            if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
+                   UploadStream.INSTANCE.commit();
+            }
+            //this needs to go after, due to geometry updates committed by the nodeManager
+            this.sectionRenderer.getGeometryManager().tick();
         }
         UploadStream.INSTANCE.tick();
 
@@ -142,6 +144,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.modelService.addDebugData(debug);
         this.renderGen.addDebugData(debug);
         this.sectionRenderer.addDebug(debug);
+        this.nodeManager.addDebug(debug);
     }
 
     public void shutdown() {

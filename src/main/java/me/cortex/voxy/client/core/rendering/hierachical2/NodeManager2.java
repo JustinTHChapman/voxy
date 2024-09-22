@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering.hierachical2;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.gl.GlBuffer;
@@ -12,6 +13,10 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.jellysquid.mods.sodium.client.util.MathUtil;
 
+import java.util.List;
+
+
+
 public class NodeManager2 {
     //Assumptions:
     // all nodes have children (i.e. all nodes have at least one child existence bit set at all times)
@@ -21,6 +26,18 @@ public class NodeManager2 {
     //NOTE:
     // For the queue processing, will need a redirect node-value type
     //      since for inner node child resize gpu could take N frames to update
+
+
+
+    //There is a very funny issue that has kinda, just resolved itself accidentally,
+    // however i wonder if i want a better solution for.
+    //That issue is, top level nodes that have no children
+    // the accidental solution, is that when the node is marked, it generates
+    // the child request,
+    // however, since there are no children in it, it sticks around, since there isnt anything to update it and invoke
+    // the finishRequest on it
+    // if the top level node ends up being updated with a child update, it should automatically solve itself
+    // as the new children are added to the already inprogress request!!!!
 
     public static final int NULL_GEOMETRY_ID = -1;
     public static final int EMPTY_GEOMETRY_ID = -2;
@@ -44,6 +61,7 @@ public class NodeManager2 {
     private final Long2IntOpenHashMap activeSectionMap = new Long2IntOpenHashMap();
     private final NodeStore nodeData;
     public final int maxNodeCount;
+    private final IntArrayList topLevelNodeIds = new IntArrayList();
     public NodeManager2(int maxNodeCount, AbstractSectionGeometryManager geometryManager, SectionUpdateRouter updateRouter) {
         if (!MathUtil.isPowerOfTwo(maxNodeCount)) {
             throw new IllegalArgumentException("Max node count must be a power of 2");
@@ -68,6 +86,8 @@ public class NodeManager2 {
         int id = this.singleRequests.put(request);
         this.updateRouter.watch(pos, WorldEngine.UPDATE_FLAGS);
         this.activeSectionMap.put(pos, id|NODE_TYPE_REQUEST|REQUEST_TYPE_SINGLE);
+
+
     }
 
     public void removeTopLevelNode(long pos) {
@@ -77,6 +97,16 @@ public class NodeManager2 {
             return;
         }
         //TODO: assert is top level node
+
+        //TODO:FIXME augment topLevelNodeIds with a hashmap from node id to array index
+        // OR!! just ensure the list is always ordered?? maybe? idk i think hashmap is best
+        // since the array list might get shuffled as nodes are removed
+        // since need to move the entry at the end of the array to fill a hole made
+    }
+
+
+    IntArrayList getTopLevelNodeIds() {
+        return this.topLevelNodeIds;
     }
 
     //==================================================================================================================
@@ -217,6 +247,11 @@ public class NodeManager2 {
         //this.nodeData.setNodeType();
         this.activeSectionMap.put(request.getPosition(), id|NODE_TYPE_LEAF);//Assume that the result of any single request type is a leaf node
         this.nodeUpdates.add(id);
+
+
+        //Assume that this is always a top node
+        // FIXME: DONT DO THIS
+        this.topLevelNodeIds.add(id);
     }
 
     private void finishRequest(int requestId, NodeChildRequest request) {
@@ -366,5 +401,9 @@ public class NodeManager2 {
                 (WorldEngine.getX(basePos)<<1)|(addin&1),
                 (WorldEngine.getY(basePos)<<1)|((addin>>2)&1),
                 (WorldEngine.getZ(basePos)<<1)|((addin>>1)&1));
+    }
+
+    public void addDebug(List<String> debug) {
+        debug.add("NC/IF: " + this.activeSectionMap.size() + "/" + (this.singleRequests.count() + this.childRequests.count()));
     }
 }

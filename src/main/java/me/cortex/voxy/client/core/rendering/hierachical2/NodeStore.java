@@ -235,6 +235,7 @@ public final class NodeStore {
         int w = 0;
 
         short flags = 0;
+        flags |= (short) (this.isNodeRequestInFlight(nodeId)?1:0);
         flags |= (short) (this.getChildPtrCount(nodeId)<<2);
 
         {

@@ -105,7 +105,7 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
     }
 
     @Override
-    void tick() {
+    public void tick() {
         //Upload all invalidated bits
         if (!this.invalidatedSectionIds.isEmpty()) {
             for (int id : this.invalidatedSectionIds) {

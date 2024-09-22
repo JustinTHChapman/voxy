@@ -115,7 +115,7 @@ public class HierarchicalOcclusionTraverser {
         MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;//TODO maybe move this to a #define
 
         //Screen space size for descending
-        MemoryUtil.memPutFloat(ptr, 64*64); ptr += 4;
+        MemoryUtil.memPutFloat(ptr, 128*128); ptr += 4;
     }
 
     private void bindings() {
@@ -143,7 +143,7 @@ public class HierarchicalOcclusionTraverser {
         PrintfDebugUtil.bind();
 
 
-        this.traverseInternal(1);
+        this.traverseInternal(this.nodeManager.getTopLevelNodeIds().size());
 
 
         this.downloadResetRequestQueue();
@@ -192,7 +192,7 @@ public class HierarchicalOcclusionTraverser {
 
             ptr = UploadStream.INSTANCE.upload(this.scratchQueueA, 0, 4L*initialQueueSize);
             for (int i = 0; i < initialQueueSize; i++) {
-                MemoryUtil.memPutInt(ptr + 4L*i, 0);
+                MemoryUtil.memPutInt(ptr + 4L*i, this.nodeManager.getTopLevelNodeIds().getInt(i));
             }
 
             UploadStream.INSTANCE.commit();
