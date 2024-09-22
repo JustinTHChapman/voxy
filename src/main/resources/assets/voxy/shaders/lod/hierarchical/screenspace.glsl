@@ -64,14 +64,14 @@ void setupScreenspace(in UnpackedNode node) {
 
     //printf("Screenspace MIN: %f, %f, %f  MAX: %f, %f, %f", minBB.x,minBB.y,minBB.z, maxBB.x,maxBB.y,maxBB.z);
 
-    size = maxBB.xy - minBB.xy;
+    size = (maxBB.xy - minBB.xy)*0.5f;//We half it for implicit conversion to screenspace
 
 }
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
-    //printf("Cull point (%f %f %f)x(%f %f %f)", maxBB.x, maxBB.y, maxBB.z, minBB.x, minBB.y, minBB.z);
-    return any(lessThanEqual(maxBB, vec3(-1f, -1f, 0f))) || any(lessThanEqual(vec3(1f, 1f, 1f), minBB));
+    printf("Cull point (%f %f %f)x(%f %f %f)", maxBB.x, maxBB.y, maxBB.z, minBB.x, minBB.y, minBB.z);
+    return any(lessThanEqual(maxBB, vec3(-1.0f, -1.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), minBB));
 }
 
 bool isCulledByHiz() {
@@ -80,12 +80,12 @@ bool isCulledByHiz() {
     }
     vec2 ssize = size.xy * vec2(ivec2(screenW, screenH));
     float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
-    vec2 midpoint = (maxBB.xy + minBB.xy)*0.5;
-    return textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) > 0.0001;
+    vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
+    return textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) > 0.0001f;
 }
 
 //Returns if we should decend into its children or not
 bool shouldDecend() {
-    printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(screenW), float(screenH));
+    printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(size.x), float(size.y));
     return (size.x*size.y*screenW*screenH) > minSSS;
 }

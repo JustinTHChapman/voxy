@@ -75,6 +75,8 @@ public class VoxelCore {
         this.postProcessing = new PostProcessing();
 
         System.out.println("Voxy core initialized");
+
+        //this.verifyTopNodeChildren(0,0,0);
     }
 
 

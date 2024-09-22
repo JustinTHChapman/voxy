@@ -44,8 +44,9 @@ public class SectionUpdateRouter {
             if (set.containsKey(position)) {
                 current = set.get(position);
             }
-            delta = (byte) ((current&types)^types);
+            delta = (byte) (current&types);
             current |= (byte) types;
+            delta ^= (byte) (current&types);
             set.put(position, current);
         }
         if ((delta&UPDATE_TYPE_BLOCK_BIT)!=0) {

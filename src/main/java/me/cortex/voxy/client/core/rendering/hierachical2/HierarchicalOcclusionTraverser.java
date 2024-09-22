@@ -15,7 +15,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 
-import static me.cortex.voxy.client.core.rendering.PrintfDebugUtil.PRINTF_object;
+import static me.cortex.voxy.client.core.rendering.PrintfDebugUtil.PRINTF_processor;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_UNPACK_IMAGE_HEIGHT;
 import static org.lwjgl.opengl.GL12.GL_UNPACK_SKIP_IMAGES;
@@ -56,7 +56,7 @@ public class HierarchicalOcclusionTraverser {
     private final HiZBuffer hiZBuffer = new HiZBuffer();
     private final int hizSampler = glGenSamplers();
 
-    private final Shader traversal = Shader.make(PRINTF_object)
+    private final Shader traversal = Shader.make(PRINTF_processor)
             .defineIf("DEBUG", Voxy.SHADER_DEBUG)
             .define("MAX_ITERATIONS", MAX_ITERATIONS)
             .define("LOCAL_SIZE_BITS", LOCAL_WORK_SIZE_BITS)
@@ -103,6 +103,7 @@ public class HierarchicalOcclusionTraverser {
         MemoryUtil.memPutInt(ptr, sx); ptr += 4;
         MemoryUtil.memPutInt(ptr, sy); ptr += 4;
         MemoryUtil.memPutInt(ptr, sz); ptr += 4;
+
         MemoryUtil.memPutInt(ptr, viewport.width); ptr += 4;
 
         var innerTranslation = new Vector3f((float) (viewport.cameraX-(sx<<5)), (float) (viewport.cameraY-(sy<<5)), (float) (viewport.cameraZ-(sz<<5)));
@@ -175,7 +176,7 @@ public class HierarchicalOcclusionTraverser {
         //Set the first entry
         glClearNamedBufferSubData(this.queueMetaBuffer.id, GL_RGBA32UI, 0, 16, GL_RGBA, GL_UNSIGNED_INT, new int[]{firstDispatchSize,1,1,initialQueueSize});
          */
-        {
+        {//TODO:FIXME: THIS IS BULLSHIT BY INTEL need to fix the clearing
             long ptr = UploadStream.INSTANCE.upload(this.queueMetaBuffer, 0, 16*5);
             MemoryUtil.memPutInt(ptr +  0, firstDispatchSize);
             MemoryUtil.memPutInt(ptr +  4, 1);
@@ -186,6 +187,12 @@ public class HierarchicalOcclusionTraverser {
                 MemoryUtil.memPutInt(ptr + (i*16)+ 4, 1);
                 MemoryUtil.memPutInt(ptr + (i*16)+ 8, 1);
                 MemoryUtil.memPutInt(ptr + (i*16)+12, 0);
+            }
+            //TODO: Move the first queue to a persistent list so its not updated every frame
+
+            ptr = UploadStream.INSTANCE.upload(this.scratchQueueA, 0, 4L*initialQueueSize);
+            for (int i = 0; i < initialQueueSize; i++) {
+                MemoryUtil.memPutInt(ptr + 4L*i, 0);
             }
 
             UploadStream.INSTANCE.commit();
@@ -229,7 +236,7 @@ public class HierarchicalOcclusionTraverser {
     }
 
     private void forwardDownloadResult(long ptr, long size) {
-        int count = MemoryUtil.memGetInt(ptr);
+        int count = MemoryUtil.memGetInt(ptr);ptr += 8;//its 8 since we need to skip the second value (which is empty)
         if (count < 0 || count > 50000) {
             throw new IllegalStateException("Count unexpected extreme value: " + count);
         }

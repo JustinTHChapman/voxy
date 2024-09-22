@@ -8,9 +8,9 @@ public final class NodeStore {
     public static final int NODE_ID_MSK = ((1<<24)-1);
     public static final int REQUEST_ID_MSK = ((1<<16)-1);
     public static final int GEOMETRY_ID_MSK = (1<<24)-1;
-    public static final int MAX_GEOMETRY_ID = GEOMETRY_ID_MSK-2;
-    public static final int ABSENT_GEOMETRY_ID = GEOMETRY_ID_MSK-1;//Value for if want to clear geometry and make gpu request it if its needed
-    private static final int SENTINEL_EMPTY_GEOMETRY_ID = GEOMETRY_ID_MSK;
+    public static final int MAX_GEOMETRY_ID = (1<<24)-3;
+    private static final int SENTINEL_NULL_GEOMETRY_ID = (1<<24)-1;
+    private static final int SENTINEL_EMPTY_GEOMETRY_ID = (1<<24)-2;
     private static final int SENTINEL_NULL_NODE_ID = NODE_ID_MSK -1;
     private static final int SENTINEL_REQUEST_ID = REQUEST_ID_MSK -1;
     private static final int LONGS_PER_NODE = 4;
@@ -104,18 +104,31 @@ public final class NodeStore {
     public int getNodeGeometry(int node) {
         long data = this.localNodeData[id2idx(node)+1];
         int geometryPtr = (int) (data&GEOMETRY_ID_MSK);
-        if (geometryPtr == SENTINEL_EMPTY_GEOMETRY_ID) {
+        if (geometryPtr == SENTINEL_NULL_GEOMETRY_ID) {
             return -1;
+        }
+        if (geometryPtr == SENTINEL_EMPTY_GEOMETRY_ID) {
+            return -2;
         }
         return geometryPtr;
     }
 
     public void setNodeGeometry(int node, int geometryId) {
-        if (geometryId>MAX_GEOMETRY_ID || geometryId<-1) {
-            throw new IllegalArgumentException("Geometry ptr greater than MAX_GEOMETRY_ID or less than -1 : " + geometryId);
+
+        if (geometryId>MAX_GEOMETRY_ID) {
+            throw new IllegalArgumentException("Geometry ptr greater than MAX_GEOMETRY_ID: " + geometryId);
         }
+
         if (geometryId == -1) {
+            geometryId = SENTINEL_NULL_GEOMETRY_ID;
+        }
+
+        if (geometryId == -2) {
             geometryId = SENTINEL_EMPTY_GEOMETRY_ID;
+        }
+
+        if (geometryId < 0) {
+            throw new IllegalArgumentException("Geometry ptr less than -1 : " + geometryId);
         }
 
         int idx = id2idx(node)+1;
@@ -165,6 +178,9 @@ public final class NodeStore {
         this.localNodeData[id2idx(nodeId)+1] |= 1L<<63;
     }
 
+    public void unmarkRequestInFlight(int nodeId) {
+        this.localNodeData[id2idx(nodeId)+1] &= ~(1L<<63);
+    }
     public boolean isNodeRequestInFlight(int nodeId) {
         return ((this.localNodeData[id2idx(nodeId)+1]>>63)&1)!=0;
     }

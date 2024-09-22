@@ -9,20 +9,22 @@ import java.util.Arrays;
 public final class BuiltSection {
     public static final boolean VERIFY_BUILT_SECTION_OFFSETS = VoxyCommon.isVerificationFlagOn("verifyBuiltSectionOffsets");
     public final long position;
+    public final byte childExistence;
     public final int aabb;
     public final MemoryBuffer geometryBuffer;
     public final int[] offsets;
 
     private BuiltSection(long position) {
-        this(position, -1, null, null);
+        this(position, (byte) 0, -1, null, null);
     }
 
     public static BuiltSection empty(long position) {
         return new BuiltSection(position);
     }
 
-    public BuiltSection(long position, int aabb, MemoryBuffer geometryBuffer, int[] offsets) {
+    public BuiltSection(long position, byte childExistence, int aabb, MemoryBuffer geometryBuffer, int[] offsets) {
         this.position = position;
+        this.childExistence = childExistence;
         this.aabb = aabb;
         this.geometryBuffer = geometryBuffer;
         this.offsets = offsets;
@@ -37,7 +39,7 @@ public final class BuiltSection {
     }
 
     public BuiltSection clone() {
-        return new BuiltSection(this.position, this.aabb, this.geometryBuffer!=null?this.geometryBuffer.copy():null, this.offsets!=null?Arrays.copyOf(this.offsets, this.offsets.length):null);
+        return new BuiltSection(this.position, this.childExistence, this.aabb, this.geometryBuffer!=null?this.geometryBuffer.copy():null, this.offsets!=null?Arrays.copyOf(this.offsets, this.offsets.length):null);
     }
 
     public void free() {

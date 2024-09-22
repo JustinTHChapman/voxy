@@ -29,6 +29,7 @@ struct UnpackedNode {
 
 #define NULL_NODE ((1<<24)-1)
 #define NULL_MESH ((1<<24)-1)
+#define EMPTY_MESH ((1<<24)-2)
 
 void unpackNode(out UnpackedNode node, uint nodeId) {
     uvec4 compactedNode = nodes[nodeId];
@@ -55,7 +56,7 @@ bool hasMesh(in UnpackedNode node) {
 }
 
 bool isEmptyMesh(in UnpackedNode node) {
-    return node.meshPtr == (NULL_MESH-1);//Specialcase
+    return node.meshPtr == EMPTY_MESH;//Specialcase
 }
 
 bool hasChildren(in UnpackedNode node) {

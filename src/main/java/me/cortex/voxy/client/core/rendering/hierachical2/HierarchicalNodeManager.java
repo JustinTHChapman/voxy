@@ -240,7 +240,7 @@ public class HierarchicalNodeManager {
             nodeId &= ~ID_TYPE_MSK;
             if (type == ID_TYPE_REQUEST) {
                 //Doesnt result in an invalidation as we must wait for geometry to create a child
-                this.requests.get(nodeId).putChildResult(getChildIdx(position), childExistence);
+                this.requests.get(nodeId).setChildMesh(getChildIdx(position), childExistence);
             } else if (type == ID_TYPE_LEAF || type == ID_TYPE_INNER) {// || type == ID_TYPE_TOP
                 if (this.nodeData.getNodeChildExistence(nodeId) == childExistence) {
                     //Dont need to update the internal state since it is the same
@@ -345,7 +345,7 @@ public class HierarchicalNodeManager {
                 var request = this.requests.get(nodeId);
                 //Update for section part of a request, the request may be a leaf request update or an inner node update
                 int child = getChildIdx(position);
-                int prev = request.putChildResult(child, this.geometryManager.uploadSection(section));
+                int prev = request.setChildMesh(child, this.geometryManager.uploadSection(section));
                 if (prev != -1) {
                     this.geometryManager.removeSection(prev);
                 }

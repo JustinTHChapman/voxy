@@ -10,28 +10,44 @@ class NodeChildRequest {
 
     private byte results;
     private byte mask;
+    private byte existenceMask = 0;
 
     NodeChildRequest(long nodePos) {
         this.nodePos = nodePos;
     }
 
-    public int getChildMeshResult(int childIdx) {
+    public int getChildMesh(int childIdx) {
         if ((this.mask&(1<<childIdx))==0) {
             throw new IllegalStateException("Tried getting mesh result of child not in mask");
         }
         return this.childStates[childIdx];
     }
 
-    public void putChildChildExistence(int childIdx, byte childExistence) {
+    public void setChildChildExistence(int childIdx, byte childExistence) {
         if ((this.mask&(1<<childIdx))==0) {
-            throw new IllegalStateException("Tried putting child into request which isnt in mask");
+            throw new IllegalStateException("Tried setting child child existence in request when child isnt in mask");
         }
         this.childChildExistence[childIdx] = childExistence;
+        this.existenceMask |= (byte) (1<<childIdx);
     }
 
-    public int putChildResult(int childIdx, int mesh) {
+    public boolean hasChildChildExistence(int childId) {
+        if ((this.mask&(1<<childId))==0) {
+            throw new IllegalStateException("Tried getting child child existence set of child not in mask");
+        }
+        return (this.existenceMask&(1<<childId))!=0;
+    }
+
+    public byte getChildChildExistence(int childIdx) {
+        if (!this.hasChildChildExistence(childIdx)) {
+            throw new IllegalStateException("Tried getting child child existence when child child existence for child was not set");
+        }
+        return this.childChildExistence[childIdx];
+    }
+
+    public int setChildMesh(int childIdx, int mesh) {
         if ((this.mask&(1<<childIdx))==0) {
-            throw new IllegalStateException("Tried putting child into request which isnt in mask");
+            throw new IllegalStateException("Tried setting child mesh when child isnt in mask");
         }
         //Note the mesh can be -ve meaning empty mesh, but we should still mark that node as having a result
         boolean isFirstInsert = (this.results&(1<<childIdx))==0;
@@ -54,6 +70,7 @@ class NodeChildRequest {
         byte prev = this.results;
         this.results &= (byte) ~MSK;
         this.mask &= (byte) ~MSK;
+        this.existenceMask &= (byte) ~MSK;
         int mesh = this.childStates[childIdx];
         this.childStates[childIdx] = -1;
         if ((prev&MSK)==0) {
@@ -82,4 +99,5 @@ class NodeChildRequest {
     public byte getMsk() {
         return this.mask;
     }
+
 }

@@ -6,6 +6,7 @@ import me.cortex.voxy.common.world.service.SectionSavingService;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 
 import java.util.Arrays;
 import java.util.function.Consumer;
@@ -151,6 +152,7 @@ public class WorldEngine {
                         long oldId = worldSection.set(x, y, z, newId);
                         nonAirCountDelta += Mapper.isAir(oldId)==Mapper.isAir(newId)?0:(Mapper.isAir(newId)?-1:1 );
                         didStateChange |= newId != oldId;
+                        //if (newId != oldId) {VoxyCommon.breakpoint();}
                     }
                 }
             }
@@ -163,9 +165,7 @@ public class WorldEngine {
             }
 
             if (didStateChange||(emptinessStateChange!=0)) {
-                //Mark the section as dirty (enqueuing saving and geometry rebuild) and move to parent mip level
-                //TODO: have an update type! so that then e.g. if the child empty set changes it doesnt cause chunk rebuilds!
-                this.markDirty(worldSection);
+                this.markDirty(worldSection, (didStateChange?UPDATE_TYPE_BLOCK_BIT:0)|(emptinessStateChange!=0?UPDATE_TYPE_CHILD_EXISTENCE_BIT:0));
             }
 
             //Need to release the section after using it

@@ -8,6 +8,7 @@ class SingleNodeRequest {
 
     SingleNodeRequest(long nodePos) {
         this.nodePos = nodePos;
+        this.mesh = -1;
     }
 
     public void setChildExistence(byte childExistence) {
@@ -36,5 +37,9 @@ class SingleNodeRequest {
 
     public byte getChildExistence() {
         return this.childExistence;
+    }
+
+    public boolean hasChildExistenceSet() {
+        return (this.setMsk&2)!=0;
     }
 }

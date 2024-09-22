@@ -321,7 +321,7 @@ public class RenderDataFactory {
         aabb |= (this.maxY-this.minY)<<20;
         aabb |= (this.maxZ-this.minZ)<<25;
 
-        return new BuiltSection(section.key, aabb, buff, offsets);
+        return new BuiltSection(section.key, section.getNonEmptyChildren(), aabb, buff, offsets);
     }
 
 
