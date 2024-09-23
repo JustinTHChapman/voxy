@@ -61,6 +61,7 @@ public class HierarchicalOcclusionTraverser {
             .defineIf("DEBUG", Voxy.SHADER_DEBUG)
             .define("MAX_ITERATIONS", MAX_ITERATIONS)
             .define("LOCAL_SIZE_BITS", LOCAL_WORK_SIZE_BITS)
+            .define("REQUEST_QUEUE_SIZE", NodeManager.REQUEST_QUEUE_SIZE)
 
             .define("HIZ_BINDING", 0)
 
@@ -112,7 +113,6 @@ public class HierarchicalOcclusionTraverser {
 
         MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
 
-        MemoryUtil.memPutInt(ptr, NodeManager.REQUEST_QUEUE_SIZE); ptr += 4;//TODO maybe these to a #define
         MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;
 
         //Screen space size for descending

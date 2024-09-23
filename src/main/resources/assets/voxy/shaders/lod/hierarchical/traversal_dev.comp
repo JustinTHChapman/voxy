@@ -11,7 +11,6 @@ layout(binding = SCENE_UNIFORM_BINDING, std140) uniform SceneUniform {
     uint screenW;
     vec3 camSubSecPos;
     uint screenH;
-    uint requestQueueMaxSize;
     uint renderQueueMaxSize;
     float minSSS;
 };
@@ -26,9 +25,9 @@ SIMPLE_QUEUE(uint, renderQueue, RENDER_QUEUE_BINDING);
 void addRequest(inout UnpackedNode node) {
     printf("Put node decend request");
     if (!hasRequested(node)) {
-        if (requestQueueIndex.x < requestQueueMaxSize) {
+        if (requestQueueIndex.x < REQUEST_QUEUE_SIZE) {
             uint atomRes = atomicAdd(requestQueueIndex.x, 1);
-            if (atomRes < requestQueueMaxSize) {
+            if (atomRes < REQUEST_QUEUE_SIZE) {
                 //Mark node as having a request submitted to prevent duplicate submissions
                 requestQueue[atomRes] = getRawPos(node);
                 markRequested(node);

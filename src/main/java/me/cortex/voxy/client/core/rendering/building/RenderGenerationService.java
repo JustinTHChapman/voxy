@@ -65,7 +65,11 @@ public class RenderGenerationService {
     private void processJob(RenderDataFactory factory) {
         BuildTask task;
         synchronized (this.taskQueue) {
-            task = this.taskQueue.removeFirst();
+            if (Math.random() < 0.5) {
+                task = this.taskQueue.removeLast();
+            } else {
+                task = this.taskQueue.removeFirst();
+            }
         }
         //long time = BuiltSection.getTime();
         var section = task.sectionSupplier.get();
@@ -150,6 +154,6 @@ public class RenderGenerationService {
     }
 
     public void addDebugData(List<String> debug) {
-        debug.add("RMQ: " + this.taskQueue.size());//render mesh queue
+        debug.add("RSSQ: " + this.taskQueue.size());//render section service queue
     }
 }
