@@ -38,8 +38,8 @@ public class HierarchicalOcclusionTraverser {
     private final GlBuffer renderList = new GlBuffer(100_000 * 4 + 4).zero();//100k sections max to render, TODO: Maybe move to render service or somewhere else
 
     private final GlBuffer queueMetaBuffer = new GlBuffer(4*4*5).zero();
-    private final GlBuffer scratchQueueA = new GlBuffer(10_000*4).zero();
-    private final GlBuffer scratchQueueB = new GlBuffer(10_000*4).zero();
+    private final GlBuffer scratchQueueA = new GlBuffer(20_000*4).zero();
+    private final GlBuffer scratchQueueB = new GlBuffer(20_000*4).zero();
 
     private static final int LOCAL_WORK_SIZE_BITS = 5;
     private static final int MAX_ITERATIONS = 5;
@@ -116,7 +116,7 @@ public class HierarchicalOcclusionTraverser {
         MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;
 
         //Screen space size for descending
-        MemoryUtil.memPutFloat(ptr, 64*64); ptr += 4;
+        MemoryUtil.memPutFloat(ptr, 128*128); ptr += 4;
     }
 
     private void bindings() {
