@@ -77,17 +77,17 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
 
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(0, 0,0,0));
-        this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
+        //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
 
-        /*
+
         final int H_WIDTH = 10;
         for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
-            for (int y = 0; y <= 0; y++) {
+            for (int y = -1; y <= 0; y++) {
                 for (int z = -H_WIDTH; z <= H_WIDTH; z++) {
                     this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
                 }
             }
-        }*/
+        }
     }
 
     public void setup(Camera camera) {

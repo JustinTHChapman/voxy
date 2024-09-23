@@ -48,7 +48,7 @@ public final class NodeStore {
         if (id < 0) {
             throw new IllegalStateException("Failed to allocate " + count + " consecutive nodes!!");
         }
-        this.ensureSized(id + (count-1));
+        this.ensureSized(id + count);
         for (int i = 0; i < count; i++) {
             this.clear(id + i);
         }

@@ -121,16 +121,14 @@ public class PostProcessing {
         glDepthMask(false);
         glColorMask(false,false,false,false);
         this.emptyBlit.blit();
-        glColorMask(true,true,true,true);
         glDepthMask(true);
-        //glDisable(GL_DEPTH_TEST);
-
 
         glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
         //Set depth to 0 w.r.t mask
         glStencilFunc(GL_EQUAL, 0, 0xFF);
         this.setDepth0.blit();
         glDisable(GL_DEPTH_TEST);
+        glColorMask(true,true,true,true);
 
         //Make voxy terrain render only where there isnt mc terrain
         glStencilFunc(GL_EQUAL, 1, 0xFF);
