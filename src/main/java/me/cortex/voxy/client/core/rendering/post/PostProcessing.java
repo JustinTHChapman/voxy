@@ -32,6 +32,7 @@ public class PostProcessing {
     private GlTexture colourSSAO;
     private GlTexture depthStencil;
     private boolean didSSAO;
+    private final FullscreenBlit setDepth0 = new FullscreenBlit("voxy:post/depth0.frag");
     private final FullscreenBlit emptyBlit = new FullscreenBlit("voxy:post/noop.frag");
     //private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_cutout.frag");
     private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag");
@@ -93,6 +94,7 @@ public class PostProcessing {
         if (this.colour != null) this.colour.free();
         if (this.depthStencil != null) this.depthStencil.free();
         this.emptyBlit.delete();
+        this.setDepth0.delete();
         this.blitTexture.delete();
         this.ssaoComp.free();
     }
@@ -121,14 +123,16 @@ public class PostProcessing {
         this.emptyBlit.blit();
         glColorMask(true,true,true,true);
         glDepthMask(true);
+        //glDisable(GL_DEPTH_TEST);
+
+
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        //Set depth to 0 w.r.t mask
+        glStencilFunc(GL_EQUAL, 0, 0xFF);
+        this.setDepth0.blit();
         glDisable(GL_DEPTH_TEST);
 
-        //Clear the depth buffer we copied cause else it will interfear with results (not really i think idk)
-        glClear(GL_DEPTH_BUFFER_BIT);
-
-
         //Make voxy terrain render only where there isnt mc terrain
-        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
         glStencilFunc(GL_EQUAL, 1, 0xFF);
 
 

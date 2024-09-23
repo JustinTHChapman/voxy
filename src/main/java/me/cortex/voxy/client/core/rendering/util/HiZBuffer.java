@@ -74,6 +74,8 @@ public class HiZBuffer {
         glBindFramebuffer(GL_FRAMEBUFFER, this.fb.id);
 
         glDepthFunc(GL_ALWAYS);
+        glDepthMask(true);
+        glEnable(GL_DEPTH_TEST);
 
 
         //System.err.println("SRC: " + GlTexture.getRawTextureType(srcDepthTex) + " DST: " + this.texture.id);
@@ -100,6 +102,7 @@ public class HiZBuffer {
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, this.levels-1);//TODO: CHECK IF ITS -1 or -0
 
         glDepthFunc(GL_LEQUAL);
+        glDisable(GL_DEPTH_TEST);
         glBindFramebuffer(GL_FRAMEBUFFER, boundFB);
         glViewport(0, 0, width, height);
         glBindVertexArray(0);

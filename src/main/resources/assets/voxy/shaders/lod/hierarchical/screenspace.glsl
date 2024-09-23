@@ -21,6 +21,7 @@ vec3 minBB;
 vec3 maxBB;
 vec2 size;
 
+uint lod;
 
 //Sets up screenspace with the given node id, returns true on success false on failure/should not continue
 //Accesses data that is setup in the main traversal and is just shared to here
@@ -34,7 +35,7 @@ void setupScreenspace(in UnpackedNode node) {
     vec3 point = VP*(((transform.transform*vec4((node.pos<<node.lodLevel) - transform.originPos.xyz, 1))
                     + (transform.worldPos.xyz-camChunkPos))-camSubChunk);
                     */
-
+    lod = node.lodLevel;
 
     vec4 base = VP*vec4(vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos, 1);
 
@@ -48,7 +49,7 @@ void setupScreenspace(in UnpackedNode node) {
 
     for (int i = 1; i < 8; i++) {
         //NOTE!: cant this be precomputed and put in an array?? in the scene uniform??
-        vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0),1))*(32<<node.lodLevel);//Size of section is 32x32x32 (need to change it to a bounding box in the future)
+        vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*(32<<node.lodLevel),1));//Size of section is 32x32x32 (need to change it to a bounding box in the future)
         pPoint += base;
         vec3 point = pPoint.xyz/pPoint.w;
         //TODO: CLIP TO VIEWPORT
@@ -74,7 +75,6 @@ void setupScreenspace(in UnpackedNode node) {
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
-    printf("Cull point (%f %f %f)x(%f %f %f)", maxBB.x, maxBB.y, maxBB.z, minBB.x, minBB.y, minBB.z);
     return any(lessThanEqual(maxBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), minBB));
 }
 
@@ -85,11 +85,12 @@ bool isCulledByHiz() {
     vec2 ssize = size.xy * vec2(ivec2(screenW, screenH));
     float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
-    return textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) > 0.0001f;
+    //    printf("HiZ sample point culled: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
+    return textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) < 0.0001f;
 }
 
 //Returns if we should decend into its children or not
 bool shouldDecend() {
-    printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(size.x), float(size.y));
+    //printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(size.x), float(size.y));
     return (size.x*size.y*screenW*screenH) > minSSS;
 }

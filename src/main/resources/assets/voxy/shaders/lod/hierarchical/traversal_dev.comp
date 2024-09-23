@@ -23,7 +23,7 @@ SIMPLE_QUEUE(uvec2, requestQueue, REQUEST_QUEUE_BINDING);
 SIMPLE_QUEUE(uint, renderQueue, RENDER_QUEUE_BINDING);
 
 void addRequest(inout UnpackedNode node) {
-    printf("Put node decend request");
+    //printf("Put node decend request");
     if (!hasRequested(node)) {
         if (requestQueueIndex.x < REQUEST_QUEUE_SIZE) {
             uint atomRes = atomicAdd(requestQueueIndex.x, 1);
@@ -59,17 +59,17 @@ void enqueueSelfForRender(in UnpackedNode node) {
 void traverse(in UnpackedNode node) {
     //Compute screenspace
     setupScreenspace(node);
-    debugDumpNode(node);
+    //debugDumpNode(node);
 
     if (outsideFrustum() || isCulledByHiz()) {
-        printf("culled");
+        //printf("culled");
     } else {
         //It is visible, TODO: maybe do a more detailed hiz test? (or make it so that )
 
         //Only decend if not a root node
         if (node.lodLevel!=0 && shouldDecend()) {
             if (hasChildren(node)) {
-                printf("A");
+                //printf("A");
                 enqueueChildren(node);
             } else {
                 printf("B");
