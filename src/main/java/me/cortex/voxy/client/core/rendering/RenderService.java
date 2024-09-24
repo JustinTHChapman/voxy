@@ -69,7 +69,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
             this.sectionUpdateQueue.push(section);
         });
 
-        this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);
+        this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 256);
 
         world.setDirtyCallback(router::forward);
 
@@ -79,7 +79,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(0, 0,0,0));
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
 
-
+        /*
         final int H_WIDTH = 10;
         for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
             for (int y = -1; y <= 0; y++) {
@@ -87,7 +87,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
                     this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
                 }
             }
-        }
+        }*/
     }
 
     public void setup(Camera camera) {

@@ -69,7 +69,7 @@ void setupScreenspace(in UnpackedNode node) {
     maxBB = maxBB*0.5f+0.5f;
     minBB = minBB*0.5f+0.5f;
 
-    size = (maxBB.xy - minBB.xy);//We half it for implicit conversion to screenspace
+    size = clamp(maxBB.xy - minBB.xy, vec2(0), vec2(1));//We half it for implicit conversion to screenspace
 
 }
 
@@ -85,8 +85,12 @@ bool isCulledByHiz() {
     vec2 ssize = size.xy * vec2(screenW, screenH);
     float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
-    //    printf("HiZ sample point culled: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
-    return textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) < 0.0001f;
+    bool culled = textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) < 0.0001f;
+    /*
+    if (culled) {
+        printf("HiZ sample point not culled: (%f,%f)@%f against %f, level %d", midpoint.x, midpoint.y, miplevel, minBB.z, lod);
+    }*/
+    return culled;
 }
 
 //Returns if we should decend into its children or not

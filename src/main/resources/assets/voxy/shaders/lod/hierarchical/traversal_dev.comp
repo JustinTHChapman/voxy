@@ -72,7 +72,7 @@ void traverse(in UnpackedNode node) {
                 //printf("A");
                 enqueueChildren(node);
             } else {
-                printf("B");
+                //printf("B");
                 addRequest(node);
                 //TODO: use self mesh (is error state if it doesnt have one since all leaf nodes should have a mesh)
                 // Basicly guarenteed to have a mesh, if it doesnt it is very very bad and incorect since its a violation of the graph properties
@@ -81,10 +81,10 @@ void traverse(in UnpackedNode node) {
             }
         } else {
             if (hasMesh(node)) {
-                printf("C");
+                //printf("C");
                 enqueueSelfForRender(node);
             } else {
-                printf("D");
+                //printf("D");
                 //!! not ideal, we want to render this mesh but dont have it. If we havent sent a request
                 // then send a request for a mesh for this node.
                 addRequest(node);
