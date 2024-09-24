@@ -102,6 +102,11 @@ public class ServiceThreadPool {
         this.jobCounter.release(1);
     }
 
+    void steal(ServiceSlice service) {
+        this.totalJobWeight.addAndGet(-service.weightPerJob);
+        this.jobCounter.acquireUninterruptibly(1);
+    }
+
     private void worker(int threadId) {
         long seed = 1234342;
         int revolvingSelector = 0;

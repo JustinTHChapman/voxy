@@ -30,7 +30,10 @@ public class ActiveSectionTracker {
     }
 
     public WorldSection acquire(int lvl, int x, int y, int z, boolean nullOnEmpty) {
-        long key = WorldEngine.getWorldSectionId(lvl, x, y, z);
+        return this.acquire(WorldEngine.getWorldSectionId(lvl, x, y, z), nullOnEmpty);
+    }
+
+    public WorldSection acquire(long key, boolean nullOnEmpty) {
         var cache = this.loadedSectionCache[this.getCacheArrayIndex(key)];
         VolatileHolder<WorldSection> holder = null;
         boolean isLoader = false;
@@ -50,7 +53,12 @@ public class ActiveSectionTracker {
 
         //If this thread was the one to create the reference then its the thread to load the section
         if (isLoader) {
-            var section = new WorldSection(lvl, x, y, z, this);
+            var section = new WorldSection(WorldEngine.getLevel(key),
+                    WorldEngine.getX(key),
+                    WorldEngine.getY(key),
+                    WorldEngine.getZ(key),
+                    this);
+
             int status = -1;//this.dataCache.load(section);
             if (status == -1) {//Cache miss
                 status = this.loader.load(section);
@@ -85,7 +93,7 @@ public class ActiveSectionTracker {
                     return section;
                 }
             }
-            return this.acquire(lvl, x, y, z, nullOnEmpty);
+            return this.acquire(key, nullOnEmpty);
         }
     }
 

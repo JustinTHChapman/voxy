@@ -17,6 +17,7 @@ public class WorldEngine {
     public static final int UPDATE_TYPE_BLOCK_BIT = 1;
     public static final int UPDATE_TYPE_CHILD_EXISTENCE_BIT = 2;
     public static final int UPDATE_FLAGS = UPDATE_TYPE_BLOCK_BIT | UPDATE_TYPE_CHILD_EXISTENCE_BIT;
+
     public interface ISectionChangeCallback {void accept(WorldSection section, int updateFlags);}
 
 
@@ -75,6 +76,14 @@ public class WorldEngine {
 
     public WorldSection acquire(int lvl, int x, int y, int z) {
         return this.sectionTracker.acquire(lvl, x, y, z, false);
+    }
+
+    public WorldSection acquire(long pos) {
+        return this.sectionTracker.acquire(pos, false);
+    }
+
+    public WorldSection acquireIfExists(long pos) {
+        return this.sectionTracker.acquire(pos, true);
     }
 
     //TODO: Fixme/optimize, cause as the lvl gets higher, the size of x,y,z gets smaller so i can dynamically compact the format

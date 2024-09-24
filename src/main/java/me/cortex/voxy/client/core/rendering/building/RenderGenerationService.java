@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering.building;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import me.cortex.voxy.client.core.model.IdNotYetComputedException;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
@@ -16,8 +17,13 @@ import java.util.function.Supplier;
 
 //TODO: Add a render cache
 public class RenderGenerationService {
-    public interface TaskChecker {boolean check(int lvl, int x, int y, int z);}
-    private record BuildTask(long position, Supplier<WorldSection> sectionSupplier, boolean[] hasDoneModelRequest) {}
+    private static final class BuildTask {
+        final long position;
+        boolean hasDoneModelRequest;
+        private BuildTask(long position) {
+            this.position = position;
+        }
+    }
 
     private final Long2ObjectLinkedOpenHashMap<BuildTask> taskQueue = new Long2ObjectLinkedOpenHashMap<>();
 
@@ -61,6 +67,10 @@ public class RenderGenerationService {
         }
     }
 
+    private WorldSection acquireSection(long pos) {
+        return this.world.acquireIfExists(pos);
+    }
+
     //TODO: add a generated render data cache
     private void processJob(RenderDataFactory factory) {
         BuildTask task;
@@ -72,7 +82,7 @@ public class RenderGenerationService {
             }
         }
         //long time = BuiltSection.getTime();
-        var section = task.sectionSupplier.get();
+        var section = this.acquireSection(task.position);
         if (section == null) {
             this.resultConsumer.accept(BuiltSection.empty(task.position));
             return;
@@ -85,7 +95,7 @@ public class RenderGenerationService {
             if (!this.modelBakery.factory.hasModelForBlockId(e.id)) {
                 this.modelBakery.requestBlockBake(e.id);
             }
-            if (task.hasDoneModelRequest[0]) {
+            if (task.hasDoneModelRequest) {
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException ex) {
@@ -95,11 +105,18 @@ public class RenderGenerationService {
                 //The reason for the extra id parameter is that we explicitly add/check against the exception id due to e.g. requesting accross a chunk boarder wont be captured in the request
                 this.computeAndRequestRequiredModels(section, e.id);
             }
-            //We need to reinsert the build task into the queue
-            //System.err.println("Render task failed to complete due to un-computed client id");
-            synchronized (this.taskQueue) {
-                var queuedTask = this.taskQueue.computeIfAbsent(section.key, (a)->task);
-                queuedTask.hasDoneModelRequest[0] = true;//Mark (or remark) the section as having chunks requested
+
+            {
+                //We need to reinsert the build task into the queue
+                BuildTask queuedTask;
+                synchronized (this.taskQueue) {
+                    queuedTask = this.taskQueue.putIfAbsent(section.key, task);
+                }
+                if (queuedTask == null) {
+                    queuedTask = task;
+                }
+
+                queuedTask.hasDoneModelRequest = true;//Mark (or remark) the section as having chunks requested
 
                 if (queuedTask == task) {//use the == not .equal to see if we need to release a permit
                     this.threads.execute();//Since we put in queue, release permit
@@ -113,36 +130,33 @@ public class RenderGenerationService {
         }
     }
 
-    public void enqueueTask(int lvl, int x, int y, int z) {
-        this.enqueueTask(lvl, x, y, z, (l,x1,y1,z1)->true);
-    }
 
-    public void enqueueTask(long position) {
-        this.enqueueTask(position, (l,x1,y1,z1)->true);
-    }
-
-    public void enqueueTask(int lvl, int x, int y, int z, TaskChecker checker) {
-        this.enqueueTask(WorldEngine.getWorldSectionId(lvl, x, y, z), checker);
-    }
-
-    public void enqueueTask(long ikey, TaskChecker checker) {
+    public void enqueueTask(long pos) {
         synchronized (this.taskQueue) {
-            this.taskQueue.computeIfAbsent(ikey, key->{
+            this.taskQueue.computeIfAbsent(pos, key->{
                 this.threads.execute();
-                return new BuildTask(ikey, ()->{
-                    if (checker.check(WorldEngine.getLevel(ikey), WorldEngine.getX(ikey), WorldEngine.getY(ikey), WorldEngine.getZ(ikey))) {
-                        return this.world.acquireIfExists(WorldEngine.getLevel(ikey), WorldEngine.getX(ikey), WorldEngine.getY(ikey), WorldEngine.getZ(ikey));
-                    } else {
-                        return null;
-                    }
-                }, new boolean[1]);
+                return new BuildTask(key);
             });
         }
     }
 
-    public int getTaskCount() {
-        return this.threads.getJobCount();
+    public void removeTask(long pos) {
+        BuildTask task;
+        synchronized (this.taskQueue) {
+            task = this.taskQueue.remove(pos);
+        }
+        if (task != null) {
+            if (!this.threads.steal()) {
+                throw new IllegalStateException("Failed to steal a task!!!");
+            }
+        }
     }
+
+    /*
+    public void enqueueTask(int lvl, int x, int y, int z) {
+        this.enqueueTask(WorldEngine.getWorldSectionId(lvl, x, y, z));
+    }
+    */
 
     public void shutdown() {
         this.threads.shutdown();

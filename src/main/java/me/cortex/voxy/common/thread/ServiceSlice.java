@@ -77,7 +77,9 @@ public class ServiceSlice extends TrackedObject {
             if (this.activeCount.decrementAndGet() < 0) {
                 throw new IllegalStateException("Alive count negative!");
             }
-            this.jobCount2.decrementAndGet();
+            if (this.jobCount2.decrementAndGet() < 0) {
+                throw new IllegalStateException("Job count negative!");
+            }
         }
         return true;
     }
@@ -132,5 +134,17 @@ public class ServiceSlice extends TrackedObject {
             }
             Thread.yield();
         }
+    }
+
+    //Steal a job, if there is no job available return false
+    public boolean steal() {
+        if (!this.jobCount.tryAcquire()) {
+            return false;
+        }
+        if (this.jobCount2.decrementAndGet() < 0) {
+            throw new IllegalStateException("Job count negative!!!");
+        }
+        this.threadPool.steal(this);
+        return true;
     }
 }
