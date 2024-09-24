@@ -82,7 +82,7 @@ bool isCulledByHiz() {
     if (minBB.z < 0) {//Minpoint is behind the camera, its always going to pass
         return false;
     }
-    vec2 ssize = size.xy * vec2(ivec2(screenW, screenH));
+    vec2 ssize = size.xy * vec2(screenW, screenH);
     float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
     //    printf("HiZ sample point culled: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);

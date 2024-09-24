@@ -106,17 +106,17 @@ public class HierarchicalOcclusionTraverser {
         MemoryUtil.memPutInt(ptr, sy); ptr += 4;
         MemoryUtil.memPutInt(ptr, sz); ptr += 4;
 
-        MemoryUtil.memPutInt(ptr, viewport.width); ptr += 4;
+        MemoryUtil.memPutFloat(ptr, viewport.width); ptr += 4;
 
         var innerTranslation = new Vector3f((float) (viewport.cameraX-(sx<<5)), (float) (viewport.cameraY-(sy<<5)), (float) (viewport.cameraZ-(sz<<5)));
         innerTranslation.getToAddress(ptr); ptr += 4*3;
 
-        MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
+        MemoryUtil.memPutFloat(ptr, viewport.height); ptr += 4;
 
         MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;
 
         //Screen space size for descending
-        MemoryUtil.memPutFloat(ptr, 128*128); ptr += 4;
+        MemoryUtil.memPutFloat(ptr, 150*150); ptr += 4;
     }
 
     private void bindings() {
