@@ -38,7 +38,7 @@ public class ModelBakerySubsystem {
 
     public void tick() {
         //There should be a method to access the frame time IIRC, if the user framecap is unlimited lock it to like 60 fps for computation
-        int BUDGET = 10;//TODO: make this computed based on the remaining free time in a frame (and like div by 2 to reduce overhead) (with a min of 1)
+        int BUDGET = 20;//TODO: make this computed based on the remaining free time in a frame (and like div by 2 to reduce overhead) (with a min of 1)
 
         for (int i = 0; i < BUDGET && !this.blockIdQueue.isEmpty(); i++) {
             int blockId = -1;

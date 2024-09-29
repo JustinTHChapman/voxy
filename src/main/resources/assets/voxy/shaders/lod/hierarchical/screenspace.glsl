@@ -21,8 +21,6 @@ vec3 minBB;
 vec3 maxBB;
 vec2 size;
 
-uint lod;
-
 //Sets up screenspace with the given node id, returns true on success false on failure/should not continue
 //Accesses data that is setup in the main traversal and is just shared to here
 void setupScreenspace(in UnpackedNode node) {
@@ -35,7 +33,6 @@ void setupScreenspace(in UnpackedNode node) {
     vec3 point = VP*(((transform.transform*vec4((node.pos<<node.lodLevel) - transform.originPos.xyz, 1))
                     + (transform.worldPos.xyz-camChunkPos))-camSubChunk);
                     */
-    lod = node.lodLevel;
 
     vec4 base = VP*vec4(vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos, 1);
 
@@ -86,10 +83,10 @@ bool isCulledByHiz() {
     float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
     bool culled = textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) < 0.0001f;
-    /*
+
     if (culled) {
-        printf("HiZ sample point not culled: (%f,%f)@%f against %f, level %d", midpoint.x, midpoint.y, miplevel, minBB.z, lod);
-    }*/
+        printf("HiZ sample point culled: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
+    }
     return culled;
 }
 

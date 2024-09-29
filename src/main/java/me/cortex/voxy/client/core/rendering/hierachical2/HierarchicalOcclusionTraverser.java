@@ -28,9 +28,10 @@ import static org.lwjgl.opengl.GL45.*;
 
 // TODO: swap to persistent gpu threads instead of dispatching MAX_ITERATIONS of compute layers
 public class HierarchicalOcclusionTraverser {
+    public static final int REQUEST_QUEUE_SIZE = 256;
+
     private final NodeManager2 nodeManager;
 
-    private final int maxRequestCount;
     private final GlBuffer requestBuffer;
 
     private final GlBuffer nodeBuffer;
@@ -61,7 +62,7 @@ public class HierarchicalOcclusionTraverser {
             .defineIf("DEBUG", Voxy.SHADER_DEBUG)
             .define("MAX_ITERATIONS", MAX_ITERATIONS)
             .define("LOCAL_SIZE_BITS", LOCAL_WORK_SIZE_BITS)
-            .define("REQUEST_QUEUE_SIZE", NodeManager.REQUEST_QUEUE_SIZE)
+            .define("REQUEST_QUEUE_SIZE", REQUEST_QUEUE_SIZE)
 
             .define("HIZ_BINDING", 0)
 
@@ -79,11 +80,10 @@ public class HierarchicalOcclusionTraverser {
             .compile();
 
 
-    public HierarchicalOcclusionTraverser(NodeManager2 nodeManager, int requestBufferCount) {
+    public HierarchicalOcclusionTraverser(NodeManager2 nodeManager) {
         this.nodeManager = nodeManager;
-        this.requestBuffer = new GlBuffer(requestBufferCount*8L+8).zero();
+        this.requestBuffer = new GlBuffer(REQUEST_QUEUE_SIZE*8L+8).zero();
         this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).zero();
-        this.maxRequestCount = requestBufferCount;
 
 
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
@@ -245,8 +245,8 @@ public class HierarchicalOcclusionTraverser {
             Logger.warn("Count over max buffer size, clamping, got count: " + count);
             count = (int) ((this.requestBuffer.size()>>3)-1);
         }
-        if (count > this.maxRequestCount) {
-            System.err.println("Count larger than 'maxRequestCount', overflow captured. Overflowed by " + (count-this.maxRequestCount));
+        if (count > REQUEST_QUEUE_SIZE) {
+            System.err.println("Count larger than 'maxRequestCount', overflow captured. Overflowed by " + (count-REQUEST_QUEUE_SIZE));
         }
         if (count != 0) {
             //this.nodeManager.processRequestQueue(count, ptr + 8);
