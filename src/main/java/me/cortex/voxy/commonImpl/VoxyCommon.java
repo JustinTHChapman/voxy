@@ -35,7 +35,7 @@ public class VoxyCommon implements ModInitializer {
 
 
     //This is hardcoded like this because people do not understand what they are doing
-    private static final boolean GlobalVerificationDisableOverride = true;//System.getProperty("voxy.verificationDisableOverride", "false").equals("true");
+    private static final boolean GlobalVerificationDisableOverride = false;//System.getProperty("voxy.verificationDisableOverride", "false").equals("true");
     public static boolean isVerificationFlagOn(String name) {
         return (!GlobalVerificationDisableOverride) && System.getProperty("voxy."+name, "true").equals("true");
     }
