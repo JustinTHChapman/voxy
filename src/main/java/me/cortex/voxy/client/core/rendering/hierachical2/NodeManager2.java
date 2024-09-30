@@ -369,6 +369,17 @@ public class NodeManager2 {
     }
 
     //==================================================================================================================
+    // Used by the cleaning system to ensure memory capacity in the geometry store
+    int markGeometryNull(int nodeId) {
+        return 0;
+    }
+
+    //Removes, clears and frees itself, all children, requests and everything recursively
+    void removeNodeAndChildrenRecursive(int nodeId) {
+
+    }
+
+    //==================================================================================================================
     public boolean writeChanges(GlBuffer nodeBuffer) {
         //TODO: use like compute based copy system or something
         // since microcopies are bad
