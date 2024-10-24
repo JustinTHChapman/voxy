@@ -223,6 +223,8 @@ public class ModelTextureBakery {
 
         var bb = new BufferBuilder(this.allocator, VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
         if (!renderFluid) {
+            //TODO: need to do 2 variants for quads, one which have coloured, ones that dont, might be able to pull a spare bit
+            // at the end whether or not a pixel should be mixed with texture
             renderQuads(bb, state, model, new MatrixStack(), randomValue);
         } else {
             MinecraftClient.getInstance().getBlockRenderManager().renderFluid(BlockPos.ORIGIN, new BlockRenderView() {
@@ -328,8 +330,8 @@ public class ModelTextureBakery {
             var quads = model.getQuads(state, direction, new LocalRandom(randomValue));
             for (var quad : quads) {
                 //TODO: mark pixels that have
-                int meta = quad.hasColor()?1:0;
-                builder.quad(stack.peek(), quad, 255f/((meta>>16)&0xff), 255f/((meta>>8)&0xff), 255f/(meta&0xff), 1.0f, 0, 0);
+                int meta = 1;
+                builder.quad(stack.peek(), quad, ((meta>>16)&0xff)/255f, ((meta>>8)&0xff)/255f, (meta&0xff)/255f, 1.0f, 0, 0);
             }
         }
     }

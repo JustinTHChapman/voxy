@@ -7,10 +7,12 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlFence;
 import me.cortex.voxy.client.core.gl.GlPersistentMappedBuffer;
 import me.cortex.voxy.client.core.util.AllocationArena;
+import me.cortex.voxy.common.util.MemoryBuffer;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.function.Consumer;
 
 import static me.cortex.voxy.client.core.util.AllocationArena.SIZE_LIMIT;
 import static org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData;
@@ -49,14 +51,24 @@ public class DownloadStream {
         this.download(buffer, 0, buffer.size(), resultConsumer);
     }
 
-    public void download(GlBuffer buffer, long destOffset, long size, DownloadResultConsumer resultConsumer) {
+    public void download(GlBuffer buffer, Consumer<MemoryBuffer> resultConsumer) {
+        this.download(buffer, 0, buffer.size(), resultConsumer);
+    }
+
+    public void download(GlBuffer buffer, long downloadOffset, long size, Consumer<MemoryBuffer> consumer) {
+        this.download(buffer, downloadOffset, size, (ptr,size2)-> {
+            consumer.accept(MemoryBuffer.createUntrackedUnfreeableRawFrom(ptr, size));
+        });
+    }
+
+    public void download(GlBuffer buffer, long downloadOffset, long size, DownloadResultConsumer resultConsumer) {
         if (size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException();
         }
         if (size <= 0) {
             throw new IllegalArgumentException();
         }
-        if (destOffset+size > buffer.size()) {
+        if (downloadOffset+size > buffer.size()) {
             throw new IllegalArgumentException();
         }
 
@@ -87,7 +99,7 @@ public class DownloadStream {
             throw new IllegalStateException();
         }
 
-        this.downloadList.add(new DownloadData(buffer, addr, destOffset, size, resultConsumer));
+        this.downloadList.add(new DownloadData(buffer, addr, downloadOffset, size, resultConsumer));
     }
 
 

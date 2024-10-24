@@ -9,7 +9,11 @@ public class GeometryCache {
     private long currentSize;
     private final Long2ObjectLinkedOpenHashMap<BuiltSection> cache = new Long2ObjectLinkedOpenHashMap<>();
     public GeometryCache(long maxSize) {
-        this.maxCombinedSize = maxSize;
+        this.setMaxTotalSize(maxSize);
+    }
+
+    public void setMaxTotalSize(long size) {
+        this.maxCombinedSize = size;
     }
 
     //Puts the section into the cache

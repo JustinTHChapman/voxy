@@ -5,15 +5,17 @@ import org.lwjgl.system.MemoryUtil;
 public class MemoryBuffer extends TrackedObject {
     public final long address;
     public final long size;
+    private final boolean freeable;
 
     public MemoryBuffer(long size) {
-        this.size = size;
-        this.address = MemoryUtil.nmemAlloc(size);
+        this(true, MemoryUtil.nmemAlloc(size), size, true);
     }
 
-    private MemoryBuffer(long address, long size) {
+    private MemoryBuffer(boolean track, long address, long size, boolean freeable) {
+        super(track);
         this.size = size;
         this.address = address;
+        this.freeable = freeable;
     }
 
     public void cpyTo(long dst) {
@@ -24,11 +26,15 @@ public class MemoryBuffer extends TrackedObject {
     @Override
     public void free() {
         super.free0();
-        MemoryUtil.nmemFree(this.address);
+        if (this.freeable) {
+            MemoryUtil.nmemFree(this.address);
+        } else {
+            throw new IllegalArgumentException("Tried to free unfreeable buffer");
+        }
     }
 
     public MemoryBuffer copy() {
-        var copy = new MemoryBuffer(this.size);
+        var copy = new MemoryBuffer(false, this.size, size, freeable);
         this.cpyTo(copy.address);
         return copy;
     }
@@ -41,10 +47,18 @@ public class MemoryBuffer extends TrackedObject {
         //Free the current object, but not the memory associated with it
         super.free0();
 
-        return new MemoryBuffer(this.address, size);
+        return new MemoryBuffer(true, this.address, size, this.freeable);
     }
 
 
     //TODO: create like Long(offset) -> value at offset
     // methods for get and set, that way can have a single unifed system to ensure memory access bounds
+
+
+    public static MemoryBuffer createUntrackedRawFrom(long address, long size) {
+        return new MemoryBuffer(false, address, size, true);
+    }
+    public static MemoryBuffer createUntrackedUnfreeableRawFrom(long address, long size) {
+        return new MemoryBuffer(false, address, size, false);
+    }
 }

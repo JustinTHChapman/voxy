@@ -3,6 +3,8 @@ package me.cortex.voxy.client.core.rendering.section;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.jellysquid.mods.sodium.client.util.MathUtil;
 
+import java.util.function.Consumer;
+
 //Does not care about the position of the sections, multiple sections that have the same position can be uploaded
 // it is up to the traversal system to manage what sections exist in the geometry buffer
 // the system is basicly "dumb" as in it just follows orders
@@ -24,4 +26,6 @@ public abstract class AbstractSectionGeometryManager {
     public void tick() {}
 
     public void free() {}
+
+    public abstract void downloadAndRemove(int id, Consumer<BuiltSection> callback);
 }

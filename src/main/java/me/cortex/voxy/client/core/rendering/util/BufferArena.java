@@ -7,6 +7,8 @@ import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.function.Consumer;
+
 public class BufferArena {
     private final long size;
     private final int elementSize;
@@ -61,5 +63,11 @@ public class BufferArena {
 
     public long getUsedBytes() {
         return this.used*this.elementSize;
+    }
+
+    public void downloadRemove(long allocation, Consumer<MemoryBuffer> consumer) {
+        int size = this.allocationMap.free(allocation);
+        this.used -= size;
+        DownloadStream.INSTANCE.download(this.buffer, allocation*this.elementSize, (long) size *this.elementSize, consumer);
     }
 }

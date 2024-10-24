@@ -7,11 +7,15 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.util.BufferArena;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.util.HierarchicalBitSet;
+import me.cortex.voxy.common.util.MemoryBuffer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 import org.lwjgl.system.MemoryUtil;
+
+import java.util.function.Consumer;
 
 public class BasicSectionGeometryManager extends AbstractSectionGeometryManager {
     private static final int SECTION_METADATA_SIZE = 32;
@@ -86,10 +90,11 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
             throw new IllegalStateException("Unable to upload section geometry as geometry buffer is full");
         }
         //8 bytes per quad
-        return new SectionMeta(geometry.position, geometry.aabb, geometryPtr, (int) (geometry.geometryBuffer.size/8), geometry.offsets);
+        return new SectionMeta(geometry.position, geometry.aabb, geometryPtr, (int) (geometry.geometryBuffer.size/8), geometry.offsets, geometry.childExistence);
     }
 
-    private record SectionMeta(long position, int aabb, int geometryPtr, int itemCount, int[] offsets) {
+    //TODO: move child existence to and external thing to not get confused
+    private record SectionMeta(long position, int aabb, int geometryPtr, int itemCount, int[] offsets, byte childExistence) {
         public void writeMetadata(long ptr) {
             //Split the long into 2 ints to solve endian issues
             MemoryUtil.memPutInt(ptr, (int) (this.position>>32)); ptr += 4;
@@ -128,6 +133,20 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
         this.sectionMetadataBuffer.free();
         this.geometry.free();
     }
+
+    @Override
+    public void downloadAndRemove(int id, Consumer<BuiltSection> callback) {
+        if (!this.allocationSet.free(id)) {
+            throw new IllegalStateException("Id was not already allocated. id: " + id);
+        }
+        var oldMetadata = this.sectionMetadata.set(id, null);
+        this.geometry.downloadRemove(oldMetadata.geometryPtr, buffer ->
+            callback.accept(new BuiltSection(oldMetadata.position, oldMetadata.childExistence, oldMetadata.aabb, buffer.copy(), oldMetadata.offsets))
+        );
+        this.geometry.free(oldMetadata.geometryPtr);
+        this.invalidatedSectionIds.add(id);
+    }
+
 
     int getSectionCount() {
         return this.allocationSet.getCount();

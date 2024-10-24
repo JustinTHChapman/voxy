@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering.hierarchical;
+package me.cortex.voxy.client.core.rendering.hierachical2;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;

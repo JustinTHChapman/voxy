@@ -6,7 +6,6 @@ import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
-import org.lwjgl.system.MemoryUtil;
 import redis.clients.jedis.JedisPool;
 
 import java.nio.ByteBuffer;
