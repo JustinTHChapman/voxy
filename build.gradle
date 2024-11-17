@@ -28,6 +28,7 @@ def gitCommitHash = { ->
     exec {
         commandLine 'git', 'rev-parse', '--short', 'HEAD'
         standardOutput = stdout
+        ignoreExitValue = true
     }
     return stdout.toString().trim()
 }
