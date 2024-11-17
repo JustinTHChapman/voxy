@@ -103,16 +103,13 @@ layout(binding = MODEL_COLOUR_BUFFER_BINDING, std430) readonly restrict buffer M
 };
 #endif
 
-#ifdef LIGHTING_BUFFER_BINDING
-layout(binding = LIGHTING_BUFFER_BINDING, std430) readonly restrict buffer LightingBuffer {
-    uint lightData[];
-};
+#ifdef LIGHTING_SAMPLER_BINDING
+
+layout(binding = LIGHTING_SAMPLER_BINDING) uniform sampler2D lightSampler;
 
 vec4 getLighting(uint index) {
-    uvec4 arr = uvec4(lightData[index]);
-    arr = arr>>uvec4(16,8,0,24);
-    arr = arr & uvec4(0xFF);
-    return vec4(arr)*vec4(1.0f/255.0f);
+    int i2 = int(index);
+    return texture(lightSampler, vec2((i2>>4)&0xF, i2&0xF)/16.0f);
 }
 #endif
 

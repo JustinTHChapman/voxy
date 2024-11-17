@@ -89,7 +89,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getGeometryBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.geometryManager.getMetadataBufferId());
         this.modelStore.bind(3, 4, 0);
-        LightMapHelper.bind(5);
+        LightMapHelper.bind(1);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawCallBuffer.id);
@@ -99,7 +99,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
 
     private void renderTerrain() {
-        RenderLayer.getCutoutMipped().startDrawing();
+        //RenderLayer.getCutoutMipped().startDrawing();
 
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
@@ -113,7 +113,10 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glBindVertexArray(0);
         glBindSampler(0, 0);
         glBindTextureUnit(0, 0);
-        RenderLayer.getCutoutMipped().endDrawing();
+        glBindSampler(1, 0);
+        glBindTextureUnit(1, 0);
+
+        //RenderLayer.getCutoutMipped().endDrawing();
     }
 
     @Override
