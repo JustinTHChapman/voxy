@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
+/*
 @Mixin(ClientChunkManager.class)
 public class MixinClientChunkManager {
     @Shadow @Final ClientWorld world;
@@ -27,3 +28,4 @@ public class MixinClientChunkManager {
         }
     }
 }
+*/

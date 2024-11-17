@@ -1,6 +1,6 @@
 package me.cortex.voxy.client.core.model;
 
-import me.jellysquid.mods.sodium.client.util.color.ColorSRGB;
+import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
 import net.minecraft.util.math.ColorHelper;
 
 //Texturing utils to manipulate data from the model bakery
@@ -183,8 +183,8 @@ public class TextureUtils {
 
     //TODO: FIXME!!! ITS READING IT AS ABGR??? isnt the format RGBA??
     private static int weightedAverageColor(int one, int two) {
-        int alphaOne = ColorHelper.Abgr.getAlpha(one);
-        int alphaTwo = ColorHelper.Abgr.getAlpha(two);
+        int alphaOne = ColorHelper.getAlpha(one);
+        int alphaTwo = ColorHelper.getAlpha(two);
         if (alphaOne == alphaTwo) {
             return averageRgb(one, two, alphaOne);
         } else if (alphaOne == 0) {
@@ -195,12 +195,12 @@ public class TextureUtils {
             float scale = 1.0F / (float)(alphaOne + alphaTwo);
             float relativeWeightOne = (float)alphaOne * scale;
             float relativeWeightTwo = (float)alphaTwo * scale;
-            float oneR = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getRed(one)) * relativeWeightOne;
-            float oneG = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getGreen(one)) * relativeWeightOne;
-            float oneB = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getBlue(one)) * relativeWeightOne;
-            float twoR = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getRed(two)) * relativeWeightTwo;
-            float twoG = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getGreen(two)) * relativeWeightTwo;
-            float twoB = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getBlue(two)) * relativeWeightTwo;
+            float oneR = ColorSRGB.srgbToLinear(ColorHelper.getRed(one)) * relativeWeightOne;
+            float oneG = ColorSRGB.srgbToLinear(ColorHelper.getGreen(one)) * relativeWeightOne;
+            float oneB = ColorSRGB.srgbToLinear(ColorHelper.getBlue(one)) * relativeWeightOne;
+            float twoR = ColorSRGB.srgbToLinear(ColorHelper.getRed(two)) * relativeWeightTwo;
+            float twoG = ColorSRGB.srgbToLinear(ColorHelper.getGreen(two)) * relativeWeightTwo;
+            float twoB = ColorSRGB.srgbToLinear(ColorHelper.getBlue(two)) * relativeWeightTwo;
             float linearR = oneR + twoR;
             float linearG = oneG + twoG;
             float linearB = oneB + twoB;
@@ -210,12 +210,12 @@ public class TextureUtils {
     }
 
     private static int averageRgb(int a, int b, int alpha) {
-        float ar = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getRed(a));
-        float ag = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getGreen(a));
-        float ab = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getBlue(a));
-        float br = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getRed(b));
-        float bg = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getGreen(b));
-        float bb = ColorSRGB.srgbToLinear(ColorHelper.Abgr.getBlue(b));
+        float ar = ColorSRGB.srgbToLinear(ColorHelper.getRed(a));
+        float ag = ColorSRGB.srgbToLinear(ColorHelper.getGreen(a));
+        float ab = ColorSRGB.srgbToLinear(ColorHelper.getBlue(a));
+        float br = ColorSRGB.srgbToLinear(ColorHelper.getRed(b));
+        float bg = ColorSRGB.srgbToLinear(ColorHelper.getGreen(b));
+        float bb = ColorSRGB.srgbToLinear(ColorHelper.getBlue(b));
         return ColorSRGB.linearToSrgb((ar + br) * 0.5F, (ag + bg) * 0.5F, (ab + bb) * 0.5F, alpha);
     }
 }

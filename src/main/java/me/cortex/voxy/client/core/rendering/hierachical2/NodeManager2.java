@@ -11,7 +11,7 @@ import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.core.util.ExpandingObjectAllocationList;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.jellysquid.mods.sodium.client.util.MathUtil;
+import net.caffeinemc.mods.sodium.client.util.MathUtil;
 
 import java.util.List;
 

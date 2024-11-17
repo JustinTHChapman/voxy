@@ -5,6 +5,7 @@ import me.cortex.voxy.client.core.IGetVoxelCore;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.VoxelCore;
 import net.minecraft.client.render.*;
+import net.minecraft.client.util.ObjectAllocator;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
 import org.jetbrains.annotations.Nullable;
@@ -25,17 +26,9 @@ public abstract class MixinWorldRenderer implements IGetVoxelCore {
     @Unique private VoxelCore core;
 
     @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/WorldRenderer;setupTerrain(Lnet/minecraft/client/render/Camera;Lnet/minecraft/client/render/Frustum;ZZ)V", shift = At.Shift.AFTER))
-    private void injectSetup(RenderTickCounter tickCounter, boolean renderBlockOutline, Camera camera, GameRenderer gameRenderer, LightmapTextureManager lightmapTextureManager, Matrix4f matrix4f, Matrix4f matrix4f2, CallbackInfo ci) {
+    private void injectSetup(ObjectAllocator allocator, RenderTickCounter tickCounter, boolean renderBlockOutline, Camera camera, GameRenderer gameRenderer, LightmapTextureManager lightmapTextureManager, Matrix4f positionMatrix, Matrix4f projectionMatrix, CallbackInfo ci) {
         if (this.core != null) {
             this.core.renderSetup(this.frustum, camera);
-        }
-    }
-
-    @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/WorldRenderer;renderLayer(Lnet/minecraft/client/render/RenderLayer;DDDLorg/joml/Matrix4f;Lorg/joml/Matrix4f;)V", ordinal = 2, shift = At.Shift.AFTER))
-    private void injectOpaqueRender(RenderTickCounter tickCounter, boolean renderBlockOutline, Camera camera, GameRenderer gameRenderer, LightmapTextureManager lightmapTextureManager, Matrix4f matrix4f, Matrix4f matrix4f2, CallbackInfo ci) {
-        if (this.core != null) {
-            var cam = camera.getPos();
-            //this.core.renderOpaque(matrices, cam.x, cam.y, cam.z);
         }
     }
 

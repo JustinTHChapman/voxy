@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version "1.7.1"
+    id 'fabric-loom' version "1.8.11"
     id 'maven-publish'
 }
 
@@ -56,35 +56,33 @@ dependencies {
     modImplementation(fabricApi.module("fabric-rendering-fluids-v1", project.fabric_version))
     modImplementation(fabricApi.module("fabric-resource-loader-v0", project.fabric_version))
     modImplementation(fabricApi.module("fabric-command-api-v2", project.fabric_version))
-    modImplementation("net.fabricmc.fabric-api:fabric-rendering-data-attachment-v1:0.3.38+73761d2e9a")
+    //modImplementation("net.fabricmc.fabric-api:fabric-rendering-data-attachment-v1:0.3.38+73761d2e9a")
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
     //TODO: this is to eventually not need sodium installed as atm its just used for parsing shaders
-    modRuntimeOnly "maven.modrinth:sodium:mc1.21-0.5.9"
-    modCompileOnly "maven.modrinth:sodium:mc1.21-0.5.9"
+    modRuntimeOnly "maven.modrinth:sodium:mc1.21.3-0.6.0-fabric"
+    modCompileOnly "maven.modrinth:sodium:mc1.21.3-0.6.0-fabric"
 
     //modRuntimeOnly "maven.modrinth:nvidium:0.2.6-beta"
     modCompileOnly "maven.modrinth:nvidium:0.2.8-beta"
 
-    modImplementation("maven.modrinth:cloth-config:15.0.127+fabric")
+    modImplementation("maven.modrinth:cloth-config:16.0.141+fabric")
 
-    modImplementation("maven.modrinth:modmenu:11.0.1")
+    modImplementation("maven.modrinth:modmenu:12.0.0-beta.1")
 
-    modCompileOnly("maven.modrinth:iris:1.7.3+1.21")
+    modCompileOnly("maven.modrinth:iris:1.8.0+1.21.3-fabric")
 
-    //modRuntimeOnly("maven.modrinth:iris:1.6.17+1.20.4")
-
-    modCompileOnly("maven.modrinth:starlight:1.1.3+1.20.4")
+    //modCompileOnly("maven.modrinth:starlight:1.1.3+1.20.4")
 
     //modCompileOnly("maven.modrinth:immersiveportals:v5.1.7-mc1.20.4")
 
-    modCompileOnly("maven.modrinth:vivecraft:1.20.4-1.1.6-fabric")
+    modCompileOnly("maven.modrinth:vivecraft:1.21.1-1.1.14-b2-fabric")
 
-    modCompileOnly("maven.modrinth:chunky:1.4.16-fabric")
-    modRuntimeOnly("maven.modrinth:chunky:1.4.16-fabric")
+    modCompileOnly("maven.modrinth:chunky:1.4.27-fabric")
+    modRuntimeOnly("maven.modrinth:chunky:1.4.27-fabric")
 
-    modRuntimeOnly("maven.modrinth:spark:1.10.73-fabric")
+    modRuntimeOnly("maven.modrinth:spark:1.10.115-fabric")
     modRuntimeOnly("maven.modrinth:fabric-permissions-api:0.3.1")
     //modRuntimeOnly("maven.modrinth:nsight-loader:1.2.0")
 

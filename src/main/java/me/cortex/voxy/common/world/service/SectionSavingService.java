@@ -33,7 +33,7 @@ public class SectionSavingService {
             saveData.free();
         } catch (Exception e) {
             e.printStackTrace();
-            MinecraftClient.getInstance().executeSync(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("Voxy saver had an exception while executing please check logs and report error")));
+            MinecraftClient.getInstance().executeSync(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("Voxy saver had an exception while executing please check logs and report error"), true));
         }
         section.release();
     }

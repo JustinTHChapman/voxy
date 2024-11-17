@@ -58,7 +58,7 @@ public class ModelBakerySubsystem {
         //Upload all biomes
         while (!this.biomeQueue.isEmpty()) {
             var biome = this.biomeQueue.poll();
-            var biomeReg = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME);
+            var biomeReg = MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
             this.factory.addBiome(biome.id, biomeReg.get(Identifier.of(biome.biome)));
         }
 

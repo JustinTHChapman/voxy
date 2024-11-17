@@ -15,6 +15,7 @@ import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.WorldChunk;
 import org.joml.Matrix4f;
+import org.popcraft.chunky.mixin.ServerChunkCacheMixin;
 import org.popcraft.chunky.platform.FabricWorld;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -28,9 +29,9 @@ import java.util.function.BiConsumer;
 
 @Mixin(FabricWorld.class)
 public class MixinFabricWorld {
-    @WrapOperation(method = "getChunkAtAsync", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ChunkHolder;load(Lnet/minecraft/world/chunk/ChunkStatus;Lnet/minecraft/server/world/ServerChunkLoadingManager;)Ljava/util/concurrent/CompletableFuture;"))
-    private CompletableFuture<OptionalChunk<Chunk>> captureGeneratedChunk(ChunkHolder instance, ChunkStatus chunkStatus, ServerChunkLoadingManager serverChunkLoadingManager, Operation<CompletableFuture<OptionalChunk<Chunk>>> original) {
-        var future = original.call(instance, chunkStatus, serverChunkLoadingManager);
+    @WrapOperation(method = "getChunkAtAsync", at = @At(value = "INVOKE", target = "Lorg/popcraft/chunky/mixin/ServerChunkCacheMixin;invokeGetChunkFutureMainThread(IILnet/minecraft/world/chunk/ChunkStatus;Z)Ljava/util/concurrent/CompletableFuture;"))
+    private CompletableFuture<OptionalChunk<Chunk>> captureGeneratedChunk(ServerChunkCacheMixin instance, int i, int j, ChunkStatus chunkStatus, boolean b, Operation<CompletableFuture<OptionalChunk<Chunk>>> original) {
+        var future = original.call(instance, i, j, chunkStatus, b);
         return future.thenApplyAsync(res->{
             res.ifPresent(chunk -> {
                 var core = ((IGetVoxelCore)(MinecraftClient.getInstance().worldRenderer)).getVoxelCore();

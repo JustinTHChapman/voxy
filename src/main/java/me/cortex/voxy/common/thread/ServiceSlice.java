@@ -72,7 +72,7 @@ public class ServiceSlice extends TrackedObject {
         } catch (Exception e) {
             System.err.println("Unexpected error occurred while executing a service job, expect things to break badly");
             e.printStackTrace();
-            MinecraftClient.getInstance().execute(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("A voxy service had an exception while executing please check logs and report error")));
+            MinecraftClient.getInstance().execute(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("A voxy service had an exception while executing please check logs and report error"), true));
         } finally {
             if (this.activeCount.decrementAndGet() < 0) {
                 throw new IllegalStateException("Alive count negative!");

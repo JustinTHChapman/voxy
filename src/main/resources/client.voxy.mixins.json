@@ -5,15 +5,12 @@
   "client": [
     "chunky.MixinFabricWorld",
     "joml.AccessFrustumIntersection",
-    "minecraft.MixinClientChunkManager",
     "minecraft.MixinDebugHud",
     "minecraft.MixinMinecraftClient",
     "minecraft.MixinWorldRenderer",
     "nvidium.MixinRenderPipeline",
     "sodium.MixinDefaultChunkRenderer",
-    "sodium.MixinRenderSectionManager",
-    "sodium.MixinSodiumWorldRender",
-    "sodium.MixinShaderParser"
+    "sodium.MixinRenderSectionManager"
   ],
   "injectors": {
     "defaultRequire": 1

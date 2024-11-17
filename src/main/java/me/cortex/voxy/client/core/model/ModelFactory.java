@@ -71,7 +71,7 @@ public class ModelFactory {
         }
     }
 
-    private final Biome DEFAULT_BIOME = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME).get(BiomeKeys.PLAINS);
+    private final Biome DEFAULT_BIOME = MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).get(BiomeKeys.PLAINS);
 
     public final ModelTextureBakery bakery;
 

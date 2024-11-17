@@ -1,7 +1,7 @@
 package me.cortex.voxy.client.core.rendering.section;
 
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
-import me.jellysquid.mods.sodium.client.util.MathUtil;
+import net.caffeinemc.mods.sodium.client.util.MathUtil;
 
 import java.util.function.Consumer;
 
