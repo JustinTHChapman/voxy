@@ -19,8 +19,17 @@ layout(binding = SCENE_UNIFORM_BINDING, std140) uniform SceneUniform {
 #import <voxy:lod/hierarchical/node.glsl>
 #import <voxy:lod/hierarchical/screenspace.glsl>
 
-SIMPLE_QUEUE(uvec2, requestQueue, REQUEST_QUEUE_BINDING);
-SIMPLE_QUEUE(uint, renderQueue, RENDER_QUEUE_BINDING);
+//SIMPLE_QUEUE(uvec2, requestQueue, REQUEST_QUEUE_BINDING);
+layout(binding = REQUEST_QUEUE_BINDING, std430) restrict buffer requestQueueStruct {
+    uvec2 requestQueueIndex;
+    uvec2[] requestQueue;
+};
+
+//SIMPLE_QUEUE(uint, renderQueue, RENDER_QUEUE_BINDING);
+layout(binding = RENDER_QUEUE_BINDING, std430) restrict buffer renderQueueStruct {
+    uint renderQueueIndex;
+    uint[] renderQueue;
+};
 
 void addRequest(inout UnpackedNode node) {
     //printf("Put node decend request");
