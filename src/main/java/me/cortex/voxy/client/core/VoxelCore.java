@@ -8,6 +8,7 @@ import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
@@ -64,17 +65,17 @@ public class VoxelCore {
         this.serviceThreadPool = new ServiceThreadPool(VoxyConfig.CONFIG.serviceThreads);
 
         this.world = worldSelection.createEngine(this.serviceThreadPool);
-        System.out.println("Initializing voxy core");
+        Logger.info("Initializing voxy core");
 
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         Capabilities.init();//Ensure clinit is called
 
         this.renderer = new RenderService(this.world, this.serviceThreadPool);
-        System.out.println("Using " + this.renderer.getClass().getSimpleName());
+        Logger.info("Using " + this.renderer.getClass().getSimpleName());
         this.postProcessing = new PostProcessing();
 
-        System.out.println("Voxy core initialized");
+        Logger.info("Voxy core initialized");
 
         //this.verifyTopNodeChildren(0,0,0);
     }
@@ -174,7 +175,7 @@ public class VoxelCore {
     // since they are AABBS crossing the normal is impossible without one of the axis being equal
 
     public void shutdown() {
-        System.out.println("Flushing download stream");
+        Logger.info("Flushing download stream");
         DownloadStream.INSTANCE.flushWaitClear();
 
         //if (Thread.currentThread() != this.shutdownThread) {
@@ -183,18 +184,18 @@ public class VoxelCore {
 
         //this.world.getMapper().forceResaveStates();
         if (this.importer != null) {
-            System.out.println("Shutting down importer");
-            try {this.importer.shutdown();this.importer = null;} catch (Exception e) {e.printStackTrace();}
+            Logger.info("Shutting down importer");
+            try {this.importer.shutdown();this.importer = null;} catch (Exception e) {Logger.error("Error shutting down importer", e);}
         }
-        System.out.println("Shutting down rendering");
-        try {this.renderer.shutdown();} catch (Exception e) {e.printStackTrace();}
-        System.out.println("Shutting down post processor");
-        if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {e.printStackTrace();}}
-        System.out.println("Shutting down world engine");
-        try {this.world.shutdown();} catch (Exception e) {e.printStackTrace();}
-        System.out.println("Shutting down service thread pool");
+        Logger.info("Shutting down rendering");
+        try {this.renderer.shutdown();} catch (Exception e) {Logger.error("Error shutting down renderer", e);}
+        Logger.info("Shutting down post processor");
+        if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {Logger.error("Error shutting down post processor", e);}}
+        Logger.info("Shutting down world engine");
+        try {this.world.shutdown();} catch (Exception e) {Logger.error("Error shutting down world engine", e);}
+        Logger.info("Shutting down service thread pool");
         this.serviceThreadPool.shutdown();
-        System.out.println("Voxel core shut down");
+        Logger.info("Voxel core shut down");
     }
 
     public boolean createWorldImporter(World mcWorld, File worldPath) {
@@ -235,7 +236,7 @@ public class VoxelCore {
                         if (lvl == 0) {
                             var own = this.world.acquire(lvl, x, y, z);
                             if ((own.getNonEmptyChildren() != 0) ^ (own.getNonEmptyBlockCount() != 0)) {
-                                System.err.println("Lvl 0 node not marked correctly " + WorldEngine.pprintPos(own.key));
+                                Logger.error("Lvl 0 node not marked correctly " + WorldEngine.pprintPos(own.key));
                             }
                             own.release();
                         } else {
@@ -247,7 +248,7 @@ public class VoxelCore {
                             }
                             var own = this.world.acquire(lvl, x, y, z);
                             if (own.getNonEmptyChildren() != msk) {
-                                System.err.println("Section empty child mask not correct " + WorldEngine.pprintPos(own.key) + " got: " + String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(own.getNonEmptyChildren()))).replace(' ', '0') + " expected: " + String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(msk))).replace(' ', '0'));
+                                Logger.error("Section empty child mask not correct " + WorldEngine.pprintPos(own.key) + " got: " + String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(own.getNonEmptyChildren()))).replace(' ', '0') + " expected: " + String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(msk))).replace(' ', '0'));
                             }
                             own.release();
                         }

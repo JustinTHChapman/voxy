@@ -33,6 +33,7 @@ public class ExpandingObjectAllocationList<T> {
         if (!this.bitSet.free(id)) {
             throw new IllegalArgumentException("Index " + id + " was already released");
         }
+        this.objects[id] = null;
     }
 
     public T get(int index) {

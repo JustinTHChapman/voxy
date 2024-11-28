@@ -28,7 +28,7 @@ import static org.lwjgl.opengl.GL45.*;
 
 // TODO: swap to persistent gpu threads instead of dispatching MAX_ITERATIONS of compute layers
 public class HierarchicalOcclusionTraverser {
-    public static final int REQUEST_QUEUE_SIZE = 256;
+    public static final int REQUEST_QUEUE_SIZE = 50;
 
     private final NodeManager2 nodeManager;
 
@@ -242,12 +242,16 @@ public class HierarchicalOcclusionTraverser {
             throw new IllegalStateException("Count unexpected extreme value: " + count);
         }
         if (count > (this.requestBuffer.size()>>3)-1) {
-            Logger.warn("Count over max buffer size, clamping, got count: " + count);
+            //This should not break the synchonization between gpu and cpu as in the traversal shader is
+            // `if (atomRes < REQUEST_QUEUE_SIZE) {` which forcefully clamps to the request size
+
+            //Logger.warn("Count over max buffer size, clamping, got count: " + count + ".");
+
             count = (int) ((this.requestBuffer.size()>>3)-1);
         }
-        if (count > REQUEST_QUEUE_SIZE) {
-            System.err.println("Count larger than 'maxRequestCount', overflow captured. Overflowed by " + (count-REQUEST_QUEUE_SIZE));
-        }
+        //if (count > REQUEST_QUEUE_SIZE) {
+        //    Logger.warn("Count larger than 'maxRequestCount', overflow captured. Overflowed by " + (count-REQUEST_QUEUE_SIZE));
+        //}
         if (count != 0) {
             //this.nodeManager.processRequestQueue(count, ptr + 8);
 

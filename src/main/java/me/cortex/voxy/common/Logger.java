@@ -29,4 +29,15 @@ public class Logger {
         var stackEntry = new Throwable().getStackTrace()[1];
         LOGGER.warn("["+stackEntry.getClassName()+"]: "+ Stream.of(args).map(Object::toString).collect(Collectors.joining(" ")), throwable);
     }
+
+    public static void info(Object... args) {
+        Throwable throwable = null;
+        for (var i : args) {
+            if (i instanceof Throwable) {
+                throwable = (Throwable) i;
+            }
+        }
+        var stackEntry = new Throwable().getStackTrace()[1];
+        LOGGER.info("["+stackEntry.getClassName()+"]: "+ Stream.of(args).map(Object::toString).collect(Collectors.joining(" ")), throwable);
+    }
 }

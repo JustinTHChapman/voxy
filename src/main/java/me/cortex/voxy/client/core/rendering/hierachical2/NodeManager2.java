@@ -17,6 +17,12 @@ import java.util.List;
 
 
 
+//TODO FIXME: CIRTICAL ISSUE: if a node is a top level section and is empty, when a child is tried to be made it explodes
+// since all the children are empty
+//  To properly fix this, the top level nodes should only exist if there are non empty children
+// (issues related to this fix, lod updates from 0 children state to something children state, aswell as other way round)
+
+
 public class NodeManager2 {
     //Assumptions:
     // all nodes have children (i.e. all nodes have at least one child existence bit set at all times)
@@ -62,6 +68,8 @@ public class NodeManager2 {
     private final NodeStore nodeData;
     public final int maxNodeCount;
     private final IntArrayList topLevelNodeIds = new IntArrayList();
+    private int activeNodeRequestCount;
+
     public NodeManager2(int maxNodeCount, AbstractSectionGeometryManager geometryManager, SectionUpdateRouter updateRouter) {
         if (!MathUtil.isPowerOfTwo(maxNodeCount)) {
             throw new IllegalArgumentException("Max node count must be a power of 2");
@@ -86,8 +94,6 @@ public class NodeManager2 {
         int id = this.singleRequests.put(request);
         this.updateRouter.watch(pos, WorldEngine.UPDATE_FLAGS);
         this.activeSectionMap.put(pos, id|NODE_TYPE_REQUEST|REQUEST_TYPE_SINGLE);
-
-
     }
 
     public void removeTopLevelNode(long pos) {
@@ -154,7 +160,7 @@ public class NodeManager2 {
         } else if ((nodeId&NODE_TYPE_MSK)==NODE_TYPE_INNER || (nodeId&NODE_TYPE_MSK)==NODE_TYPE_LEAF) {
             // Just doing a geometry update
             if (this.updateNodeGeometry(nodeId&NODE_ID_MSK, sectionResult) != 0) {
-                this.nodeUpdates.add(nodeId&NODE_ID_MSK);
+                this.invalidateNode(nodeId&NODE_ID_MSK);
             }
         }
     }
@@ -246,7 +252,7 @@ public class NodeManager2 {
         //TODO: this (or remove)
         //this.nodeData.setNodeType();
         this.activeSectionMap.put(request.getPosition(), id|NODE_TYPE_LEAF);//Assume that the result of any single request type is a leaf node
-        this.nodeUpdates.add(id);
+        this.invalidateNode(id);
 
 
         //Assume that this is always a top node
@@ -277,7 +283,7 @@ public class NodeManager2 {
                 this.nodeData.setNodeChildExistence(childNodeId, request.getChildChildExistence(childIdx));
                 this.nodeData.setNodeGeometry(childNodeId, request.getChildMesh(childIdx));
                 //Mark for update
-                this.nodeUpdates.add(childNodeId);
+                this.invalidateNode(childNodeId);
                 //Put in map
                 int pid = this.activeSectionMap.put(childPos, childNodeId|NODE_TYPE_LEAF);
                 if ((pid&NODE_TYPE_MSK) != NODE_TYPE_REQUEST) {
@@ -290,8 +296,9 @@ public class NodeManager2 {
             this.nodeData.setChildPtr(parentNodeId, base);
             this.nodeData.setChildPtrCount(parentNodeId, offset+1);
             this.nodeData.setNodeRequest(parentNodeId, 0);//TODO: create a better null request
+            this.activeNodeRequestCount--;
             this.nodeData.unmarkRequestInFlight(parentNodeId);
-            this.nodeUpdates.add(parentNodeId);
+            this.invalidateNode(parentNodeId);
         } else if ((parentNodeId&NODE_TYPE_MSK)==NODE_TYPE_INNER) {
             System.err.println("TODO: FIXME FINISH: finishRequest NODE_TYPE_INNER");
         } else {
@@ -319,8 +326,17 @@ public class NodeManager2 {
             Logger.warn("Tried processing a node that already has a request in flight: " + nodeId + " pos: " + WorldEngine.pprintPos(pos) + " ignoring");
             return;
         }
-        this.nodeData.markRequestInFlight(nodeId);
 
+
+        //TODO: ADJUST AND FIX THIS TO MAKE IT REMOVE THE LAST THING IN QUEUE OR SOMETHING
+        //if (this.activeNodeRequestCount > 100 && WorldEngine.getLevel(pos) < 2) {
+            //Logger.info("Many active requests, declining request at " + WorldEngine.pprintPos(pos));
+        //    this.invalidateNode(nodeId);
+        //    return;
+        //}
+
+
+        this.nodeData.markRequestInFlight(nodeId);
         if (nodeType == NODE_TYPE_LEAF) {
             //The hard one of processRequest, spin up a new request for the node
             this.makeLeafChildRequest(nodeId);
@@ -355,6 +371,7 @@ public class NodeManager2 {
 
             //Insert all the children into the tracking map with the node id
             int pid = this.activeSectionMap.put(childPos, requestId|NODE_TYPE_REQUEST|REQUEST_TYPE_CHILD);
+
             if (pid != -1) {
                 throw new IllegalStateException("Leaf request creation failed to insert child into map as a mapping already existed for the node! pos: " + WorldEngine.pprintPos(childPos) + " id: " + pid);
             }
@@ -366,6 +383,7 @@ public class NodeManager2 {
         }
 
         this.nodeData.setNodeRequest(nodeId, requestId);
+        this.activeNodeRequestCount++;
     }
 
     //==================================================================================================================
@@ -393,7 +411,9 @@ public class NodeManager2 {
         return true;
     }
 
-
+    private void invalidateNode(int nodeId) {
+        this.nodeUpdates.add(nodeId);
+    }
 
     //==================================================================================================================
     private static int getChildIdx(long pos) {
