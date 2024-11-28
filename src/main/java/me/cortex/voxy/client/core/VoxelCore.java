@@ -1,9 +1,13 @@
 package me.cortex.voxy.client.core;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.client.core.model.IdNotYetComputedException;
+import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.*;
+import me.cortex.voxy.client.core.rendering.building.RenderDataFactory;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;
@@ -12,6 +16,8 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.world.WorldSection;
+import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.ClientBossBar;
@@ -78,6 +84,9 @@ public class VoxelCore {
         Logger.info("Voxy core initialized");
 
         //this.verifyTopNodeChildren(0,0,0);
+
+        this.testMeshingPerformance();
+
     }
 
 
@@ -257,4 +266,65 @@ public class VoxelCore {
             }
         }
     }
+
+
+
+
+
+
+    private void testMeshingPerformance() {
+        var modelService = new ModelBakerySubsystem(this.world.getMapper());
+        RenderDataFactory factory = new RenderDataFactory(this.world, modelService.factory, false);
+
+        List<WorldSection> sections = new ArrayList<>();
+
+        System.out.println("Loading sections");
+        for (int x = -17; x <= 17; x++) {
+            for (int z = -17; z <= 17; z++) {
+                for (int y = -1; y <= 4; y++) {
+                    var section = this.world.acquire(0, x, y, z);
+
+                    int nonAir = 0;
+                    for (long state : section.copyData()) {
+                        nonAir += Mapper.isAir(state)?0:1;
+                        modelService.requestBlockBake(Mapper.getBlockId(state));
+                    }
+
+                    if (nonAir > 500 && Math.abs(x) <= 16 && Math.abs(z) <= 16) {
+                        sections.add(section);
+                    } else {
+                        section.release();
+                    }
+                }
+            }
+        }
+
+        System.out.println("Baking models");
+        {
+            //Bake everything
+            while (!modelService.areQueuesEmpty()) {
+                modelService.tick();
+                glFinish();
+            }
+        }
+
+        System.out.println("Ready!");
+
+        {
+            int iteration = 0;
+            while (true) {
+                long start = System.currentTimeMillis();
+                for (var section : sections) {
+                    var mesh = factory.generateMesh(section);
+
+                    mesh.free();
+                }
+                long delta = System.currentTimeMillis() - start;
+                System.out.println("Iteration: " + (iteration++) + " took " + delta + "ms, for an average of " + ((float)delta/sections.size()) + "ms per section");
+            }
+        }
+
+    }
+
+
 }

@@ -94,4 +94,8 @@ public class ModelBakerySubsystem {
     public ModelStore getStore() {
         return this.storage;
     }
+
+    public boolean areQueuesEmpty() {
+        return this.blockIdQueue.isEmpty() && this.factory.getInflightCount() == 0 && this.biomeQueue.isEmpty();
+    }
 }
