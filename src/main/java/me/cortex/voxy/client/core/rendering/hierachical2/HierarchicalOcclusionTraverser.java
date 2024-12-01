@@ -115,8 +115,10 @@ public class HierarchicalOcclusionTraverser {
 
         MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;
 
+
+        final float screenspaceAreaDecreasingSize = 100 * 100;
         //Screen space size for descending
-        MemoryUtil.memPutFloat(ptr, 100*100); ptr += 4;
+        MemoryUtil.memPutFloat(ptr, (float) (screenspaceAreaDecreasingSize) /(viewport.width*viewport.height)); ptr += 4;
     }
 
     private void bindings() {

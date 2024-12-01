@@ -63,25 +63,33 @@ void setupScreenspace(in UnpackedNode node) {
     //printf("Screenspace MIN: %f, %f, %f  MAX: %f, %f, %f", minBB.x,minBB.y,minBB.z, maxBB.x,maxBB.y,maxBB.z);
 
     //Convert to screenspace
-    maxBB = maxBB*0.5f+0.5f;
-    minBB = minBB*0.5f+0.5f;
+    maxBB.xy = maxBB.xy*0.5f+0.5f;
+    minBB.xy = minBB.xy*0.5f+0.5f;
 
-    size = clamp(maxBB.xy - minBB.xy, vec2(0), vec2(1));//We half it for implicit conversion to screenspace
+    size = clamp(maxBB.xy - minBB.xy, vec2(0), vec2(1));
 
 }
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
     return any(lessThanEqual(maxBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), minBB));
+
+    //|| any(lessThanEqual(minBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), maxBB));
 }
 
 bool isCulledByHiz() {
-    if (minBB.z < 0) {//Minpoint is behind the camera, its always going to pass
+    //if (minBB.z < 0) {//Minpoint is behind the camera, its always going to pass
+    //    return false;//Just cull it for now cause other culling isnt working, TODO: FIXME
+    //}
+    if (maxBB.z > 1) {
         return false;
     }
-    vec2 ssize = size.xy * vec2(screenW, screenH);
+
+    vec2 ssize = size * vec2(screenW, screenH);
     float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
+    //TODO: maybe get rid of clamp
+    midpoint = clamp(midpoint, vec2(0), vec2(1));
     bool culled = textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) < 0.0001f;
 
     if (culled) {
@@ -93,5 +101,5 @@ bool isCulledByHiz() {
 //Returns if we should decend into its children or not
 bool shouldDecend() {
     //printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(size.x), float(size.y));
-    return (size.x*size.y*screenW*screenH) > minSSS;
+    return (size.x*size.y) > minSSS;
 }
