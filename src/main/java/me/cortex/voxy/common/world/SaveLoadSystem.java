@@ -30,13 +30,22 @@ public class SaveLoadSystem {
         return x|(y<<10)|(z<<5);
     }
 
+
+    private static final ThreadLocal<short[]> SHORT_CACHE = ThreadLocal.withInitial(()->new short[32*32*32]);
+    private static final ThreadLocal<long[]> LONG_CACHE = ThreadLocal.withInitial(()->new long[32*32*32]);
+    private static final ThreadLocal<Long2ShortOpenHashMap> OTHER_THING_CACHE = ThreadLocal.withInitial(()-> {
+        var thing = new Long2ShortOpenHashMap(512);
+        thing.defaultReturnValue((short) -1);
+        return thing;
+    });
+
+
     //TODO: Cache like long2short and the short and other data to stop allocs
     public static MemoryBuffer serialize(WorldSection section) {
         var data = section.copyData();
-        var compressed = new short[data.length];
-        Long2ShortOpenHashMap LUT = new Long2ShortOpenHashMap(data.length);
-        LUT.defaultReturnValue((short) -1);
-        long[] lutValues = new long[32*16*16];//If there are more than this many states in a section... im concerned
+        var compressed = SHORT_CACHE.get();
+        Long2ShortOpenHashMap LUT = OTHER_THING_CACHE.get();LUT.clear();
+        long[] lutValues = LONG_CACHE.get();//If there are more than this many states in a section... im concerned
         short lutIndex = 0;
         long pHash = 99;
         for (int i = 0; i < data.length; i++) {
@@ -93,10 +102,11 @@ public class SaveLoadSystem {
         if (lutLen > 32*32*32) {
             throw new IllegalStateException("lutLen impossibly large, max size should be 32768 but got size " + lutLen);
         }
-        long[] lut = new long[lutLen];
+        //TODO: cache this in a thread local
+        long[] lut = LONG_CACHE.get();
         long hash = 0;
         if (VERIFY_HASH_ON_LOAD) {
-            hash = key ^ (lut.length * 1293481298141L);
+            hash = key ^ (lutLen * 1293481298141L);
             hash ^= metadata; hash *= 1242629872171L;
         }
         for (int i = 0; i < lutLen; i++) {
