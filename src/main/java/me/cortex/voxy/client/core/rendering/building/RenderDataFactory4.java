@@ -51,6 +51,17 @@ public class RenderDataFactory4 {
             x -= length-1;
             z -= width-1;
 
+            if (this.axis == 2) {
+                //Need to swizzle the data if on x axis
+                int tmp = x;
+                x = z;
+                z = tmp;
+
+                tmp = length;
+                length = width;
+                width = tmp;
+            }
+
             //Lower 26 bits can be auxiliary data since that is where quad position information goes;
             int auxData = (int) (data&((1<<26)-1));
             data &= ~(data&((1<<26)-1));
@@ -226,35 +237,140 @@ public class RenderDataFactory4 {
         }
     }
 
+
+    private final Mesher[] xAxisMeshers = new Mesher[32];
+    {
+        for (int i = 0; i < 32; i++) {
+            var mesher = new Mesher();
+            mesher.auxiliaryPosition = i;
+            mesher.axis = 2;//X axis
+            this.xAxisMeshers[i] = mesher;
+        }
+    }
+
+    private static final long X_I_MSK = 0x4210842108421L;
     private void generateXFaces() {
-        //TODO: actually fking accelerate this
-
-        this.blockMesher.axis = 2;// X axis
-        for (int x = 0; x < 31; x++) {//TODO: need to do the faces that border sections
-            this.blockMesher.auxiliaryPosition = x;
+        for (int y = 0; y < 32; y++) {
+            long sumA = 0;
+            long sumB = 0;
+            long sumC = 0;
+            int partialHasCount = -1;
+            int msk = 0;
             for (int z = 0; z < 32; z++) {
-                for (int y = 0; y < 32; y++) {
-                    int idx = x+z*32+y*32*32;
-                    long self = this.sectionData[idx*2];
-                    long next = this.sectionData[(idx+1)*2];
+                int lMsk = this.opaqueMasks[y*32+z];
+                msk = (lMsk^(lMsk>>>1));
+                msk &= -1>>>1;//Remove top bit as we dont actually know/have the data for that slice
 
-                    boolean so = ModelQueries.isFullyOpaque(this.sectionData[idx*2+1]);
-                    boolean no = ModelQueries.isFullyOpaque(this.sectionData[(idx+1)*2+1]);
-                    if (so^no) {//Not culled
+                //Always increment cause can do funny trick (i.e. -1 on skip amount)
+                sumA += X_I_MSK;
+                sumB += X_I_MSK;
+                sumC += X_I_MSK;
+
+                partialHasCount &= ~msk;
+
+                if (z == 30 && partialHasCount != 0) {//Hackfix for incremental count overflow issue
+                    int cmsk = partialHasCount;
+                    while (cmsk!=0) {
+                        int index = Integer.numberOfTrailingZeros(cmsk);
+                        cmsk &= ~Integer.lowestOneBit(cmsk);
+                        //TODO: fixme! check this is correct or if should be 30
+                        this.xAxisMeshers[index].skip(31);
+                    }
+                    //Clear the sum
+                    sumA &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount), X_I_MSK)*0x1F);
+                    sumB &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>11, X_I_MSK)*0x1F);
+                    sumC &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>22, X_I_MSK)*0x1F);
+                }
+
+                if (msk == 0) {
+                    continue;
+                }
+
+                /*
+                {//Dont need this as can just increment everything then -1 in mask
+                    //Compute and increment skips for indexes
+                    long imsk = Integer.toUnsignedLong(~msk);// we only want to increment where there isnt a face
+                    sumA += Long.expand(imsk, X_I_MSK);
+                    sumB += Long.expand(imsk>>11, X_I_MSK);
+                    sumC += Long.expand(imsk>>22, X_I_MSK);
+                }*/
+
+                int faceForwardMsk = msk&lMsk;
+                int iter = msk;
+                while (iter!=0) {
+                    int index = Integer.numberOfTrailingZeros(iter);
+                    iter &= ~Integer.lowestOneBit(iter);
+
+                    var mesher = this.xAxisMeshers[index];
+
+                    int skipCount;//Compute the skip count
+                    {//TODO: Branch-less
+                        //Compute skip and clear
+                        if (index<11) {
+                            skipCount = (int) (sumA>>(index*5));
+                            sumA &= ~(0x1FL<<(index*5));
+                        } else if (index<22) {
+                            skipCount = (int) (sumB>>((index-11)*5));
+                            sumB &= ~(0x1FL<<((index-11)*5));
+                        } else {
+                            skipCount = (int) (sumC>>((index-22)*5));
+                            sumC &= ~(0x1FL<<((index-22)*5));
+                        }
+                        skipCount &= 0x1F;
+                        skipCount--;
+                    }
+
+                    if (skipCount != 0) {
+                        mesher.skip(skipCount);
+                    }
+
+                    int facingForward = ((faceForwardMsk>>index)&1);
+                    {
+                        int idx = index + (z * 32) + (y * 32 * 32);
+                        //TODO: swap this out for something not getting the next entry
+                        long A = this.sectionData[idx * 2];
+                        long B = this.sectionData[(idx + 1) * 2];
+
                         //Flip data with respect to facing direction
-                        long selfModel = so?self:next;
-                        long nextModel = so?next:selfModel;
+                        long selfModel = facingForward==1?A:B;
+                        long nextModel = facingForward==1?B:A;
 
                         //Example thing thats just wrong but as example
-                        this.blockMesher.putNext((long) (so?1L:0L) | ((selfModel&0xFFFF)<<26) | (0xFFL<<55));
-                    } else {
-                        this.blockMesher.putNext(0);
+                        mesher.putNext((long) facingForward | ((selfModel&0xFFFF)<<26) | (0xFFL<<55));
+                        //mesher.emitQuad(y, z, 1, 1,(long) facingForward | ((selfModel&0xFFFF)<<26) | (0xFFL<<55));
                     }
                 }
-                this.blockMesher.endRow();
             }
-            this.blockMesher.finish();
+
+            //Need to skip the remaining entries in the skip array
+            {
+                msk = ~msk;//Invert the mask as we only need to set stuff that isnt 0
+                while (msk!=0) {
+                    int index = Integer.numberOfTrailingZeros(msk);
+                    msk &= ~Integer.lowestOneBit(msk);
+                    int skipCount;
+                    if (index < 11) {
+                        skipCount = (int) (sumA>>(index*5));
+                    } else if (index<22) {
+                        skipCount = (int) (sumB>>((index-11)*5));
+                    } else {
+                        skipCount = (int) (sumC>>((index-22)*5));
+                    }
+                    skipCount &= 0x1F;
+
+                    if (skipCount != 0) {
+                        this.xAxisMeshers[index].skip(skipCount);
+                    }
+                }
+            }
         }
+        for (var mesher : this.xAxisMeshers) {
+            mesher.finish();
+        }
+    }
+
+    public static void main(String[] args) {
+        System.out.println(1L<<(-555));
     }
 
     /*
