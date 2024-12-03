@@ -41,7 +41,9 @@ vec4 uint2vec4RGBA(uint colour) {
 
 vec4 getFaceSize(uint faceData) {
     float EPSILON = 0.001f;
+
     vec4 faceOffsetsSizes = extractFaceSizes(faceData);
+
     //Expand the quads by a very small amount
     faceOffsetsSizes.xz -= vec2(EPSILON);
     faceOffsetsSizes.yw += vec2(EPSILON);

@@ -125,7 +125,7 @@ public class SaveLoadSystem {
         }
 
         int nonEmptyBlockCount = 0;
-        for (int i = 0; i < section.data.length; i++) {
+        for (int i = 0; i < WorldSection.SECTION_VOLUME; i++) {
             long state = lut[MemoryUtil.memGetShort(ptr)]; ptr += 2; if (VERIFY_MEMORY_ACCESS && data.size<=(ptr-data.address)) throw new IllegalStateException("Memory access OOB");
             nonEmptyBlockCount += Mapper.isAir(state)?0:1;
             section.data[z2lin(i)] = state;

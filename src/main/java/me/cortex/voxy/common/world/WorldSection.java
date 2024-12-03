@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 //Represents a loaded world section at a specific detail level
 // holds a 32x32x32 region of detail
 public final class WorldSection {
+    public static final int SECTION_VOLUME = 32*32*32;
     public static final boolean VERIFY_WORLD_SECTION_EXECUTION = VoxyCommon.isVerificationFlagOn("verifyWorldSectionExecution");
 
 

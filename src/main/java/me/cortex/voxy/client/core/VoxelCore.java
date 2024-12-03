@@ -152,8 +152,8 @@ public class VoxelCore {
 
         this.renderer.renderFarAwayOpaque(viewport);
 
-        //Compute the SSAO of the rendered terrain, TODO: fix it breaking depth
-        //this.postProcessing.computeSSAO(projection, matrices);
+        //Compute the SSAO of the rendered terrain, TODO: fix it breaking depth or breaking _something_ am not sure what
+        this.postProcessing.computeSSAO(projection, matrices);
 
         //We can render the translucent directly after as it is the furthest translucent objects
         this.renderer.renderFarAwayTranslucent(viewport);
