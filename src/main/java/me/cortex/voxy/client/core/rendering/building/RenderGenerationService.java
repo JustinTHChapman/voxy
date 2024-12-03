@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import me.cortex.voxy.client.core.model.IdNotYetComputedException;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
@@ -18,6 +19,7 @@ import java.util.function.Supplier;
 //TODO: Add a render cache
 public class RenderGenerationService {
     private static final class BuildTask {
+        WorldSection section;
         final long position;
         boolean hasDoneModelRequest;
         private BuildTask(long position) {
@@ -79,7 +81,15 @@ public class RenderGenerationService {
             //task = (Math.random() < 0.1)?this.taskQueue.removeLast():this.taskQueue.removeFirst();
         }
         //long time = BuiltSection.getTime();
-        var section = this.acquireSection(task.position);
+        boolean shouldFreeSection = true;
+
+        WorldSection section;
+        if (task.section == null) {
+            section = this.acquireSection(task.position);
+        } else {
+            section = task.section;
+        }
+
         if (section == null) {
             this.resultConsumer.accept(BuiltSection.empty(task.position));
             return;
@@ -103,7 +113,9 @@ public class RenderGenerationService {
                 //The reason for the extra id parameter is that we explicitly add/check against the exception id due to e.g. requesting accross a chunk boarder wont be captured in the request
                 this.computeAndRequestRequiredModels(section, e.id);
             }
-
+            {//Keep the lock on the section, and attach it to the task, this prevents needing to re-aquire it later
+                task.section = section;
+            }
             {
                 //We need to reinsert the build task into the queue
                 BuildTask queuedTask;
@@ -118,11 +130,22 @@ public class RenderGenerationService {
 
                 if (queuedTask == task) {//use the == not .equal to see if we need to release a permit
                     this.threads.execute();//Since we put in queue, release permit
+
+                    //If we did put it in the queue, dont release the section
+                    shouldFreeSection = false;
+                } else {
+                    Logger.warn("Funkyness happened and multiple tasks for same section where in queue");
+                    //Things went bad, set section to null and ensure section is freed
+                    task.section = null;
+                    shouldFreeSection = true;
                 }
             }
         }
 
-        section.release();
+        if (shouldFreeSection) {
+            section.release();
+        }
+
         if (mesh != null) {//If the mesh is null it means it didnt finish, so dont submit
             this.resultConsumer.accept(mesh);
         }
