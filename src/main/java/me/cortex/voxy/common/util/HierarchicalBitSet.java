@@ -78,6 +78,8 @@ public class HierarchicalBitSet {
         return 0;
     }
 
+
+    //TODO: FIXME: THIS IS SLOW AS SHIT
     public int allocateNextConsecutiveCounted(int count) {
         if (this.A==-1) {
             return -1;

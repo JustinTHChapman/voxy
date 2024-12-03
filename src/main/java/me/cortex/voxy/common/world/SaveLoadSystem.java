@@ -110,7 +110,7 @@ public class SaveLoadSystem {
             hash ^= metadata; hash *= 1242629872171L;
         }
         for (int i = 0; i < lutLen; i++) {
-            lut[i] = MemoryUtil.memGetLong(ptr); ptr += 8; if (VERIFY_MEMORY_ACCESS && data.size<=(ptr-data.address)) throw new IllegalStateException("Memory access OOB");
+            lut [i] = MemoryUtil.memGetLong(ptr); ptr += 8; if (VERIFY_MEMORY_ACCESS && data.size<=(ptr-data.address)) throw new IllegalStateException("Memory access OOB");
             if (VERIFY_HASH_ON_LOAD) {
                 hash *= 1230987149811L;
                 hash += 12831;

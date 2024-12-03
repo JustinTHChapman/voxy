@@ -330,6 +330,8 @@ public class ModelFactory {
 
         metadata |= cullsSame?32:0;
 
+        boolean fullyOpaque = true;
+
         //TODO: add a bunch of control config options for overriding/setting options of metadata for each face of each type
         for (int face = 5; face != -1; face--) {//In reverse order to make indexing into the metadata long easier
             long faceUploadPtr = uploadPtr + 4L * face;//Each face gets 4 bytes worth of data
@@ -339,6 +341,8 @@ public class ModelFactory {
                 metadata |= 0xFF;//Mark the face as non-existent
                 //Set to -1 as safepoint
                 MemoryUtil.memPutInt(faceUploadPtr, -1);
+
+                fullyOpaque = false;
                 continue;
             }
             var faceSize = TextureUtils.computeBounds(textureData[face], checkMode);
@@ -360,6 +364,7 @@ public class ModelFactory {
                 occludesFace &= ((float)writeCount)/(MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE) > 0.9;// only occlude if the face covers more than 90% of the face
             }
             metadata |= occludesFace?1:0;
+            fullyOpaque &= occludesFace;
 
 
 
@@ -398,6 +403,7 @@ public class ModelFactory {
 
             MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
         }
+        metadata |= fullyOpaque?(1L<<(48+6)):0;
         this.metadataCache[modelId] = metadata;
 
         uploadPtr += 4*6;

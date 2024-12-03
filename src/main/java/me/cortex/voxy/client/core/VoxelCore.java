@@ -8,6 +8,7 @@ import me.cortex.voxy.client.core.model.IdNotYetComputedException;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderDataFactory;
+import me.cortex.voxy.client.core.rendering.building.RenderDataFactory4;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;
@@ -85,8 +86,7 @@ public class VoxelCore {
 
         //this.verifyTopNodeChildren(0,0,0);
 
-        this.testMeshingPerformance();
-
+        //this.testMeshingPerformance();
     }
 
 
@@ -152,8 +152,8 @@ public class VoxelCore {
 
         this.renderer.renderFarAwayOpaque(viewport);
 
-        //Compute the SSAO of the rendered terrain
-        this.postProcessing.computeSSAO(projection, matrices);
+        //Compute the SSAO of the rendered terrain, TODO: fix it breaking depth
+        //this.postProcessing.computeSSAO(projection, matrices);
 
         //We can render the translucent directly after as it is the furthest translucent objects
         this.renderer.renderFarAwayTranslucent(viewport);
@@ -274,7 +274,7 @@ public class VoxelCore {
 
     private void testMeshingPerformance() {
         var modelService = new ModelBakerySubsystem(this.world.getMapper());
-        RenderDataFactory factory = new RenderDataFactory(this.world, modelService.factory, false);
+        var factory = new RenderDataFactory4(this.world, modelService.factory, false);
 
         List<WorldSection> sections = new ArrayList<>();
 
@@ -321,6 +321,7 @@ public class VoxelCore {
                 }
                 long delta = System.currentTimeMillis() - start;
                 System.out.println("Iteration: " + (iteration++) + " took " + delta + "ms, for an average of " + ((float)delta/sections.size()) + "ms per section");
+                //System.out.println("Quad count: " + factory.quadCount);
             }
         }
 

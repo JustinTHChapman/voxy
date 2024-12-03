@@ -43,7 +43,7 @@ public class RenderGenerationService {
 
         this.threads = serviceThreadPool.createService("Section mesh generation service", 100, ()->{
             //Thread local instance of the factory
-            var factory = new RenderDataFactory(this.world, this.modelBakery.factory, this.emitMeshlets);
+            var factory = new RenderDataFactory4(this.world, this.modelBakery.factory, this.emitMeshlets);
             return () -> {
                 this.processJob(factory);
             };
@@ -72,14 +72,11 @@ public class RenderGenerationService {
     }
 
     //TODO: add a generated render data cache
-    private void processJob(RenderDataFactory factory) {
+    private void processJob(RenderDataFactory4 factory) {
         BuildTask task;
         synchronized (this.taskQueue) {
-            if (Math.random() < 0.5) {
-                task = this.taskQueue.removeLast();
-            } else {
-                task = this.taskQueue.removeFirst();
-            }
+            task = this.taskQueue.removeFirst();
+            //task = (Math.random() < 0.1)?this.taskQueue.removeLast():this.taskQueue.removeFirst();
         }
         //long time = BuiltSection.getTime();
         var section = this.acquireSection(task.position);
@@ -96,8 +93,9 @@ public class RenderGenerationService {
                 this.modelBakery.requestBlockBake(e.id);
             }
             if (task.hasDoneModelRequest) {
+
                 try {
-                    Thread.sleep(10);
+                    Thread.sleep(1);
                 } catch (InterruptedException ex) {
                     throw new RuntimeException(ex);
                 }

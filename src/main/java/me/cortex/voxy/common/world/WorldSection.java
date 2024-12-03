@@ -150,7 +150,7 @@ public final class WorldSection {
     }
 
     public static int getIndex(int x, int y, int z) {
-        int M = (1<<5)-1;
+        final int M = (1<<5)-1;
         if (VERIFY_WORLD_SECTION_EXECUTION) {
             if (x < 0 || x > M || y < 0 || y > M || z < 0 || z > M) {
                 throw new IllegalArgumentException("Out of bounds: " + x + ", " + y + ", " + z);
@@ -173,9 +173,13 @@ public final class WorldSection {
     }
 
     public void copyDataTo(long[] cache) {
+        copyDataTo(cache, 0);
+    }
+
+    public void copyDataTo(long[] cache, int dstOffset) {
         this.assertNotFree();
-        if (cache.length != this.data.length) throw new IllegalArgumentException();
-        System.arraycopy(this.data, 0, cache, 0, this.data.length);
+        if ((cache.length-dstOffset) < this.data.length) throw new IllegalArgumentException();
+        System.arraycopy(this.data, 0, cache, dstOffset, this.data.length);
     }
 
     public static int getChildIndex(int x, int y, int z) {

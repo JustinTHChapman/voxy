@@ -18,10 +18,10 @@ public class RenderDataFactory {
     private final WorldEngine world;
     private final ModelFactory modelMan;
 
-    private final Mesher2D negativeMesher = new Mesher2D(5, 15);
-    private final Mesher2D positiveMesher = new Mesher2D(5, 15);
-    private final Mesher2D negativeFluidMesher = new Mesher2D(5, 15);
-    private final Mesher2D positiveFluidMesher = new Mesher2D(5, 15);
+    private final Mesher2D negativeMesher = new Mesher2D();
+    private final Mesher2D positiveMesher = new Mesher2D();
+    private final Mesher2D negativeFluidMesher = new Mesher2D();
+    private final Mesher2D positiveFluidMesher = new Mesher2D();
 
     private final long[] sectionCache = new long[32*32*32];
     private final long[] connectedSectionCache = new long[32*32*32];
@@ -501,6 +501,7 @@ public class RenderDataFactory {
         otherFlags |= ModelQueries.isTranslucent(metadata)?1L<<33:0;
         otherFlags |= ModelQueries.isDoubleSided(metadata)?1L<<34:0;
         mesher.put(a, b, ((long)clientModelId) | (((long) Mapper.getLightId(ModelQueries.faceUsesSelfLighting(metadata, face)?self:facingState))<<16) | ((((long) Mapper.getBiomeId(self))<<24) * (ModelQueries.isBiomeColoured(metadata)?1:0)) | otherFlags);
+        //mesher.put(a, b, ((long)clientModelId) | (((long) 0)<<16) | (0) | otherFlags);
         return true;
     }
 
@@ -510,8 +511,9 @@ public class RenderDataFactory {
         int count = mesher.process();
         var array = mesher.getArray();
         for (int i = 0; i < count; i++) {
-            int quad = array[i];
-            long data = mesher.getDataFromQuad(quad);
+            int quad = array[i*3];
+            long data = Integer.toUnsignedLong(array[i*3+1]);
+            data |= ((long) array[i*3+2])<<32;
             long encodedQuad = Integer.toUnsignedLong(QuadEncoder.encodePosition(face, otherAxis, quad)) | ((data&0xFFFF)<<26) | (((data>>16)&0xFF)<<55) | (((data>>24)&0x1FF)<<46);
 
 

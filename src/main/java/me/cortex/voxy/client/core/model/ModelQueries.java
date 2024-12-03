@@ -41,4 +41,8 @@ public abstract class ModelQueries {
     public static boolean cullsSame(long metadata) {
         return ((metadata>>(8*6))&32) != 0;
     }
+
+    public static boolean isFullyOpaque(long metadata) {
+        return ((metadata>>(8*6))&64) != 0;
+    }
 }
