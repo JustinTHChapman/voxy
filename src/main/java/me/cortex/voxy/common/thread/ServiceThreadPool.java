@@ -1,5 +1,7 @@
 package me.cortex.voxy.common.thread;
 
+import me.cortex.voxy.common.Logger;
+
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -121,11 +123,11 @@ public class ServiceThreadPool {
             while (true) {
                 var ref = this.serviceSlices;
                 if (ref.length == 0) {
-                    System.err.println("Service worker tried to run but had 0 slices");
+                    Logger.error("Service worker tried to run but had 0 slices");
                     break;
                 }
                 if (attempts-- == 0) {
-                    System.err.println("Unable to execute service after many attempts, releasing");
+                    Logger.warn("Unable to execute service after many attempts, releasing");
                     try {
                         Thread.sleep(10);
                     } catch (InterruptedException e) {
