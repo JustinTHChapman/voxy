@@ -30,8 +30,8 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
 
 
         addGeneralCategory(builder, config);
-        addThreadsCategory(builder, config);
-        addStorageCategory(builder, config);
+        //addThreadsCategory(builder, config);
+        //addStorageCategory(builder, config);
 
         builder.setSavingRunnable(() -> {
             //After saving the core should be reloaded/reset
@@ -73,12 +73,13 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setSaveConsumer(val -> config.ingestEnabled = val)
                 .setDefaultValue(DEFAULT.ingestEnabled)
                 .build());
-
+        /*
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.quality"), config.renderQuality, 32, 512)
                 .setTooltip(Text.translatable("voxy.config.general.quality.tooltip"))
                 .setSaveConsumer(val -> config.renderQuality = val)
                 .setDefaultValue(DEFAULT.renderQuality)
                 .build());
+        */
 
         /*
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.geometryBuffer"), config.geometryBufferSize, (1<<27)/8, ((1<<31)-1)/8)
@@ -94,11 +95,13 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .build());
          */
 
+        /*
         category.addEntry(entryBuilder.startIntField(Text.translatable("voxy.config.general.renderDistance"), config.renderDistance)
                 .setTooltip(Text.translatable("voxy.config.general.renderDistance.tooltip"))
                 .setSaveConsumer(val -> config.renderDistance = val)
                 .setDefaultValue(DEFAULT.renderDistance)
                 .build());
+        */
 
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.serviceThreads"), config.serviceThreads, 1, Runtime.getRuntime().availableProcessors())
                 .setTooltip(Text.translatable("voxy.config.general.serviceThreads.tooltip"))
