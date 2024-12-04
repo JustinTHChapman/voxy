@@ -108,6 +108,9 @@ public class PostProcessing {
 
         this.setSize(width, height);
         glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);
+
+        //glClearColor(0,0,0,0);//TODO: RESTORE THIS TO THE ORIGINAL VALUE
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         glBlitNamedFramebuffer(sourceFB, this.framebuffer.id, 0,0, width, height, 0,0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
