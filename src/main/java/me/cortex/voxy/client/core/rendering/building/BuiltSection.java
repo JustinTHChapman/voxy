@@ -14,12 +14,15 @@ public final class BuiltSection {
     public final MemoryBuffer geometryBuffer;
     public final int[] offsets;
 
-    private BuiltSection(long position) {
-        this(position, (byte) 0, -1, null, null);
+    private BuiltSection(long position, byte children) {
+        this(position, children, -1, null, null);
     }
 
     public static BuiltSection empty(long position) {
-        return new BuiltSection(position);
+        return new BuiltSection(position, (byte) 0);
+    }
+    public static BuiltSection emptyWithChildren(long position, byte children) {
+        return new BuiltSection(position, children);
     }
 
     public BuiltSection(long position, byte childExistence, int aabb, MemoryBuffer geometryBuffer, int[] offsets) {

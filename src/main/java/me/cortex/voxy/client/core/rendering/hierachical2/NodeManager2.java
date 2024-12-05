@@ -280,7 +280,11 @@ public class NodeManager2 {
                 int childNodeId = base+offset;
                 //Fill in node
                 this.nodeData.setNodePosition(childNodeId, childPos);
-                this.nodeData.setNodeChildExistence(childNodeId, request.getChildChildExistence(childIdx));
+                byte childExistence = request.getChildChildExistence(childIdx);
+                if (childExistence == 0) {
+                    throw new IllegalStateException("Request result with child existence of 0");
+                }
+                this.nodeData.setNodeChildExistence(childNodeId, childExistence);
                 this.nodeData.setNodeGeometry(childNodeId, request.getChildMesh(childIdx));
                 //Mark for update
                 this.invalidateNode(childNodeId);

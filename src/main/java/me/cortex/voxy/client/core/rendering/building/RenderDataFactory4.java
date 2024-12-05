@@ -210,7 +210,7 @@ public class RenderDataFactory4 {
                             long nextModel = facingForward == 1 ? B : A;
 
                             //Example thing thats just wrong but as example
-                            this.blockMesher.putNext((long) facingForward | ((selfModel & 0xFFFF) << 26) | (0xFFL << 55));
+                            this.blockMesher.putNext((long) facingForward | ((selfModel & 0xFFFF) << 26) | (((nextModel>>16)&0xFF) << 55));
                         }
                     }
                     this.blockMesher.endRow();
@@ -319,7 +319,7 @@ public class RenderDataFactory4 {
                         long nextModel = facingForward==1?B:A;
 
                         //Example thing thats just wrong but as example
-                        mesher.putNext((long) facingForward | ((selfModel&0xFFFF)<<26) | (0xFFL<<55));
+                        mesher.putNext((long) facingForward | ((selfModel&0xFFFF)<<26) | (((nextModel>>16)&0xFF)<<55));
                         //mesher.emitQuad(y, z, 1, 1,(long) facingForward | ((selfModel&0xFFFF)<<26) | (0xFFL<<55));
                     }
                 }
@@ -399,7 +399,7 @@ public class RenderDataFactory4 {
         // this stops e.g. multiple layers of glass (and ocean) from having 3000 layers of quads etc
 
         if (this.quadCount == 0) {
-            return BuiltSection.empty(section.key);
+            return BuiltSection.emptyWithChildren(section.key, section.getNonEmptyChildren());
         }
 
         //TODO: FIXME AND OPTIMIZE, get rid of the stupid quad collector bullshit
