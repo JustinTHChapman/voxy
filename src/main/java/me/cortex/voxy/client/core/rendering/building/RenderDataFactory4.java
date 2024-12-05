@@ -145,8 +145,27 @@ public class RenderDataFactory4 {
                 opaque = 0;
             }
         }
-    }
+        /*
 
+                for (int i = 0; i < 32*32*32; i++) {
+                    long block = sectionData[i + 32*32*32];//Get the block mapping
+
+                    int modelId = this.modelMan.getModelId(Mapper.getBlockId(block));
+                    long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
+
+                    sectionData[i*2] = modelId|((long) (Mapper.getLightId(block)) <<16)|(((long) (Mapper.getBiomeId(block)))<<24);
+                    //sectionData[i*2+1] = modelMetadata;
+
+                    boolean isFullyOpaque = ModelQueries.isFullyOpaque(modelMetadata);
+                    int msk = 1 << (i&31);
+                    opaque &= ~msk; opaque |= isFullyOpaque?msk:0;
+
+                    //TODO: here also do bitmask of what neighboring sections are needed to compute (may be getting rid of this in future)
+
+                    if ((i&31)==31) this.opaqueMasks[i>>5] = opaque;
+                }
+         */
+    }
 
 
     private void generateYZFaces() {
@@ -370,9 +389,10 @@ public class RenderDataFactory4 {
         //Prepare everything
         this.prepareSectionData();
 
-        this.generateYZFaces();
 
+        this.generateYZFaces();
         this.generateXFaces();
+
 
         //TODO:NOTE! when doing face culling of translucent blocks,
         // if the connecting type of the translucent block is the same AND the face is full, discard it
@@ -392,7 +412,7 @@ public class RenderDataFactory4 {
         for (int face = 0; face < 6; face++) {
             offsets[face + 2] = coff;
             int size = this.directionalQuadCounters[face];
-            UnsafeUtil.memcpy(this.directionalQuadBufferPtr + (face*(8*(1<<16))) + (size*8L), ptr + coff*8L, (size* 8L));
+            UnsafeUtil.memcpy(this.directionalQuadBufferPtr + (face*(8*(1<<16))), ptr + coff*8L, (size* 8L));
             coff += size;
         }
 
