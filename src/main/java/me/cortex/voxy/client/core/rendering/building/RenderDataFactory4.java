@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.model.ModelQueries;
 import me.cortex.voxy.client.core.util.Mesher2D;
 import me.cortex.voxy.client.core.util.ScanMesher2D;
 import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
@@ -26,7 +27,11 @@ public class RenderDataFactory4 {
 
 
     //TODO: emit directly to memory buffer instead of long arrays
-    private final LongArrayList[] directionalQuadCollectors = new LongArrayList[]{new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList()};
+
+    //Each axis gets a max quad count of 2^16 (65536 quads) since that is the max the basic geometry manager can handle
+    private final MemoryBuffer directionalQuadBuffer = new MemoryBuffer(6*(8*(1<<16)));
+    private final long directionalQuadBufferPtr = this.directionalQuadBuffer.address;
+    private final int[] directionalQuadCounters = new int[6];//Maybe change to short? (or long /w raw pointers)
 
 
     private int minX;
@@ -83,7 +88,7 @@ public class RenderDataFactory4 {
             long quad = data | encodedPosition;
 
 
-            RenderDataFactory4.this.directionalQuadCollectors[face].add(quad);
+            MemoryUtil.memPutLong(RenderDataFactory4.this.directionalQuadBufferPtr + (RenderDataFactory4.this.directionalQuadCounters[face]++)*8L + face*8L*(1<<16), quad);
         }
     }
 
@@ -352,9 +357,8 @@ public class RenderDataFactory4 {
         this.maxY = Integer.MIN_VALUE;
         this.maxZ = Integer.MIN_VALUE;
 
-        for (var i : this.directionalQuadCollectors) {
-            i.clear();
-        }
+        Arrays.fill(this.directionalQuadCounters, (short) 0);
+
         /*
         this.world.acquire(section.lvl, section.x+1, section.y, section.z).release();
         this.world.acquire(section.lvl, section.x-1, section.y, section.z).release();
@@ -385,15 +389,11 @@ public class RenderDataFactory4 {
         long ptr = buff.address;
         int coff = 0;
 
-        long size = 0;
         for (int face = 0; face < 6; face++) {
             offsets[face + 2] = coff;
-            final LongArrayList faceArray = this.directionalQuadCollectors[face];
-            size = faceArray.size();
-            for (int i = 0; i < size; i++) {
-                long data = faceArray.getLong(i);
-                MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
-            }
+            int size = this.directionalQuadCounters[face];
+            UnsafeUtil.memcpy(this.directionalQuadBufferPtr + (face*(8*(1<<16))) + (size*8L), ptr + coff*8L, (size* 8L));
+            coff += size;
         }
 
 
