@@ -80,6 +80,15 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
 
 
+        /*
+        for (int x = 0; x <= 25000>>9; x++) {
+            for (int y = -1; y <= 1; y++) {
+                for (int z = 0; z <= 25000>>9; z++) {
+                    this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
+                }
+            }
+        }*/
+
         final int H_WIDTH = 10;
         for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
             for (int y = -1; y <= 0; y++) {

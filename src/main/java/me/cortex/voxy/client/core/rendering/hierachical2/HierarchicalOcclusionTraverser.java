@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering.hierachical2;
 
 import me.cortex.voxy.client.Voxy;
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
@@ -39,8 +40,8 @@ public class HierarchicalOcclusionTraverser {
     private final GlBuffer renderList = new GlBuffer(100_000 * 4 + 4).zero();//100k sections max to render, TODO: Maybe move to render service or somewhere else
 
     private final GlBuffer queueMetaBuffer = new GlBuffer(4*4*5).zero();
-    private final GlBuffer scratchQueueA = new GlBuffer(20_000*4).zero();
-    private final GlBuffer scratchQueueB = new GlBuffer(20_000*4).zero();
+    private final GlBuffer scratchQueueA = new GlBuffer(50_000*4).zero();
+    private final GlBuffer scratchQueueB = new GlBuffer(50_000*4).zero();
 
     private static final int LOCAL_WORK_SIZE_BITS = 5;
     private static final int MAX_ITERATIONS = 5;
@@ -116,7 +117,7 @@ public class HierarchicalOcclusionTraverser {
         MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;
 
 
-        final float screenspaceAreaDecreasingSize = 100 * 100;
+        final float screenspaceAreaDecreasingSize = VoxyConfig.CONFIG.subDivisionSize*VoxyConfig.CONFIG.subDivisionSize;
         //Screen space size for descending
         MemoryUtil.memPutFloat(ptr, (float) (screenspaceAreaDecreasingSize) /(viewport.width*viewport.height)); ptr += 4;
     }

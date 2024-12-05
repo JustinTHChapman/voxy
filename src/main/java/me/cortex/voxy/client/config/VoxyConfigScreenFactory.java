@@ -103,6 +103,13 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .build());
         */
 
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.subDivisionSize"), config.subDivisionSize, 32, 256)
+                .setTooltip(Text.translatable("voxy.config.general.subDivisionSize.tooltip"))
+                .setSaveConsumer(val -> config.subDivisionSize = val)
+                .setDefaultValue(DEFAULT.subDivisionSize)
+                .build());
+
+
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.serviceThreads"), config.serviceThreads, 1, Runtime.getRuntime().availableProcessors())
                 .setTooltip(Text.translatable("voxy.config.general.serviceThreads.tooltip"))
                 .setSaveConsumer(val -> config.serviceThreads = val)
