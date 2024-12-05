@@ -142,98 +142,57 @@ public class RenderDataFactory4 {
         }
     }
 
-    private void generateYFaces() {
-        this.blockMesher.axis = 0;// Y axis
-        for (int y = 0; y < 31; y++) {
-            this.blockMesher.auxiliaryPosition = y;
-            for (int z = 0; z < 32; z++) {//TODO: need to do the faces that border sections
-                int current = this.opaqueMasks[(y+0)*32+z];
-                int next    = this.opaqueMasks[(y+1)*32+z];
-
-                int msk     = current ^ next;
-                if (msk == 0) {
-                    this.blockMesher.skip(32);
-                    continue;
-                }
-
-                //TODO: For boarder sections, should NOT EMIT neighbors faces
-                int faceForwardMsk = msk&current;
 
 
-                int cIdx = -1;
-                while (msk!=0) {
-                    int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
-                    int delta = index - cIdx - 1; cIdx = index; //index--;
-                    if (delta != 0) this.blockMesher.skip(delta);
-                    msk &= ~Integer.lowestOneBit(msk);
+    private void generateYZFaces() {
+        for (int axis = 0; axis < 2; axis++) {
+            this.blockMesher.axis = axis;
+            for (int layer = 0; layer < 31; layer++) {
+                this.blockMesher.auxiliaryPosition = layer;
+                for (int other = 0; other < 32; other++) {//TODO: need to do the faces that border sections
+                    int pidx = axis==0 ?(layer*32+other):(other*32+layer);
+                    int skipAmount = axis==0?32:1;
 
-                    int facingForward = ((faceForwardMsk>>index)&1);
+                    int current = this.opaqueMasks[pidx];
+                    int next = this.opaqueMasks[pidx + skipAmount];
 
-                    {
-                        int idx = index + (z * 32) + (y * 32 * 32);
-                        //TODO: swap this out for something not getting the next entry
-                        long A = this.sectionData[idx * 2];
-                        long B = this.sectionData[(idx + 32*32) * 2];
-
-                        //Flip data with respect to facing direction
-                        long selfModel = facingForward==1?A:B;
-                        long nextModel = facingForward==1?B:A;
-
-                        //Example thing thats just wrong but as example
-                        this.blockMesher.putNext((long) facingForward | ((selfModel&0xFFFF)<<26) | (0xFFL<<55));
+                    int msk = current ^ next;
+                    if (msk == 0) {
+                        this.blockMesher.skip(32);
+                        continue;
                     }
-                }
-                this.blockMesher.endRow();
-            }
-            this.blockMesher.finish();
-        }
-    }
 
+                    //TODO: For boarder sections, should NOT EMIT neighbors faces
+                    int faceForwardMsk = msk & current;
+                    int cIdx = -1;
+                    while (msk != 0) {
+                        int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
+                        int delta = index - cIdx - 1;
+                        cIdx = index; //index--;
+                        if (delta != 0) this.blockMesher.skip(delta);
+                        msk &= ~Integer.lowestOneBit(msk);
 
-    private void generateZFaces() {
-        this.blockMesher.axis = 1;// Z axis
-        for (int z = 0; z < 31; z++) {
-            this.blockMesher.auxiliaryPosition = z;
-            for (int y = 0; y < 32; y++) {//TODO: need to do the faces that border sections
-                int current = this.opaqueMasks[y*32+z];
-                int next    = this.opaqueMasks[y*32+z+1];
+                        int facingForward = ((faceForwardMsk >> index) & 1);
 
-                int msk     = current ^ next;
-                if (msk == 0) {
-                    this.blockMesher.skip(32);
-                    continue;
-                }
+                        {
+                            int idx = index + (pidx*32);
 
-                //TODO: For boarder sections, should NOT EMIT neighbors faces
-                int faceForwardMsk = msk&current;
+                            //TODO: swap this out for something not getting the next entry
+                            long A = this.sectionData[idx * 2];
+                            long B = this.sectionData[(idx + skipAmount * 32) * 2];
 
+                            //Flip data with respect to facing direction
+                            long selfModel = facingForward == 1 ? A : B;
+                            long nextModel = facingForward == 1 ? B : A;
 
-                int cIdx = -1;
-                while (msk!=0) {
-                    int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
-                    int delta = index - cIdx - 1; cIdx = index; //index--;
-                    if (delta != 0) this.blockMesher.skip(delta);
-                    msk &= ~Integer.lowestOneBit(msk);
-
-                    int facingForward = ((faceForwardMsk>>index)&1);
-
-                    {
-                        int idx = index + (z * 32) + (y * 32 * 32);
-                        //TODO: swap this out for something not getting the next entry
-                        long A = this.sectionData[idx * 2];
-                        long B = this.sectionData[(idx + 32) * 2];
-
-                        //Flip data with respect to facing direction
-                        long selfModel = facingForward==1?A:B;
-                        long nextModel = facingForward==1?B:A;
-
-                        //Example thing thats just wrong but as example
-                        this.blockMesher.putNext((long) facingForward | ((selfModel&0xFFFF)<<26) | (0xFFL<<55));
+                            //Example thing thats just wrong but as example
+                            this.blockMesher.putNext((long) facingForward | ((selfModel & 0xFFFF) << 26) | (0xFFL << 55));
+                        }
                     }
+                    this.blockMesher.endRow();
                 }
-                this.blockMesher.endRow();
+                this.blockMesher.finish();
             }
-            this.blockMesher.finish();
         }
     }
 
@@ -369,10 +328,6 @@ public class RenderDataFactory4 {
         }
     }
 
-    public static void main(String[] args) {
-        System.out.println(1L<<(-555));
-    }
-
     /*
     private static long createQuad() {
         ((long)clientModelId) | (((long) Mapper.getLightId(ModelQueries.faceUsesSelfLighting(metadata, face)?self:facingState))<<16) | ((((long) Mapper.getBiomeId(self))<<24) * (ModelQueries.isBiomeColoured(metadata)?1:0)) | otherFlags
@@ -411,9 +366,7 @@ public class RenderDataFactory4 {
         //Prepare everything
         this.prepareSectionData();
 
-        this.generateYFaces();
-
-        this.generateZFaces();
+        this.generateYZFaces();
 
         this.generateXFaces();
 
