@@ -6,9 +6,29 @@ import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.SaveLoadSystem;
 
+import java.lang.ref.Cleaner;
+
 import static org.lwjgl.util.zstd.Zstd.*;
 
 public class ZSTDCompressor implements StorageCompressor {
+    private static final Cleaner CLEANER = Cleaner.create();
+    private record Ref(long ptr) {}
+    private static Ref createCleanableCompressionContext() {
+        long ctx = ZSTD_createCCtx();
+        var ref = new Ref(ctx);
+        CLEANER.register(ref, ()->ZSTD_freeCCtx(ctx));
+        return ref;
+    }
+    private static Ref createCleanableDecompressionContext() {
+        long ctx = ZSTD_createDCtx();
+        var ref = new Ref(ctx);
+        CLEANER.register(ref, ()->ZSTD_freeDCtx(ctx));
+        return ref;
+    }
+
+    private static final ThreadLocal<Ref> COMPRESSION_CTX = ThreadLocal.withInitial(ZSTDCompressor::createCleanableCompressionContext);
+    private static final ThreadLocal<Ref> DECOMPRESSION_CTX = ThreadLocal.withInitial(ZSTDCompressor::createCleanableDecompressionContext);
+
     private final int level;
 
     public ZSTDCompressor(int level) {
@@ -18,14 +38,14 @@ public class ZSTDCompressor implements StorageCompressor {
     @Override
     public MemoryBuffer compress(MemoryBuffer saveData) {
         MemoryBuffer compressedData  = new MemoryBuffer((int)ZSTD_COMPRESSBOUND(saveData.size));
-        long compressedSize = nZSTD_compress(compressedData.address, compressedData.size, saveData.address, saveData.size, this.level);
+        long compressedSize = nZSTD_compressCCtx(COMPRESSION_CTX.get().ptr, compressedData.address, compressedData.size, saveData.address, saveData.size, this.level);
         return compressedData.subSize(compressedSize);
     }
 
     @Override
     public MemoryBuffer decompress(MemoryBuffer saveData) {
         var decompressed = new MemoryBuffer(SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE);
-        long size = nZSTD_decompress(decompressed.address, decompressed.size, saveData.address, saveData.size);
+        long size = nZSTD_decompressDCtx(DECOMPRESSION_CTX.get().ptr, decompressed.address, decompressed.size, saveData.address, saveData.size);
         return decompressed.subSize(size);
     }
 
