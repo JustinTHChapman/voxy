@@ -22,7 +22,7 @@ public class HierarchicalBitSet {
         this(1<<(6*4));
     }
 
-    public int allocateNext() {
+    public int allocateNext() {//TODO FIXME THERE IS A BUG SOMEWHERE IN HERE WHEN DEALING WITH LARGE NUMBERS limit of (1<<19), with first 266240 entries already set, returns 524288 as the next entry instead of 266241
         if (this.A==-1) {
             return -1;
         }
@@ -49,6 +49,7 @@ public class HierarchicalBitSet {
                 bp |= 1L<<(idx&0x3f);
                 this.B[idx>>6] = bp;
                 if (bp==-1) {
+                    idx >>= 6;
                     this.A |= 1L<<(idx&0x3f);
                 }
             }
@@ -160,7 +161,17 @@ public class HierarchicalBitSet {
     }
 
 
-    public static void main(String[] args) {
+
+    public static void main(String[] args)  {
+        var h = new HierarchicalBitSet(1<<19);
+        for (int i = 0; i < 1<<19; i++) {
+            if (h.allocateNext() != i) {
+                throw new IllegalStateException("At:" + i);
+            }
+        }
+    }
+
+    public static void main2(String[] args) {
         var h = new HierarchicalBitSet();
         for (int i = 0; i < 64*32; i++) {
             h.set(i);
