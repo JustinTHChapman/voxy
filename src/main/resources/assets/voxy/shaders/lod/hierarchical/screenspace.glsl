@@ -20,6 +20,7 @@ layout(binding = HIZ_BINDING) uniform sampler2DShadow hizDepthSampler;
 vec3 minBB;
 vec3 maxBB;
 vec2 size;
+float zThing;
 
 //Sets up screenspace with the given node id, returns true on success false on failure/should not continue
 //Accesses data that is setup in the main traversal and is just shared to here
@@ -43,11 +44,13 @@ void setupScreenspace(in UnpackedNode node) {
 
     minBB = base.xyz/base.w;
     maxBB = minBB;
+    zThing = -999999999999.0f;
 
     for (int i = 1; i < 8; i++) {
         //NOTE!: cant this be precomputed and put in an array?? in the scene uniform??
         vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*(32<<node.lodLevel),1));//Size of section is 32x32x32 (need to change it to a bounding box in the future)
         pPoint += base;
+        zThing = max(pPoint.z, zThing);
         vec3 point = pPoint.xyz/pPoint.w;
         //TODO: CLIP TO VIEWPORT
         minBB = min(minBB, point);
@@ -63,8 +66,8 @@ void setupScreenspace(in UnpackedNode node) {
     //printf("Screenspace MIN: %f, %f, %f  MAX: %f, %f, %f", minBB.x,minBB.y,minBB.z, maxBB.x,maxBB.y,maxBB.z);
 
     //Convert to screenspace
-    maxBB.xy = maxBB.xy*0.5f+0.5f;
-    minBB.xy = minBB.xy*0.5f+0.5f;
+    maxBB = maxBB*0.5f+0.5f;
+    minBB = minBB*0.5f+0.5f;
 
     size = clamp(maxBB.xy - minBB.xy, vec2(0), vec2(1));
 
@@ -72,7 +75,7 @@ void setupScreenspace(in UnpackedNode node) {
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
-    return any(lessThanEqual(maxBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), minBB));
+    return any(lessThanEqual(maxBB, vec3(0.0f))) || any(lessThanEqual(vec3(1.0f), minBB)) || zThing < 0;
 
     //|| any(lessThanEqual(minBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), maxBB));
 }
@@ -81,9 +84,7 @@ bool isCulledByHiz() {
     //if (minBB.z < 0) {//Minpoint is behind the camera, its always going to pass
     //    return false;//Just cull it for now cause other culling isnt working, TODO: FIXME
     //}
-    if (maxBB.z > 1) {
-        return false;
-    }
+
 
     vec2 ssize = size * vec2(screenW, screenH);
     float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)))-1;
@@ -92,7 +93,7 @@ bool isCulledByHiz() {
     //TODO: maybe get rid of clamp
     //Todo: replace with some rasterization, e.g. especially for request back to cpu
     midpoint = clamp(midpoint, vec2(0), vec2(1));
-    bool culled = textureLod(hizDepthSampler, vec3(midpoint, minBB.z*0.5f+0.5f), miplevel) < 0.0001f;
+    bool culled = textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) < 0.0001f;
 
     if (culled) {
         printf("HiZ sample point culled: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
