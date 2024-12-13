@@ -142,7 +142,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
             this.sectionUpdateQueue.consume();
             this.geometryUpdateQueue.consume();
             if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
-                   UploadStream.INSTANCE.commit();
+                UploadStream.INSTANCE.commit();
             }
             //this needs to go after, due to geometry updates committed by the nodeManager
             this.sectionRenderer.getGeometryManager().tick();

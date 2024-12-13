@@ -1,6 +1,5 @@
 package me.cortex.voxy.client.core.rendering.building;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
 import me.cortex.voxy.client.core.Capabilities;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.client.core.model.ModelQueries;
@@ -11,12 +10,15 @@ import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.Arrays;
 
 
 public class RenderDataFactory4 {
+    private static final boolean VERIFY_MESHING = VoxyCommon.isVerificationFlagOn("verifyMeshing");
+
     private final WorldEngine world;
     private final ModelFactory modelMan;
 
@@ -47,6 +49,7 @@ public class RenderDataFactory4 {
     //Wont work for double sided quads
     private final class Mesher extends ScanMesher2D {
         public int auxiliaryPosition = 0;
+        public boolean doAuxiliaryFaceOffset = true;
         public int axis = 0;
 
         //Note x, z are in top right
@@ -54,6 +57,24 @@ public class RenderDataFactory4 {
         protected void emitQuad(int x, int z, int length, int width, long data) {
             RenderDataFactory4.this.quadCount++;
 
+            if (VERIFY_MESHING) {
+                if (length<1||length>16) {
+                    throw new IllegalStateException("length out of bounds: " + length);
+                }
+                if (width<1||width>16) {
+                    throw new IllegalStateException("width out of bounds: " + width);
+                }
+                if (x<0||x>31) {
+                    throw new IllegalStateException("x out of bounds: " + x);
+                }
+                if (z<0||z>31) {
+                    throw new IllegalStateException("z out of bounds: " + z);
+                }
+                if (x-(length-1)<0 || z-(width-1)<0) {
+                    throw new IllegalStateException("dim out of bounds: " + (x-(length-1))+", " + (z-(width-1)));
+                }
+
+            }
             x -= length-1;
             z -= width-1;
 
@@ -70,15 +91,22 @@ public class RenderDataFactory4 {
 
             //Lower 26 bits can be auxiliary data since that is where quad position information goes;
             int auxData = (int) (data&((1<<26)-1));
+            int faceSide = auxData&1;
             data &= ~(data&((1<<26)-1));
 
             final int axis = this.axis;
-            int face = (auxData&1)|(axis<<1);
-            int encodedPosition = (auxData&1)|(axis<<1);
+            int face = (axis<<1)|faceSide;
+            int encodedPosition = face;
 
             //Shift up if is negative axis
             int auxPos = this.auxiliaryPosition;
-            auxPos += (~auxData)&1;
+            auxPos += this.doAuxiliaryFaceOffset?(1-faceSide):0;//Shift
+
+            if (VERIFY_MESHING) {
+                if (auxPos > 31) {
+                    throw new IllegalStateException("OOB face: " + auxPos + ", " + faceSide);
+                }
+            }
 
             encodedPosition |= ((width - 1) << 7) | ((length - 1) << 3);
 
@@ -199,6 +227,46 @@ public class RenderDataFactory4 {
                     this.blockMesher.endRow();
                 }
                 this.blockMesher.finish();
+            }
+
+            {
+                this.blockMesher.doAuxiliaryFaceOffset = false;
+                //Hacky generate section side faces (without check neighbor section)
+                for (int side = 0; side < 2; side++) {
+                    int layer = side == 0 ? 0 : 31;
+                    this.blockMesher.auxiliaryPosition = layer;
+                    for (int other = 0; other < 32; other++) {
+                        int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
+                        int msk = this.opaqueMasks[pidx];
+                        if (msk == 0) {
+                            this.blockMesher.skip(32);
+                            continue;
+                        }
+
+                        int cIdx = -1;
+                        while (msk != 0) {
+                            int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
+                            int delta = index - cIdx - 1;
+                            cIdx = index; //index--;
+                            if (delta != 0) this.blockMesher.skip(delta);
+                            msk &= ~Integer.lowestOneBit(msk);
+
+                            {
+                                int idx = index + (pidx * 32);
+
+                                //TODO: swap this out for something not getting the next entry
+                                long A = this.sectionData[idx * 2];
+
+                                //Example thing thats just wrong but as example
+                                this.blockMesher.putNext((long) (side == 0 ? 0L : 1L) | ((A & 0xFFFFL) << 26) | (((0xFFL) & 0xFF) << 55));
+                            }
+                        }
+                        this.blockMesher.endRow();
+                    }
+
+                    this.blockMesher.finish();
+                }
+                this.blockMesher.doAuxiliaryFaceOffset = true;
             }
         }
     }
@@ -330,6 +398,46 @@ public class RenderDataFactory4 {
                 }
             }
         }
+
+        //Generate the side faces, hackily, using 0 and 1 mesher
+        {
+            var ma = this.xAxisMeshers[0];
+            var mb = this.xAxisMeshers[31];
+            ma.finish();
+            mb.finish();
+            ma.doAuxiliaryFaceOffset = false;
+            mb.doAuxiliaryFaceOffset = false;
+            for (int y = 0; y < 32; y++) {
+                int skipA = 0;
+                int skipB = 0;
+                for (int z = 0; z < 32; z++) {
+                    int i = y*32+z;
+                    int msk = this.opaqueMasks[i];
+                    if ((msk & 1) != 0) {
+                        ma.skip(skipA); skipA = 0;
+
+                        long A = this.sectionData[(i<<5) * 2];
+
+                        ma.putNext(0L | ((A&0xFFFF)<<26) | (((0xFFL)&0xFF)<<55));
+                    } else {skipA++;}
+
+                    if ((msk & (1<<31)) != 0) {
+                        mb.skip(skipB); skipB = 0;
+
+                        long A = this.sectionData[(i*32+31) * 2];
+
+                         mb.putNext(1L | ((A&0xFFFF)<<26) | (((0xFFL)&0xFF)<<55));
+                    } else {skipB++;}
+                }
+                ma.skip(skipA);
+                mb.skip(skipB);
+            }
+            ma.finish();
+            mb.finish();
+            ma.doAuxiliaryFaceOffset = true;
+            mb.doAuxiliaryFaceOffset = true;
+        }
+
         for (var mesher : this.xAxisMeshers) {
             mesher.finish();
         }
