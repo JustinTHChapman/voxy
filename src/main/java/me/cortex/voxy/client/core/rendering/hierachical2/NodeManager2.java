@@ -438,7 +438,11 @@ public class NodeManager2 {
             int pid = this.activeSectionMap.put(childPos, requestId|NODE_TYPE_REQUEST|REQUEST_TYPE_CHILD);
 
             if (pid != -1) {
-                throw new IllegalStateException("Leaf request creation failed to insert child into map as a mapping already existed for the node! pos: " + WorldEngine.pprintPos(childPos) + " id: " + pid);
+                String extra = "";
+                if ((pid&NODE_TYPE_MSK)==NODE_TYPE_LEAF) {
+                    extra = " type leaf: pos " + WorldEngine.pprintPos( this.nodeData.nodePosition(pid)) + " hasRequest: " + this.nodeData.isNodeRequestInFlight(pid);
+                }
+                throw new IllegalStateException("Leaf request creation failed to insert child into map as a mapping already existed for the node! pos: " + WorldEngine.pprintPos(childPos) + " id: " + pid + " for parent " + WorldEngine.pprintPos(pos) + " extra " + extra);
             }
 
             //Watch and request the child node at the given position
