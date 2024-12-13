@@ -22,7 +22,7 @@ public class HierarchicalBitSet {
         this(1<<(6*4));
     }
 
-    public int allocateNext() {//TODO FIXME THERE IS A BUG SOMEWHERE IN HERE WHEN DEALING WITH LARGE NUMBERS limit of (1<<19), with first 266240 entries already set, returns 524288 as the next entry instead of 266241
+    public int allocateNext() {
         if (this.A==-1) {
             return -1;
         }
