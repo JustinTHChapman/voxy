@@ -5,11 +5,14 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.util.AllocationArena;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.function.Consumer;
 
 public class BufferArena {
+    private static final boolean CHECK_SSBO_MAX_SIZE_CHECK = VoxyCommon.isVerificationFlagOn("checkSSBOMaxSize");
+
     private final long size;
     private final int elementSize;
     private final GlBuffer buffer;
@@ -20,7 +23,7 @@ public class BufferArena {
         if (capacity%elementSize != 0) {
             throw new IllegalArgumentException("Capacity not a multiple of element size");
         }
-        if (capacity > Capabilities.INSTANCE.ssboMaxSize) {
+        if (CHECK_SSBO_MAX_SIZE_CHECK && capacity > Capabilities.INSTANCE.ssboMaxSize) {
             throw new IllegalArgumentException("Buffer is bigger than max ssbo size (requested " + capacity + " but has max of " + Capabilities.INSTANCE.ssboMaxSize+")");
         }
         this.size = capacity;

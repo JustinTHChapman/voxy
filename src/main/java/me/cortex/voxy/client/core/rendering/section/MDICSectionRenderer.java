@@ -125,7 +125,12 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         this.uploadUniformBuffer(viewport);
 
-        //TODO compute the draw calls
+        //TODO Move this to after culling has occured instead of here, since here the geometry might have changed and
+        // can cause explosions, while if do after culling, its after geometry changes
+        // well the thing is here it technicnally should be before geometry changes anyway tho??
+        // so here should actually be fine aswell???
+        // but doing it before enables computing temporal draw commands aswell to fix temporal coherance
+        // yea thats true, should move it probably
         {
             this.commandGenShader.bind();
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);

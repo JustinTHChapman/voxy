@@ -6,12 +6,10 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.PrintfDebugUtil;
-import me.cortex.voxy.client.core.rendering.hierarchical.NodeManager;
 import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
-import me.cortex.voxy.common.Logger;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -29,9 +27,12 @@ import static org.lwjgl.opengl.GL45.*;
 
 // TODO: swap to persistent gpu threads instead of dispatching MAX_ITERATIONS of compute layers
 public class HierarchicalOcclusionTraverser {
+    public static final boolean HIERARCHICAL_SHADER_DEBUG = System.getProperty("voxy.hierarchicalShaderDebug", "false").equals("true");
+
     public static final int REQUEST_QUEUE_SIZE = 50;
 
     private final NodeManager2 nodeManager;
+    private final NodeCleaner nodeCleaner;
 
     private final GlBuffer requestBuffer;
 
@@ -60,7 +61,7 @@ public class HierarchicalOcclusionTraverser {
     private final int hizSampler = glGenSamplers();
 
     private final Shader traversal = Shader.make(PRINTF_processor)
-            .defineIf("DEBUG", Voxy.SHADER_DEBUG)
+            .defineIf("DEBUG", HIERARCHICAL_SHADER_DEBUG)
             .define("MAX_ITERATIONS", MAX_ITERATIONS)
             .define("LOCAL_SIZE_BITS", LOCAL_WORK_SIZE_BITS)
             .define("REQUEST_QUEUE_SIZE", REQUEST_QUEUE_SIZE)
@@ -81,7 +82,8 @@ public class HierarchicalOcclusionTraverser {
             .compile();
 
 
-    public HierarchicalOcclusionTraverser(NodeManager2 nodeManager) {
+    public HierarchicalOcclusionTraverser(NodeManager2 nodeManager, NodeCleaner nodeCleaner) {
+        this.nodeCleaner = nodeCleaner;
         this.nodeManager = nodeManager;
         this.requestBuffer = new GlBuffer(REQUEST_QUEUE_SIZE*8L+8).zero();
         this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).zero();
@@ -116,6 +118,16 @@ public class HierarchicalOcclusionTraverser {
 
         MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;
 
+
+        /*
+        //Very funny and cool thing that is possible
+        if (MinecraftClient.getInstance().getCurrentFps() < 30) {
+            VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + 5, 256);
+        }
+
+        if (60 < MinecraftClient.getInstance().getCurrentFps()) {
+            VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - 1, 32);
+        }*/
 
         final float screenspaceAreaDecreasingSize = VoxyConfig.CONFIG.subDivisionSize*VoxyConfig.CONFIG.subDivisionSize;
         //Screen space size for descending

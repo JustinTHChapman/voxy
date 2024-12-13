@@ -158,6 +158,15 @@ public class NodeManager2 {
                 throw new IllegalStateException();
             }
         } else if ((nodeId&NODE_TYPE_MSK)==NODE_TYPE_INNER || (nodeId&NODE_TYPE_MSK)==NODE_TYPE_LEAF) {
+            /*
+            //More verification
+            if (sectionResult.childExistence != this.nodeData.getNodeChildExistence(nodeId)) {
+                Logger.error("Child existance verification mismatch. expected: " +  this.nodeData.getNodeChildExistence(nodeId) + " got: " + sectionResult.childExistence);
+                if (this.nodeData.isNodeRequestInFlight(nodeId)) {
+                    Logger.error("AAAAAAAAAA");
+                }
+            }*/
+
             // Just doing a geometry update
             if (this.updateNodeGeometry(nodeId&NODE_ID_MSK, sectionResult) != 0) {
                 this.invalidateNode(nodeId&NODE_ID_MSK);
@@ -235,10 +244,62 @@ public class NodeManager2 {
             }
         } else if ((nodeId&NODE_TYPE_MSK)==NODE_TYPE_INNER) {
             //Very complex and painful operation
-
+            Logger.error("UNFINISHED OPERATION TODO: FIXME");
         } else if ((nodeId&NODE_TYPE_MSK)==NODE_TYPE_LEAF) {
+
+            //We might be leaf but we still might be inflight
+            if (this.nodeData.isNodeRequestInFlight(nodeId&NODE_ID_MSK)) {
+                //  Logger.error("UNFINISHED OPERATION TODO: FIXME: painful operation, needs to account for both adding and removing, need to do the same with inner node, but also create requests, or cleanup children");
+                int requestId = this.nodeData.getNodeRequest(nodeId);
+                var request = this.childRequests.get(requestId);// TODO: do not assume request is childRequest (it will probably always be)
+                if (request.getPosition() != pos) throw new IllegalStateException("Request not in pos");
+                {//Update the request
+                    byte oldMsk = request.getMsk();
+                    byte change = (byte) (oldMsk ^ childExistence);
+                    {//Remove children and free/release associated meshes
+                        byte rem = (byte) (change&oldMsk);
+                        for (int i = 0; i < 8; i++) {
+                            if ((rem&(1<<i))==0) continue;
+                            int meshId = request.removeAndUnRequire(i);
+                            if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
+                                this.geometryManager.removeSection(meshId);
+                            }
+
+                            //Remove child from being watched and activeSections
+                            long cPos = makeChildPos(pos, i);
+                            if (this.activeSectionMap.remove(cPos) == -1) {//TODO: verify the removed section is a request type of child and the request id matches this
+                                throw new IllegalStateException("Child pos was in a request but not in active section map");
+                            }
+                            if (!this.updateRouter.unwatch(cPos, WorldEngine.UPDATE_FLAGS)) {
+                                throw new IllegalStateException("Child pos was not being watched");
+                            }
+                        }
+                    }
+
+                    {//Add new children to the request
+                        byte rem = (byte) (change&childExistence);
+                        for (int i = 0; i < 8; i++) {
+                            if ((rem&(1<<i))==0) continue;
+                            //Add child to request
+                            request.addChildRequirement(i);
+
+                            //Add child to active tracker and put in updateRouter
+                            long cPos = makeChildPos(pos, i);
+                            if (this.activeSectionMap.put(cPos, requestId|NODE_TYPE_REQUEST|REQUEST_TYPE_CHILD) != -1) {
+                                throw new IllegalStateException("Child pos was already in active section tracker but was part of a request");
+                            }
+                            if (!this.updateRouter.watch(cPos, WorldEngine.UPDATE_FLAGS)) {
+                                throw new IllegalStateException("Child pos update router issue");
+                            }
+                        }
+                    }
+                }
+            }
+
             //Just need to update the child node data, nothing else
             this.nodeData.setNodeChildExistence(nodeId&NODE_ID_MSK, childExistence);
+            //Need to resubmit to gpu
+            this.invalidateNode(nodeId&NODE_ID_MSK);
         }
     }
 
@@ -347,7 +408,7 @@ public class NodeManager2 {
 
         } else {//nodeType == NODE_TYPE_INNER
             //TODO: assert that the node isnt already being watched for geometry, if it is, just spit out a warning? and ignore
-
+            Logger.error("TODO FINISH THIS");
             if (!this.updateRouter.watch(pos, WorldEngine.UPDATE_TYPE_BLOCK_BIT)) {
                 //FIXME: i think this can occur accidently? when removing nodes or something creating leaf nodes
                 // or other, the node might be wanted to be watched by gpu, but cpu already started watching it a few frames ago

@@ -24,7 +24,7 @@ public class VoxelIngestService {
     private final WorldEngine world;
     public VoxelIngestService(WorldEngine world, ServiceThreadPool pool) {
         this.world = world;
-        this.threads = pool.createService("Ingest service", 100, ()-> this::processJob);
+        this.threads = pool.createServiceNoCleanup("Ingest service", 100, ()-> this::processJob);
     }
 
     private void processJob() {

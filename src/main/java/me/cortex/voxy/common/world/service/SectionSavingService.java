@@ -20,7 +20,7 @@ public class SectionSavingService {
 
     public SectionSavingService(WorldEngine worldEngine, ServiceThreadPool threadPool) {
         this.world = worldEngine;
-        this.threads = threadPool.createService("Section saving service", 100, () -> this::processJob);
+        this.threads = threadPool.createServiceNoCleanup("Section saving service", 100, () -> this::processJob);
     }
 
     private void processJob() {

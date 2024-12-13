@@ -2,10 +2,17 @@ package me.cortex.voxy.common.util;
 
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
 public class MemoryBuffer extends TrackedObject {
     public final long address;
     public final long size;
     private final boolean freeable;
+
+    private static final AtomicInteger COUNT =  new AtomicInteger(0);
+    private static final AtomicLong TOTAL_SIZE = new AtomicLong(0);
+
 
     public MemoryBuffer(long size) {
         this(true, MemoryUtil.nmemAlloc(size), size, true);
@@ -16,6 +23,11 @@ public class MemoryBuffer extends TrackedObject {
         this.size = size;
         this.address = address;
         this.freeable = freeable;
+
+        COUNT.incrementAndGet();
+        if (freeable) {
+            TOTAL_SIZE.addAndGet(size);
+        }
     }
 
     public void cpyTo(long dst) {
@@ -26,8 +38,11 @@ public class MemoryBuffer extends TrackedObject {
     @Override
     public void free() {
         super.free0();
+
+        COUNT.decrementAndGet();
         if (this.freeable) {
             MemoryUtil.nmemFree(this.address);
+            TOTAL_SIZE.addAndGet(-this.size);
         } else {
             throw new IllegalArgumentException("Tried to free unfreeable buffer");
         }
@@ -44,8 +59,13 @@ public class MemoryBuffer extends TrackedObject {
         if (size > this.size) {
             throw new IllegalArgumentException("Requested size larger than current size");
         }
+
         //Free the current object, but not the memory associated with it
-        super.free0();
+        this.free0();
+        COUNT.decrementAndGet();
+        if (this.freeable) {
+            TOTAL_SIZE.addAndGet(-this.size);
+        }
 
         return new MemoryBuffer(true, this.address, size, this.freeable);
     }
@@ -60,5 +80,13 @@ public class MemoryBuffer extends TrackedObject {
     }
     public static MemoryBuffer createUntrackedUnfreeableRawFrom(long address, long size) {
         return new MemoryBuffer(false, address, size, false);
+    }
+
+    public static int getCount() {
+        return COUNT.get();
+    }
+
+    public static long getTotalSize() {
+        return TOTAL_SIZE.get();
     }
 }

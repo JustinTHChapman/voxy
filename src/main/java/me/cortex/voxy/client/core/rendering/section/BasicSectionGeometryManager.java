@@ -54,7 +54,7 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
             throw new IllegalStateException("Tried adding section when section count is already at capacity");
         }
         if (newId > this.sectionMetadata.size()) {
-            throw new IllegalStateException();
+            throw new IllegalStateException("Size exceeds limits: " + newId + ", " + this.sectionMetadata.size() + ", " + this.allocationSet.getCount());
         }
 
         var newMeta = createMeta(sectionData);

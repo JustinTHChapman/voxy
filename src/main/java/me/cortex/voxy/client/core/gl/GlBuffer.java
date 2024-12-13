@@ -11,6 +11,9 @@ public class GlBuffer extends TrackedObject {
     public final int id;
     private final long size;
 
+    private static int COUNT;
+    private static long TOTAL_SIZE;
+
     public GlBuffer(long size) {
         this(size, 0);
     }
@@ -19,12 +22,19 @@ public class GlBuffer extends TrackedObject {
         this.id = glCreateBuffers();
         this.size = size;
         glNamedBufferStorage(this.id, size, flags);
+        this.zero();
+
+        COUNT++;
+        TOTAL_SIZE += size;
     }
 
     @Override
     public void free() {
         this.free0();
         glDeleteBuffers(this.id);
+
+        COUNT--;
+        TOTAL_SIZE -= this.size;
     }
 
     public long size() {
@@ -34,5 +44,13 @@ public class GlBuffer extends TrackedObject {
     public GlBuffer zero() {
         nglClearNamedBufferData(this.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, 0);
         return this;
+    }
+
+    public static int getCount() {
+        return COUNT;
+    }
+
+    public static long getTotalSize() {
+        return TOTAL_SIZE;
     }
 }

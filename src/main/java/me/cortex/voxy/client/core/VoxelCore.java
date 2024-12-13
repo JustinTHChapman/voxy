@@ -1,19 +1,18 @@
 package me.cortex.voxy.client.core;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.model.IdNotYetComputedException;
+import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.*;
-import me.cortex.voxy.client.core.rendering.building.RenderDataFactory;
 import me.cortex.voxy.client.core.rendering.building.RenderDataFactory4;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
+import me.cortex.voxy.client.taskbar.Taskbar;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
@@ -67,6 +66,8 @@ public class VoxelCore {
     private final ServiceThreadPool serviceThreadPool;
 
     private WorldImporter importer;
+    private UUID importerBossBarUUID;
+
     public VoxelCore(ContextSelectionSystem.Selection worldSelection) {
         var cfg = worldSelection.getConfig();
         this.serviceThreadPool = new ServiceThreadPool(VoxyConfig.CONFIG.serviceThreads);
@@ -167,6 +168,8 @@ public class VoxelCore {
         debug.add("");
         debug.add("");
         debug.add("Voxy Core: " + VoxyCommon.MOD_VERSION);
+        debug.add("MemoryBuffer, Count/Size (mb): " + MemoryBuffer.getCount() + "/" + (MemoryBuffer.getTotalSize()/1_000_000));
+        debug.add("GlBuffer, Count/Size (mb): " + GlBuffer.getCount() + "/" + (GlBuffer.getTotalSize()/1_000_000));
         /*
         debug.add("Ingest service tasks: " + this.world.ingestService.getTaskCount());
         debug.add("Saving service tasks: " + this.world.savingService.getTaskCount());
@@ -205,6 +208,11 @@ public class VoxelCore {
         Logger.info("Shutting down service thread pool");
         this.serviceThreadPool.shutdown();
         Logger.info("Voxel core shut down");
+        //Remove bossbar
+        if (this.importerBossBarUUID != null) {
+            MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.remove(this.importerBossBarUUID);
+            Taskbar.INSTANCE.setIsNone();
+        }
     }
 
     public boolean createWorldImporter(World mcWorld, File worldPath) {
@@ -215,19 +223,26 @@ public class VoxelCore {
             return false;
         }
 
-        var bossBar = new ClientBossBar(MathHelper.randomUuid(), Text.of("Voxy world importer"), 0.0f, BossBar.Color.GREEN, BossBar.Style.PROGRESS, false, false, false);
+        Taskbar.INSTANCE.setProgress(0,10000);
+        Taskbar.INSTANCE.setIsProgression();
+
+        this.importerBossBarUUID = MathHelper.randomUuid();
+        var bossBar = new ClientBossBar(this.importerBossBarUUID, Text.of("Voxy world importer"), 0.0f, BossBar.Color.GREEN, BossBar.Style.PROGRESS, false, false, false);
         MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.put(bossBar.getUuid(), bossBar);
         this.importer.importWorldAsyncStart(worldPath, (a,b)->
                 MinecraftClient.getInstance().executeSync(()-> {
+                    Taskbar.INSTANCE.setProgress(a, b);
                     bossBar.setPercent(((float) a)/((float) b));
                     bossBar.setName(Text.of("Voxy import: "+ a+"/"+b + " chunks"));
                 }),
                 ()-> {
                     MinecraftClient.getInstance().executeSync(()-> {
-                        MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.remove(bossBar.getUuid());
+                        MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.remove(this.importerBossBarUUID);
+                        this.importerBossBarUUID = null;
                         String msg = "Voxy world import finished";
                         MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(Text.literal(msg));
-                        System.err.println(msg);
+                        Logger.info(msg);
+                        Taskbar.INSTANCE.setIsNone();
                     });
                 });
         return true;

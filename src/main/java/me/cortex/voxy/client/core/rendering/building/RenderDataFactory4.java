@@ -43,6 +43,7 @@ public class RenderDataFactory4 {
 
     private int quadCount = 0;
 
+
     //Wont work for double sided quads
     private final class Mesher extends ScanMesher2D {
         public int auxiliaryPosition = 0;
@@ -123,48 +124,30 @@ public class RenderDataFactory4 {
     private void prepareSectionData() {
         final var sectionData = this.sectionData;
         int opaque = 0;
+
+        int neighborAcquireMsk = 0;
         for (int i = 0; i < 32*32*32;) {
-            long block = sectionData[i + 32*32*32];//Get the block mapping
+            long block = sectionData[i + 32 * 32 * 32];//Get the block mapping
 
             int modelId = this.modelMan.getModelId(Mapper.getBlockId(block));
             long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
 
-            sectionData[i*2] = modelId|((long) (Mapper.getLightId(block)) <<16)|(((long) (Mapper.getBiomeId(block)))<<24);
-            sectionData[i*2+1] = modelMetadata;
+            sectionData[i * 2] = modelId | ((long) (Mapper.getLightId(block)) << 16) | (((long) (Mapper.getBiomeId(block))) << 24);
+            sectionData[i * 2 + 1] = modelMetadata;
 
             boolean isFullyOpaque = ModelQueries.isFullyOpaque(modelMetadata);
-            opaque |= (isFullyOpaque ? 1 : 0) << (i&31);
+            opaque |= (isFullyOpaque ? 1 : 0) << (i & 31);
 
             //TODO: here also do bitmask of what neighboring sections are needed to compute (may be getting rid of this in future)
 
             //Do increment here
             i++;
 
-            if ((i&31)==0) {
-                this.opaqueMasks[(i>>5)-1] = opaque;
+            if ((i & 31) == 0) {
+                this.opaqueMasks[(i >> 5) - 1] = opaque;
                 opaque = 0;
             }
         }
-        /*
-
-                for (int i = 0; i < 32*32*32; i++) {
-                    long block = sectionData[i + 32*32*32];//Get the block mapping
-
-                    int modelId = this.modelMan.getModelId(Mapper.getBlockId(block));
-                    long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
-
-                    sectionData[i*2] = modelId|((long) (Mapper.getLightId(block)) <<16)|(((long) (Mapper.getBiomeId(block)))<<24);
-                    //sectionData[i*2+1] = modelMetadata;
-
-                    boolean isFullyOpaque = ModelQueries.isFullyOpaque(modelMetadata);
-                    int msk = 1 << (i&31);
-                    opaque &= ~msk; opaque |= isFullyOpaque?msk:0;
-
-                    //TODO: here also do bitmask of what neighboring sections are needed to compute (may be getting rid of this in future)
-
-                    if ((i&31)==31) this.opaqueMasks[i>>5] = opaque;
-                }
-         */
     }
 
 
@@ -384,7 +367,8 @@ public class RenderDataFactory4 {
         this.world.acquire(section.lvl, section.x, section.y+1, section.z).release();
         this.world.acquire(section.lvl, section.x, section.y-1, section.z).release();
         this.world.acquire(section.lvl, section.x, section.y, section.z+1).release();
-        this.world.acquire(section.lvl, section.x, section.y, section.z-1).release();*/
+        this.world.acquire(section.lvl, section.x, section.y, section.z-1).release();
+         */
 
         //Prepare everything
         this.prepareSectionData();
@@ -471,9 +455,9 @@ public class RenderDataFactory4 {
          */
     }
 
-
-
-
+    public void free() {
+        this.directionalQuadBuffer.free();
+    }
 
 
 

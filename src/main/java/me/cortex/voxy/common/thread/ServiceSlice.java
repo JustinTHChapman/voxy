@@ -1,9 +1,11 @@
 package me.cortex.voxy.common.thread;
 
+import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.util.TrackedObject;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 
+import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
@@ -14,23 +16,25 @@ public class ServiceSlice extends TrackedObject {
     final int weightPerJob;
     volatile boolean alive = true;
     private final ServiceThreadPool threadPool;
-    private Supplier<Runnable> workerGenerator;
+    private Supplier<Pair<Runnable, Runnable>> workerGenerator;
     final Semaphore jobCount = new Semaphore(0);
     private final Runnable[] runningCtxs;
+    private final Runnable[] cleanupCtxs;
     private final AtomicInteger activeCount = new AtomicInteger();
     private final AtomicInteger jobCount2 = new AtomicInteger();
     private final BooleanSupplier condition;
 
-    ServiceSlice(ServiceThreadPool threadPool, Supplier<Runnable> workerGenerator, String name, int weightPerJob, BooleanSupplier condition) {
+    ServiceSlice(ServiceThreadPool threadPool, Supplier<Pair<Runnable, Runnable>> workerGenerator, String name, int weightPerJob, BooleanSupplier condition) {
         this.threadPool = threadPool;
         this.condition = condition;
         this.runningCtxs = new Runnable[threadPool.getThreadCount()];
+        this.cleanupCtxs = new Runnable[threadPool.getThreadCount()];
         this.name = name;
         this.weightPerJob = weightPerJob;
         this.setWorkerGenerator(workerGenerator);
     }
 
-    protected void setWorkerGenerator(Supplier<Runnable> workerGenerator) {
+    protected void setWorkerGenerator(Supplier<Pair<Runnable, Runnable>> workerGenerator) {
         this.workerGenerator = workerGenerator;
     }
 
@@ -62,7 +66,9 @@ public class ServiceSlice extends TrackedObject {
         //If the running context is null, create and set it
         var ctx = this.runningCtxs[threadIndex];
         if (ctx == null) {
-            ctx = this.workerGenerator.get();
+            var pair = this.workerGenerator.get();
+            ctx = pair.left();
+            this.cleanupCtxs[threadIndex] = pair.right();//Set cleanup
             this.runningCtxs[threadIndex] = ctx;
         }
 
@@ -106,7 +112,18 @@ public class ServiceSlice extends TrackedObject {
         //Tell parent to remove
         this.threadPool.removeService(this);
 
+        this.runCleanup();
+
         super.free0();
+    }
+
+    private void runCleanup() {
+        for (var runnable : this.cleanupCtxs) {
+            if (runnable != null) {
+                runnable.run();
+            }
+        }
+        Arrays.fill(this.cleanupCtxs, null);
     }
 
     @Override

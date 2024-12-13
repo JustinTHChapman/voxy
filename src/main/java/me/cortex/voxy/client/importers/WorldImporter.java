@@ -2,6 +2,7 @@ package me.cortex.voxy.client.importers;
 
 import com.mojang.serialization.Codec;
 import me.cortex.voxy.client.core.util.ByteBufferBackedInputStream;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -54,7 +55,7 @@ public class WorldImporter {
     private volatile boolean isRunning;
     public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool) {
         this.world = worldEngine;
-        this.threadPool = servicePool.createService("World importer", 1, ()-> ()->jobQueue.poll().run(), ()->this.world.savingService.getTaskCount() < 4000);
+        this.threadPool = servicePool.createServiceNoCleanup("World importer", 1, ()->()->jobQueue.poll().run(), ()->this.world.savingService.getTaskCount() < 4000);
 
         var biomeRegistry = mcWorld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
         var defaultBiome = biomeRegistry.getOrThrow(BiomeKeys.PLAINS);
@@ -227,7 +228,7 @@ public class WorldImporter {
                                             System.err.println("Error decompressing chunk data");
                                         } else {
                                             var nbt = NbtIo.readCompound(decompressedData);
-                                            this.importChunkNBT(nbt);
+                                            this.importChunkNBT(nbt, x, z);
                                         }
                                     }
                                 } catch (Exception e) {
@@ -261,20 +262,26 @@ public class WorldImporter {
         }
     }
 
-    private void importChunkNBT(NbtCompound chunk) {
+    private void importChunkNBT(NbtCompound chunk, int regionX, int regionZ) {
         if (!chunk.contains("Status")) {
             //Its not real so decrement the chunk
             this.totalChunks.decrementAndGet();
             return;
         }
+
         //Dont process non full chunk sections
         if (ChunkStatus.byId(chunk.getString("Status")) != ChunkStatus.FULL) {
             this.totalChunks.decrementAndGet();
             return;
         }
+
         try {
             int x = chunk.getInt("xPos");
             int z = chunk.getInt("zPos");
+            if (x>>5 != regionX || z>>5 != regionZ) {
+                Logger.error("Chunk position is not located in correct region, expected: (" + regionX + ", " + regionZ+"), got: " + "(" + (x>>5) + ", " + (z>>5)+"), importing anyway");
+            }
+
             for (var sectionE : chunk.getList("sections", NbtElement.COMPOUND_TYPE)) {
                 var section = (NbtCompound) sectionE;
                 int y = section.getInt("Y");

@@ -1,6 +1,7 @@
 package me.cortex.voxy.common.thread;
 
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.util.Pair;
 
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -35,11 +36,19 @@ public class ServiceThreadPool {
         }
     }
 
-    public synchronized ServiceSlice createService(String name, int weight, Supplier<Runnable> workGenerator) {
+    public ServiceSlice createServiceNoCleanup(String name, int weight, Supplier<Runnable> workGenerator) {
+        return this.createService(name, weight, ()->new Pair<>(workGenerator.get(), null));
+    }
+
+    public ServiceSlice createServiceNoCleanup(String name, int weight, Supplier<Runnable> workGenerator, BooleanSupplier executionCondition) {
+        return this.createService(name, weight, ()->new Pair<>(workGenerator.get(), null), executionCondition);
+    }
+
+    public synchronized ServiceSlice createService(String name, int weight, Supplier<Pair<Runnable, Runnable>> workGenerator) {
         return this.createService(name, weight, workGenerator, ()->true);
     }
 
-    public synchronized ServiceSlice createService(String name, int weight, Supplier<Runnable> workGenerator, BooleanSupplier executionCondition) {
+    public synchronized ServiceSlice createService(String name, int weight, Supplier<Pair<Runnable, Runnable>> workGenerator, BooleanSupplier executionCondition) {
         var service = new ServiceSlice(this, workGenerator, name, weight, executionCondition);
         this.insertService(service);
         return service;

@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
+import me.cortex.voxy.client.core.rendering.hierachical2.NodeCleaner;
 import me.cortex.voxy.client.core.rendering.hierachical2.NodeManager2;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
 import me.cortex.voxy.client.core.rendering.section.IUsesMeshlets;
@@ -35,6 +36,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     private final AbstractSectionRenderer<J, ?> sectionRenderer;
 
     private final NodeManager2 nodeManager;
+    private final NodeCleaner nodeCleaner;
     private final HierarchicalOcclusionTraverser traversal;
     private final ModelBakerySubsystem modelService;
     private final RenderGenerationService renderGen;
@@ -47,12 +49,13 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         //Max sections: ~500k
         //Max geometry: 1 gb
-        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<19, (1L<<31)-1024);
+        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<31)-1024);
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
         var router = new SectionUpdateRouter();
 
         this.nodeManager = new NodeManager2(1<<21, this.sectionRenderer.getGeometryManager(), router);
+        this.nodeCleaner = new NodeCleaner(this.nodeManager);
 
         this.sectionUpdateQueue = new MessageQueue<>(section -> {
             byte childExistence = section.getNonEmptyChildren();
@@ -69,12 +72,14 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
             this.sectionUpdateQueue.push(section);
         });
 
-        this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager);
+        this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, this.nodeCleaner);
 
         world.setDirtyCallback(router::forward);
 
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
+
+
 
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(0, 0,0,0));
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
@@ -89,7 +94,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
             }
         }*/
 
-        final int H_WIDTH = 10;
+
+        final int H_WIDTH = 20;
         for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
             for (int y = -1; y <= 0; y++) {
                 for (int z = -H_WIDTH; z <= H_WIDTH; z++) {
@@ -97,6 +103,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
                 }
             }
         }
+
+        //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
     }
 
     public void setup(Camera camera) {
@@ -128,6 +136,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         //TODO: Need to find a proper way to fix this (if there even is one)
         if (true /* firstInvocationThisFrame */) {
             DownloadStream.INSTANCE.tick();
+
+            this.nodeCleaner.tick();//Probably do this here??
 
             this.sectionUpdateQueue.consume();
             this.geometryUpdateQueue.consume();
@@ -167,6 +177,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.viewportSelector.free();
         this.sectionRenderer.free();
         this.traversal.free();
+        this.nodeCleaner.free();
         //Release all the unprocessed built geometry
         this.geometryUpdateQueue.clear(BuiltSection::free);
     }

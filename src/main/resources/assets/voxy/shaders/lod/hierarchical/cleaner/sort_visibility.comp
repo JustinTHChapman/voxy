@@ -1,0 +1,51 @@
+#version 460 core
+//Uses intrinsics and other operations to perform very fast sorting
+// we dont need a propper sort, only a fuzzy sort, as in we only need to top 128 entries, but those can be unsorted
+
+//#define OUTPUT_SIZE 128
+
+layout(local_size_x=32, local_size_y=8) in;
+//256 workgroup
+
+
+layout(binding = VISIBILITY_BUFFER_BINDING, std430) restrict readonly buffer VisibilityDataBuffer {
+    uint[] visiblity;
+};
+
+layout(binding = OUTPUT_BUFFER_BINDING, std430) restrict volatile buffer MinimumVisibilityBuffer {//TODO: might need to be volatile
+    uint minVisIds[OUTPUT_SIZE];
+};
+
+uint atomicDerefMin(uint atId, uint id, uint value) {
+    uint existingId = minVisIds[atId];
+    while (true) {
+        //Check if the value is less than the dereferenced value, if its not, return our own id
+        if (visiblity[existingId] <= value) {
+            return id;
+        }
+        //Attempt to swap, since we know we are less than the existingId
+        atomicCompSwap(minVisIds[atId], existingId, id);
+        //Check if we did swap, else if we failed (or got reswapped else where) recheck
+        existingId = minVisIds[atId];
+        if (existingId == id) {
+            return existingId;
+        }
+    }
+}
+
+//TODO: optimize
+void bubbleSort(uint start, uint id, uint value) {
+    for (uint i = start; i < OUTPUT_SIZE; i++) {
+        uint nextId = atomicDerefMin(i, id, value);
+        if (nextId == id) {
+            return;//Not inserted, so return
+        }
+        //Else we need to bubble the value up
+        id = nextId;
+        value = visiblity[id];
+    }
+}
+
+void main() {
+    //First do a min sort/set of min OUTPUT_SIZE values of the set
+}
