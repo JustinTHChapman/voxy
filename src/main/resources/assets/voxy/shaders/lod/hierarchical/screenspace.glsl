@@ -86,15 +86,17 @@ bool isCulledByHiz() {
     }
 
     vec2 ssize = size * vec2(screenW, screenH);
-    float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
+    float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)))-1;
+    miplevel = clamp(miplevel, 1, 10);
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
     //TODO: maybe get rid of clamp
     midpoint = clamp(midpoint, vec2(0), vec2(1));
-    bool culled = textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) < 0.0001f;
+    bool culled = textureLod(hizDepthSampler, vec3(midpoint, minBB.z*0.5f+0.5f), 1) < 0.0001f;
 
     if (culled) {
         printf("HiZ sample point culled: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
     }
+
     return culled;
 }
 
