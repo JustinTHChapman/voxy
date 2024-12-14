@@ -4,6 +4,7 @@ import me.cortex.voxy.common.storage.StorageCompressor;
 import me.cortex.voxy.common.storage.config.CompressorConfig;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.util.ThreadLocalMemoryBuffer;
 import me.cortex.voxy.common.world.SaveLoadSystem;
 
 import java.lang.ref.Cleaner;
@@ -29,6 +30,8 @@ public class ZSTDCompressor implements StorageCompressor {
     private static final ThreadLocal<Ref> COMPRESSION_CTX = ThreadLocal.withInitial(ZSTDCompressor::createCleanableCompressionContext);
     private static final ThreadLocal<Ref> DECOMPRESSION_CTX = ThreadLocal.withInitial(ZSTDCompressor::createCleanableDecompressionContext);
 
+    private static final ThreadLocalMemoryBuffer SCRATCH = new ThreadLocalMemoryBuffer(SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE + 1024);
+
     private final int level;
 
     public ZSTDCompressor(int level) {
@@ -37,15 +40,16 @@ public class ZSTDCompressor implements StorageCompressor {
 
     @Override
     public MemoryBuffer compress(MemoryBuffer saveData) {
-        MemoryBuffer compressedData  = new MemoryBuffer((int)ZSTD_COMPRESSBOUND(saveData.size));
+        MemoryBuffer compressedData = new MemoryBuffer((int)ZSTD_COMPRESSBOUND(saveData.size));
         long compressedSize = nZSTD_compressCCtx(COMPRESSION_CTX.get().ptr, compressedData.address, compressedData.size, saveData.address, saveData.size, this.level);
         return compressedData.subSize(compressedSize);
     }
 
     @Override
     public MemoryBuffer decompress(MemoryBuffer saveData) {
-        var decompressed = new MemoryBuffer(SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE);
+        var decompressed = SCRATCH.get().createUntrackedUnfreeableReference();
         long size = nZSTD_decompressDCtx(DECOMPRESSION_CTX.get().ptr, decompressed.address, decompressed.size, saveData.address, saveData.size);
+        //TODO:FIXME: DONT ASSUME IT DOESNT FAIL
         return decompressed.subSize(size);
     }
 

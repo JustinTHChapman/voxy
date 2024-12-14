@@ -1,15 +1,15 @@
 package me.cortex.voxy.common.world;
 
+import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.util.ThreadLocalMemoryBuffer;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
-import me.cortex.voxy.commonImpl.VoxyCommon;
 
 import java.util.Arrays;
-import java.util.function.Consumer;
 
 //Use an LMDB backend to store the world, use a local inmemory cache for lod sections
 // automatically manages and invalidates sections of the world as needed
@@ -46,21 +46,19 @@ public class WorldEngine {
         this.ingestService  = new VoxelIngestService(this, serviceThreadPool);
     }
 
+
+    private static final ThreadLocalMemoryBuffer MEMORY_CACHE = new ThreadLocalMemoryBuffer(SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE + 1024);
     private int unsafeLoadSection(WorldSection into) {
-        var data = this.storage.getSectionData(into.key);
+        var data = this.storage.getSectionData(into.key, MEMORY_CACHE.get().createUntrackedUnfreeableReference());
         if (data != null) {
-            try {
-                if (!SaveLoadSystem.deserialize(into, data)) {
-                    this.storage.deleteSectionData(into.key);
-                    //TODO: regenerate the section from children
-                    Arrays.fill(into.data, Mapper.AIR);
-                    System.err.println("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, removing");
-                    return -1;
-                } else {
-                    return 0;
-                }
-            } finally {
-                data.free();
+            if (!SaveLoadSystem.deserialize(into, data)) {
+                this.storage.deleteSectionData(into.key);
+                //TODO: regenerate the section from children
+                Arrays.fill(into.data, Mapper.AIR);
+                Logger.error("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, removing");
+                return -1;
+            } else {
+                return 0;
             }
         } else {
             //TODO: if we need to fetch an lod from a server, send the request here and block until the request is finished

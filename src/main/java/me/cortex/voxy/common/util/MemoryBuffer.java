@@ -9,6 +9,7 @@ public class MemoryBuffer extends TrackedObject {
     public final long address;
     public final long size;
     private final boolean freeable;
+    private final boolean tracked;
 
     private static final AtomicInteger COUNT =  new AtomicInteger(0);
     private static final AtomicLong TOTAL_SIZE = new AtomicLong(0);
@@ -20,11 +21,14 @@ public class MemoryBuffer extends TrackedObject {
 
     private MemoryBuffer(boolean track, long address, long size, boolean freeable) {
         super(track);
+        this.tracked = track;
         this.size = size;
         this.address = address;
         this.freeable = freeable;
 
-        COUNT.incrementAndGet();
+        if (track) {
+            COUNT.incrementAndGet();
+        }
         if (freeable) {
             TOTAL_SIZE.addAndGet(size);
         }
@@ -38,8 +42,9 @@ public class MemoryBuffer extends TrackedObject {
     @Override
     public void free() {
         super.free0();
-
-        COUNT.decrementAndGet();
+        if (this.tracked) {
+            COUNT.decrementAndGet();
+        }
         if (this.freeable) {
             MemoryUtil.nmemFree(this.address);
             TOTAL_SIZE.addAndGet(-this.size);
@@ -56,18 +61,20 @@ public class MemoryBuffer extends TrackedObject {
 
     //Creates a new MemoryBuffer, defunking this buffer and sets the size to be a subsize of the current size
     public MemoryBuffer subSize(long size) {
-        if (size > this.size) {
-            throw new IllegalArgumentException("Requested size larger than current size");
+        if (size > this.size || size <= 0) {
+            throw new IllegalArgumentException("Requested size larger than current size, or less than 0, requested: "+size+" capacity: " + this.size);
         }
 
         //Free the current object, but not the memory associated with it
         this.free0();
-        COUNT.decrementAndGet();
+        if (this.tracked) {
+            COUNT.decrementAndGet();
+        }
         if (this.freeable) {
             TOTAL_SIZE.addAndGet(-this.size);
         }
 
-        return new MemoryBuffer(true, this.address, size, this.freeable);
+        return new MemoryBuffer(this.tracked, this.address, size, this.freeable);
     }
 
 
@@ -88,5 +95,9 @@ public class MemoryBuffer extends TrackedObject {
 
     public static long getTotalSize() {
         return TOTAL_SIZE.get();
+    }
+
+    public MemoryBuffer createUntrackedUnfreeableReference() {
+        return new MemoryBuffer(false, this.address, this.size, false);
     }
 }

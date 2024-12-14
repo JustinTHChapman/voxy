@@ -92,7 +92,8 @@ public class LMDBStorageBackend extends StorageBackend {
     }
 
     //TODO: make batch get and updates
-    public MemoryBuffer getSectionData(long key) {
+    @Override
+    public MemoryBuffer getSectionData(long key, MemoryBuffer scratch) {
         return this.synchronizedTransaction(() -> this.sectionDatabase.transaction(MDB_RDONLY, transaction->{
             var buff = transaction.stack.malloc(8);
             buff.putLong(0, key);
@@ -100,9 +101,8 @@ public class LMDBStorageBackend extends StorageBackend {
             if (bb == null) {
                 return null;
             }
-            var copy = new MemoryBuffer(bb.remaining());
-            UnsafeUtil.memcpy(MemoryUtil.memAddress(bb), copy.address, copy.size);
-            return copy;
+            UnsafeUtil.memcpy(MemoryUtil.memAddress(bb), scratch.address, bb.remaining());
+            return scratch.subSize(bb.remaining());
         }));
     }
 

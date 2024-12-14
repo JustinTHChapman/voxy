@@ -35,7 +35,7 @@ public final class WorldSection {
 
 
     //TODO: should make it dynamically adjust the size allowance based on memory pressure/WorldSection allocation rate (e.g. is it doing a world import)
-    private static final int ARRAY_REUSE_CACHE_SIZE = 300;
+    private static final int ARRAY_REUSE_CACHE_SIZE = 300;//500;//32*32*32*8*ARRAY_REUSE_CACHE_SIZE == number of bytes
     //TODO: maybe just swap this to a ConcurrentLinkedDeque
     private static final Deque<long[]> ARRAY_REUSE_CACHE = new ArrayDeque<>(1024);
 

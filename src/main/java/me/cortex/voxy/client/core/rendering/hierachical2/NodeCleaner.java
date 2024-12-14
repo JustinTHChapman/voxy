@@ -34,7 +34,7 @@ public class NodeCleaner {
     private final AutoBindingShader batchClear = Shader.makeAuto()
             .define("VISIBILITY_BUFFER_BINDING", 0)
             .define("LIST_BUFFER_BINDING", 1)
-            .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/cleaner/batch_visibility_set.com")
+            .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/cleaner/batch_visibility_set.comp")
             .compile();
 
     private final GlBuffer visibilityBuffer;
@@ -86,5 +86,6 @@ public class NodeCleaner {
         this.visibilityBuffer.free();
         this.outputBuffer.free();
         this.scratchBuffer.free();
+        this.batchClear.free();
     }
 }

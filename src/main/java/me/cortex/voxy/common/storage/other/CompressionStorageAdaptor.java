@@ -20,15 +20,15 @@ public class CompressionStorageAdaptor extends DelegatingStorageAdaptor {
         this.compressor = compressor;
     }
 
+
+    //TODO: figure out a nicer way w.r.t scratch buffer shit
     @Override
-    public MemoryBuffer getSectionData(long key) {
-        var data = this.delegate.getSectionData(key);
+    public MemoryBuffer getSectionData(long key, MemoryBuffer scratch) {
+        var data = this.delegate.getSectionData(key, scratch);
         if (data == null) {
             return null;
         }
-        var decompressed = this.compressor.decompress(data);
-        data.free();
-        return decompressed;
+        return this.compressor.decompress(data);
     }
 
     @Override

@@ -21,12 +21,12 @@ public class ReadonlyCachingLayer extends StorageBackend {
     }
 
     @Override
-    public MemoryBuffer getSectionData(long key) {
-        var result = this.cache.getSectionData(key);
+    public MemoryBuffer getSectionData(long key, MemoryBuffer scratch) {
+        var result = this.cache.getSectionData(key, scratch);
         if (result != null) {
             return result;
         }
-        result = this.onMiss.getSectionData(key);
+        result = this.onMiss.getSectionData(key, scratch);
         if (result != null) {
             this.cache.setSectionData(key, result);
         }

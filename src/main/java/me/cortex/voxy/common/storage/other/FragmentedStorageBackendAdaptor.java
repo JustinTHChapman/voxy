@@ -41,8 +41,8 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
     // multiple layers of spliced storage backends can be stacked
 
     @Override
-    public MemoryBuffer getSectionData(long key) {
-        return this.backends[this.getSegmentId(key)].getSectionData(key);
+    public MemoryBuffer getSectionData(long key, MemoryBuffer scratch) {
+        return this.backends[this.getSegmentId(key)].getSectionData(key, scratch);
     }
 
     @Override

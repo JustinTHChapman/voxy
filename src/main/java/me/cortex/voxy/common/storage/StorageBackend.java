@@ -11,7 +11,8 @@ import java.util.function.LongConsumer;
 public abstract class StorageBackend {
     public abstract void iterateStoredSectionPositions(LongConsumer consumer);
 
-    public abstract MemoryBuffer getSectionData(long key);
+    //Implementation may use the scratch buffer as the return value, it MUST NOT free the scratch buffer
+    public abstract MemoryBuffer getSectionData(long key, MemoryBuffer scratch);
 
     public abstract void setSectionData(long key, MemoryBuffer data);
 

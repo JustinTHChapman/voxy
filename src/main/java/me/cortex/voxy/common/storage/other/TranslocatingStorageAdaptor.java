@@ -48,28 +48,28 @@ public class TranslocatingStorageAdaptor extends DelegatingStorageAdaptor {
     }
 
     @Override
-    public MemoryBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key, MemoryBuffer scratch) {
         for (var transform : this.transforms) {
             long tpos = transform.transformIfInBox(key);
             if (tpos != -1) {
                 if (transform.mode == Mode.BOX_ONLY || transform.mode == null) {
-                    return super.getSectionData(tpos);
+                    return super.getSectionData(tpos, scratch);
                 } else if (transform.mode == Mode.PRIORITY_BOX) {
-                    var data = super.getSectionData(tpos);
+                    var data = super.getSectionData(tpos, scratch);
                     if (data == null) {
-                        return super.getSectionData(key);
+                        return super.getSectionData(key, scratch);
                     }
                 } else if (transform.mode == Mode.PRIORITY_ORIGINAL) {
-                    var data = super.getSectionData(key);
+                    var data = super.getSectionData(key, scratch);
                     if (data == null) {
-                        return super.getSectionData(tpos);
+                        return super.getSectionData(tpos, scratch);
                     }
                 } else {
                     throw new IllegalStateException();
                 }
             }
         }
-        return super.getSectionData(key);
+        return super.getSectionData(key, scratch);
     }
 
     @Override

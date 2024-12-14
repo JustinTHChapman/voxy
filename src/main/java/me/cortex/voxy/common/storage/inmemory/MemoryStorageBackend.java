@@ -45,12 +45,13 @@ public class MemoryStorageBackend extends StorageBackend {
     }
 
     @Override
-    public MemoryBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key, MemoryBuffer scratch) {
         var map = this.getMap(key);
         synchronized (map) {
             var data = map.get(key);
             if (data != null) {
-                return data.copy();
+                data.cpyTo(scratch.address);
+                return scratch.subSize(data.size);
             } else {
                 return null;
             }

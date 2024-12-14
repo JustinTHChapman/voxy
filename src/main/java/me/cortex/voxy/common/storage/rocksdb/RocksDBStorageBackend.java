@@ -6,6 +6,9 @@ import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
+import me.cortex.voxy.common.world.SaveLoadSystem;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 import org.rocksdb.*;
 
 import java.nio.ByteBuffer;
@@ -18,6 +21,7 @@ public class RocksDBStorageBackend extends StorageBackend {
     private final RocksDB db;
     private final ColumnFamilyHandle worldSections;
     private final ColumnFamilyHandle idMappings;
+    private final ReadOptions sectionReadOps;
 
     //NOTE: closes in order
     private final List<AbstractImmutableNativeReference> closeList = new ArrayList<>();
@@ -65,10 +69,13 @@ public class RocksDBStorageBackend extends StorageBackend {
                     path, cfDescriptors,
                     handles);
 
+            this.sectionReadOps = new ReadOptions();
+
             this.closeList.addAll(handles);
             this.closeList.add(this.db);
             this.closeList.add(options);
             this.closeList.add(cfOpts);
+            this.closeList.add(this.sectionReadOps);
 
             this.worldSections = handles.get(1);
             this.idMappings = handles.get(2);
@@ -85,21 +92,30 @@ public class RocksDBStorageBackend extends StorageBackend {
     }
 
     @Override
-    public MemoryBuffer getSectionData(long key) {
-        try {
-            var result = this.db.get(this.worldSections, longToBytes(key));
-            if (result == null) {
+    public MemoryBuffer getSectionData(long key, MemoryBuffer scratch) {
+        try (var stack = MemoryStack.stackPush()){
+            var buffer = stack.malloc(8);
+            //HATE JAVA HATE JAVA HATE JAVA, Long.reverseBytes()
+            //THIS WILL ONLY WORK ON LITTLE ENDIAN SYSTEM AAAAAAAAA ;-;
+
+            MemoryUtil.memPutLong(MemoryUtil.memAddress(buffer), Long.reverseBytes(key));
+
+            var result = this.db.get(this.worldSections,
+                    this.sectionReadOps,
+                    buffer,
+                    MemoryUtil.memByteBuffer(scratch.address, (int) (scratch.size)));
+
+            if (result == RocksDB.NOT_FOUND) {
                 return null;
             }
-            //Need to copy to native memory
-            var buffer = new MemoryBuffer(result.length);
-            UnsafeUtil.memcpy(result, buffer.address);
-            return buffer;
+
+            return scratch.subSize(result);
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
     }
 
+    //TODO: FIXME, use the ByteBuffer variant
     @Override
     public void setSectionData(long key, MemoryBuffer data) {
         try {

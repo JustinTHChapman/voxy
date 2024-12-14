@@ -37,7 +37,7 @@ public class RedisStorageBackend extends StorageBackend {
     }
 
     @Override
-    public MemoryBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key, MemoryBuffer scratch) {
         try (var jedis = this.pool.getResource()) {
             if (this.user != null) {
                 jedis.auth(this.user, this.password);
@@ -48,9 +48,8 @@ public class RedisStorageBackend extends StorageBackend {
                 return null;
             }
             //Need to copy to native memory
-            var buffer = new MemoryBuffer(result.length);
-            UnsafeUtil.memcpy(result, buffer.address);
-            return buffer;
+            UnsafeUtil.memcpy(result, scratch.address);
+            return scratch.subSize(result.length);
         }
     }
 

@@ -24,7 +24,9 @@ public abstract class TrackedObject {
         }
         this.ref.freedRef[0] = true;
         if (TRACK_OBJECT_ALLOCATIONS) {
-            this.ref.cleanable.clean();
+            if (this.ref.cleanable != null) {
+                this.ref.cleanable.clean();
+            }
         }
     }
 
