@@ -326,8 +326,10 @@ public class NodeManager2 {
         if (parentNodeId == -1 || (parentNodeId&NODE_TYPE_MSK)==NODE_TYPE_REQUEST) {
             throw new IllegalStateException("CRITICAL BAD STATE!!! finishRequest tried to finish for a node that no longer exists in the map or has become a request type somehow?!!?!!" + WorldEngine.pprintPos(request.getPosition()) + " " + parentNodeId);
         }
+        int parentNodeType = parentNodeId&NODE_TYPE_MSK;
+        parentNodeId &= NODE_ID_MSK;
 
-        if ((parentNodeId&NODE_TYPE_MSK)==NODE_TYPE_LEAF) {
+        if (parentNodeType==NODE_TYPE_LEAF) {
             int msk = Byte.toUnsignedInt(request.getMsk());
             int base = this.nodeData.allocate(Integer.bitCount(msk));
             int offset = -1;
@@ -363,9 +365,20 @@ public class NodeManager2 {
             this.nodeData.setNodeRequest(parentNodeId, 0);//TODO: create a better null request
             this.activeNodeRequestCount--;
             this.nodeData.unmarkRequestInFlight(parentNodeId);
+
+            //Change it from a leaf to an inner node
+            {
+                int pid = this.activeSectionMap.remove(request.getPosition());
+                if (pid == -1 || (pid & NODE_TYPE_MSK) != NODE_TYPE_LEAF) {
+                    throw new IllegalStateException("Unexpected node mapping: " + pid);
+                }
+            }
+            //_this is why it hasnt been working, grrr, wasnt doing this_
+            this.activeSectionMap.put(request.getPosition(), NODE_TYPE_INNER|parentNodeId);//Set the type from leaf to inner node
+
             this.invalidateNode(parentNodeId);
-        } else if ((parentNodeId&NODE_TYPE_MSK)==NODE_TYPE_INNER) {
-            System.err.println("TODO: FIXME FINISH: finishRequest NODE_TYPE_INNER");
+        } else if (parentNodeType==NODE_TYPE_INNER) {
+            Logger.error("TODO: FIXME FINISH: finishRequest NODE_TYPE_INNER");
         } else {
             throw new IllegalStateException();
         }

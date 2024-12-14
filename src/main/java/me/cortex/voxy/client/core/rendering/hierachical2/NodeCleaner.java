@@ -1,8 +1,16 @@
 package me.cortex.voxy.client.core.rendering.hierachical2;
 
+import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import org.lwjgl.system.MemoryUtil;
+
+import static org.lwjgl.opengl.GL20.glUniform1i;
+import static org.lwjgl.opengl.GL43C.glDispatchCompute;
 
 //Uses compute shaders to compute the last 256 rendered section (64x64 workgroup size maybe)
 // done via warp level sort, then workgroup sort (shared memory), (/w sorting network)
@@ -14,6 +22,8 @@ public class NodeCleaner {
 
     private static final int OUTPUT_COUNT = 64;
 
+    private static final int BATCH_SET_SIZE = 2048;
+
     private final Shader sorter = Shader.make()
             .define("OUTPUT_SIZE", OUTPUT_COUNT)
             .define("VISIBILITY_BUFFER_BINDING", 1)
@@ -21,8 +31,17 @@ public class NodeCleaner {
             .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/cleaner/sort_visibility.comp")
             .compile();
 
+    private final AutoBindingShader batchClear = Shader.makeAuto()
+            .define("VISIBILITY_BUFFER_BINDING", 0)
+            .define("LIST_BUFFER_BINDING", 1)
+            .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/cleaner/batch_visibility_set.com")
+            .compile();
+
     private final GlBuffer visibilityBuffer;
     private final GlBuffer outputBuffer = new GlBuffer(OUTPUT_COUNT*4);
+    private final GlBuffer scratchBuffer = new GlBuffer(BATCH_SET_SIZE*4);//Scratch buffer for setting ids with
+
+    private final IntArrayFIFOQueue idsToClear = new IntArrayFIFOQueue();
 
     private final NodeManager2 nodeManager;
     int visibilityId = 0;
@@ -30,16 +49,42 @@ public class NodeCleaner {
 
     public NodeCleaner(NodeManager2 nodeManager) {
         this.nodeManager = nodeManager;
-        this.visibilityBuffer = new GlBuffer(nodeManager.maxNodeCount*4L);
+        this.visibilityBuffer = new GlBuffer(nodeManager.maxNodeCount*4L).zero();
+
+        this.batchClear
+                .ssbo("VISIBILITY_BUFFER_BINDING", this.visibilityBuffer)
+                .ssbo("LIST_BUFFER_BINDING", this.scratchBuffer);
+    }
+
+    public void clearId(int id) {
+        this.idsToClear.enqueue(id);
     }
 
     public void tick() {
+        this.clearIds();
+    }
 
+    private void clearIds() {
+        if (!this.idsToClear.isEmpty()) {
+            this.batchClear.bind();
+
+            while (!this.idsToClear.isEmpty()) {
+                int cnt = Math.min(this.idsToClear.size(), BATCH_SET_SIZE);
+                long ptr = UploadStream.INSTANCE.upload(this.scratchBuffer, 0, cnt * 4L);
+                for (int i = 0; i < cnt; i++) {
+                    MemoryUtil.memPutInt(ptr + cnt * 4, this.idsToClear.dequeueInt());
+                }
+                UploadStream.INSTANCE.commit();
+                glUniform1i(0, cnt);
+                glDispatchCompute((cnt+127)/128, 1, 1);
+            }
+        }
     }
 
     public void free() {
         this.sorter.free();
         this.visibilityBuffer.free();
         this.outputBuffer.free();
+        this.scratchBuffer.free();
     }
 }

@@ -11,6 +11,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.FluidBlock;
@@ -311,7 +312,8 @@ public class ModelFactory {
 
             if (allFalse == allTrue) {//If only some sides where self culled then abort
                 cullsSame = false;
-                if (LOGGED_SELF_CULLING_WARNING.add(blockState)) System.err.println("Warning! blockstate: " + blockState + " only culled against its self some of the time");
+                if (LOGGED_SELF_CULLING_WARNING.add(blockState))
+                    Logger.info("Warning! blockstate: " + blockState + " only culled against its self some of the time");
             }
 
             if (allTrue) {
