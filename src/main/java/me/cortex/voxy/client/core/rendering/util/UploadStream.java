@@ -30,7 +30,7 @@ public class UploadStream {
     private final Deque<UploadData> uploadList = new ArrayDeque<>();
 
     public UploadStream(long size) {
-        this.uploadBuffer = new GlPersistentMappedBuffer(size,GL_MAP_WRITE_BIT|GL_MAP_UNSYNCHRONIZED_BIT|GL_MAP_COHERENT_BIT);
+        this.uploadBuffer = new GlPersistentMappedBuffer(size,GL_MAP_WRITE_BIT|GL_MAP_UNSYNCHRONIZED_BIT|GL_MAP_COHERENT_BIT).name("UploadStream");
         this.allocationArena.setLimit(size);
     }
 

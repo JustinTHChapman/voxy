@@ -22,9 +22,9 @@ public class ModelStore {
     public final int blockSampler = glGenSamplers();
 
     public ModelStore() {
-        this.modelBuffer = new GlBuffer(MODEL_SIZE * (1<<16));
-        this.modelColourBuffer = new GlBuffer(4 * (1<<16));
-        this.textures = new GlTexture().store(GL_RGBA8, 4, ModelFactory.MODEL_TEXTURE_SIZE*3*256,ModelFactory.MODEL_TEXTURE_SIZE*2*256);
+        this.modelBuffer = new GlBuffer(MODEL_SIZE * (1<<16)).name("ModelData");
+        this.modelColourBuffer = new GlBuffer(4 * (1<<16)).name("ModelColour");
+        this.textures = new GlTexture().store(GL_RGBA8, 4, ModelFactory.MODEL_TEXTURE_SIZE*3*256,ModelFactory.MODEL_TEXTURE_SIZE*2*256).name("ModelTextures");
 
 
 

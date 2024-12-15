@@ -51,4 +51,8 @@ public class GlTexture extends TrackedObject {
         super.free0();
         glDeleteTextures(this.id);
     }
+
+    public GlTexture name(String name) {
+        return GlDebug.name(name, this);
+    }
 }

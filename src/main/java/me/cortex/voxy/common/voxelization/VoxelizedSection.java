@@ -3,6 +3,8 @@ package me.cortex.voxy.common.voxelization;
 
 import me.cortex.voxy.common.world.other.Mapper;
 
+import java.util.Arrays;
+
 //16x16x16 block section
 public class VoxelizedSection {
     public int x;
@@ -38,5 +40,10 @@ public class VoxelizedSection {
 
     public static VoxelizedSection createEmpty() {
         return new VoxelizedSection(new long[16*16*16 + 8*8*8 + 4*4*4 + 2*2*2 + 1]);
+    }
+
+    public VoxelizedSection zero() {
+        Arrays.fill(this.section, 0);
+        return this;
     }
 }

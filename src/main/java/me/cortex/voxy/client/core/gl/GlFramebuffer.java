@@ -37,4 +37,9 @@ public class GlFramebuffer extends TrackedObject {
         }
         return this;
     }
+
+
+    public GlFramebuffer name(String name) {
+        return GlDebug.name(name, this);
+    }
 }

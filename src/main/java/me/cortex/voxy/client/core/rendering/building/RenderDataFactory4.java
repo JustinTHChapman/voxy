@@ -160,7 +160,7 @@ public class RenderDataFactory4 {
             int modelId = this.modelMan.getModelId(Mapper.getBlockId(block));
             long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
 
-            sectionData[i * 2] = modelId | ((long) (Mapper.getLightId(block)) << 16) | (((long) (Mapper.getBiomeId(block))) << 24);
+            sectionData[i * 2] = modelId | ((long) (Mapper.getLightId(block)) << 16) | (ModelQueries.isBiomeColoured(modelMetadata)?(((long) (Mapper.getBiomeId(block))) << 24):0);
             sectionData[i * 2 + 1] = modelMetadata;
 
             boolean isFullyOpaque = ModelQueries.isFullyOpaque(modelMetadata);
@@ -221,7 +221,11 @@ public class RenderDataFactory4 {
                             long nextModel = facingForward == 1 ? B : A;
 
                             //Example thing thats just wrong but as example
-                            this.blockMesher.putNext((long) facingForward | ((selfModel & 0xFFFF) << 26) | (((nextModel>>16)&0xFF) << 55));
+                            this.blockMesher.putNext(((long) facingForward) |//Facing
+                                    ((selfModel & 0xFFFF) << 26) | //ModelId
+                                    (((nextModel>>16)&0xFF) << 55) |//Lighting
+                                    ((selfModel&(0x1FFL<<24))<<(46-24))//biomeId
+                            );
                         }
                     }
                     this.blockMesher.endRow();
@@ -258,7 +262,11 @@ public class RenderDataFactory4 {
                                 long A = this.sectionData[idx * 2];
 
                                 //Example thing thats just wrong but as example
-                                this.blockMesher.putNext((long) (side == 0 ? 0L : 1L) | ((A & 0xFFFFL) << 26) | (((0xFFL) & 0xFF) << 55));
+                                this.blockMesher.putNext((long) (side == 0 ? 0L : 1L) |
+                                        ((A & 0xFFFFL) << 26) |
+                                        (((0xFFL) & 0xFF) << 55) |
+                                        ((A&(0x1FFL<<24))<<(46-24))
+                                );
                             }
                         }
                         this.blockMesher.endRow();
@@ -370,8 +378,11 @@ public class RenderDataFactory4 {
                         long nextModel = facingForward==1?B:A;
 
                         //Example thing thats just wrong but as example
-                        mesher.putNext((long) facingForward | ((selfModel&0xFFFF)<<26) | (((nextModel>>16)&0xFF)<<55));
-                        //mesher.emitQuad(y, z, 1, 1,(long) facingForward | ((selfModel&0xFFFF)<<26) | (0xFFL<<55));
+                        mesher.putNext(((long) facingForward) |//Facing
+                                ((selfModel & 0xFFFF) << 26) | //ModelId
+                                (((nextModel>>16)&0xFF) << 55) |//Lighting
+                                ((selfModel&(0x1FFL<<24))<<(46-24))//biomeId
+                        );
                     }
                 }
             }
@@ -418,7 +429,7 @@ public class RenderDataFactory4 {
 
                         long A = this.sectionData[(i<<5) * 2];
 
-                        ma.putNext(0L | ((A&0xFFFF)<<26) | (((0xFFL)&0xFF)<<55));
+                        ma.putNext(0L | ((A&0xFFFF)<<26) | (((0xFFL)&0xFF)<<55)|((A&(0x1FFL<<24))<<(46-24)));
                     } else {skipA++;}
 
                     if ((msk & (1<<31)) != 0) {
@@ -426,7 +437,7 @@ public class RenderDataFactory4 {
 
                         long A = this.sectionData[(i*32+31) * 2];
 
-                         mb.putNext(1L | ((A&0xFFFF)<<26) | (((0xFFL)&0xFF)<<55));
+                         mb.putNext(1L | ((A&0xFFFF)<<26) | (((0xFFL)&0xFF)<<55)|((A&(0x1FFL<<24))<<(46-24)));
                     } else {skipB++;}
                 }
                 ma.skip(skipA);

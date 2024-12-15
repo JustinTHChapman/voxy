@@ -34,8 +34,7 @@ public class VoxelIngestService {
             i++;
             var lighting = this.captureLightMap.remove(ChunkSectionPos.from(chunk.getPos(), i).asLong());
             if (section.isEmpty() && lighting==null) {//If the chunk section has lighting data, propagate it
-                //TODO: add local cache so that it doesnt constantly create new sections
-                this.world.insertUpdate(VoxelizedSection.createEmpty().setPosition(chunk.getPos().x, i, chunk.getPos().z));
+                this.world.insertUpdate(SECTION_CACHE.get().zero().setPosition(chunk.getPos().x, i, chunk.getPos().z));
             } else {
                 VoxelizedSection csec = WorldConversionFactory.convert(
                         SECTION_CACHE.get().setPosition(chunk.getPos().x, i, chunk.getPos().z),

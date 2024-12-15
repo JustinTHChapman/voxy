@@ -53,4 +53,8 @@ public class GlBuffer extends TrackedObject {
     public static long getTotalSize() {
         return TOTAL_SIZE;
     }
+
+    public GlBuffer name(String name) {
+        return GlDebug.name(name, this);
+    }
 }

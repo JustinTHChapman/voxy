@@ -1,5 +1,7 @@
 package me.cortex.voxy.client.core.gl.shader;
 
+import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.GlDebug;
 import me.cortex.voxy.common.util.TrackedObject;
 import org.lwjgl.opengl.GL20C;
 
@@ -29,6 +31,9 @@ public class Shader extends TrackedObject {
     }
 
 
+    public Shader name(String name) {
+        return GlDebug.name(name, this);
+    }
 
 
     public static Builder<Shader> make(IShaderProcessor... processor) {

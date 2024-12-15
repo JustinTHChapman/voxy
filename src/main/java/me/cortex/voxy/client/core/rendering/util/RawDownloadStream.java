@@ -27,7 +27,7 @@ public class RawDownloadStream {
     private final Deque<DownloadFrame> frames = new ArrayDeque<>();
 
     public RawDownloadStream(int size) {
-        this.downloadBuffer = new GlPersistentMappedBuffer(size, GL_MAP_READ_BIT|GL_MAP_COHERENT_BIT);
+        this.downloadBuffer = new GlPersistentMappedBuffer(size, GL_MAP_READ_BIT|GL_MAP_COHERENT_BIT).name("RawDownloadStream");
         this.allocationArena.setLimit(size);
     }
 

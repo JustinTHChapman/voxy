@@ -25,15 +25,20 @@ repositories {
 
 def gitCommitHash = { ->
     def stdout = new ByteArrayOutputStream()
-    exec {
+    ExecResult result = exec ()->{
         commandLine 'git', 'rev-parse', '--short', 'HEAD'
         standardOutput = stdout
         ignoreExitValue = true
     }
-    return stdout.toString().trim()
-}
-def buildtime = System.currentTimeSeconds()
 
+    if (result.getExitValue() != 0) {
+        return "<UnknownCommit>";
+    } else {
+        return stdout.toString().trim();
+    }
+}
+
+def buildtime = {System.currentTimeSeconds()}
 processResources {
     inputs.properties("version": project.version, "commit": gitCommitHash, "buildtime": buildtime)
 
@@ -128,6 +133,7 @@ repositories {
     mavenCentral()
 }
 
+
 dependencies {
     implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
 
@@ -141,8 +147,8 @@ dependencies {
     include(runtimeOnly "org.lwjgl:lwjgl-lmdb:$lwjglVersion:natives-linux")
     include(runtimeOnly "org.lwjgl:lwjgl-zstd:$lwjglVersion:natives-linux")
 
-    include(implementation 'org.rocksdb:rocksdbjni:8.10.0')
     include(implementation 'redis.clients:jedis:5.1.0')
+    include(implementation('org.rocksdb:rocksdbjni:8.10.0'))
     include(implementation 'org.apache.commons:commons-pool2:2.12.0')
     //implementation 'org.rocksdb:rocksdbjni:8.10.0'
     //implementation 'redis.clients:jedis:5.1.0'

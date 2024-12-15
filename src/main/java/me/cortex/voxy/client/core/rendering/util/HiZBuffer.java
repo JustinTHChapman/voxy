@@ -23,8 +23,9 @@ public class HiZBuffer {
     private final Shader hiz = Shader.make()
             .add(ShaderType.VERTEX, "voxy:hiz/blit.vsh")
             .add(ShaderType.FRAGMENT, "voxy:hiz/blit.fsh")
-            .compile();
-    private final GlFramebuffer fb = new GlFramebuffer();
+            .compile()
+            .name("HiZ Builder");
+    private final GlFramebuffer fb = new GlFramebuffer().name("HiZ");
     private final int sampler = glGenSamplers();
     private GlTexture texture;
     private int levels;
@@ -42,7 +43,7 @@ public class HiZBuffer {
         // (could probably increase it to be defined by a max meshlet coverage computation thing)
 
         //GL_DEPTH_COMPONENT32F //Cant use this as it does not match the depth format of the provided depth buffer
-        this.texture = new GlTexture().store(GL_DEPTH24_STENCIL8, this.levels, width, height);
+        this.texture = new GlTexture().store(GL_DEPTH24_STENCIL8, this.levels, width, height).name("HiZ");
         glTextureParameteri(this.texture.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_COMPARE_MODE, GL_NONE);

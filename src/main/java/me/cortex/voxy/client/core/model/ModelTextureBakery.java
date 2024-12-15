@@ -2,7 +2,6 @@ package me.cortex.voxy.client.core.model;
 
 import com.mojang.blaze3d.platform.GlStateManager;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
-import me.cortex.voxy.client.core.gl.GlRenderBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
@@ -66,7 +65,8 @@ public class ModelTextureBakery {
     private final Shader rasterShader = Shader.make()
             .add(ShaderType.VERTEX, "voxy:bakery/position_tex.vsh")
             .add(ShaderType.FRAGMENT, "voxy:bakery/position_tex.fsh")
-            .compile();
+            .compile()
+            .name("ModelBaker");
 
     private final Shader copyOutShader;
 
@@ -78,11 +78,11 @@ public class ModelTextureBakery {
 
         this.width = width;
         this.height = height;
-        this.colourTex = new GlTexture().store(GL_RGBA8, 1, width, height);
-        this.depthTex = new GlTexture().store(GL_DEPTH24_STENCIL8, 1, width, height);
+        this.colourTex = new GlTexture().store(GL_RGBA8, 1, width, height).name("ModelBakeryColour");
+        this.depthTex = new GlTexture().store(GL_DEPTH24_STENCIL8, 1, width, height).name("ModelBakeryDepth");
         this.depthTexView = this.depthTex.createView();
 
-        this.framebuffer = new GlFramebuffer().bind(GL_COLOR_ATTACHMENT0, this.colourTex).bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthTex).verify();
+        this.framebuffer = new GlFramebuffer().bind(GL_COLOR_ATTACHMENT0, this.colourTex).bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthTex).verify().name("ModelFramebuffer");
 
         glTextureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
         glTextureParameteri(this.depthTexView.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
@@ -91,7 +91,8 @@ public class ModelTextureBakery {
                 .define("WIDTH", width)
                 .define("HEIGHT", height)
                 .add(ShaderType.COMPUTE, "voxy:bakery/buffercopy.comp")
-                .compile();
+                .compile()
+                .name("ModelBakeryOut");
 
         //This is done to help make debugging easier
         FACE_VIEWS.clear();
