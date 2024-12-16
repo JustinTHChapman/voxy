@@ -62,6 +62,7 @@ public class NodeCleaner {
 
     public void tick() {
         this.clearIds();
+
     }
 
     private void clearIds() {

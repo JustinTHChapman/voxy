@@ -42,7 +42,11 @@ public class WorldConversionFactory {
                                             block = state;
                                             blockId = 0;
                                         } else {
-                                            blockId = blockCache.computeIfAbsent(state, stateMapper::getIdForBlockState);
+                                            blockId = blockCache.getOrDefault(state, -1);
+                                            if (blockId == -1) {
+                                                blockId = stateMapper.getIdForBlockState(state);
+                                                blockCache.put(state, blockId);
+                                            }
                                             block = state;
                                         }
                                     }

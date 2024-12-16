@@ -93,8 +93,6 @@ public class WorldEngine {
     public static int getLevel(long id) {
         return (int) ((id>>60)&0xf);
     }
-
-    //TODO: check these shifts are correct for all the gets
     public static int getX(long id) {
         return (int) ((id<<36)>>40);
     }
