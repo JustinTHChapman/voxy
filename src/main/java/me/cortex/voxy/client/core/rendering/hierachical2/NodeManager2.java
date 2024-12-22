@@ -218,6 +218,7 @@ public class NodeManager2 {
     }
     //==================================================================================================================
 
+    //TODO: cleanup this code shitshow and extract common operations to reduce code duplication
     public void processChildChange(long pos, byte childExistence) {
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
@@ -310,66 +311,11 @@ public class NodeManager2 {
     }
 
     private void updateChildSectionsInner(long pos, int nodeId, byte childExistence) {
-
         //Very complex and painful operation
 
-        /**
-        if (this.nodeData.isNodeRequestInFlight(nodeId&NODE_ID_MSK)) {
-            int requestId = this.nodeData.getNodeRequest(nodeId);
-            var request = this.childRequests.get(requestId);// TODO: do not assume request is childRequest (it will probably always be)
-            if (request.getPosition() != pos) throw new IllegalStateException("Request is not at pos");
-            byte oldMsk = request.getMsk();
-            byte change = (byte) (oldMsk ^ childExistence);
-
-
-//            {//Remove children that no longer exist, TODO: FIXME: THEY MIGHT NOT BE IN THE REQUEST
-//                byte rem = (byte) (change&childExistence);
-//                for (int i = 0; i < 8; i++) {
-//                    if ((rem & (1 << i)) == 0) continue;
-//                    int meshId = request.removeAndUnRequire(i);
-//                    if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
-//                        this.geometryManager.removeSection(meshId);
-//                    }
-//
-//                    //Remove child from being watched and activeSections
-//                    long cPos = makeChildPos(pos, i);
-//                    if (this.activeSectionMap.remove(cPos) == -1) {//TODO: verify the removed section is a request type of child and the request id matches this
-//                        throw new IllegalStateException("Child pos was in a request but not in active section map");
-//                    }
-//                    if (!this.updateRouter.unwatch(cPos, WorldEngine.UPDATE_FLAGS)) {
-//                        throw new IllegalStateException("Child pos was not being watched");
-//                    }
-//
-//
-//                    throw new IllegalStateException("UNFINISHED!: need to recursivly remove children");
-//                }
-//            }
-
-
-            {//Add new children
-                byte add = (byte) (change&childExistence);
-                for (int i = 0; i < 8; i++) {
-                    if ((add&(1<<i))==0) continue;
-                    //Add child to request
-                    request.addChildRequirement(i);
-
-                    //Add child to active tracker and put in updateRouter
-                    long cPos = makeChildPos(pos, i);
-                    if (this.activeSectionMap.put(cPos, requestId|NODE_TYPE_REQUEST|REQUEST_TYPE_CHILD) != -1) {
-                        throw new IllegalStateException("Child pos was already in active section tracker but was part of a request");
-                    }
-                    if (!this.updateRouter.watch(cPos, WorldEngine.UPDATE_FLAGS)) {
-                        throw new IllegalStateException("Child pos update router issue");
-                    }
-
-                }
-            }
-        }
-         */
 
         //TODO: operation of needing to create a request node to add new sections
         // (or modify the node to remove a child node (recursively probably ;-;))
-
 
 
         //This works in 2 parts, adding and removing, adding is (surprisingly) much easier than removing
@@ -407,16 +353,53 @@ public class NodeManager2 {
             }
         }
 
-        // Do removals
-        byte rem = (byte) ((existence^childExistence)&existence);;
-        if (rem != 0) {
-            Logger.error("UNFINISHED OPERATION TODO: FIXME");
-        }
-
-
-
         //Update the nodes existence msk to the new one
+        // this needs to be before the removal since that may invoke requestFinish, which expects updated node masks
+        //TODO: verify this
         this.nodeData.setNodeChildExistence(nodeId&NODE_ID_MSK, childExistence);
+
+        // Do removals
+        byte rem = (byte) ((existence^childExistence)&existence);
+        if (rem != 0) {
+            //If there is an inflight request, update it w.r.t removals
+            if (this.nodeData.isNodeRequestInFlight(nodeId)) {
+                int requestId = this.nodeData.getNodeRequest(nodeId);
+                var request = this.childRequests.get(requestId);// TODO: do not assume request is childRequest (it will probably always be)
+                if (request.getPosition() != pos) throw new IllegalStateException("Request is not at pos");
+
+
+                byte reqRem = (byte) (request.getMsk()&rem);
+                if (reqRem != 0) {
+                    //There are things in the request to remove
+                    for (int i = 0; i < 8; i++) {
+                        if ((reqRem & (1 << i)) == 0) continue;
+                        int meshId = request.removeAndUnRequire(i);
+                        if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
+                            this.geometryManager.removeSection(meshId);
+                        }
+
+                        //Remove child from being watched and activeSections
+                        long cPos = makeChildPos(pos, i);
+                        if (this.activeSectionMap.remove(cPos) == -1) {//TODO: verify the removed section is a request type of child and the request id matches this
+                            throw new IllegalStateException("Child pos was in a request but not in active section map");
+                        }
+                        if (!this.updateRouter.unwatch(cPos, WorldEngine.UPDATE_FLAGS)) {
+                            throw new IllegalStateException("Child pos was not being watched");
+                        }
+                    }
+                }
+                rem ^= reqRem;
+                //If the request is satisfied, submit the result
+                if (request.isSatisfied()) {
+                    this.finishRequest(requestId, request);
+                }
+            }
+
+            if (rem != 0) {
+                //There are child node entries that need removing
+                Logger.error("UNFINISHED OPERATION TODO: FIXME");
+            }
+        }
     }
 
     //==================================================================================================================
