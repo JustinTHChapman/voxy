@@ -22,14 +22,18 @@ public class ServiceThreadPool {
     private final ThreadGroup threadGroup;
 
     public ServiceThreadPool(int threadCount) {
-        this.threadGroup = new ThreadGroup("Service job workers");
+        this(threadCount, 4);//Maybe change to 3
+    }
 
+    public ServiceThreadPool(int threadCount, int priority) {
+        this.threadGroup = new ThreadGroup("Service job workers");
         this.workers = new Thread[threadCount];
         for (int i = 0; i < threadCount; i++) {
             int threadId = i;
             var worker = new Thread(this.threadGroup, ()->this.worker(threadId));
             worker.setDaemon(false);
             worker.setName("Service worker #" + i);
+            worker.setPriority(priority);
             worker.start();
             worker.setUncaughtExceptionHandler(this::handleUncaughtException);
             this.workers[i]  = worker;

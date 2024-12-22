@@ -100,11 +100,12 @@ public class RenderGenerationService {
         try {
             mesh = factory.generateMesh(section);
         } catch (IdNotYetComputedException e) {
+            //TODO: maybe move this to _after_ task as been readded to queue??
+
             if (!this.modelBakery.factory.hasModelForBlockId(e.id)) {
                 this.modelBakery.requestBlockBake(e.id);
             }
             if (task.hasDoneModelRequest) {
-
                 try {
                     Thread.sleep(1);
                 } catch (InterruptedException ex) {
@@ -114,6 +115,8 @@ public class RenderGenerationService {
                 //The reason for the extra id parameter is that we explicitly add/check against the exception id due to e.g. requesting accross a chunk boarder wont be captured in the request
                 this.computeAndRequestRequiredModels(section, e.id);
             }
+
+
             {//Keep the lock on the section, and attach it to the task, this prevents needing to re-aquire it later
                 task.section = section;
             }

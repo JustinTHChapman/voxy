@@ -88,6 +88,11 @@ public class Shader extends TrackedObject {
             return this;
         }
 
+        public Builder<T> define(String name, String value) {
+            this.defines.put(name, value);
+            return this;
+        }
+
         public Builder<T> add(ShaderType type, String id) {
             this.addSource(type, ShaderLoader.parse(id));
             return this;

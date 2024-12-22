@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering;
 
+import com.mojang.datafixers.util.Either;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
@@ -15,11 +16,13 @@ import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.util.MessageQueue;
+import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldSection;
 import net.minecraft.client.render.Camera;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 
@@ -49,7 +52,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         //Max sections: ~500k
         //Max geometry: 1 gb
-        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<31)-1024);
+        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<32)-1024);
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
         var router = new SectionUpdateRouter();
@@ -93,16 +96,51 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
                 }
             }
         }*/
+        if (true) {
+            if (true) {
+                final int H_WIDTH = 10;
+                for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
+                    for (int z = -H_WIDTH; z <= H_WIDTH; z++) {
+                        for (int y = -1; y <= 0; y++) {
+                            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
+                        }
+                    }
+                }
+            } else {
+                for (int x = -5; x <= 20; x++) {
+                    for (int z = -5; z <= 20; z++) {
+                        for (int y = 0; y <= 1; y++) {
+                            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
+                        }
+                    }
+                }
+            }
 
-
-        final int H_WIDTH = 20;
-        for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
-            for (int y = -1; y <= 0; y++) {
-                for (int z = -H_WIDTH; z <= H_WIDTH; z++) {
-                    this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
+        } else {
+            /*
+            for (int x = -5; x <= 5; x++) {
+                for (int z = -5; z <= 5; z++) {
+                    for (int y = -5; y <= 5; y++) {
+                        this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
+                    }
+                }
+            }
+            for (int x = -5; x <= 5; x++) {
+                for (int z = -5; z <= 5; z++) {
+                    for (int y = -5; y <= 5; y++) {
+                        this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x+16, y, z));
+                    }
+                }
+            }*/
+            for (int x = -3; x <= 3; x++) {
+                for (int z = -3; z <= 3; z++) {
+                    for (int y = -8; y <= 7; y++) {
+                        this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
+                    }
                 }
             }
         }
+
 
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
     }

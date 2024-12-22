@@ -87,8 +87,8 @@ bool isCulledByHiz() {
 
 
     vec2 ssize = size * vec2(screenW, screenH);
-    float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)))-1;
-    miplevel = clamp(miplevel, 1, 10);
+    float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
+    miplevel = clamp(miplevel, 1, 20);
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
     //TODO: maybe get rid of clamp
     //Todo: replace with some rasterization, e.g. especially for request back to cpu

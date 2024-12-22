@@ -75,7 +75,6 @@ vec3 swizzelDataAxis(uint axis, vec3 data) {
 void main() {
     int cornerIdx = gl_VertexID&3;
     Quad quad = quadData[uint(gl_VertexID)>>2];
-    vec3 innerPos = extractPos(quad);
     uint face = extractFace(quad);
     uint modelId = extractStateId(quad);
     BlockModel model = modelData[modelId];

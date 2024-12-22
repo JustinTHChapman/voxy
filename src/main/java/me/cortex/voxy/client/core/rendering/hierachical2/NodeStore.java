@@ -70,12 +70,13 @@ public final class NodeStore {
         this.free(nodeId, 1);
     }
 
-    private void free(int baseNodeId, int count) {
+    public void free(int baseNodeId, int count) {
         for (int i = 0; i < count; i++) {
             int nodeId = baseNodeId + i;
-            if (!this.allocationSet.free(nodeId)) {
+            if (!this.allocationSet.free(nodeId)) {//TODO: add batch free
                 throw new IllegalStateException("Node " + nodeId + " was not allocated!");
             }
+            this.clear(nodeId);
         }
     }
 
@@ -87,6 +88,20 @@ public final class NodeStore {
         this.localNodeData[idx+1] = GEOMETRY_ID_MSK|(((long)NODE_ID_MSK)<<24);
         this.localNodeData[idx+2] = 0;
         this.localNodeData[idx+3] = 0;
+    }
+
+
+    //Copy from allocated index A to allocated index B
+    public void copyNode(int fromId, int toId) {
+        if (!(this.allocationSet.isSet(fromId)&&this.allocationSet.isSet(toId))) {
+            throw new IllegalArgumentException();
+        }
+        int f = id2idx(fromId);
+        int t = id2idx(toId);
+        this.localNodeData[t  ] = this.localNodeData[f  ];
+        this.localNodeData[t+1] = this.localNodeData[f+1];
+        this.localNodeData[t+2] = this.localNodeData[f+2];
+        this.localNodeData[t+3] = this.localNodeData[f+3];
     }
 
     public void setNodePosition(int node, long position) {
@@ -213,7 +228,7 @@ public final class NodeStore {
 
     public int getChildPtrCount(int nodeId) {
         long data = this.localNodeData[id2idx(nodeId)+1];
-        return (int) ((data>>56)&0x7);
+        return ((int)((data>>56)&0x7))+1;
     }
 
     public void setChildPtrCount(int nodeId, int count) {
@@ -236,7 +251,7 @@ public final class NodeStore {
 
         short flags = 0;
         flags |= (short) (this.isNodeRequestInFlight(nodeId)?1:0);
-        flags |= (short) (this.getChildPtrCount(nodeId)<<2);
+        flags |= (short) ((this.getChildPtrCount(nodeId)-1)<<2);
 
         {
             int geometry = this.getNodeGeometry(nodeId);
@@ -246,8 +261,9 @@ public final class NodeStore {
                 z |= geometry&0xFFFFFF;//TODO: check and ensure bounds
             }
         }
-
-        w |= this.getChildPtr(nodeId)&0xFFFFFF;//TODO: check and ensure bounds
+        int childPtr = this.getChildPtr(nodeId);
+        //TODO: check and ensure bounds
+        w |= childPtr&0xFFFFFF;
 
         z |= (flags&0xFF)<<24;
         w |= ((flags>>8)&0xFF)<<24;

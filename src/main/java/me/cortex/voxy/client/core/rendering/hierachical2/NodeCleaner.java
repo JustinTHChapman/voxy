@@ -6,6 +6,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import org.lwjgl.system.MemoryUtil;
 
@@ -62,6 +63,19 @@ public class NodeCleaner {
 
     public void tick() {
         this.clearIds();
+
+        if (false) {
+            this.outputBuffer.zero();//TODO: maybe dont set to zero??
+
+            this.sorter.bind();
+            //TODO: choose whether this is in nodeSpace or section/geometryId space
+            //glDispatchCompute(, 1, 1);
+
+            //DownloadStream.INSTANCE.download(this.outputBuffer, this::onDownload);
+        }
+    }
+
+    private void onDownload(long ptr, long size) {
 
     }
 
