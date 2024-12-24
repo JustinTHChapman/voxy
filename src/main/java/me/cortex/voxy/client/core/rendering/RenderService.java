@@ -52,7 +52,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         //Max sections: ~500k
         //Max geometry: 1 gb
-        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<32)-1024);
+        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<31)-1024);
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
         var router = new SectionUpdateRouter();
@@ -98,7 +98,10 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         }*/
         if (true) {
             if (true) {
-                final int H_WIDTH = 10;
+                if (true) {
+                    return;
+                }
+                final int H_WIDTH = 50;
                 for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
                     for (int z = -H_WIDTH; z <= H_WIDTH; z++) {
                         for (int y = -1; y <= 0; y++) {
@@ -107,8 +110,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
                     }
                 }
             } else {
-                for (int x = -5; x <= 20; x++) {
-                    for (int z = -5; z <= 20; z++) {
+                for (int x = -75; x <= 75; x++) {
+                    for (int z = -75; z <= 75; z++) {
                         for (int y = 0; y <= 1; y++) {
                             this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
                         }
@@ -145,7 +148,11 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
     }
 
+    private int q = -1024;
     public void setup(Camera camera) {
+        if (q<(151*151*2)&&q++>=0) {
+            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, (q%151)-75, ((q/151)/151)-1, ((q/151)%151)-75));
+        }
         this.modelService.tick();
     }
 

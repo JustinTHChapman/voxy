@@ -126,6 +126,15 @@ public class VoxelCore {
         if (IrisUtil.irisShadowActive()) {
             return;
         }
+
+
+        //Do some very cheeky stuff for MiB
+        if (false) {
+            int sector = (((int)Math.floor(cameraX)>>4)+512)>>10;
+            cameraX -= sector<<14;//10+4
+            cameraY += (16+(256-32-sector*30))*16;
+        }
+
         matrices.push();
         matrices.translate(-cameraX, -cameraY, -cameraZ);
         matrices.pop();
