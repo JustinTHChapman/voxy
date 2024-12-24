@@ -57,7 +57,7 @@ public final class NodeStore {
 
     //Ensures that index is within the array, if not, resizes to contain it + buffer zone
     private void ensureSized(int index) {
-        if (index*LONGS_PER_NODE > this.localNodeData.length) {
+        if (index*LONGS_PER_NODE >= this.localNodeData.length) {
             int newSize = Math.min((index+INCREMENT_SIZE), this.allocationSet.getLimit());
 
             long[] newStore = new long[newSize * LONGS_PER_NODE];
