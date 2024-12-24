@@ -31,6 +31,8 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -134,6 +136,7 @@ public class WorldImporter {
         this.worker = new Thread(() -> {
             this.isRunning = true;
             var files = directory.listFiles();
+            Arrays.sort(files, File::compareTo);
             this.estimatedTotalChunks.addAndGet(files.length*1024);
             for (var file : files) {
                 if (!file.isFile()) {
