@@ -27,13 +27,18 @@ public class HiZBuffer {
             .name("HiZ Builder");
     private final GlFramebuffer fb = new GlFramebuffer().name("HiZ");
     private final int sampler = glGenSamplers();
+    private final int type;
     private GlTexture texture;
     private int levels;
     private int width;
     private int height;
 
     public HiZBuffer() {
+        this(GL_DEPTH24_STENCIL8);
+    }
+    public HiZBuffer(int type) {
         glNamedFramebufferDrawBuffer(this.fb.id, GL_NONE);
+        this.type = type;
     }
 
     private void alloc(int width, int height) {
@@ -43,7 +48,7 @@ public class HiZBuffer {
         // (could probably increase it to be defined by a max meshlet coverage computation thing)
 
         //GL_DEPTH_COMPONENT32F //Cant use this as it does not match the depth format of the provided depth buffer
-        this.texture = new GlTexture().store(GL_DEPTH24_STENCIL8, this.levels, width, height).name("HiZ");
+        this.texture = new GlTexture().store(this.type, this.levels, width, height).name("HiZ");
         glTextureParameteri(this.texture.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_COMPARE_MODE, GL_NONE);
