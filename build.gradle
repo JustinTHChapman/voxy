@@ -126,6 +126,39 @@ jar {
     }
 }
 
+tasks.register('excludeUnused', Zip) {
+    //outputs.upToDateWhen { false }
+    archiveExtension.set("jar")
+    entryCompression(ZipEntryCompression.STORED)
+    destinationDirectory.set temporaryDir
+    archiveFileName.set processIncludeJars.outputDirectory.asFileTree.filter {
+        it.name.startsWith('rocksdb')
+    }.first().name
+    processIncludeJars.outputDirectory.asFileTree.each {
+        if (it.name.startsWith('rocksdb')) {
+            from zipTree(it)
+        }
+    }
+    exclude {
+        def file = it.name
+        if (file.endsWith(".jnilib")) {
+            return true
+        }
+        if (!file.endsWith(".so")) {
+            return false
+        }
+        return ["osx", "linux32", "s390x", "riscv64", "ppc64le", "aarch64"].any(file::contains)
+    }
+    dependsOn processIncludeJars
+}
+
+remapJar {
+    nestedJars = nestedJars.filter {
+        !it.name.startsWith('rocksdb')
+    }
+    nestedJars.from excludeUnused
+}
+
 project.ext.lwjglVersion = "3.3.3"
 project.ext.lwjglNatives = "natives-windows"
 
