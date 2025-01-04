@@ -131,9 +131,12 @@ tasks.register('excludeUnused', Zip) {
     archiveExtension.set("jar")
     entryCompression(ZipEntryCompression.STORED)
     destinationDirectory.set temporaryDir
+    /*
     archiveFileName.set processIncludeJars.outputDirectory.asFileTree.filter {
         it.name.startsWith('rocksdb')
     }.first().name
+     */
+    archiveFileName.set "rocksdb.jar"
     processIncludeJars.outputDirectory.asFileTree.each {
         if (it.name.startsWith('rocksdb')) {
             from zipTree(it)
