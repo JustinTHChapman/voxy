@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.util;
+package me.cortex.voxy.common.util;
 
 import it.unimi.dsi.fastutil.longs.LongRBTreeSet;
 

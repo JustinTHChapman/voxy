@@ -1,10 +1,9 @@
 package me.cortex.voxy.client.core.rendering.util;
 
 
-import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlFence;
 import me.cortex.voxy.client.core.gl.GlPersistentMappedBuffer;
-import me.cortex.voxy.client.core.util.AllocationArena;
+import me.cortex.voxy.common.util.AllocationArena;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

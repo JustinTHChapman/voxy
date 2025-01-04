@@ -1,7 +1,7 @@
 package me.cortex.voxy.client.core.rendering.building;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
-import me.cortex.voxy.client.core.Capabilities;
+import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.client.core.model.ModelQueries;
 import me.cortex.voxy.client.core.util.Mesher2D;

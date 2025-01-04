@@ -3,10 +3,8 @@ package me.cortex.voxy.client.config;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import me.cortex.voxy.client.core.Capabilities;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import net.fabricmc.loader.api.FabricLoader;
-import org.lwjgl.opengl.GL;
 
 import java.io.FileReader;
 import java.io.IOException;

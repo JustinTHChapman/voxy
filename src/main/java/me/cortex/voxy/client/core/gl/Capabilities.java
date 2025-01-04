@@ -1,12 +1,10 @@
-package me.cortex.voxy.client.core;
+package me.cortex.voxy.client.core.gl;
 
-import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL20C;
 
 import static org.lwjgl.opengl.GL32.glGetInteger64;
-import static org.lwjgl.opengl.GL32C.glGetInteger64i;
 import static org.lwjgl.opengl.GL43C.GL_MAX_SHADER_STORAGE_BLOCK_SIZE;
 
 public class Capabilities {

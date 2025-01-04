@@ -57,11 +57,11 @@ public class WorldImporter {
     private volatile boolean isRunning;
     public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool) {
         this.world = worldEngine;
-        this.threadPool = servicePool.createServiceNoCleanup("World importer", 1, ()->()->jobQueue.poll().run(), ()->this.world.savingService.getTaskCount() < 4000);
+        this.threadPool = servicePool.createServiceNoCleanup("World importer", 1, ()->()->this.jobQueue.poll().run(), ()->this.world.savingService.getTaskCount() < 4000);
 
         var biomeRegistry = mcWorld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
         var defaultBiome = biomeRegistry.getOrThrow(BiomeKeys.PLAINS);
-        this.defaultBiomeProvider = new ReadableContainer<RegistryEntry<Biome>>() {
+        this.defaultBiomeProvider = new ReadableContainer<>() {
             @Override
             public RegistryEntry<Biome> get(int x, int y, int z) {
                 return defaultBiome;
