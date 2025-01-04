@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.importers;
+package me.cortex.voxy.commonImpl.importers;
 
 import com.mojang.serialization.Codec;
 import me.cortex.voxy.common.util.ByteBufferBackedInputStream;

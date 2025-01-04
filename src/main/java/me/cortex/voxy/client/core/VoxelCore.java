@@ -15,7 +15,7 @@ import me.cortex.voxy.client.taskbar.Taskbar;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.client.importers.WorldImporter;
+import me.cortex.voxy.commonImpl.importers.WorldImporter;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
