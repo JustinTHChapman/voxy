@@ -45,11 +45,13 @@ def gitCommitHash = { ->
 
 def buildtime = {System.currentTimeSeconds()}
 processResources {
-    inputs.properties("version": project.version, "commit": gitCommitHash, "buildtime": buildtime)
+    def time = buildtime()
+    def hash = gitCommitHash()
+    inputs.properties("version": project.version, "commit": hash, "buildtime": time)
 
     archivesBaseName = "voxy"
     filesMatching("fabric.mod.json") {
-        expand "commit": gitCommitHash, "version": project.version, "buildtime": buildtime
+        expand "version": project.version, "commit": hash, "buildtime": time
     }
 }
 
