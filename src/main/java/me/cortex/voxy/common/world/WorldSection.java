@@ -1,9 +1,7 @@
 package me.cortex.voxy.common.world;
 
 
-import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.minecraft.util.Pair;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
