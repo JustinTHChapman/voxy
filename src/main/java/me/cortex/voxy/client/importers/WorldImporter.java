@@ -1,7 +1,7 @@
 package me.cortex.voxy.client.importers;
 
 import com.mojang.serialization.Codec;
-import me.cortex.voxy.client.core.util.ByteBufferBackedInputStream;
+import me.cortex.voxy.common.util.ByteBufferBackedInputStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
@@ -32,7 +32,6 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
