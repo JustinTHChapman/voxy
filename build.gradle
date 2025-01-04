@@ -24,17 +24,22 @@ repositories {
 
 
 def gitCommitHash = { ->
-    def stdout = new ByteArrayOutputStream()
-    ExecResult result = exec ()->{
-        commandLine 'git', 'rev-parse', '--short', 'HEAD'
-        standardOutput = stdout
-        ignoreExitValue = true
-    }
+    try {
+        def stdout = new ByteArrayOutputStream()
+        ExecResult result = exec () -> {
+            commandLine 'git', 'rev-parse', '--short', 'HEAD'
+            standardOutput = stdout
+            ignoreExitValue = true
+        }
 
-    if (result.getExitValue() != 0) {
+        if (result.getExitValue() != 0) {
+            return "<UnknownCommit>";
+        } else {
+            return stdout.toString().trim();
+        }
+    } catch (Exception e) {
+        e.printStackTrace()
         return "<UnknownCommit>";
-    } else {
-        return stdout.toString().trim();
     }
 }
 
