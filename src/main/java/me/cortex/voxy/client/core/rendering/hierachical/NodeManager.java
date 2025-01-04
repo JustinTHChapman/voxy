@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering.hierachical2;
+package me.cortex.voxy.client.core.rendering.hierachical;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -24,7 +24,7 @@ import java.util.List;
 // (issues related to this fix, lod updates from 0 children state to something children state, aswell as other way round)
 
 
-public class NodeManager2 {
+public class NodeManager {
     private static final boolean VERIFY_NODE_MANAGER_OPERATIONS = VoxyCommon.isVerificationFlagOn("nodeManager");
     //Assumptions:
     // all nodes have children (i.e. all nodes have at least one child existence bit set at all times)
@@ -72,7 +72,7 @@ public class NodeManager2 {
     private final IntArrayList topLevelNodeIds = new IntArrayList();
     private int activeNodeRequestCount;
 
-    public NodeManager2(int maxNodeCount, AbstractSectionGeometryManager geometryManager, SectionUpdateRouter updateRouter) {
+    public NodeManager(int maxNodeCount, AbstractSectionGeometryManager geometryManager, SectionUpdateRouter updateRouter) {
         if (!MathUtil.isPowerOfTwo(maxNodeCount)) {
             throw new IllegalArgumentException("Max node count must be a power of 2");
         }

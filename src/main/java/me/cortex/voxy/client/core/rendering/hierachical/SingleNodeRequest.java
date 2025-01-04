@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering.hierachical2;
+package me.cortex.voxy.client.core.rendering.hierachical;
 
 class SingleNodeRequest {
     private final long nodePos;

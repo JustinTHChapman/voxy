@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering.hierachical2;
+package me.cortex.voxy.client.core.rendering.hierachical;
 
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -14,8 +14,8 @@ import me.cortex.voxy.common.world.WorldEngine;
 import net.caffeinemc.mods.sodium.client.util.MathUtil;
 import org.lwjgl.system.MemoryUtil;
 
-import static me.cortex.voxy.client.core.rendering.hierachical2.NodeStore.EMPTY_GEOMETRY_ID;
-import static me.cortex.voxy.client.core.rendering.hierachical2.NodeStore.NODE_ID_MSK;
+import static me.cortex.voxy.client.core.rendering.hierachical.NodeStore.EMPTY_GEOMETRY_ID;
+import static me.cortex.voxy.client.core.rendering.hierachical.NodeStore.NODE_ID_MSK;
 
 //Contains no logic to interface with the gpu, nor does it contain any gpu buffers
 public class HierarchicalNodeManager {

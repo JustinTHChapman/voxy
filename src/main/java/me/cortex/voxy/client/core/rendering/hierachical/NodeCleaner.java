@@ -1,12 +1,10 @@
-package me.cortex.voxy.client.core.rendering.hierachical2;
+package me.cortex.voxy.client.core.rendering.hierachical;
 
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
-import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import org.lwjgl.system.MemoryUtil;
 
@@ -44,11 +42,11 @@ public class NodeCleaner {
 
     private final IntArrayFIFOQueue idsToClear = new IntArrayFIFOQueue();
 
-    private final NodeManager2 nodeManager;
+    private final NodeManager nodeManager;
     int visibilityId = 0;
 
 
-    public NodeCleaner(NodeManager2 nodeManager) {
+    public NodeCleaner(NodeManager nodeManager) {
         this.nodeManager = nodeManager;
         this.visibilityBuffer = new GlBuffer(nodeManager.maxNodeCount*4L).zero();
 

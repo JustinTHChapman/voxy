@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering.hierachical2;
+package me.cortex.voxy.client.core.rendering.hierachical;
 
 class NodeChildRequest {
     //Child states contain micrometadata in the top bits

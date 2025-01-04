@@ -1,6 +1,5 @@
-package me.cortex.voxy.client.core.rendering.hierachical2;
+package me.cortex.voxy.client.core.rendering.hierachical;
 
-import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
@@ -31,7 +30,7 @@ public class HierarchicalOcclusionTraverser {
 
     public static final int REQUEST_QUEUE_SIZE = 50;
 
-    private final NodeManager2 nodeManager;
+    private final NodeManager nodeManager;
     private final NodeCleaner nodeCleaner;
 
     private final GlBuffer requestBuffer;
@@ -82,7 +81,7 @@ public class HierarchicalOcclusionTraverser {
             .compile();
 
 
-    public HierarchicalOcclusionTraverser(NodeManager2 nodeManager, NodeCleaner nodeCleaner) {
+    public HierarchicalOcclusionTraverser(NodeManager nodeManager, NodeCleaner nodeCleaner) {
         this.nodeCleaner = nodeCleaner;
         this.nodeManager = nodeManager;
         this.requestBuffer = new GlBuffer(REQUEST_QUEUE_SIZE*8L+8).zero();

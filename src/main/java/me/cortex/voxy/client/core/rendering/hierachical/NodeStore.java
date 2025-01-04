@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering.hierachical2;
+package me.cortex.voxy.client.core.rendering.hierachical;
 
 import me.cortex.voxy.common.util.HierarchicalBitSet;
 import org.lwjgl.system.MemoryUtil;

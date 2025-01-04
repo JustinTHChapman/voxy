@@ -1,18 +1,12 @@
 package me.cortex.voxy.client.core.rendering.section;
 
-import it.unimi.dsi.fastutil.Pair;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
-import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.util.BufferArena;
-import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.util.HierarchicalBitSet;
-import me.cortex.voxy.common.util.MemoryBuffer;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.function.Consumer;

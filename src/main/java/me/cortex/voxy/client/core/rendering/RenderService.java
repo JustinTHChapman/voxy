@@ -1,28 +1,24 @@
 package me.cortex.voxy.client.core.rendering;
 
-import com.mojang.datafixers.util.Either;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
-import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalNodeManager;
-import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
-import me.cortex.voxy.client.core.rendering.hierachical2.NodeCleaner;
-import me.cortex.voxy.client.core.rendering.hierachical2.NodeManager2;
+import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
+import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
+import me.cortex.voxy.client.core.rendering.hierachical.NodeManager;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
 import me.cortex.voxy.client.core.rendering.section.IUsesMeshlets;
 import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.util.MessageQueue;
-import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldSection;
 import net.minecraft.client.render.Camera;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 
@@ -38,7 +34,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     private final ViewportSelector<?> viewportSelector;
     private final AbstractSectionRenderer<J, ?> sectionRenderer;
 
-    private final NodeManager2 nodeManager;
+    private final NodeManager nodeManager;
     private final NodeCleaner nodeCleaner;
     private final HierarchicalOcclusionTraverser traversal;
     private final ModelBakerySubsystem modelService;
@@ -57,7 +53,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
         var router = new SectionUpdateRouter();
 
-        this.nodeManager = new NodeManager2(1<<21, this.sectionRenderer.getGeometryManager(), router);
+        this.nodeManager = new NodeManager(1<<21, this.sectionRenderer.getGeometryManager(), router);
         this.nodeCleaner = new NodeCleaner(this.nodeManager);
 
         this.sectionUpdateQueue = new MessageQueue<>(section -> {
