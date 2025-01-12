@@ -127,7 +127,7 @@ public class WorldImporter {
 
     private volatile Thread worker;
     private UpdateCallback updateCallback;
-    public void importWorldAsyncStart(File directory, UpdateCallback updateCallback, Runnable onCompletion) {
+    public void importWorldAsyncStart(File directory, UpdateCallback updateCallback, Consumer<Integer> onCompletion) {
         this.totalChunks.set(0);
         this.estimatedTotalChunks.set(0);
         this.chunksProcessed.set(0);
@@ -166,7 +166,7 @@ public class WorldImporter {
             while (this.chunksProcessed.get() != this.totalChunks.get() && this.isRunning) {
                 Thread.onSpinWait();
             }
-            onCompletion.run();
+            onCompletion.accept(this.totalChunks.get());
             this.worker = null;
         });
         this.worker.setName("World importer");

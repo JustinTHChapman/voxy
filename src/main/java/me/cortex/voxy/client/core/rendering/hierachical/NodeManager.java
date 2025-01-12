@@ -398,6 +398,7 @@ public class NodeManager {
             if (rem != 0) {
                 //There are child node entries that need removing
                 Logger.error("UNFINISHED OPERATION TODO: FIXME");
+                //TODO:FIXME:FINISH:CRITICAL
             }
         }
     }

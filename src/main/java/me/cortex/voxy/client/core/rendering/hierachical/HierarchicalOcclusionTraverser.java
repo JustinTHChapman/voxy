@@ -39,6 +39,11 @@ public class HierarchicalOcclusionTraverser {
     private final GlBuffer uniformBuffer = new GlBuffer(1024).zero();
     private final GlBuffer renderList = new GlBuffer(100_000 * 4 + 4).zero();//100k sections max to render, TODO: Maybe move to render service or somewhere else
 
+
+
+    private final GlBuffer renderTrackingBuffer;
+
+
     private final GlBuffer queueMetaBuffer = new GlBuffer(4*4*5).zero();
     private final GlBuffer scratchQueueA = new GlBuffer(100_000*4).zero();
     private final GlBuffer scratchQueueB = new GlBuffer(100_000*4).zero();
@@ -55,6 +60,7 @@ public class HierarchicalOcclusionTraverser {
     private static final int NODE_QUEUE_META_BINDING = BINDING_COUNTER++;
     private static final int NODE_QUEUE_SOURCE_BINDING = BINDING_COUNTER++;
     private static final int NODE_QUEUE_SINK_BINDING = BINDING_COUNTER++;
+    private static final int RENDER_TRACKER_BINDING = BINDING_COUNTER++;
 
     private final HiZBuffer hiZBuffer = new HiZBuffer();
     private final int hizSampler = glGenSamplers();
@@ -77,6 +83,8 @@ public class HierarchicalOcclusionTraverser {
             .define("NODE_QUEUE_SOURCE_BINDING", NODE_QUEUE_SOURCE_BINDING)
             .define("NODE_QUEUE_SINK_BINDING", NODE_QUEUE_SINK_BINDING)
 
+            .define("RENDER_TRACKER_BINDING", RENDER_TRACKER_BINDING)
+
             .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/traversal_dev.comp")
             .compile();
 
@@ -86,6 +94,8 @@ public class HierarchicalOcclusionTraverser {
         this.nodeManager = nodeManager;
         this.requestBuffer = new GlBuffer(REQUEST_QUEUE_SIZE*8L+8).zero();
         this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).zero();
+
+        this.renderTrackingBuffer = new GlBuffer(nodeManager.maxNodeCount*4L).zero();
 
 
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
@@ -118,6 +128,14 @@ public class HierarchicalOcclusionTraverser {
         MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;
 
 
+        final float screenspaceAreaDecreasingSize = VoxyConfig.CONFIG.subDivisionSize*VoxyConfig.CONFIG.subDivisionSize;
+        //Screen space size for descending
+        MemoryUtil.memPutFloat(ptr, (float) (screenspaceAreaDecreasingSize) /(viewport.width*viewport.height)); ptr += 4;
+
+
+        //FrameId for timing info
+        MemoryUtil.memPutInt(ptr, viewport.frameId); ptr += 4;
+
         /*
         //Very funny and cool thing that is possible
         if (MinecraftClient.getInstance().getCurrentFps() < 30) {
@@ -127,10 +145,6 @@ public class HierarchicalOcclusionTraverser {
         if (60 < MinecraftClient.getInstance().getCurrentFps()) {
             VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - 1, 32);
         }*/
-
-        final float screenspaceAreaDecreasingSize = VoxyConfig.CONFIG.subDivisionSize*VoxyConfig.CONFIG.subDivisionSize;
-        //Screen space size for descending
-        MemoryUtil.memPutFloat(ptr, (float) (screenspaceAreaDecreasingSize) /(viewport.width*viewport.height)); ptr += 4;
     }
 
     private void bindings() {
@@ -139,6 +153,7 @@ public class HierarchicalOcclusionTraverser {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_QUEUE_BINDING, this.renderList.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, NODE_DATA_BINDING, this.nodeBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, NODE_QUEUE_META_BINDING, this.queueMetaBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_TRACKER_BINDING, this.renderTrackingBuffer.id);
         glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.queueMetaBuffer.id);
 
         //Bind the hiz buffer
@@ -292,6 +307,7 @@ public class HierarchicalOcclusionTraverser {
         this.queueMetaBuffer.free();
         this.scratchQueueA.free();
         this.scratchQueueB.free();
+        this.renderTrackingBuffer.free();
         glDeleteSamplers(this.hizSampler);
     }
 }

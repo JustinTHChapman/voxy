@@ -239,17 +239,20 @@ public class VoxelCore {
         this.importerBossBarUUID = MathHelper.randomUuid();
         var bossBar = new ClientBossBar(this.importerBossBarUUID, Text.of("Voxy world importer"), 0.0f, BossBar.Color.GREEN, BossBar.Style.PROGRESS, false, false, false);
         MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.put(bossBar.getUuid(), bossBar);
+        long start = System.currentTimeMillis();
         this.importer.importWorldAsyncStart(worldPath, (a,b)->
                 MinecraftClient.getInstance().executeSync(()-> {
                     Taskbar.INSTANCE.setProgress(a, b);
                     bossBar.setPercent(((float) a)/((float) b));
                     bossBar.setName(Text.of("Voxy import: "+ a+"/"+b + " chunks"));
                 }),
-                ()-> {
+                chunkCount -> {
                     MinecraftClient.getInstance().executeSync(()-> {
                         MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.remove(this.importerBossBarUUID);
                         this.importerBossBarUUID = null;
-                        String msg = "Voxy world import finished";
+                        long delta = System.currentTimeMillis() - start;
+
+                        String msg = "Voxy world import finished in " + (delta/1000) + " seconds, averaging " + (chunkCount/(delta/1000)) + " chunks per second";
                         MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(Text.literal(msg));
                         Logger.info(msg);
                         Taskbar.INSTANCE.setIsNone();

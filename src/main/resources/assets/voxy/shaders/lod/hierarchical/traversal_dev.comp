@@ -13,6 +13,7 @@ layout(binding = SCENE_UNIFORM_BINDING, std140) uniform SceneUniform {
     float screenH;
     uint renderQueueMaxSize;
     float minSSS;
+    uint frameId;
 };
 
 #import <voxy:lod/hierarchical/queue.glsl>
@@ -29,6 +30,10 @@ layout(binding = REQUEST_QUEUE_BINDING, std430) restrict buffer requestQueueStru
 layout(binding = RENDER_QUEUE_BINDING, std430) restrict buffer renderQueueStruct {
     uint renderQueueIndex;
     uint[] renderQueue;
+};
+
+layout(binding = RENDER_TRACKER_BINDING, std430) restrict writeonly buffer renderTrackerArray {
+    uint[] lastRenderFrame;
 };
 
 void addRequest(inout UnpackedNode node) {
@@ -61,6 +66,10 @@ void enqueueSelfForRender(in UnpackedNode node) {
         #ifdef IS_DEBUG
         debugRenderNodeQueue[atomicAdd(debugRenderNodeQueueIndex, 1)] = node.nodeId;
         #endif
+
+        //TODO: decide if it should be this node id, or the mesh id
+        // for now do node id... think
+        lastRenderFrame[getId(node)] = frameId;
     }
 }
 

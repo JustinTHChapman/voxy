@@ -92,12 +92,13 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
                 }
             }
         }*/
+
         if (true) {
             if (true) {
                 if (true) {
                     return;
                 }
-                final int H_WIDTH = 50;
+                final int H_WIDTH = 10;//50;
                 for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
                     for (int z = -H_WIDTH; z <= H_WIDTH; z++) {
                         for (int y = -1; y <= 0; y++) {
@@ -142,12 +143,15 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
 
         //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
+
     }
 
-    private int q = -128;
+    private int q = -60;
     public void setup(Camera camera) {
-        for (int i = 0; i<32 && q<(151*151*2)&&q++>=0;i++) {
-            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, (q%151)-75, ((q/151)/151)-1, ((q/151)%151)-75));
+        final int W = 80;
+        final int H = 2;
+        for (int i = 0; i<32 && q<((W*2+1)*(W*2+1)*H)&&q++>=0;i++) {
+            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, (q%(W*2+1))-W, ((q/(W*2+1))/(W*2+1))-1, ((q/(W*2+1))%(W*2+1)))-W);
         }
         this.modelService.tick();
     }
