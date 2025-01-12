@@ -162,9 +162,9 @@ tasks.register('excludeUnused', Zip) {
     dependsOn processIncludeJars
 }
 
-if (processIncludeJars.outputDirectory.asFileTree.filter {
+if (!processIncludeJars.outputDirectory.asFileTree.filter {
     it.name.startsWith('rocksdb')
-}.first() != null) {
+}.isEmpty()) {
     println "Compressing rocksdb"
     remapJar {
         nestedJars = nestedJars.filter {
