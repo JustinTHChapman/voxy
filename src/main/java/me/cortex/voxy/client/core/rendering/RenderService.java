@@ -13,6 +13,7 @@ import me.cortex.voxy.client.core.rendering.section.IUsesMeshlets;
 import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MessageQueue;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
@@ -48,7 +49,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         //Max sections: ~500k
         //Max geometry: 1 gb
-        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<32)-1024);
+        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<31)-1024);
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
         var router = new SectionUpdateRouter();
@@ -148,10 +149,14 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
     private int q = -60;
     public void setup(Camera camera) {
-        final int W = 80;
+        final int W = 32;
         final int H = 2;
-        for (int i = 0; i<32 && q<((W*2+1)*(W*2+1)*H)&&q++>=0;i++) {
-            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, (q%(W*2+1))-W, ((q/(W*2+1))/(W*2+1))-1, ((q/(W*2+1))%(W*2+1)))-W);
+        for (int i = 0; i<64 && q<((W*2+1)*(W*2+1)*H)&&q++>=0;i++) {
+            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, (q%(W*2+1))-W, ((q/(W*2+1))/(W*2+1))-1, ((q/(W*2+1))%(W*2+1))-W));
+        }
+        if (q==((W*2+1)*(W*2+1)*H)) {
+            q++;
+            Logger.info("Finished loading render distance");
         }
         this.modelService.tick();
     }

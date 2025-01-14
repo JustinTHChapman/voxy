@@ -14,11 +14,11 @@ public class MixinClientCommonNetworkHandler {
     private void handleDisconnectAsCrash(Packet<?> packet, Exception exception, CallbackInfo ci) {
         if (packet instanceof GameJoinS2CPacket) {
             ci.cancel();
-            if (exception instanceof RuntimeException re) {
-                throw re;
-            } else {
+            //if (exception instanceof RuntimeException re) {
+            //    throw re;
+            //} else {
                 throw new RuntimeException("Force crashing due to exception during on game join", exception);
-            }
+            //}
         }
     }
 }
