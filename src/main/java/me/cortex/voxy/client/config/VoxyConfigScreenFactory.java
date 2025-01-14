@@ -3,15 +3,12 @@ package me.cortex.voxy.client.config;
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
 import me.cortex.voxy.client.core.IGetVoxelCore;
-import me.shedaniel.clothconfig2.ClothConfigDemo;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
-
-import java.util.List;
 
 public class VoxyConfigScreenFactory implements ModMenuApi {
     private static VoxyConfig DEFAULT;
@@ -69,7 +66,7 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setDefaultValue(DEFAULT.ingestEnabled)
                 .build());
 
-        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.subDivisionSize"), config.subDivisionSize, 40, 256)
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.subDivisionSize"), config.subDivisionSize, 30, 256)
                 .setTooltip(Text.translatable("voxy.config.general.subDivisionSize.tooltip"))
                 .setSaveConsumer(val -> config.subDivisionSize = val)
                 .setDefaultValue(DEFAULT.subDivisionSize)
