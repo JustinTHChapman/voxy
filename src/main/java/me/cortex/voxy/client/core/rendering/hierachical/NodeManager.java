@@ -257,7 +257,7 @@ public class NodeManager {
                 //  Logger.error("UNFINISHED OPERATION TODO: FIXME: painful operation, needs to account for both adding and removing, need to do the same with inner node, but also create requests, or cleanup children");
                 int requestId = this.nodeData.getNodeRequest(nodeId);
                 var request = this.childRequests.get(requestId);// TODO: do not assume request is childRequest (it will probably always be)
-                if (request.getPosition() != pos) throw new IllegalStateException("Request is not at pos");
+                if (request.getPosition() != pos) throw new IllegalStateException("Request is not at pos, got " + WorldEngine.pprintPos(request.getPosition()) + " expected " + WorldEngine.pprintPos(pos));
                 {//Update the request
                     byte oldMsk = request.getMsk();
                     byte change = (byte) (oldMsk ^ childExistence);
