@@ -197,6 +197,13 @@ public class Mapper {
         return this.block2stateEntry.computeIfAbsent(state, this::registerNewBlockState).id;
     }
 
+    public int getBlockStateOpacity(long mappingId) {
+        return this.getBlockStateOpacity(getBlockId(mappingId));
+    }
+
+    public int getBlockStateOpacity(int blockId) {
+        return this.blockId2stateEntry.get(blockId).opacity;
+    }
 
     //TODO: replace lambda with a class cached lambda ref (cause doing this:: still does a lambda allocation)
     public int getIdForBiome(RegistryEntry<Biome> biome) {
@@ -279,9 +286,11 @@ public class Mapper {
     public static final class StateEntry {
         public final int id;
         public final BlockState state;
+        public final int opacity;
         public StateEntry(int id, BlockState state) {
             this.id = id;
             this.state = state;
+            this.opacity = state.getOpacity();
         }
 
         public byte[] serialize() {
