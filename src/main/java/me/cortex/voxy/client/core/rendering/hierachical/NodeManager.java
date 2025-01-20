@@ -275,6 +275,7 @@ public class NodeManager {
                             if (this.activeSectionMap.remove(cPos) == -1) {//TODO: verify the removed section is a request type of child and the request id matches this
                                 throw new IllegalStateException("Child pos was in a request but not in active section map");
                             }
+
                             if (!this.updateRouter.unwatch(cPos, WorldEngine.UPDATE_FLAGS)) {
                                 throw new IllegalStateException("Child pos was not being watched");
                             }
@@ -391,6 +392,10 @@ public class NodeManager {
                         }
                     }
                 }
+                //TODO: FIXME: This isnt right, as we need to remove node + geometry if it was in a request aswell as a child?
+                // BUT dont think thats possible?
+
+
                 rem ^= reqRem;
                 //If the request is satisfied, submit the result
                 if (request.isSatisfied()) {
@@ -399,10 +404,70 @@ public class NodeManager {
             }
 
             if (rem != 0) {
+                //"TODO"
                 //There are child node entries that need removing
+                // TODO: this should be ok to do before request is satisfied
                 Logger.error("UNFINISHED OPERATION TODO: FIXME");
+                for (int i = 0; i < 8; i++) {
+                    if ((rem & (1 << i)) == 0) continue;
+                    long cPos = makeChildPos(pos, i);
+
+                    this.recurseRemoveNode(cPos);
+                    //TOdo: update the child existance afak
+                }
                 //TODO:FIXME:FINISH:CRITICAL
             }
+        }
+    }
+
+    //Recursivly fully removes all nodes and children
+    private void recurseRemoveNode(long pos) {
+        //NOTE: this also removes from the section map
+        int nodeId = this.activeSectionMap.remove(pos);
+        if (nodeId == -1) {
+            throw new IllegalStateException("Cannot remove pos that doesnt exist");
+        }
+        int type = nodeId&NODE_TYPE_MSK;
+        nodeId &= NODE_ID_MSK;
+        if (type == NODE_TYPE_INNER || type == NODE_TYPE_LEAF) {
+            if (!this.nodeData.nodeExists(nodeId)) {
+                throw new IllegalStateException("Node exists in section map but not in nodeData");
+            }
+
+
+            byte childExistence = this.nodeData.getNodeChildExistence(nodeId);
+            if (this.nodeData.isNodeRequestInFlight(nodeId)) {
+                //If there is an inflight request, the request and all associated data
+                int reqId = this.nodeData.getNodeRequest(nodeId);
+                //TODO: Dont assume this can only be a child request
+
+                var req = this.childRequests.get(reqId);
+                childExistence ^= req.getMsk();
+
+
+                this.childRequests.release(reqId);//Release the request
+            }
+
+
+            //Need to recurse into childExistence that exist, this is xor between a request mask if there is and the
+            // childRequest
+            // this is only valid if this node is an inner node
+
+
+            Logger.error("UNFINISHED OPERATION TODO: FIXME2");
+
+            //Free geometry and related memory for this node
+
+
+            //Unwatch geometry
+            if (!this.updateRouter.unwatch(pos, WorldEngine.UPDATE_FLAGS)) {
+                throw new IllegalStateException("Pos was not being watched");
+            }
+
+        } else {
+
+            Logger.error("UNFINISHED OPERATION TODO: FIXME3");
+            //NOTE: There are request type singles and request type child!!!!
         }
     }
 
@@ -504,7 +569,7 @@ public class NodeManager {
             int reqMsk = Byte.toUnsignedInt(request.getMsk());
             if ((byte) (existingChildMsk|reqMsk) != this.nodeData.getNodeChildExistence(parentNodeId)) {
                 //System.out.println(Integer.toBinaryString(Byte.toUnsignedInt(this.nodeData.getNodeChildExistence(parentNodeId))));System.out.println(Integer.toBinaryString(existingChildMsk));System.out.println(Integer.toBinaryString(reqMsk));
-                throw new IllegalStateException("node data existence state does not match pointer mask");
+                    throw new IllegalStateException("node data existence state does not match pointer mask");
             }
 
 
@@ -604,12 +669,6 @@ public class NodeManager {
             throw new IllegalStateException("Unknown node type: " + nodeType);
         }
 
-        if (this.nodeData.isNodeRequestInFlight(nodeId)) {
-            Logger.warn("Tried processing a node that already has a request in flight: " + nodeId + " pos: " + WorldEngine.pprintPos(pos) + " ignoring");
-            return;
-        }
-
-
         //TODO: ADJUST AND FIX THIS TO MAKE IT REMOVE THE LAST THING IN QUEUE OR SOMETHING
         //if (this.activeNodeRequestCount > 100 && WorldEngine.getLevel(pos) < 2) {
             //Logger.info("Many active requests, declining request at " + WorldEngine.pprintPos(pos));
@@ -618,16 +677,47 @@ public class NodeManager {
         //}
 
 
-        this.nodeData.markRequestInFlight(nodeId);
+
+
+
+        //TODO:
+        // Make it so that if a request is not in flight it has an invalid/null request entry
+
+        // NOTE: inner nodes /w request should check they have geometry independenently of being inflight
+
+
+
+
+
+
+
+
+        //TODO: FIXTHIS: https://discord.com/channels/973046939375505408/973046939375505411/1328785093812031489
+        // this causes things to go bad, when racing the gpu, i.e. this becomes an inner node that has geometry and there is now a request for it
+        // in this case we should not mark the node as inflight as it casuse very bad things to happen
+        // we should only mark inflight when there is actually a request
         if (nodeType == NODE_TYPE_LEAF) {
+            //Check if the node is already in-flight, if it is, dont do any processing
+            if (this.nodeData.isNodeRequestInFlight(nodeId)) {
+                Logger.warn("Tried processing a node that already has a request in flight: " + nodeId + " pos: " + WorldEngine.pprintPos(pos) + " ignoring");
+                return;
+            }
+
+            //Mark node as having an inflight request
+            this.nodeData.markRequestInFlight(nodeId);
+
             //The hard one of processRequest, spin up a new request for the node
             this.makeLeafChildRequest(nodeId);
 
         } else {//nodeType == NODE_TYPE_INNER
+            //Dont mark node as having an inflight request
+
             //TODO: assert that the node isnt already being watched for geometry, if it is, just spit out a warning? and ignore
             Logger.error("TODO FINISH THIS");
+            // THis shouldent result in markRequestInFlight afak
+
             if (!this.updateRouter.watch(pos, WorldEngine.UPDATE_TYPE_BLOCK_BIT)) {
-                //FIXME: i think this can occur accidently? when removing nodes or something creating leaf nodes
+                //FIXME: think this can occur accidently? when removing nodes or something creating leaf nodes
                 // or other, the node might be wanted to be watched by gpu, but cpu already started watching it a few frames ago
                 Logger.warn("Node: " + nodeId + " at pos: " + WorldEngine.pprintPos(pos) + " got update request, but geometry was already being watched");
             }
@@ -723,4 +813,8 @@ public class NodeManager {
     public void addDebug(List<String> debug) {
         debug.add("NC/IF: " + this.activeSectionMap.size() + "/" + (this.singleRequests.count() + this.childRequests.count()));
     }
+
+    //public int getCurrentMaxNodeId() {
+    //    return this.nodeData.getEndNodeId();
+    //}
 }

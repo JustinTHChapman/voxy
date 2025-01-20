@@ -22,7 +22,7 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
     public FragmentedStorageBackendAdaptor(StorageBackend... backends) {
         this.backends = backends;
         int len = backends.length;
-        if ((len&(len-1)) != (len-1)) {
+        if ((len&(len-1)) != 0) {
             throw new IllegalArgumentException("Backend count not a power of 2");
         }
     }

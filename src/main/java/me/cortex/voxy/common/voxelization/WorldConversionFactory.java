@@ -10,6 +10,7 @@ import net.minecraft.world.chunk.PalettedContainer;
 import net.minecraft.world.chunk.ReadableContainer;
 
 public class WorldConversionFactory {
+    //TODO: create a mapping for world/mapper -> local mapping
     private static final ThreadLocal<Reference2IntOpenHashMap<BlockState>> BLOCK_CACHE = ThreadLocal.withInitial(Reference2IntOpenHashMap::new);
 
     public static VoxelizedSection convert(VoxelizedSection section,

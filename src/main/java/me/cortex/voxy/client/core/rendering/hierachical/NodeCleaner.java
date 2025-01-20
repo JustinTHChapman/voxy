@@ -16,6 +16,9 @@ import static org.lwjgl.opengl.GL43C.glDispatchCompute;
 // then use bubble sort (/w fast path going to middle or 2 subdivisions deep) the bubble it up
 // can do incremental sorting pass aswell, so only scan and sort a rolling sector of sections
 // (over a few frames to not cause lag, maybe)
+
+
+//TODO : USE THIS IN HierarchicalOcclusionTraverser instead of other shit
 public class NodeCleaner {
     //TODO: use batch_visibility_set to clear visibility data when nodes are removed!! (TODO: nodeManager will need to forward info to this)
 
@@ -36,7 +39,7 @@ public class NodeCleaner {
             .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/cleaner/batch_visibility_set.comp")
             .compile();
 
-    private final GlBuffer visibilityBuffer;
+    final GlBuffer visibilityBuffer;
     private final GlBuffer outputBuffer = new GlBuffer(OUTPUT_COUNT*4);
     private final GlBuffer scratchBuffer = new GlBuffer(BATCH_SET_SIZE*4);//Scratch buffer for setting ids with
 
@@ -67,7 +70,7 @@ public class NodeCleaner {
 
             this.sorter.bind();
             //TODO: choose whether this is in nodeSpace or section/geometryId space
-            //glDispatchCompute(, 1, 1);
+            //glDispatchCompute(this.nodeManager.getCurrentMaxNodeId()/, 1, 1);
 
             //DownloadStream.INSTANCE.download(this.outputBuffer, this::onDownload);
         }

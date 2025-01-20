@@ -135,6 +135,9 @@ public class WorldImporter {
         this.worker = new Thread(() -> {
             this.isRunning = true;
             var files = directory.listFiles();
+            if (files == null) {
+                onCompletion.accept(0);
+            }
             Arrays.sort(files, File::compareTo);
             this.estimatedTotalChunks.addAndGet(files.length*1024);
             for (var file : files) {
@@ -159,6 +162,7 @@ public class WorldImporter {
                     Thread.onSpinWait();
                 }
                 if (!this.isRunning) {
+                    onCompletion.accept(this.totalChunks.get());
                     return;
                 }
             }

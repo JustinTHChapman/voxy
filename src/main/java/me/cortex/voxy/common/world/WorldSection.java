@@ -55,6 +55,7 @@ public final class WorldSection {
     public final AtomicBoolean inSaveQueue = new AtomicBoolean();
 
     //When the first bit is set it means its loaded
+    @SuppressWarnings("all")
     private volatile int atomicState = 1;
 
     WorldSection(int lvl, int x, int y, int z, ActiveSectionTracker tracker) {

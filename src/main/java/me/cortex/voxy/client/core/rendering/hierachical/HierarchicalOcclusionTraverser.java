@@ -41,9 +41,6 @@ public class HierarchicalOcclusionTraverser {
 
 
 
-    private final GlBuffer renderTrackingBuffer;
-
-
     private final GlBuffer queueMetaBuffer = new GlBuffer(4*4*5).zero();
     private final GlBuffer scratchQueueA = new GlBuffer(100_000*4).zero();
     private final GlBuffer scratchQueueB = new GlBuffer(100_000*4).zero();
@@ -95,8 +92,6 @@ public class HierarchicalOcclusionTraverser {
         this.requestBuffer = new GlBuffer(REQUEST_QUEUE_SIZE*8L+8).zero();
         this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).zero();
 
-        this.renderTrackingBuffer = new GlBuffer(nodeManager.maxNodeCount*4L).zero();
-
 
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -133,8 +128,8 @@ public class HierarchicalOcclusionTraverser {
         MemoryUtil.memPutFloat(ptr, (float) (screenspaceAreaDecreasingSize) /(viewport.width*viewport.height)); ptr += 4;
 
 
-        //FrameId for timing info
-        MemoryUtil.memPutInt(ptr, viewport.frameId); ptr += 4;
+        //VisibilityId
+        MemoryUtil.memPutInt(ptr, this.nodeCleaner.visibilityId); ptr += 4;
 
         /*
         //Very funny and cool thing that is possible
@@ -153,7 +148,7 @@ public class HierarchicalOcclusionTraverser {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_QUEUE_BINDING, this.renderList.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, NODE_DATA_BINDING, this.nodeBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, NODE_QUEUE_META_BINDING, this.queueMetaBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_TRACKER_BINDING, this.renderTrackingBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_TRACKER_BINDING, this.nodeCleaner.visibilityBuffer.id);
         glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.queueMetaBuffer.id);
 
         //Bind the hiz buffer
@@ -307,7 +302,6 @@ public class HierarchicalOcclusionTraverser {
         this.queueMetaBuffer.free();
         this.scratchQueueA.free();
         this.scratchQueueB.free();
-        this.renderTrackingBuffer.free();
         glDeleteSamplers(this.hizSampler);
     }
 }
