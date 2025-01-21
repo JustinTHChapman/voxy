@@ -207,7 +207,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     public MDICViewport createViewport() {
         return new MDICViewport();
     }
-//
+
     @Override
     public void free() {
         super.free();
