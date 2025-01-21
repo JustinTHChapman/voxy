@@ -8,6 +8,8 @@ layout(local_size_x = 128) in;
 #define SECTION_METADATA_BUFFER_BINDING 3
 #define VISIBILITY_BUFFER_BINDING 4
 #define INDIRECT_SECTION_LOOKUP_BINDING 5
+#define POSITION_SCRATCH_BINDING 6
+#define POSITION_SCRATCH_ACCESS writeonly
 
 #import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/gl46/bindings.glsl>
@@ -34,13 +36,13 @@ uint encodeLocalLodPos(uint detail, ivec3 pos) {
 
 
 //Note: if i want reverse indexing i need to use the index buffer offset to offset
-void writeCmd(uint idx, uint encodedPos, uint offset, uint quadCount) {
+void writeCmd(uint idx, uint instance, uint offset, uint quadCount) {
     DrawCommand cmd;
     cmd.count = quadCount * 6;
     cmd.instanceCount = 1;
     cmd.firstIndex = 0;
     cmd.baseVertex = int(offset)<<2;
-    cmd.baseInstance = encodedPos;
+    cmd.baseInstance = instance;
     cmdBuffer[idx] = cmd;
 }
 
@@ -69,14 +71,15 @@ void main() {
 
     //This prevents overflow of the relative position encoder
     if (shouldRender) {
-        shouldRender = !any(lessThan(ivec3(254), abs(ipos-(baseSectionPos>>detail))));
+
     }
 
     if (shouldRender) {
-        uint encodedPos = encodeLocalLodPos(detail, ipos);
         uint ptr = extractQuadStart(meta);
         ivec3 relative = ipos-(baseSectionPos>>detail);
+        uint drawId = gl_GlobalInvocationID.x;
 
+        positionBuffer[drawId] = uvec2(meta.posA, meta.posB);
 
 
         uint msk = 0;
@@ -98,56 +101,56 @@ void main() {
         count = meta.cntA&0xFFFF;
         if (count != 0) {
             //uint translucentCommandPtr = atomicAdd(translucentDrawCount, 1) + 400000;//FIXME: dont hardcode this offset
-            //writeCmd(translucentCommandPtr, encodedPos, ptr, count);
+            //writeCmd(translucentCommandPtr, drawId, ptr, count);
         }
         ptr += count;
 
         //Double sided quads
         count = (meta.cntA>>16)&0xFFFF;
         if (count != 0) {
-            writeCmd(cmdPtr++, encodedPos, ptr, count);
+            writeCmd(cmdPtr++, drawId, ptr, count);
         }
         ptr += count;
 
         //Down
         count = (meta.cntB)&0xFFFF;
         if (((msk&(1u<<0))!=0)) {
-            writeCmd(cmdPtr++, encodedPos, ptr, count);
+            writeCmd(cmdPtr++, drawId, ptr, count);
         }
         ptr += count;
 
         //Up
         count = (meta.cntB>>16)&0xFFFF;
         if ((msk&(1u<<1))!=0) {
-            writeCmd(cmdPtr++, encodedPos, ptr, count);
+            writeCmd(cmdPtr++, drawId, ptr, count);
         }
         ptr += count;
 
         //North
         count = (meta.cntC)&0xFFFF;
         if ((msk&(1u<<2))!=0) {
-            writeCmd(cmdPtr++, encodedPos, ptr, count);
+            writeCmd(cmdPtr++, drawId, ptr, count);
         }
         ptr += count;
 
         //South
         count = (meta.cntC>>16)&0xFFFF;
         if ((msk&(1u<<3))!=0) {
-            writeCmd(cmdPtr++, encodedPos, ptr, count);
+            writeCmd(cmdPtr++, drawId, ptr, count);
         }
         ptr += count;
 
         //West
         count = (meta.cntD)&0xFFFF;
         if ((msk&(1u<<4))!=0) {
-            writeCmd(cmdPtr++, encodedPos, ptr, count);
+            writeCmd(cmdPtr++, drawId, ptr, count);
         }
         ptr += count;
 
         //East
         count = (meta.cntD>>16)&0xFFFF;
         if ((msk&(1u<<5))!=0) {
-            writeCmd(cmdPtr++, encodedPos, ptr, count);
+            writeCmd(cmdPtr++, drawId, ptr, count);
         }
         ptr += count;
     }

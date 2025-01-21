@@ -103,6 +103,15 @@ layout(binding = MODEL_COLOUR_BUFFER_BINDING, std430) readonly restrict buffer M
 };
 #endif
 
+#ifdef POSITION_SCRATCH_BINDING
+#ifndef POSITION_SCRATCH_ACCESS
+#define POSITION_SCRATCH_ACCESS readonly
+#endif
+layout(binding = POSITION_SCRATCH_BINDING, std430) POSITION_SCRATCH_ACCESS restrict buffer PositionScratchBuffer {
+    uvec2 positionBuffer[];
+};
+#endif
+
 #ifdef LIGHTING_SAMPLER_BINDING
 
 layout(binding = LIGHTING_SAMPLER_BINDING) uniform sampler2D lightSampler;

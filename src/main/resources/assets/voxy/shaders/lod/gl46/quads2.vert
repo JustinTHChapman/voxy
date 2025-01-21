@@ -5,6 +5,7 @@
 #define SECTION_METADATA_BUFFER_BINDING 2
 #define MODEL_BUFFER_BINDING 3
 #define MODEL_COLOUR_BUFFER_BINDING 4
+#define POSITION_SCRATCH_BINDING 5
 #define LIGHTING_SAMPLER_BINDING 1
 
 
@@ -25,6 +26,7 @@ layout(location = 5) out flat vec4 conditionalTinting;
 layout(location = 6) out flat uint quadDebug;
 #endif
 
+/*
 uint extractLodLevel() {
     return uint(gl_BaseInstance)>>27;
 }
@@ -33,7 +35,7 @@ uint extractLodLevel() {
 //Gives a relative position of +-255 relative to the player center in its respective lod
 ivec3 extractRelativeLodPos() {
     return (ivec3(gl_BaseInstance)<<ivec3(5,14,23))>>ivec3(23);
-}
+}*/
 
 vec4 uint2vec4RGBA(uint colour) {
     return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255.0;
@@ -69,6 +71,21 @@ vec3 swizzelDataAxis(uint axis, vec3 data) {
     return data;
 }
 
+uint extractDetail(uvec2 encPos) {
+    return encPos.x>>28;
+}
+
+ivec3 extractLoDPosition(uvec2 encPos) {
+    int y = ((int(encPos.x)<<4)>>24);
+    int x = (int(encPos.y)<<4)>>8;
+    int z = int((encPos.x&((1u<<20)-1))<<4);
+    z |= int(encPos.y>>28);
+    z <<= 8;
+    z >>= 8;
+    return ivec3(x,y,z);
+}
+
+
 //TODO: add a mechanism so that some quads can ignore backface culling
 // this would help alot with stuff like crops as they would look kinda weird i think,
 // same with flowers etc
@@ -83,7 +100,9 @@ void main() {
     bool hasAO = modelHasMipmaps(model);//TODO: replace with per face AO flag
     bool isShaded = hasAO;//TODO: make this a per face flag
 
-    uint lodLevel = extractLodLevel();
+
+    uvec2 encPos = positionBuffer[gl_BaseInstance];
+    uint lodLevel = extractDetail(encPos);
 
 
     vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
@@ -153,7 +172,7 @@ void main() {
     cornerPos += swizzelDataAxis(face>>1, vec3(faceSize.xz, mix(depthOffset, 1-depthOffset, float(face&1u))));
 
 
-    vec3 origin = vec3(((extractRelativeLodPos()<<lodLevel) - (baseSectionPos&(ivec3((1<<lodLevel)-1))))<<5);
+    vec3 origin = vec3(((extractLoDPosition(encPos)<<lodLevel) - baseSectionPos)<<5);
     gl_Position = MVP*vec4((cornerPos+swizzelDataAxis(face>>1,vec3(cQuadSize,0)))*(1<<lodLevel)+origin, 1.0);
 
     #ifdef DEBUG_RENDER

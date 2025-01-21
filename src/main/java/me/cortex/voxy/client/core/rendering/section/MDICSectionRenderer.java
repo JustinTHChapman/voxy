@@ -57,6 +57,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     //TODO: needs to be in the viewport, since it contains the compute indirect call/values
     private final GlBuffer drawCountCallBuffer = new GlBuffer(1024).zero();
     private final GlBuffer drawCallBuffer  = new GlBuffer(5*4*400000).zero();//400k draw calls
+    private final GlBuffer positionScratchBuffer  = new GlBuffer(8*400000).zero();//400k positions
 
     public MDICSectionRenderer(ModelStore modelStore, int maxSectionCount, long geometryCapacity) {
         super(modelStore, new BasicSectionGeometryManager(maxSectionCount, geometryCapacity));
@@ -89,6 +90,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getGeometryBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.geometryManager.getMetadataBufferId());
         this.modelStore.bind(3, 4, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.positionScratchBuffer.id);
         LightMapHelper.bind(1);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
@@ -139,6 +141,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBufferId());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.positionScratchBuffer.id);
             glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountCallBuffer.id);
             glDispatchComputeIndirect(0);
             glMemoryBarrier(GL_COMMAND_BARRIER_BIT);
@@ -204,7 +207,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     public MDICViewport createViewport() {
         return new MDICViewport();
     }
-
+//
     @Override
     public void free() {
         super.free();
@@ -215,5 +218,6 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.prepShader.free();
         this.drawCallBuffer.free();
         this.drawCountCallBuffer.free();
+        this.positionScratchBuffer.free();
     }
 }
