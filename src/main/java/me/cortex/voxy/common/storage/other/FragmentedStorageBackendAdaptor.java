@@ -12,6 +12,7 @@ import net.minecraft.util.math.random.RandomSeed;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.LongConsumer;
 
@@ -163,6 +164,33 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
 
         public static String getConfigTypeName() {
             return "FragmentationAdaptor";
+        }
+    }
+
+    public static class Config2 extends StorageConfig {
+        public StorageConfig delegate;
+        public String basePath;
+        public int count;
+
+
+        @Override
+        public List<StorageConfig> getChildStorageConfigs() {
+            return new ArrayList<>(Collections.singleton(this.delegate));
+        }
+
+        @Override
+        public StorageBackend build(ConfigBuildCtx ctx) {
+            StorageBackend[] builtBackends = new StorageBackend[this.count];
+            for (int i = 0; i < this.count; i++) {
+                ctx.pushPath(this.basePath+"_"+i);
+                builtBackends[i] = this.delegate.build(ctx);
+                ctx.popPath();
+            }
+            return new FragmentedStorageBackendAdaptor(builtBackends);
+        }
+
+        public static String getConfigTypeName() {
+            return "AutoFragmentationAdaptor";
         }
     }
 }
