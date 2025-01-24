@@ -5,6 +5,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import org.lwjgl.system.MemoryUtil;
 
@@ -26,7 +27,7 @@ public class NodeCleaner {
 
     private static final int BATCH_SET_SIZE = 2048;
 
-    private final Shader sorter = Shader.make()
+    private final AutoBindingShader sorter = Shader.makeAuto()
             .define("OUTPUT_SIZE", OUTPUT_COUNT)
             .define("VISIBILITY_BUFFER_BINDING", 1)
             .define("OUTPUT_BUFFER_BINDING", 2)
@@ -56,6 +57,10 @@ public class NodeCleaner {
         this.batchClear
                 .ssbo("VISIBILITY_BUFFER_BINDING", this.visibilityBuffer)
                 .ssbo("LIST_BUFFER_BINDING", this.scratchBuffer);
+
+        this.sorter
+                .ssbo("VISIBILITY_BUFFER_BINDING", this.visibilityBuffer)
+                .ssbo("OUTPUT_BUFFER_BINDING", this.outputBuffer);
     }
 
     public void clearId(int id) {
@@ -63,6 +68,7 @@ public class NodeCleaner {
     }
 
     public void tick() {
+        this.visibilityId++;
         this.clearIds();
 
         if (false) {
@@ -70,14 +76,19 @@ public class NodeCleaner {
 
             this.sorter.bind();
             //TODO: choose whether this is in nodeSpace or section/geometryId space
-            //glDispatchCompute(this.nodeManager.getCurrentMaxNodeId()/, 1, 1);
+            //this.nodeManager.getCurrentMaxNodeId()
+            glDispatchCompute((200_000+127)/128, 1, 1);
 
-            //DownloadStream.INSTANCE.download(this.outputBuffer, this::onDownload);
+            DownloadStream.INSTANCE.download(this.outputBuffer, this::onDownload);
         }
     }
 
     private void onDownload(long ptr, long size) {
-
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < 64; i++) {
+            b.append(", ").append(MemoryUtil.memGetInt(ptr + 4 * i));
+        }
+        System.out.println(b);
     }
 
     private void clearIds() {

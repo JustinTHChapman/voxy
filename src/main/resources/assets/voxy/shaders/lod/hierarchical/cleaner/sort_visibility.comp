@@ -4,7 +4,7 @@
 
 //#define OUTPUT_SIZE 128
 
-layout(local_size_x=32, local_size_y=8) in;
+layout(local_size_x=128, local_size_y=1) in;
 //256 workgroup
 
 
@@ -16,6 +16,7 @@ layout(binding = OUTPUT_BUFFER_BINDING, std430) restrict volatile buffer Minimum
     uint minVisIds[OUTPUT_SIZE];
 };
 
+//Returns the id of the max value
 uint atomicDerefMin(uint atId, uint id, uint value) {
     uint existingId = minVisIds[atId];
     while (true) {
@@ -26,9 +27,10 @@ uint atomicDerefMin(uint atId, uint id, uint value) {
         //Attempt to swap, since we know we are less than the existingId
         atomicCompSwap(minVisIds[atId], existingId, id);
         //Check if we did swap, else if we failed (or got reswapped else where) recheck
+        uint pExistingId = existingId;
         existingId = minVisIds[atId];
         if (existingId == id) {
-            return existingId;
+            return pExistingId;
         }
     }
 }
@@ -37,9 +39,6 @@ uint atomicDerefMin(uint atId, uint id, uint value) {
 void bubbleSort(uint start, uint id, uint value) {
     for (uint i = start; i < OUTPUT_SIZE; i++) {
         uint nextId = atomicDerefMin(i, id, value);
-        if (nextId == id) {
-            return;//Not inserted, so return
-        }
         //Else we need to bubble the value up
         id = nextId;
         value = visiblity[id];
@@ -47,5 +46,9 @@ void bubbleSort(uint start, uint id, uint value) {
 }
 
 void main() {
+    //if (gl_GlobalInvocationID.x <64) {
+    //    minVisIds[gl_GlobalInvocationID.x] = visiblity[gl_GlobalInvocationID.x];
+    //}
     //First do a min sort/set of min OUTPUT_SIZE values of the set
+    bubbleSort(0, gl_GlobalInvocationID.x, visiblity[gl_GlobalInvocationID.x]);
 }

@@ -233,7 +233,7 @@ public class RenderDataFactory4 {
                 this.blockMesher.finish();
             }
 
-            {
+            if (true) {
                 this.blockMesher.doAuxiliaryFaceOffset = false;
                 //Hacky generate section side faces (without check neighbor section)
                 for (int side = 0; side < 2; side++) {
@@ -411,7 +411,7 @@ public class RenderDataFactory4 {
         }
 
         //Generate the side faces, hackily, using 0 and 1 mesher
-        {
+        if (true) {
             var ma = this.xAxisMeshers[0];
             var mb = this.xAxisMeshers[31];
             ma.finish();

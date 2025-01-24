@@ -272,7 +272,7 @@ public final class NodeStore {
         MemoryUtil.memPutInt(ptr, w); ptr += 4;
     }
 
-    //public int getEndNodeId() {
-
-    //}
+    public int getEndNodeId() {
+        return this.allocationSet.getMaxIndex();
+    }
 }

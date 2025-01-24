@@ -161,6 +161,10 @@ public class HierarchicalBitSet {
     }
 
 
+    public int getMaxIndex() {
+        throw new IllegalStateException();
+    }
+
 
     public static void main(String[] args)  {
         var h = new HierarchicalBitSet(1<<19);
