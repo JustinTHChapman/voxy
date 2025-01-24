@@ -413,9 +413,10 @@ public class NodeManager {
                     long cPos = makeChildPos(pos, i);
 
                     this.recurseRemoveNode(cPos);
-                    //TOdo: update the child existance afak
                 }
-                //TODO:FIXME:FINISH:CRITICAL
+
+                //TODO: check this is ok and correct
+                this.nodeData.setNodeChildExistence(nodeId&NODE_ID_MSK, childExistence);
             }
         }
     }
@@ -444,6 +445,7 @@ public class NodeManager {
                 var req = this.childRequests.get(reqId);
                 childExistence ^= req.getMsk();
 
+                //TODO FINISH
 
                 this.childRequests.release(reqId);//Release the request
             }
@@ -814,7 +816,7 @@ public class NodeManager {
         debug.add("NC/IF: " + this.activeSectionMap.size() + "/" + (this.singleRequests.count() + this.childRequests.count()));
     }
 
-    //public int getCurrentMaxNodeId() {
-    //    return this.nodeData.getEndNodeId();
-    //}
+    public int getCurrentMaxNodeId() {
+        return this.nodeData.getEndNodeId();
+    }
 }
