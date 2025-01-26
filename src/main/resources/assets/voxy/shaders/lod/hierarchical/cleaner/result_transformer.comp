@@ -1,0 +1,23 @@
+#version 460 core
+layout(local_size_x=OUTPUT_SIZE) in;
+
+layout(binding = MIN_ID_BUFFER_BINDING, std430) restrict readonly buffer VisibilityDataBuffer {
+    uint minVisIds[OUTPUT_SIZE];
+};
+
+layout(binding = NODE_BUFFER_BINDING, std430) restrict readonly buffer NodeData {
+    uvec4[] nodes;
+};
+
+layout(binding = OUTPUT_BUFFER_BINDING, std430) restrict writeonly buffer OutputBuffer {
+    uvec2 outputBuffer[OUTPUT_SIZE];
+};
+
+layout(binding = QQQQQQ, std430) restrict buffer QQQ {
+    uint[] qq;
+};
+
+void main() {
+    outputBuffer[gl_LocalInvocationID.x] = nodes[minVisIds[gl_LocalInvocationID.x]].xy;//Move the position of the node id into the output buffer
+    //outputBuffer[gl_LocalInvocationID.x].x = qq[minVisIds[gl_LocalInvocationID.x]];//
+}

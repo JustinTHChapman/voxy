@@ -53,7 +53,7 @@ public class GlBuffer extends TrackedObject {
         glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0);
         glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
 
-        glClearNamedBufferData(this.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[]{data});
+        glClearNamedBufferData(this.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[]{data});
         return this;
     }
 
