@@ -5,10 +5,11 @@
   "client": [
     "chunky.MixinFabricWorld",
     "joml.AccessFrustumIntersection",
+    "minecraft.MixinClientCommonNetworkHandler",
+    "minecraft.MixinThreadExecutor",
     "minecraft.MixinDebugHud",
     "minecraft.MixinMinecraftClient",
     "minecraft.MixinWorldRenderer",
-    "minecraft.MixinClientCommonNetworkHandler",
     "sodium.MixinDefaultChunkRenderer",
     "sodium.MixinRenderSectionManager"
   ],

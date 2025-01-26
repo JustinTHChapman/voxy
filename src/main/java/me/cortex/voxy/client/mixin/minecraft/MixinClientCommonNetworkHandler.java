@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
+import me.cortex.voxy.client.LoadException;
 import net.minecraft.client.network.ClientCommonNetworkHandler;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.GameJoinS2CPacket;
@@ -14,11 +15,7 @@ public class MixinClientCommonNetworkHandler {
     private void handleDisconnectAsCrash(Packet<?> packet, Exception exception, CallbackInfo ci) {
         if (packet instanceof GameJoinS2CPacket) {
             ci.cancel();
-            //if (exception instanceof RuntimeException re) {
-            //    throw re;
-            //} else {
-                throw new RuntimeException("Force crashing due to exception during on game join", exception);
-            //}
+            throw new LoadException("Force crashing due to exception during on game join", exception);
         }
     }
 }
