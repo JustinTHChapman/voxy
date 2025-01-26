@@ -1,7 +1,6 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
 import me.cortex.voxy.client.LoadException;
-import net.minecraft.network.packet.s2c.play.GameJoinS2CPacket;
 import net.minecraft.util.thread.ThreadExecutor;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
