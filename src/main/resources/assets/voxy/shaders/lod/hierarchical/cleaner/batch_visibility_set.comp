@@ -11,11 +11,11 @@ layout(binding = LIST_BUFFER_BINDING, std430) restrict readonly buffer SetListBu
 };
 
 layout(location=0) uniform uint count;
-#define SET_TO uint(-1)
+layout(location=1) uniform uint setTo;
 void main() {
     uint id = gl_GlobalInvocationID.x;
     if (count <= id) {
         return;
     }
-    visiblity[ids[id]] = SET_TO;
+    visiblity[ids[id]] = setTo;
 }

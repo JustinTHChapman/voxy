@@ -3,8 +3,10 @@ package me.cortex.voxy.client.core.rendering.hierachical;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
+import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.PrintfDebugUtil;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -30,10 +32,11 @@ public class NodeCleaner {
 
     private static final int BATCH_SET_SIZE = 2048;
 
-    private final AutoBindingShader sorter = Shader.makeAuto()
+    private final AutoBindingShader sorter = Shader.makeAuto(PrintfDebugUtil.PRINTF_processor)
             .define("OUTPUT_SIZE", OUTPUT_COUNT)
             .define("VISIBILITY_BUFFER_BINDING", 1)
             .define("OUTPUT_BUFFER_BINDING", 2)
+            .define("NODE_DATA_BINDING", 3)
             .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/cleaner/sort_visibility.comp")
             .compile();
 
@@ -75,6 +78,8 @@ public class NodeCleaner {
         this.sorter
                 .ssbo("VISIBILITY_BUFFER_BINDING", this.visibilityBuffer)
                 .ssbo("OUTPUT_BUFFER_BINDING", this.outputBuffer);
+
+        this.nodeManager.setClearIdCallback(this::clearId);
     }
 
     public void clearId(int id) {
@@ -90,6 +95,8 @@ public class NodeCleaner {
             this.outputBuffer.fill(this.nodeManager.maxNodeCount-2);//TODO: maybe dont set to zero??
 
             this.sorter.bind();
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, nodeDataBuffer.id);
+
             //TODO: choose whether this is in nodeSpace or section/geometryId space
             //this.nodeManager.getCurrentMaxNodeId()
             glDispatchCompute((200_000+127)/128, 1, 1);
@@ -105,16 +112,12 @@ public class NodeCleaner {
             glDispatchCompute(1,1,1);
 
             DownloadStream.INSTANCE.download(this.outputBuffer, 4*OUTPUT_COUNT, 8*OUTPUT_COUNT, this::onDownload);
-
-
-            this.visibilityBuffer.fill(-1);
-
         }
     }
 
     private boolean shouldCleanGeometry() {
         // if there is less than 200mb of space, clean
-        return this.nodeManager.getGeometryManager().getRemainingCapacity() < 200_000_000L;
+        return this.nodeManager.getGeometryManager().getRemainingCapacity() < 500_000_000L;
     }
 
     private void onDownload(long ptr, long size) {
@@ -122,6 +125,10 @@ public class NodeCleaner {
         for (int i = 0; i < 64; i++) {
             long pos = Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr + 8 * i))<<32;
             pos |= Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr + 8 * i + 4));
+            if (pos == 0) {
+                //TODO: investigate how or what this happens
+                continue;
+            }
             this.nodeManager.removeNodeGeometry(pos);
             //b.append(", ").append(WorldEngine.pprintPos(pos));//.append(((int)((pos>>32)&0xFFFFFFFFL)));//
         }
@@ -139,7 +146,8 @@ public class NodeCleaner {
                     MemoryUtil.memPutInt(ptr + cnt * 4, this.idsToClear.dequeueInt());
                 }
                 UploadStream.INSTANCE.commit();
-                glUniform1i(0, cnt);
+                glUniform1ui(0, cnt);
+                glUniform1ui(1, this.visibilityId);
                 glDispatchCompute((cnt+127)/128, 1, 1);
             }
         }

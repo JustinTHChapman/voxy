@@ -73,6 +73,11 @@ public class NodeManager {
     private final IntArrayList topLevelNodeIds = new IntArrayList();
     private int activeNodeRequestCount;
 
+    public interface ClearIdCallback {void clearId(int id);}
+    private ClearIdCallback clearIdCallback;
+    public void setClearIdCallback(ClearIdCallback callback) {this.clearIdCallback = callback;}
+    private void clearId(int id) { if (this.clearIdCallback != null) this.clearIdCallback.clearId(id); }
+
     public NodeManager(int maxNodeCount, AbstractSectionGeometryManager geometryManager, SectionUpdateRouter updateRouter) {
         if (!MathUtil.isPowerOfTwo(maxNodeCount)) {
             throw new IllegalArgumentException("Max node count must be a power of 2");
@@ -222,7 +227,6 @@ public class NodeManager {
     }
     //==================================================================================================================
 
-    //TODO: cleanup this code shitshow and extract common operations to reduce code duplication
     public void processChildChange(long pos, byte childExistence) {
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
@@ -460,13 +464,13 @@ public class NodeManager {
             Logger.error("UNFINISHED OPERATION TODO: FIXME2");
 
             //Free geometry and related memory for this node
-
+            this.nodeData.free(nodeId);
+            this.clearId(nodeId);
 
             //Unwatch geometry
             if (!this.updateRouter.unwatch(pos, WorldEngine.UPDATE_FLAGS)) {
                 throw new IllegalStateException("Pos was not being watched");
             }
-
         } else {
 
             Logger.error("UNFINISHED OPERATION TODO: FIXME3");
@@ -522,6 +526,8 @@ public class NodeManager {
                 this.nodeData.setNodeGeometry(childNodeId, request.getChildMesh(childIdx));
                 //Mark for update
                 this.invalidateNode(childNodeId);
+                this.clearId(childNodeId);//Clear the id
+
                 //Put in map
                 int pid = this.activeSectionMap.put(childPos, childNodeId|NODE_TYPE_LEAF);
                 if ((pid&NODE_TYPE_MSK) != NODE_TYPE_REQUEST) {
@@ -780,6 +786,9 @@ public class NodeManager {
             return;
         }
 
+        //Reset/clear the id
+        this.clearId(nodeId);
+
         if (nodeType == NODE_TYPE_LEAF) {
             //If it is a leaf node, check that the parent has geometry, if it doesnt, request geometry for that parent
             // if it DOES tho, remove all the children and make the parent a leaf node
@@ -791,7 +800,10 @@ public class NodeManager {
 
             if (WorldEngine.getLevel(pos) == MAX_LOD_LAYERS-1) {
                 //Cannot remove top level nodes
-                Logger.info("Tried cleaning top level node " + WorldEngine.pprintPos(pos));
+
+                //Logger.info("Tried cleaning top level node " + WorldEngine.pprintPos(pos));
+
+                this.removeGeometryInternal(pos, nodeId);
                 return;
             }
 
@@ -804,15 +816,19 @@ public class NodeManager {
             if (this.nodeData.getNodeGeometry(pId) == NULL_GEOMETRY_ID) {
                 //If the parent has null geometry we must first fill it before we can remove it
 
-                //Logger.error("TODO: THIS");
+                Logger.error("TODO: THIS");
             } else {
                 //Else make the parent node a leaf node and remove all the children
 
-                //Logger.error("TODO: THIS 2");
+                Logger.error("TODO: THIS 2");
             }
+            //this.removeGeometryInternal(pos, nodeId);
             return;
         }
+        this.removeGeometryInternal(pos, nodeId);
+    }
 
+    private void removeGeometryInternal(long pos, int nodeId) {
         int geometryId = this.nodeData.getNodeGeometry(nodeId);
         if (geometryId != NULL_GEOMETRY_ID && geometryId != EMPTY_GEOMETRY_ID) {
             //Unwatch geometry updates
@@ -826,7 +842,6 @@ public class NodeManager {
             //this.cleaner
         }
         this.invalidateNode(nodeId);
-
     }
 
     //==================================================================================================================

@@ -66,7 +66,7 @@ public final class NodeStore {
         }
     }
 
-    private void free(int nodeId) {
+    public void free(int nodeId) {
         this.free(nodeId, 1);
     }
 

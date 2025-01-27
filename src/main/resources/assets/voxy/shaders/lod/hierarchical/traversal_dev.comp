@@ -61,15 +61,14 @@ void enqueueChildren(in UnpackedNode node) {
 
 void enqueueSelfForRender(in UnpackedNode node) {
     //printf("render %d@[%d,%d,%d]", node.lodLevel, node.pos.x, node.pos.y, node.pos.z);
-    if ((!isEmptyMesh(node)) && renderQueueIndex < renderQueueMaxSize) {
-        renderQueue[atomicAdd(renderQueueIndex, 1)] = getMesh(node);
-        #ifdef IS_DEBUG
-        debugRenderNodeQueue[atomicAdd(debugRenderNodeQueueIndex, 1)] = node.nodeId;
-        #endif
-
-        //TODO: decide if it should be this node id, or the mesh id
-        // for now do node id... think
+    if (renderQueueIndex < renderQueueMaxSize) {
         lastRenderFrame[getId(node)] = frameId;
+        if (!isEmptyMesh(node)) {
+            renderQueue[atomicAdd(renderQueueIndex, 1)] = getMesh(node);
+            #ifdef IS_DEBUG
+            debugRenderNodeQueue[atomicAdd(debugRenderNodeQueueIndex, 1)] = node.nodeId;
+            #endif
+        }
     }
 }
 
