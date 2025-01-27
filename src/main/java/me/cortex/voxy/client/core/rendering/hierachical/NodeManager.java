@@ -816,11 +816,11 @@ public class NodeManager {
             if (this.nodeData.getNodeGeometry(pId) == NULL_GEOMETRY_ID) {
                 //If the parent has null geometry we must first fill it before we can remove it
 
-                Logger.error("TODO: THIS");
+                //Logger.error("TODO: THIS");
             } else {
                 //Else make the parent node a leaf node and remove all the children
 
-                Logger.error("TODO: THIS 2");
+                //Logger.error("TODO: THIS 2");
             }
             //this.removeGeometryInternal(pos, nodeId);
             return;

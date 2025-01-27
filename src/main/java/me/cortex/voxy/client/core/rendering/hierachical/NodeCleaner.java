@@ -117,7 +117,7 @@ public class NodeCleaner {
 
     private boolean shouldCleanGeometry() {
         // if there is less than 200mb of space, clean
-        return this.nodeManager.getGeometryManager().getRemainingCapacity() < 500_000_000L;
+        return this.nodeManager.getGeometryManager().getRemainingCapacity() < 3_000_000_000L;
     }
 
     private void onDownload(long ptr, long size) {
