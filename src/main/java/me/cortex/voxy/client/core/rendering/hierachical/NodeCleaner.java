@@ -85,7 +85,7 @@ public class NodeCleaner {
         this.visibilityId++;
         this.clearIds();
 
-        if (false) {
+        if (this.shouldCleanGeometry() & false) {
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
             this.outputBuffer.fill(this.nodeManager.maxNodeCount-2);//TODO: maybe dont set to zero??
 
@@ -105,17 +105,27 @@ public class NodeCleaner {
             glDispatchCompute(1,1,1);
 
             DownloadStream.INSTANCE.download(this.outputBuffer, 4*OUTPUT_COUNT, 8*OUTPUT_COUNT, this::onDownload);
+
+
+            this.visibilityBuffer.fill(-1);
+
         }
     }
 
+    private boolean shouldCleanGeometry() {
+        // if there is less than 200mb of space, clean
+        return this.nodeManager.getGeometryManager().getRemainingCapacity() < 200_000_000L;
+    }
+
     private void onDownload(long ptr, long size) {
-        StringBuilder b = new StringBuilder();
+        //StringBuilder b = new StringBuilder();
         for (int i = 0; i < 64; i++) {
             long pos = Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr + 8 * i))<<32;
             pos |= Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr + 8 * i + 4));
-            b.append(", ").append(WorldEngine.pprintPos(pos));//.append(((int)((pos>>32)&0xFFFFFFFFL)));//
+            this.nodeManager.removeNodeGeometry(pos);
+            //b.append(", ").append(WorldEngine.pprintPos(pos));//.append(((int)((pos>>32)&0xFFFFFFFFL)));//
         }
-        System.out.println(b);
+        //System.out.println(b);
     }
 
     private void clearIds() {

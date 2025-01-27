@@ -255,8 +255,10 @@ public final class NodeStore {
 
         {
             int geometry = this.getNodeGeometry(nodeId);
-            if (geometry == -1) {
+            if (geometry == -2) {
                 z |= 0xFFFFFF-1;//This is a special case, which basically says to the renderer that the geometry is empty (not that it doesnt exist)
+            } else if (geometry == -1) {
+                z |= 0xFFFFFF;//Special case null
             } else {
                 z |= geometry&0xFFFFFF;//TODO: check and ensure bounds
             }

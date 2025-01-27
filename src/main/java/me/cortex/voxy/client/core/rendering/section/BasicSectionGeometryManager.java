@@ -157,4 +157,9 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
     int getMetadataBufferId() {
         return this.sectionMetadataBuffer.id;
     }
+
+    @Override
+    public long getUsedCapacity() {
+        return this.geometry.getUsedBytes();
+    }
 }

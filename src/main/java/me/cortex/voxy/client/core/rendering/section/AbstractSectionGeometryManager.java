@@ -28,4 +28,9 @@ public abstract class AbstractSectionGeometryManager {
     public void free() {}
 
     public abstract void downloadAndRemove(int id, Consumer<BuiltSection> callback);
+
+    public abstract long getUsedCapacity();
+    public long getRemainingCapacity() {
+        return this.geometryCapacity - this.getUsedCapacity();
+    }
 }

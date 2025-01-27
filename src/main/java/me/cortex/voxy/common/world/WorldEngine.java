@@ -14,6 +14,8 @@ import java.util.Arrays;
 //Use an LMDB backend to store the world, use a local inmemory cache for lod sections
 // automatically manages and invalidates sections of the world as needed
 public class WorldEngine {
+    public static final int MAX_LOD_LAYERS = 5;
+
     public static final int UPDATE_TYPE_BLOCK_BIT = 1;
     public static final int UPDATE_TYPE_CHILD_EXISTENCE_BIT = 2;
     public static final int UPDATE_FLAGS = UPDATE_TYPE_BLOCK_BIT | UPDATE_TYPE_CHILD_EXISTENCE_BIT;
@@ -35,7 +37,12 @@ public class WorldEngine {
 
     public Mapper getMapper() {return this.mapper;}
 
-    public WorldEngine(StorageBackend storageBackend, ServiceThreadPool serviceThreadPool, int maxMipLayers) {
+
+    public WorldEngine(StorageBackend storageBackend, ServiceThreadPool serviceThreadPool) {
+        this(storageBackend, serviceThreadPool, MAX_LOD_LAYERS);
+    }
+
+    private WorldEngine(StorageBackend storageBackend, ServiceThreadPool serviceThreadPool, int maxMipLayers) {
         this.maxMipLevels = maxMipLayers;
         this.storage = storageBackend;
         this.mapper = new Mapper(this.storage);

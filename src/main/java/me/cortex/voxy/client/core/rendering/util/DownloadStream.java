@@ -96,6 +96,9 @@ public class DownloadStream {
         }
 
         this.downloadList.add(new DownloadData(buffer, addr, downloadOffset, size, resultConsumer));
+
+        //TODO: maybe not auto-commit
+        this.commit();
     }
 
 

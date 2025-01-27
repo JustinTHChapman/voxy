@@ -50,5 +50,9 @@ void main() {
     //    minVisIds[gl_GlobalInvocationID.x] = visiblity[gl_GlobalInvocationID.x];
     //}
     //First do a min sort/set of min OUTPUT_SIZE values of the set
-    bubbleSort(0, gl_GlobalInvocationID.x, visiblity[gl_GlobalInvocationID.x]);
+    uint vis = visiblity[gl_GlobalInvocationID.x];
+    if (visiblity[minVisIds[OUTPUT_SIZE-1]] <= vis) {
+        return;
+    }
+    bubbleSort(0, gl_GlobalInvocationID.x, vis);
 }

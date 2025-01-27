@@ -73,6 +73,7 @@ public class SectionUpdateRouter {
                 set.remove(position);
                 return true;
             }
+            set.put(position, current);
             return false;
         }
     }

@@ -16,6 +16,7 @@ import net.caffeinemc.mods.sodium.client.util.MathUtil;
 
 import java.util.List;
 
+import static me.cortex.voxy.common.world.WorldEngine.MAX_LOD_LAYERS;
 
 
 //TODO FIXME: CIRTICAL ISSUE: if a node is a top level section and is empty, when a child is tried to be made it explodes
@@ -715,7 +716,7 @@ public class NodeManager {
             //Dont mark node as having an inflight request
 
             //TODO: assert that the node isnt already being watched for geometry, if it is, just spit out a warning? and ignore
-            Logger.error("TODO FINISH THIS");
+            //Logger.error("TODO FINISH THIS");
             // THis shouldent result in markRequestInFlight afak
 
             if (!this.updateRouter.watch(pos, WorldEngine.UPDATE_TYPE_BLOCK_BIT)) {
@@ -766,12 +767,65 @@ public class NodeManager {
 
     //==================================================================================================================
     // Used by the cleaning system to ensure memory capacity in the geometry store
-    int markGeometryNull(int nodeId) {
-        return 0;
-    }
+    public void removeNodeGeometry(long pos) {
+        int nodeId = this.activeSectionMap.get(pos);
+        if (nodeId == -1) {
+            Logger.error("Got geometry removal for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, ignoring!");
+            return;
+        }
+        int nodeType = nodeId&NODE_TYPE_MSK;
+        nodeId &= NODE_ID_MSK;
+        if (nodeType == NODE_TYPE_REQUEST) {
+            Logger.error("Tried removing geometry for pos: " + WorldEngine.pprintPos(pos) + " but its type was a request, ignoring!");
+            return;
+        }
 
-    //Removes, clears and frees itself, all children, requests and everything recursively
-    void removeNodeAndChildrenRecursive(int nodeId) {
+        if (nodeType == NODE_TYPE_LEAF) {
+            //If it is a leaf node, check that the parent has geometry, if it doesnt, request geometry for that parent
+            // if it DOES tho, remove all the children and make the parent a leaf node
+            // by requesting the geometry of the parent, it means that the system will automatically handle itself
+            // (if only a bit slow as needs to go roundabout in the pipeline)
+            // but what it means is the parent then gets geometry, and the child still has the clear request from this
+            // which means magically everything might maybe should work tm?
+            //Logger.warn("Tried removing geometry for leaf node: " + WorldEngine.pprintPos(pos) + " but this is not yet supported, ignoring!");
+
+            if (WorldEngine.getLevel(pos) == MAX_LOD_LAYERS-1) {
+                //Cannot remove top level nodes
+                Logger.info("Tried cleaning top level node " + WorldEngine.pprintPos(pos));
+                return;
+            }
+
+            long pPos = makeParentPos(pos);
+            int pId = this.activeSectionMap.get(pPos);
+            if (pId == -1) throw new IllegalStateException("Parent node must exist");
+            if ((pId&NODE_TYPE_MSK)!=NODE_TYPE_INNER) throw new IllegalStateException("Parent node must be an inner node");
+            pId &= NODE_ID_MSK;
+
+            if (this.nodeData.getNodeGeometry(pId) == NULL_GEOMETRY_ID) {
+                //If the parent has null geometry we must first fill it before we can remove it
+
+                //Logger.error("TODO: THIS");
+            } else {
+                //Else make the parent node a leaf node and remove all the children
+
+                //Logger.error("TODO: THIS 2");
+            }
+            return;
+        }
+
+        int geometryId = this.nodeData.getNodeGeometry(nodeId);
+        if (geometryId != NULL_GEOMETRY_ID && geometryId != EMPTY_GEOMETRY_ID) {
+            //Unwatch geometry updates
+            if (this.updateRouter.unwatch(pos, WorldEngine.UPDATE_TYPE_BLOCK_BIT)) {
+                throw new IllegalStateException("Unwatching position for geometry removal at: " + WorldEngine.pprintPos(pos) + " resulted in full removal");
+            }
+            //Remove geometry and set to null
+            //TODO: download and remove instead of just removing, and store in ram cache for later!!
+            this.geometryManager.removeSection(geometryId);
+            this.nodeData.setNodeGeometry(nodeId, NULL_GEOMETRY_ID);
+            //this.cleaner
+        }
+        this.invalidateNode(nodeId);
 
     }
 
@@ -812,11 +866,26 @@ public class NodeManager {
                 (WorldEngine.getZ(basePos)<<1)|((addin>>1)&1));
     }
 
+    private long makeParentPos(long pos) {
+        int lvl = WorldEngine.getLevel(pos);
+        if (lvl == MAX_LOD_LAYERS-1) {
+            throw new IllegalArgumentException("Cannot create a parent higher than LoD " + (MAX_LOD_LAYERS-1));
+        }
+        return WorldEngine.getWorldSectionId(lvl+1,
+                WorldEngine.getX(pos)>>1,
+                WorldEngine.getY(pos)>>1,
+                WorldEngine.getZ(pos)>>1);
+    }
+
     public void addDebug(List<String> debug) {
         debug.add("NC/IF: " + this.activeSectionMap.size() + "/" + (this.singleRequests.count() + this.childRequests.count()));
     }
 
     public int getCurrentMaxNodeId() {
         return this.nodeData.getEndNodeId();
+    }
+
+    public AbstractSectionGeometryManager getGeometryManager() {
+        return this.geometryManager;
     }
 }
