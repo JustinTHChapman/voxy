@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public abstract class MixinThreadExecutor {
     @Shadow public static boolean isMemoryError(Throwable exception){return false;};
 
-    @Redirect(method = "executeTask", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/thread/ThreadExecutor;isMemoryError(Ljava/lang/Throwable;)Z"), remap = false)
+    @Redirect(method = "executeTask", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/thread/ThreadExecutor;isMemoryError(Ljava/lang/Throwable;)Z"))
     private boolean voxy$forceCrashOnError(Throwable exception) {
         if (exception instanceof LoadException le) {
             if (le.getCause() instanceof RuntimeException cause) {
