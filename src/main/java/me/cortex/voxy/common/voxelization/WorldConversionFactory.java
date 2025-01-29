@@ -37,10 +37,15 @@ public class WorldConversionFactory {
             }
         }
 
+        var bDat = blockContainer.data;
+        var bStor = bDat.storage;
+        var bPall = bDat.palette;
+        int i = 0;
         for (int y = 0; y < 16; y++) {
             for (int z = 0; z < 16; z++) {
                 for (int x = 0; x < 16; x++) {
-                    var state = blockContainer.get(x, y, z);
+                    var state = bPall.get(bStor.get(i++));
+
                     byte light = lightSupplier.supply(x,y,z,state);
                     if (!(state.isAir() && (light==0))) {
                         if (block != state) {
