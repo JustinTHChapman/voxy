@@ -28,7 +28,7 @@ import static org.lwjgl.opengl.GL43C.*;
 public class NodeCleaner {
     //TODO: use batch_visibility_set to clear visibility data when nodes are removed!! (TODO: nodeManager will need to forward info to this)
 
-    private static final int OUTPUT_COUNT = 64;
+    private static final int OUTPUT_COUNT = 128;
 
     private static final int BATCH_SET_SIZE = 2048;
 
@@ -122,7 +122,7 @@ public class NodeCleaner {
 
     private void onDownload(long ptr, long size) {
         //StringBuilder b = new StringBuilder();
-        for (int i = 0; i < 64; i++) {
+        for (int i = 0; i < OUTPUT_COUNT; i++) {
             long pos = Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr + 8 * i))<<32;
             pos |= Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr + 8 * i + 4));
             if (pos == 0) {

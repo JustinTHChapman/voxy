@@ -706,6 +706,15 @@ public class NodeManager {
         // in this case we should not mark the node as inflight as it casuse very bad things to happen
         // we should only mark inflight when there is actually a request
         if (nodeType == NODE_TYPE_LEAF) {
+            if (this.nodeData.getNodeGeometry(nodeId) == NULL_GEOMETRY_ID) {
+                //Weird case that not sure how possible
+                Logger.warn("Got request for leaf that doesnt have geometry, this should not be possible at pos " + WorldEngine.pprintPos(pos));
+                if (!this.updateRouter.watch(pos, WorldEngine.UPDATE_TYPE_BLOCK_BIT)) {
+                    Logger.warn("Node: " + nodeId + " at pos: " + WorldEngine.pprintPos(pos) + " got update request, but geometry was already being watched");
+                }
+                return;
+            }
+
             //Check if the node is already in-flight, if it is, dont do any processing
             if (this.nodeData.isNodeRequestInFlight(nodeId)) {
                 Logger.warn("Tried processing a node that already has a request in flight: " + nodeId + " pos: " + WorldEngine.pprintPos(pos) + " ignoring");
