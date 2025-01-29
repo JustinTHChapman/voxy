@@ -33,7 +33,7 @@ public final class WorldSection {
 
 
     //TODO: should make it dynamically adjust the size allowance based on memory pressure/WorldSection allocation rate (e.g. is it doing a world import)
-    private static final int ARRAY_REUSE_CACHE_SIZE = 300;//500;//32*32*32*8*ARRAY_REUSE_CACHE_SIZE == number of bytes
+    private static final int ARRAY_REUSE_CACHE_SIZE = 200;//500;//32*32*32*8*ARRAY_REUSE_CACHE_SIZE == number of bytes
     //TODO: maybe just swap this to a ConcurrentLinkedDeque
     private static final Deque<long[]> ARRAY_REUSE_CACHE = new ArrayDeque<>(1024);
 
@@ -74,6 +74,10 @@ public final class WorldSection {
         if (this.data == null) {
             this.data = new long[32 * 32 * 32];
         }
+    }
+
+    void primeForReuse() {
+        ATOMIC_STATE_HANDLE.set(this, 1);
     }
 
     @Override
@@ -129,17 +133,21 @@ public final class WorldSection {
                 throw new IllegalStateException("Section marked as free but has refs");
             }
         }
-        boolean isFreed = witness == 1;
-        if (isFreed) {
-            if (ARRAY_REUSE_CACHE.size() < ARRAY_REUSE_CACHE_SIZE) {
-                synchronized (ARRAY_REUSE_CACHE) {
-                    ARRAY_REUSE_CACHE.add(this.data);
-                }
-            }
-            this.data = null;
-        }
-        return isFreed;
+        return witness == 1;
     }
+
+    void _releaseArray() {
+        if (VERIFY_WORLD_SECTION_EXECUTION && this.data == null) {
+            throw new IllegalStateException();
+        }
+        if (ARRAY_REUSE_CACHE.size() < ARRAY_REUSE_CACHE_SIZE) {
+            synchronized (ARRAY_REUSE_CACHE) {
+                ARRAY_REUSE_CACHE.add(this.data);
+            }
+        }
+        this.data = null;
+    }
+
 
     public void assertNotFree() {
         if (VERIFY_WORLD_SECTION_EXECUTION) {

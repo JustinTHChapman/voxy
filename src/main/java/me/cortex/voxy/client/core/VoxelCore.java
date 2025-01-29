@@ -190,7 +190,7 @@ public class VoxelCore {
         debug.add("Render service tasks: " + this.renderGen.getTaskCount());
          */
         debug.add("I/S tasks: " + this.world.ingestService.getTaskCount() + "/"+this.world.savingService.getTaskCount());
-        debug.add("SCS: " + Arrays.toString(this.world.getLoadedSectionCacheSizes()));
+        this.world.addDebugData(debug);
         this.renderer.addDebugData(debug);
 
         PrintfDebugUtil.addToOut(debug);

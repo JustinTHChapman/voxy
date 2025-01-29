@@ -8,6 +8,7 @@ import me.cortex.voxy.common.world.other.Mapper;
 import java.util.Arrays;
 
 public class ActiveSectionTracker {
+
     //Deserialize into the supplied section, returns true on success, false on failure
     public interface SectionLoader {int load(WorldSection section);}
 
@@ -16,16 +17,18 @@ public class ActiveSectionTracker {
     private final Long2ObjectOpenHashMap<VolatileHolder<WorldSection>>[] loadedSectionCache;
     private final SectionLoader loader;
 
-    //private static final int SECONDARY_CACHE_CAPACITY = 256;
-    //private final Long2ObjectLinkedOpenHashMap<long[]> secondaryDataCache = new Long2ObjectLinkedOpenHashMap<>(SECONDARY_CACHE_CAPACITY*2);//Its x2 due to race conditions
-
+    private final int maxLRUSectionPerSlice;
+    private final Long2ObjectLinkedOpenHashMap<WorldSection>[] lruSecondaryCache;
 
     @SuppressWarnings("unchecked")
-    public ActiveSectionTracker(int numSlicesBits, SectionLoader loader) {
+    public ActiveSectionTracker(int numSlicesBits, SectionLoader loader, int cacheSize) {
         this.loader = loader;
         this.loadedSectionCache = new Long2ObjectOpenHashMap[1<<numSlicesBits];
+        this.lruSecondaryCache = new Long2ObjectLinkedOpenHashMap[1<<numSlicesBits];
+        this.maxLRUSectionPerSlice = (cacheSize+(1<<numSlicesBits)-1)/(1<<numSlicesBits);
         for (int i = 0; i < this.loadedSectionCache.length; i++) {
             this.loadedSectionCache[i] = new Long2ObjectOpenHashMap<>(1024);
+            this.lruSecondaryCache[i] = new Long2ObjectLinkedOpenHashMap<>(this.maxLRUSectionPerSlice);
         }
     }
 
@@ -34,9 +37,11 @@ public class ActiveSectionTracker {
     }
 
     public WorldSection acquire(long key, boolean nullOnEmpty) {
-        var cache = this.loadedSectionCache[this.getCacheArrayIndex(key)];
+        int index = this.getCacheArrayIndex(key);
+        var cache = this.loadedSectionCache[index];
         VolatileHolder<WorldSection> holder = null;
         boolean isLoader = false;
+        WorldSection cachedSection = null;
         synchronized (cache) {
             holder = cache.get(key);
             if (holder == null) {
@@ -49,32 +54,39 @@ public class ActiveSectionTracker {
                 section.acquire();
                 return section;
             }
+            if (isLoader) {
+                cachedSection = this.lruSecondaryCache[index].remove(key);
+                if (cachedSection != null) {
+                    cachedSection.primeForReuse();
+                }
+            }
         }
 
         //If this thread was the one to create the reference then its the thread to load the section
         if (isLoader) {
-            var section = new WorldSection(WorldEngine.getLevel(key),
-                    WorldEngine.getX(key),
-                    WorldEngine.getY(key),
-                    WorldEngine.getZ(key),
-                    this);
+            int status = 0;
+            var section = cachedSection;
+            if (section == null) {//Secondary cache miss
+                section = new WorldSection(WorldEngine.getLevel(key),
+                        WorldEngine.getX(key),
+                        WorldEngine.getY(key),
+                        WorldEngine.getZ(key),
+                        this);
 
-            int status = -1;//this.dataCache.load(section);
-            if (status == -1) {//Cache miss
                 status = this.loader.load(section);
-            }
 
-            if (status < 0) {
-                //TODO: Instead if throwing an exception do something better, like attempting to regen
-                //throw new IllegalStateException("Unable to load section: ");
-                System.err.println("Unable to load section " + section.key + " setting to air");
-                status = 1;
-            }
+                if (status < 0) {
+                    //TODO: Instead if throwing an exception do something better, like attempting to regen
+                    //throw new IllegalStateException("Unable to load section: ");
+                    System.err.println("Unable to load section " + section.key + " setting to air");
+                    status = 1;
+                }
 
-            //TODO: REWRITE THE section tracker _again_ to not be so shit and jank, and so that Arrays.fill is not 10% of the execution time
-            if (status == 1) {
-                //We need to set the data to air as it is undefined state
-                Arrays.fill(section.data, 0);
+                //TODO: REWRITE THE section tracker _again_ to not be so shit and jank, and so that Arrays.fill is not 10% of the execution time
+                if (status == 1) {
+                    //We need to set the data to air as it is undefined state
+                    Arrays.fill(section.data, 0);
+                }
             }
             section.acquire();
             holder.obj = section;
@@ -98,14 +110,23 @@ public class ActiveSectionTracker {
     }
 
     void tryUnload(WorldSection section) {
-        var cache = this.loadedSectionCache[this.getCacheArrayIndex(section.key)];
-        boolean removed = false;
+        int index = this.getCacheArrayIndex(section.key);
+        var cache = this.loadedSectionCache[index];
         synchronized (cache) {
             if (section.trySetFreed()) {
                 if (cache.remove(section.key).obj != section) {
                     throw new IllegalStateException("Removed section not the same as the referenced section in the cache");
                 }
-                removed = true;
+                //Add section to secondary cache while primary is locked
+                var lruCache = this.lruSecondaryCache[index];
+                var prev = lruCache.put(section.key, section);
+                if (prev != null) {
+                    prev._releaseArray();
+                }
+                //If cache is bigger than its ment to be, remove the least recently used and free it
+                if (this.maxLRUSectionPerSlice < lruCache.size()) {
+                    lruCache.removeFirst()._releaseArray();
+                }
             }
         }
     }
@@ -120,17 +141,24 @@ public class ActiveSectionTracker {
         return seed ^ seed >>> 31;
     }
 
-    public int[] getCacheCounts() {
-        int[] res = new int[this.loadedSectionCache.length];
-        for (int i = 0; i < this.loadedSectionCache.length; i++) {
-            res[i] = this.loadedSectionCache[i].size();
+    public int getLoadedCacheCount() {
+        int res = 0;
+        for (var cache : this.loadedSectionCache) {
+            res += cache.size();
         }
         return res;
     }
 
+    public int getSecondaryCacheSize() {
+        int res = 0;
+        for (var cache : this.lruSecondaryCache) {
+            res += cache.size();
+        }
+        return res;
+    }
 
     public static void main(String[] args) {
-        var tracker = new ActiveSectionTracker(1, a->0);
+        var tracker = new ActiveSectionTracker(1, a->0, 1<<10);
 
         var section = tracker.acquire(0,0,0,0, false);
         section.acquire();

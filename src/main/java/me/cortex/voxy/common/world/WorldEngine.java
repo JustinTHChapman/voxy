@@ -10,6 +10,7 @@ import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 
 import java.util.Arrays;
+import java.util.List;
 
 //Use an LMDB backend to store the world, use a local inmemory cache for lod sections
 // automatically manages and invalidates sections of the world as needed
@@ -47,7 +48,7 @@ public class WorldEngine {
         this.storage = storageBackend;
         this.mapper = new Mapper(this.storage);
         //4 cache size bits means that the section tracker has 16 separate maps that it uses
-        this.sectionTracker = new ActiveSectionTracker(4, this::unsafeLoadSection);
+        this.sectionTracker = new ActiveSectionTracker(4, this::unsafeLoadSection, 1<<12);//1 gb of cpu section cache
 
         this.savingService = new SectionSavingService(this, serviceThreadPool);
         this.ingestService  = new VoxelIngestService(this, serviceThreadPool);
@@ -205,8 +206,8 @@ public class WorldEngine {
         }
     }
 
-    public int[] getLoadedSectionCacheSizes() {
-        return this.sectionTracker.getCacheCounts();
+    public void addDebugData(List<String> debug) {
+        debug.add("ACC/SCC: " + this.sectionTracker.getLoadedCacheCount()+"/"+this.sectionTracker.getSecondaryCacheSize());//Active cache count, Secondary cache counts
     }
 
     public void shutdown() {
