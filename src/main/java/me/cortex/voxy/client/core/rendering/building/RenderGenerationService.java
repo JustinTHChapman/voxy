@@ -138,7 +138,9 @@ public class RenderGenerationService {
                     //If we did put it in the queue, dont release the section
                     shouldFreeSection = false;
                 } else {
-                    Logger.warn("Funkyness happened and multiple tasks for same section where in queue");
+                    //This should no longer be a worry with LRU section cache
+                    //Logger.info("Funkyness happened and multiple tasks for same section where in queue");
+
                     //Things went bad, set section to null and ensure section is freed
                     task.section = null;
                     shouldFreeSection = true;

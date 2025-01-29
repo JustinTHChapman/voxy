@@ -1,5 +1,6 @@
 package me.cortex.voxy.common.thread;
 
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.util.TrackedObject;
 import net.minecraft.client.MinecraftClient;
@@ -76,8 +77,7 @@ public class ServiceSlice extends TrackedObject {
         try {
             ctx.run();
         } catch (Exception e) {
-            System.err.println("Unexpected error occurred while executing a service job, expect things to break badly");
-            e.printStackTrace();
+            Logger.error("Unexpected error occurred while executing a service job, expect things to break badly", e);
             MinecraftClient.getInstance().execute(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("A voxy service had an exception while executing please check logs and report error"), true));
         } finally {
             if (this.activeCount.decrementAndGet() < 0) {

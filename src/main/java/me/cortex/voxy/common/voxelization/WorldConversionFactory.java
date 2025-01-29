@@ -1,6 +1,7 @@
 package me.cortex.voxy.common.voxelization;
 
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
+import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.world.other.Mipper;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.block.BlockState;
@@ -11,52 +12,53 @@ import net.minecraft.world.chunk.ReadableContainer;
 
 public class WorldConversionFactory {
     //TODO: create a mapping for world/mapper -> local mapping
-    private static final ThreadLocal<Reference2IntOpenHashMap<BlockState>> BLOCK_CACHE = ThreadLocal.withInitial(Reference2IntOpenHashMap::new);
+    private static final ThreadLocal<Pair<int[],Reference2IntOpenHashMap<BlockState>>> THREAD_LOCAL = ThreadLocal.withInitial(()->new Pair<>(new int[4*4*4], new Reference2IntOpenHashMap<>()));
 
     public static VoxelizedSection convert(VoxelizedSection section,
                                            Mapper stateMapper,
                                            PalettedContainer<BlockState> blockContainer,
                                            ReadableContainer<RegistryEntry<Biome>> biomeContainer,
                                            ILightingSupplier lightSupplier) {
-        var blockCache = BLOCK_CACHE.get();
+        var threadLocal = THREAD_LOCAL.get();
+        var blockCache = threadLocal.right();
+        var biomes = threadLocal.left();
         var data = section.section;
 
         int blockId = -1;
         BlockState block = null;
+        {
+            int i = 0;
+            for (int y = 0; y < 4; y++) {
+                for (int z = 0; z < 4; z++) {
+                    for (int x = 0; x < 4; x++) {
+                        biomes[i++] = stateMapper.getIdForBiome(biomeContainer.get(x, y, z));
+                    }
+                }
+            }
+        }
 
-        for (int oy = 0; oy < 4; oy++) {
-            for (int oz = 0; oz < 4; oz++) {
-                for (int ox = 0; ox < 4; ox++) {
-                    int biomeId = stateMapper.getIdForBiome(biomeContainer.get(ox, oy, oz));
-
-                    for (int iy = 0; iy < 4; iy++) {
-                        for (int iz = 0; iz < 4; iz++) {
-                            for (int ix = 0; ix < 4; ix++) {
-                                int x = (ox<<2)|ix;
-                                int y = (oy<<2)|iy;
-                                int z = (oz<<2)|iz;
-                                var state = blockContainer.get(x, y, z);
-                                byte light = lightSupplier.supply(x,y,z,state);
-                                if (!(state.isAir() && (light==0))) {
-                                    if (block != state) {
-                                        if (state.isAir()) {
-                                            block = state;
-                                            blockId = 0;
-                                        } else {
-                                            blockId = blockCache.getOrDefault(state, -1);
-                                            if (blockId == -1) {
-                                                blockId = stateMapper.getIdForBlockState(state);
-                                                blockCache.put(state, blockId);
-                                            }
-                                            block = state;
-                                        }
-                                    }
-                                    data[G(x, y, z)] = Mapper.composeMappingId(light, blockId, biomeId);
-                                } else {
-                                    data[G(x, y, z)] = Mapper.AIR;
+        for (int y = 0; y < 16; y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
+                    var state = blockContainer.get(x, y, z);
+                    byte light = lightSupplier.supply(x,y,z,state);
+                    if (!(state.isAir() && (light==0))) {
+                        if (block != state) {
+                            if (state.isAir()) {
+                                block = state;
+                                blockId = 0;
+                            } else {
+                                blockId = blockCache.getOrDefault(state, -1);
+                                if (blockId == -1) {
+                                    blockId = stateMapper.getIdForBlockState(state);
+                                    blockCache.put(state, blockId);
                                 }
+                                block = state;
                             }
                         }
+                        data[G(x, y, z)] = Mapper.composeMappingId(light, blockId, biomes[((y&0b1100)<<2)|(z&0b1100)|(x>>2)]);
+                    } else {
+                        data[G(x, y, z)] = Mapper.AIR;
                     }
                 }
             }

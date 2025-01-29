@@ -41,7 +41,7 @@ public class ActiveSectionTracker {
         var cache = this.loadedSectionCache[index];
         VolatileHolder<WorldSection> holder = null;
         boolean isLoader = false;
-        WorldSection cachedSection = null;
+        WorldSection section;
         synchronized (cache) {
             holder = cache.get(key);
             if (holder == null) {
@@ -49,23 +49,19 @@ public class ActiveSectionTracker {
                 cache.put(key, holder);
                 isLoader = true;
             }
-            var section = holder.obj;
+            section = holder.obj;
             if (section != null) {
                 section.acquire();
                 return section;
             }
             if (isLoader) {
-                cachedSection = this.lruSecondaryCache[index].remove(key);
-                if (cachedSection != null) {
-                    cachedSection.primeForReuse();
-                }
+                section = this.lruSecondaryCache[index].remove(key);
             }
         }
 
         //If this thread was the one to create the reference then its the thread to load the section
         if (isLoader) {
             int status = 0;
-            var section = cachedSection;
             if (section == null) {//Secondary cache miss
                 section = new WorldSection(WorldEngine.getLevel(key),
                         WorldEngine.getX(key),
@@ -87,7 +83,10 @@ public class ActiveSectionTracker {
                     //We need to set the data to air as it is undefined state
                     Arrays.fill(section.data, 0);
                 }
+            } else {
+                section.primeForReuse();
             }
+
             section.acquire();
             holder.obj = section;
             if (nullOnEmpty && status == 1) {//If its air return null as stated, release the section aswell
@@ -96,7 +95,6 @@ public class ActiveSectionTracker {
             }
             return section;
         } else {
-            WorldSection section = null;
             while ((section = holder.obj) == null)
                 Thread.onSpinWait();
 
@@ -117,6 +115,7 @@ public class ActiveSectionTracker {
                 if (cache.remove(section.key).obj != section) {
                     throw new IllegalStateException("Removed section not the same as the referenced section in the cache");
                 }
+
                 //Add section to secondary cache while primary is locked
                 var lruCache = this.lruSecondaryCache[index];
                 var prev = lruCache.put(section.key, section);
