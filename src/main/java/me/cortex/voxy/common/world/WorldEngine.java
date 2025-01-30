@@ -39,16 +39,16 @@ public class WorldEngine {
     public Mapper getMapper() {return this.mapper;}
 
 
-    public WorldEngine(StorageBackend storageBackend, ServiceThreadPool serviceThreadPool) {
-        this(storageBackend, serviceThreadPool, MAX_LOD_LAYERS);
+    public WorldEngine(StorageBackend storageBackend, ServiceThreadPool serviceThreadPool, int cacheCount) {
+        this(storageBackend, serviceThreadPool, MAX_LOD_LAYERS, cacheCount);
     }
 
-    private WorldEngine(StorageBackend storageBackend, ServiceThreadPool serviceThreadPool, int maxMipLayers) {
+    private WorldEngine(StorageBackend storageBackend, ServiceThreadPool serviceThreadPool, int maxMipLayers, int cacheCount) {
         this.maxMipLevels = maxMipLayers;
         this.storage = storageBackend;
         this.mapper = new Mapper(this.storage);
         //4 cache size bits means that the section tracker has 16 separate maps that it uses
-        this.sectionTracker = new ActiveSectionTracker(4, this::unsafeLoadSection, 1<<12);//1 gb of cpu section cache
+        this.sectionTracker = new ActiveSectionTracker(4, this::unsafeLoadSection, cacheCount);
 
         this.savingService = new SectionSavingService(this, serviceThreadPool);
         this.ingestService  = new VoxelIngestService(this, serviceThreadPool);

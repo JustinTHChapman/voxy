@@ -112,8 +112,9 @@ public class ActiveSectionTracker {
         var cache = this.loadedSectionCache[index];
         synchronized (cache) {
             if (section.trySetFreed()) {
-                if (cache.remove(section.key).obj != section) {
-                    throw new IllegalStateException("Removed section not the same as the referenced section in the cache");
+                var cached = cache.remove(section.key);
+                if (cached.obj != section) {
+                    throw new IllegalStateException("Removed section not the same as the referenced section in the cache: cached: " + cached.obj.key + "got: " + section.key);
                 }
 
                 //Add section to secondary cache while primary is locked

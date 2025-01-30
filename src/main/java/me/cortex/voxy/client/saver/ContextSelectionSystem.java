@@ -98,7 +98,7 @@ public class ContextSelectionSystem {
         }
 
         public WorldEngine createEngine(ServiceThreadPool serviceThreadPool) {
-            return new WorldEngine(this.createStorageBackend(), serviceThreadPool);
+            return new WorldEngine(this.createStorageBackend(), serviceThreadPool, VoxyConfig.CONFIG.secondaryLruCacheSize);
         }
 
         //Saves the config for the world selection or something, need to figure out how to make it work with dimensional configs maybe?

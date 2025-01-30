@@ -66,12 +66,17 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setDefaultValue(DEFAULT.ingestEnabled)
                 .build());
 
-        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.subDivisionSize"), config.subDivisionSize, 25, 256)
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.subDivisionSize"), (int) config.subDivisionSize, 25, 256)
                 .setTooltip(Text.translatable("voxy.config.general.subDivisionSize.tooltip"))
                 .setSaveConsumer(val -> config.subDivisionSize = val)
-                .setDefaultValue(DEFAULT.subDivisionSize)
+                .setDefaultValue((int) DEFAULT.subDivisionSize)
                 .build());
 
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.lruCacheSize"), config.secondaryLruCacheSize, 16, 1<<13)
+                .setTooltip(Text.translatable("voxy.config.general.lruCacheSize.tooltip"))
+                .setSaveConsumer(val ->{if (config.secondaryLruCacheSize != val) reload(); config.secondaryLruCacheSize = val;})
+                .setDefaultValue(DEFAULT.secondaryLruCacheSize)
+                .build());
 
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.serviceThreads"), config.serviceThreads, 1, Runtime.getRuntime().availableProcessors())
                 .setTooltip(Text.translatable("voxy.config.general.serviceThreads.tooltip"))
