@@ -2,6 +2,7 @@ package me.cortex.voxy.common.util;
 
 import org.lwjgl.system.MemoryUtil;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -77,6 +78,9 @@ public class MemoryBuffer extends TrackedObject {
         return new MemoryBuffer(this.tracked, this.address, size, this.freeable);
     }
 
+    public ByteBuffer asByteBuffer() {
+        return MemoryUtil.memByteBuffer(this.address, (int) this.size);
+    }
 
     //TODO: create like Long(offset) -> value at offset
     // methods for get and set, that way can have a single unifed system to ensure memory access bounds
@@ -100,4 +104,5 @@ public class MemoryBuffer extends TrackedObject {
     public MemoryBuffer createUntrackedUnfreeableReference() {
         return new MemoryBuffer(false, this.address, this.size, false);
     }
+
 }
