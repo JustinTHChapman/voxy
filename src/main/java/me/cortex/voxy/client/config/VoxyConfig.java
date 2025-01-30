@@ -35,10 +35,11 @@ public class VoxyConfig {
         if (Files.exists(path)) {
             try (FileReader reader = new FileReader(path.toFile())) {
                 var cfg = GSON.fromJson(reader, VoxyConfig.class);
-                if (cfg.defaultSaveConfig == null) {
-                    //Shitty gson being a pain TODO: replace with a proper fix
-                    cfg.defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
-                }
+
+
+                //TODO: dont always override it
+                cfg.defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
+
                 return cfg;
             } catch (IOException e) {
                 System.err.println("Could not parse config");
