@@ -132,6 +132,17 @@ public class VoxelCore {
             return;
         }
 
+        if (false) {
+            float CHANGE_PER_SECOND = 30;
+            //Auto fps targeting
+            if (MinecraftClient.getInstance().getCurrentFps() < 45) {
+                VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 256);
+            }
+
+            if (55 < MinecraftClient.getInstance().getCurrentFps()) {
+                VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 30);
+            }
+        }
 
         //Do some very cheeky stuff for MiB
         if (false) {
