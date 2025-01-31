@@ -228,18 +228,18 @@ public class WorldImporter {
                 int m = Integer.reverseBytes(MemoryUtil.memGetInt(data.address));
                 byte b = MemoryUtil.memGetByte(data.address+4L);
                 if (m == 0) {
-                    System.err.println("Chunk is allocated, but stream is missing");
+                    Logger.error("Chunk is allocated, but stream is missing");
                 } else {
                     int n = m - 1;
                     if ((b & 128) != 0) {
                         if (n != 0) {
-                            System.err.println("Chunk has both internal and external streams");
+                            Logger.error("Chunk has both internal and external streams");
                         }
-                        System.err.println("Chunk has external stream which is not supported");
+                        Logger.error("Chunk has external stream which is not supported");
                     } else if (n > data.size-5) {
-                        System.err.println("Chunk stream is truncated: expected "+n+" but read " + (data.size-5));
+                        Logger.error("Chunk stream is truncated: expected "+n+" but read " + (data.size-5));
                     } else if (n < 0) {
-                        System.err.println("Declared size of chunk is negative");
+                        Logger.error("Declared size of chunk is negative");
                     } else {
                         addedToQueue = true;
                         this.jobQueue.add(()-> {
