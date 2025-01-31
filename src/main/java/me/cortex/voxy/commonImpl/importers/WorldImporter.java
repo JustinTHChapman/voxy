@@ -3,6 +3,8 @@ package me.cortex.voxy.commonImpl.importers;
 import com.mojang.serialization.Codec;
 import me.cortex.voxy.common.util.ByteBufferBackedInputStream;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -192,78 +194,103 @@ public class WorldImporter {
     }
 
     private void importRegionFile(Path file, int x, int z) throws IOException {
-        //if (true) return;
         try (var fileStream = FileChannel.open(file, StandardOpenOption.READ)) {
-            var sectorsSavesBB = MemoryUtil.memAlloc(8192);
-            if (fileStream.read(sectorsSavesBB, 0) != 8192) {
+            var fileData = new MemoryBuffer(fileStream.size());
+            if (fileStream.read(fileData.asByteBuffer(), 0) < 8192) {
+                fileData.free();
                 System.err.println("Header of region file invalid");
                 return;
             }
-            sectorsSavesBB.rewind();
-            var sectorsSaves = sectorsSavesBB.order(ByteOrder.BIG_ENDIAN).asIntBuffer();
+            this.importRegionFile(fileData, x, z);
+            fileData.free();
+        }
+    }
 
-            //Find and load all saved chunks
-            for (int idx = 0; idx < 1024; idx++) {
-                int sectorMeta = sectorsSaves.get(idx);
-                if (sectorMeta == 0) {
-                    //Empty chunk
-                    continue;
-                }
-                int sectorStart = sectorMeta>>>8;
-                int sectorCount = sectorMeta&((1<<8)-1);
-                var data = MemoryUtil.memAlloc(sectorCount*4096).order(ByteOrder.BIG_ENDIAN);
-                fileStream.read(data, sectorStart*4096L);
-                data.flip();
-                boolean addedToQueue = false;
-                {
-                    int m = data.getInt();
-                    byte b = data.get();
-                    if (m == 0) {
-                        System.err.println("Chunk is allocated, but stream is missing");
-                    } else {
-                        int n = m - 1;
-                        if ((b & 128) != 0) {
-                            if (n != 0) {
-                                System.err.println("Chunk has both internal and external streams");
-                            }
-                            System.err.println("Chunk has external stream which is not supported");
-                        } else if (n > data.remaining()) {
-                            System.err.println("Chunk stream is truncated: expected "+n+" but read " + data.remaining());
-                        } else if (n < 0) {
-                            System.err.println("Declared size of chunk is negative");
-                        } else {
-                            addedToQueue = true;
-                            this.jobQueue.add(()-> {
-                                if (!this.isRunning) {
-                                    return;
-                                }
-                                try {
-                                    try (var decompressedData = this.decompress(b, new ByteBufferBackedInputStream(data))) {
-                                        if (decompressedData == null) {
-                                            System.err.println("Error decompressing chunk data");
-                                        } else {
-                                            var nbt = NbtIo.readCompound(decompressedData);
-                                            this.importChunkNBT(nbt, x, z);
-                                        }
-                                    }
-                                } catch (Exception e) {
-                                    throw new RuntimeException(e);
-                                } finally {
-                                    MemoryUtil.memFree(data);
-                                }
-                            });
-                            this.totalChunks.incrementAndGet();
-                            this.estimatedTotalChunks.incrementAndGet();
-                            this.threadPool.execute();
+
+    private void importRegionFile(MemoryBuffer regionFile, int x, int z) throws IOException {
+        //if (true) return;
+
+        //Find and load all saved chunks
+        for (int idx = 0; idx < 1024; idx++) {
+            int sectorMeta = Integer.reverseBytes(MemoryUtil.memGetInt(regionFile.address+idx*4));//Assumes little endian
+            if (sectorMeta == 0) {
+                //Empty chunk
+                continue;
+            }
+            int sectorStart = sectorMeta>>>8;
+            int sectorCount = sectorMeta&((1<<8)-1);
+
+            //TODO: create memory copy for each section
+            var data = new MemoryBuffer(sectorCount*4096).cpyFrom(regionFile.address+sectorStart*4096L);
+
+            boolean addedToQueue = false;
+            {
+                int m = Integer.reverseBytes(MemoryUtil.memGetInt(data.address));
+                byte b = MemoryUtil.memGetByte(data.address+4L);
+                if (m == 0) {
+                    System.err.println("Chunk is allocated, but stream is missing");
+                } else {
+                    int n = m - 1;
+                    if ((b & 128) != 0) {
+                        if (n != 0) {
+                            System.err.println("Chunk has both internal and external streams");
                         }
+                        System.err.println("Chunk has external stream which is not supported");
+                    } else if (n > data.size-5) {
+                        System.err.println("Chunk stream is truncated: expected "+n+" but read " + (data.size-5));
+                    } else if (n < 0) {
+                        System.err.println("Declared size of chunk is negative");
+                    } else {
+                        addedToQueue = true;
+                        this.jobQueue.add(()-> {
+                            if (!this.isRunning) {
+                                return;
+                            }
+                            try {
+                                try (var decompressedData = this.decompress(b, new InputStream() {
+                                    private long offset = 5;//For the initial 5 offset
+                                    @Override
+                                    public int read() {
+                                        return MemoryUtil.memGetByte(data.address + (this.offset++)) & 0xFF;
+                                    }
+
+                                    @Override
+                                    public int read(byte[] b, int off, int len) {
+                                        len = Math.min(len, this.available());
+                                        if (len == 0) {
+                                            return -1;
+                                        }
+                                        UnsafeUtil.memcpy(data.address+this.offset, len, b, off); this.offset+=len;
+                                        return len;
+                                    }
+
+                                    @Override
+                                    public int available() {
+                                        return (int) (data.size-this.offset);
+                                    }
+                                })) {
+                                    if (decompressedData == null) {
+                                        Logger.error("Error decompressing chunk data");
+                                    } else {
+                                        var nbt = NbtIo.readCompound(decompressedData);
+                                        this.importChunkNBT(nbt, x, z);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            } finally {
+                                data.free();
+                            }
+                        });
+                        this.totalChunks.incrementAndGet();
+                        this.estimatedTotalChunks.incrementAndGet();
+                        this.threadPool.execute();
                     }
                 }
-                if (!addedToQueue) {
-                    MemoryUtil.memFree(data);
-                }
             }
-
-            MemoryUtil.memFree(sectorsSavesBB);
+            if (!addedToQueue) {
+                data.free();
+            }
         }
     }
 
@@ -363,5 +390,4 @@ public class WorldImporter {
 
         this.world.insertUpdate(csec);
     }
-
 }

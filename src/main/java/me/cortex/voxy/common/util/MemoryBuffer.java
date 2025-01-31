@@ -40,6 +40,12 @@ public class MemoryBuffer extends TrackedObject {
         UnsafeUtil.memcpy(this.address, dst, this.size);
     }
 
+    public MemoryBuffer cpyFrom(long src) {
+        super.assertNotFreed();
+        UnsafeUtil.memcpy(src, this.address, this.size);
+        return this;
+    }
+
     @Override
     public void free() {
         super.free0();
