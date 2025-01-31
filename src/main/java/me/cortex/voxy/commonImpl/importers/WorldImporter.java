@@ -149,7 +149,7 @@ public class WorldImporter {
                 var name = file.getName();
                 var sections = name.split("\\.");
                 if (sections.length != 4 || (!sections[0].equals("r")) || (!sections[3].equals("mca"))) {
-                    System.err.println("Unknown file: " + name);
+                    Logger.error("Unknown file: " + name);
                     continue;
                 }
                 int rx = Integer.parseInt(sections[1]);
@@ -198,7 +198,7 @@ public class WorldImporter {
             var fileData = new MemoryBuffer(fileStream.size());
             if (fileStream.read(fileData.asByteBuffer(), 0) < 8192) {
                 fileData.free();
-                System.err.println("Header of region file invalid");
+                Logger.warn("Header of region file invalid");
                 return;
             }
             this.importRegionFile(fileData, x, z);
@@ -297,7 +297,7 @@ public class WorldImporter {
     private DataInputStream decompress(byte flags, InputStream stream) throws IOException {
         ChunkCompressionFormat chunkStreamVersion = ChunkCompressionFormat.get(flags);
         if (chunkStreamVersion == null) {
-            System.err.println("Chunk has invalid chunk stream version");
+            Logger.error("Chunk has invalid chunk stream version");
             return null;
         } else {
             return new DataInputStream(chunkStreamVersion.wrap(stream));
@@ -330,8 +330,7 @@ public class WorldImporter {
                 this.importSectionNBT(x, y, z, section);
             }
         } catch (Exception e) {
-            System.err.println("Exception importing world chunk:");
-            e.printStackTrace();
+            Logger.error("Exception importing world chunk:",e);
         }
 
         this.updateCallback.update(this.chunksProcessed.incrementAndGet(), this.estimatedTotalChunks.get());
