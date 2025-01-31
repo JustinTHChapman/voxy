@@ -159,7 +159,11 @@ public class WorldImporter {
                     throw new RuntimeException(e);
                 }
                 while ((this.totalChunks.get()-this.chunksProcessed.get() > 10_000) && this.isRunning) {
-                    Thread.onSpinWait();
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
                 if (!this.isRunning) {
                     onCompletion.accept(this.totalChunks.get());
@@ -168,7 +172,12 @@ public class WorldImporter {
             }
             this.threadPool.blockTillEmpty();
             while (this.chunksProcessed.get() != this.totalChunks.get() && this.isRunning) {
-                Thread.onSpinWait();
+                Thread.yield();
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
             onCompletion.accept(this.totalChunks.get());
             this.worker = null;
