@@ -32,8 +32,7 @@ import org.lwjgl.opengl.GL11C;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureImage;
-import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri;
+import static org.lwjgl.opengl.ARBDirectStateAccess.*;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glMemoryBarrier;
 import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
@@ -192,6 +191,11 @@ public class ModelTextureBakery {
         for (int i = 0; i < FACE_VIEWS.size(); i++) {
             int faceOffset = streamBaseOffset + TEXTURE_SIZE*i*2;
             captureViewToStream(state, model, entityModel, FACE_VIEWS.get(i), randomValue, i, renderFluid, texId, projection, streamBuffer, faceOffset);
+            int SIZE = 128;
+            int x = (i%3)*SIZE;
+            int y = (i/3)*SIZE;
+            //glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,x,y,x+SIZE,y+SIZE, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
         }
 
         renderLayer.endDrawing();
@@ -323,6 +327,14 @@ public class ModelTextureBakery {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, streamBuffer);
         glUniform1ui(4, streamOffset/4);
 
+        glDispatchCompute(1,1,1);
+        glDispatchCompute(1,1,1);
+        glDispatchCompute(1,1,1);
+        glDispatchCompute(1,1,1);
+        glDispatchCompute(1,1,1);
+        glDispatchCompute(1,1,1);
+        glDispatchCompute(1,1,1);
+        glDispatchCompute(1,1,1);
         glDispatchCompute(1,1,1);
     }
 
