@@ -26,6 +26,7 @@ public class RenderDataFactory4 {
     private final long[] sectionData = new long[32*32*32*2];
 
     private final int[] opaqueMasks = new int[32*32];
+    private final int[] nonOpaqueMasks = new int[32*32];
 
 
     //TODO: emit directly to memory buffer instead of long arrays
@@ -152,6 +153,7 @@ public class RenderDataFactory4 {
     private void prepareSectionData() {
         final var sectionData = this.sectionData;
         int opaque = 0;
+        int notEmpty = 0;
 
         int neighborAcquireMsk = 0;
         for (int i = 0; i < 32*32*32;) {
@@ -164,7 +166,8 @@ public class RenderDataFactory4 {
             sectionData[i * 2 + 1] = modelMetadata;
 
             boolean isFullyOpaque = ModelQueries.isFullyOpaque(modelMetadata);
-            opaque |= (isFullyOpaque ? 1 : 0) << (i & 31);
+            opaque |= (isFullyOpaque ? 1:0) << (i & 31);
+            notEmpty |= (modelId!=0 ? 1:0) << (i & 31);
 
             //TODO: here also do bitmask of what neighboring sections are needed to compute (may be getting rid of this in future)
 
@@ -173,7 +176,9 @@ public class RenderDataFactory4 {
 
             if ((i & 31) == 0) {
                 this.opaqueMasks[(i >> 5) - 1] = opaque;
+                this.nonOpaqueMasks[(i >> 5) - 1] = notEmpty^opaque;
                 opaque = 0;
+                notEmpty = 0;
             }
         }
     }
@@ -480,14 +485,17 @@ public class RenderDataFactory4 {
 
         Arrays.fill(this.directionalQuadCounters, (short) 0);
 
-        /*
+
         this.world.acquire(section.lvl, section.x+1, section.y, section.z).release();
         this.world.acquire(section.lvl, section.x-1, section.y, section.z).release();
+
         this.world.acquire(section.lvl, section.x, section.y+1, section.z).release();
         this.world.acquire(section.lvl, section.x, section.y-1, section.z).release();
+
         this.world.acquire(section.lvl, section.x, section.y, section.z+1).release();
         this.world.acquire(section.lvl, section.x, section.y, section.z-1).release();
-         */
+
+
 
         //Prepare everything
         this.prepareSectionData();
