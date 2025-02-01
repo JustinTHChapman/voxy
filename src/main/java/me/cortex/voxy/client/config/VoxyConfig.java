@@ -48,6 +48,7 @@ public class VoxyConfig {
         }
         var config = new VoxyConfig();
         config.defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
+        config.save();
         return config;
     }
     public void save() {
