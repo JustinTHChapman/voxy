@@ -72,7 +72,7 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setDefaultValue((int) DEFAULT.subDivisionSize)
                 .build());
 
-        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.lruCacheSize"), config.secondaryLruCacheSize, 16, 1<<13)
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.lruCacheSize"), config.secondaryLruCacheSize, 16, 1<<10)
                 .setTooltip(Text.translatable("voxy.config.general.lruCacheSize.tooltip"))
                 .setSaveConsumer(val ->{if (config.secondaryLruCacheSize != val) reload(); config.secondaryLruCacheSize = val;})
                 .setDefaultValue(DEFAULT.secondaryLruCacheSize)
