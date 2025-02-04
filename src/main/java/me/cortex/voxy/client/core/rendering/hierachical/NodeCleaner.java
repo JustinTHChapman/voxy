@@ -28,7 +28,7 @@ import static org.lwjgl.opengl.GL43C.*;
 public class NodeCleaner {
     //TODO: use batch_visibility_set to clear visibility data when nodes are removed!! (TODO: nodeManager will need to forward info to this)
 
-    private static final int OUTPUT_COUNT = 128;
+    private static final int OUTPUT_COUNT = 512;
 
     private static final int BATCH_SET_SIZE = 2048;
 
@@ -127,7 +127,7 @@ public class NodeCleaner {
             pos |= Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr + 8 * i + 4));
             if (pos == 0) {
                 //TODO: investigate how or what this happens
-                continue;
+                //continue;
             }
             this.nodeManager.removeNodeGeometry(pos);
             //b.append(", ").append(WorldEngine.pprintPos(pos));//.append(((int)((pos>>32)&0xFFFFFFFFL)));//
@@ -143,7 +143,7 @@ public class NodeCleaner {
                 int cnt = Math.min(this.idsToClear.size(), BATCH_SET_SIZE);
                 long ptr = UploadStream.INSTANCE.upload(this.scratchBuffer, 0, cnt * 4L);
                 for (int i = 0; i < cnt; i++) {
-                    MemoryUtil.memPutInt(ptr + cnt * 4, this.idsToClear.dequeueInt());
+                    MemoryUtil.memPutInt(ptr + i * 4, this.idsToClear.dequeueInt());
                 }
                 UploadStream.INSTANCE.commit();
                 glUniform1ui(0, cnt);
