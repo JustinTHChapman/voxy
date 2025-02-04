@@ -25,7 +25,7 @@ public class VoxyConfig {
     //public int renderDistance = 128;
     public int serviceThreads = Math.max(Runtime.getRuntime().availableProcessors()/2, 1);
     public float subDivisionSize = 128;
-    public int secondaryLruCacheSize = 4096;
+    public int secondaryLruCacheSize = 1024;
     public String defaultSaveConfig;
     //public int renderQuality = 256;//Smaller is higher quality
 

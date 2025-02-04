@@ -17,7 +17,7 @@ public final class WorldSection {
     public static final boolean VERIFY_WORLD_SECTION_EXECUTION = VoxyCommon.isVerificationFlagOn("verifyWorldSectionExecution");
 
 
-    private static final VarHandle ATOMIC_STATE_HANDLE;
+    static final VarHandle ATOMIC_STATE_HANDLE;
     private static final VarHandle NON_EMPTY_CHILD_HANDLE;
     private static final VarHandle NON_EMPTY_BLOCK_HANDLE;
 

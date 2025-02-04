@@ -57,7 +57,7 @@ void main() {
     }
     UnpackedNode node;
     unpackNode(node, gl_GlobalInvocationID.x);
-    if (isEmptyMesh(node) || (!hasMesh(node)) || (!hasChildren(node))) {
+    if (isEmptyMesh(node) || (!hasMesh(node)) || (!hasChildren(node)) || all(equal(node.pos, ivec3(0)))) {
         return;
     }
     bubbleSort(0, gl_GlobalInvocationID.x, vis);

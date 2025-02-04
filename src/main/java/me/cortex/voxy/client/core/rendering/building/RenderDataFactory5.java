@@ -16,7 +16,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.util.Arrays;
 
 
-public class RenderDataFactory4 {
+public class RenderDataFactory5 {
     private static final boolean VERIFY_MESHING = VoxyCommon.isVerificationFlagOn("verifyMeshing");
 
     private final WorldEngine world;
@@ -26,6 +26,8 @@ public class RenderDataFactory4 {
     private final long[] sectionData = new long[32*32*32*2];
 
     private final int[] opaqueMasks = new int[32*32];
+    private final int[] nonOpaqueMasks = new int[32*32];
+
 
     //TODO: emit directly to memory buffer instead of long arrays
 
@@ -54,7 +56,7 @@ public class RenderDataFactory4 {
         //Note x, z are in top right
         @Override
         protected void emitQuad(int x, int z, int length, int width, long data) {
-            RenderDataFactory4.this.quadCount++;
+            RenderDataFactory5.this.quadCount++;
 
             if (VERIFY_MESHING) {
                 if (length<1||length>16) {
@@ -116,14 +118,15 @@ public class RenderDataFactory4 {
             long quad = data | encodedPosition;
 
 
-            MemoryUtil.memPutLong(RenderDataFactory4.this.directionalQuadBufferPtr + (RenderDataFactory4.this.directionalQuadCounters[face]++)*8L + face*8L*(1<<16), quad);
+            MemoryUtil.memPutLong(RenderDataFactory5.this.directionalQuadBufferPtr + (RenderDataFactory5.this.directionalQuadCounters[face]++)*8L + face*8L*(1<<16), quad);
         }
     }
 
 
     private final Mesher blockMesher = new Mesher();
+    private final Mesher partiallyOpaqueMesher = new Mesher();
 
-    public RenderDataFactory4(WorldEngine world, ModelFactory modelManager, boolean emitMeshlets) {
+    public RenderDataFactory5(WorldEngine world, ModelFactory modelManager, boolean emitMeshlets) {
         this.world = world;
         this.modelMan = modelManager;
     }
@@ -151,7 +154,9 @@ public class RenderDataFactory4 {
     private void prepareSectionData() {
         final var sectionData = this.sectionData;
         int opaque = 0;
+        int notEmpty = 0;
 
+        int neighborAcquireMsk = 0;
         for (int i = 0; i < 32*32*32;) {
             long block = sectionData[i + 32 * 32 * 32];//Get the block mapping
 
@@ -163,6 +168,7 @@ public class RenderDataFactory4 {
 
             boolean isFullyOpaque = ModelQueries.isFullyOpaque(modelMetadata);
             opaque |= (isFullyOpaque ? 1:0) << (i & 31);
+            notEmpty |= (modelId!=0 ? 1:0) << (i & 31);
 
             //TODO: here also do bitmask of what neighboring sections are needed to compute (may be getting rid of this in future)
 
@@ -171,7 +177,9 @@ public class RenderDataFactory4 {
 
             if ((i & 31) == 0) {
                 this.opaqueMasks[(i >> 5) - 1] = opaque;
+                this.nonOpaqueMasks[(i >> 5) - 1] = notEmpty^opaque;
                 opaque = 0;
+                notEmpty = 0;
             }
         }
     }
@@ -274,6 +282,53 @@ public class RenderDataFactory4 {
                 }
                 this.blockMesher.doAuxiliaryFaceOffset = true;
             }
+
+
+            {//Non fully opaque geometry
+                //Note: think is ok to just reuse.. blockMesher
+                this.blockMesher.axis = axis;
+                for (int layer = 0; layer < 32; layer++) {
+                    this.blockMesher.auxiliaryPosition = layer;
+                    for (int other = 0; other < 32; other++) {//TODO: need to do the faces that border sections
+                        int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
+
+                        int msk = this.nonOpaqueMasks[pidx];
+
+                        if (msk == 0) {
+                            this.blockMesher.skip(32);
+                            continue;
+                        }
+
+
+                        int cIdx = -1;
+                        while (msk != 0) {
+                            int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
+                            int delta = index - cIdx - 1;
+                            cIdx = index; //index--;
+                            if (delta != 0) this.blockMesher.skip(delta);
+                            msk &= ~Integer.lowestOneBit(msk);
+
+                            {
+                                int idx = index + (pidx * 32);
+
+                                //TODO: swap this out for something not getting the next entry
+                                long A = this.sectionData[idx * 2];
+
+                                //Example thing thats just wrong but as example
+                                this.blockMesher.putNext((long) (false ? 0L : 1L) |
+                                        ((A & 0xFFFFL) << 26) |
+                                        (((0xFFL) & 0xFF) << 55) |
+                                        ((A&(0x1FFL<<24))<<(46-24))
+                                );
+                            }
+                        }
+                        this.blockMesher.endRow();
+                    }
+                    this.blockMesher.finish();
+                }
+            }
+
+
         }
     }
 

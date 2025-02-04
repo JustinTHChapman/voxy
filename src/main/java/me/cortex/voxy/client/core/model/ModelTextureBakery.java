@@ -155,6 +155,7 @@ public class ModelTextureBakery {
 
         //TODO: figure out why calling this makes minecraft render black
         //renderLayer.startDrawing();
+
         glClearColor(0,0,0,0);
         glClearDepth(1);
         glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);
@@ -184,18 +185,19 @@ public class ModelTextureBakery {
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         glStencilMask(0xFF);
 
-
         int texId = MinecraftClient.getInstance().getTextureManager().getTexture(Identifier.of("minecraft", "textures/atlas/blocks.png")).getGlId();
 
         final int TEXTURE_SIZE = this.width*this.height *4;//NOTE! assume here that both depth and colour are 4 bytes in size
         for (int i = 0; i < FACE_VIEWS.size(); i++) {
             int faceOffset = streamBaseOffset + TEXTURE_SIZE*i*2;
             captureViewToStream(state, model, entityModel, FACE_VIEWS.get(i), randomValue, i, renderFluid, texId, projection, streamBuffer, faceOffset);
-            int SIZE = 128;
-            int x = (i%3)*SIZE;
-            int y = (i/3)*SIZE;
-            //glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,x,y,x+SIZE,y+SIZE, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
+            if (false) {
+                int SIZE = 128;
+                int x = (i % 3) * SIZE;
+                int y = (i / 3) * SIZE;
+                glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0, 0, 16, 16, x, y, x + SIZE, y + SIZE, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            }
         }
 
         renderLayer.endDrawing();

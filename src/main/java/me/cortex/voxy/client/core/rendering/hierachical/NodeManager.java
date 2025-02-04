@@ -737,7 +737,7 @@ public class NodeManager {
             if (!this.updateRouter.watch(pos, WorldEngine.UPDATE_TYPE_BLOCK_BIT)) {
                 //FIXME: think this can occur accidently? when removing nodes or something creating leaf nodes
                 // or other, the node might be wanted to be watched by gpu, but cpu already started watching it a few frames ago
-                Logger.warn("Node: " + nodeId + " at pos: " + WorldEngine.pprintPos(pos) + " got update request, but geometry was already being watched");
+                Logger.info("Node: " + nodeId + " at pos: " + WorldEngine.pprintPos(pos) + " got update request, but geometry was already being watched");
             }
         }
     }
@@ -826,6 +826,8 @@ public class NodeManager {
                 //If the parent has null geometry we must first fill it before we can remove it
 
                 //Logger.error("TODO: THIS");
+
+                this.processRequest(pPos);//Assume we can do this, TODO: maybe dont?
             } else {
                 //Else make the parent node a leaf node and remove all the children
 

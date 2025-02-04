@@ -127,7 +127,7 @@ public class NodeCleaner {
             pos |= Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr + 8 * i + 4));
             if (pos == 0) {
                 //TODO: investigate how or what this happens
-                //continue;
+                continue;
             }
             this.nodeManager.removeNodeGeometry(pos);
             //b.append(", ").append(WorldEngine.pprintPos(pos));//.append(((int)((pos>>32)&0xFFFFFFFFL)));//
