@@ -1,7 +1,6 @@
 package me.cortex.voxy.commonImpl.importers;
 
 import com.mojang.serialization.Codec;
-import me.cortex.voxy.common.util.ByteBufferBackedInputStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
@@ -26,13 +25,15 @@ import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.PalettedContainer;
 import net.minecraft.world.chunk.ReadableContainer;
 import net.minecraft.world.storage.ChunkCompressionFormat;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
 import org.lwjgl.system.MemoryUtil;
 
 import java.io.*;
-import java.nio.ByteOrder;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -127,37 +128,83 @@ public class WorldImporter {
         this.threadPool.shutdown();
     }
 
+    private interface IImporterMethod <T> {
+        void importRegion(T file) throws Exception;
+    }
+
     private volatile Thread worker;
     private UpdateCallback updateCallback;
-    public void importWorldAsyncStart(File directory, UpdateCallback updateCallback, Consumer<Integer> onCompletion) {
+    public void importRegionDirectoryAsyncStart(File directory, UpdateCallback updateCallback, Consumer<Integer> onCompletion) {
+        var files = directory.listFiles((dir, name) -> {
+            var sections = name.split("\\.");
+            if (sections.length != 4 || (!sections[0].equals("r")) || (!sections[3].equals("mca"))) {
+                Logger.error("Unknown file: " + name);
+                return false;
+            }
+            return true;
+        });
+        if (files == null) {
+            onCompletion.accept(0);
+            return;
+        }
+        Arrays.sort(files, File::compareTo);
+        this.importRegionsAsyncStart(files, this::importRegionFile, updateCallback, onCompletion);
+    }
+
+    public void importZippedRegionDirectoryAsyncStart(File zip, String innerDirectory, UpdateCallback updateCallback, Consumer<Integer> onCompletion) {
+        try {
+            innerDirectory = innerDirectory.replace("\\\\", "\\").replace("\\", "/");
+            var file = ZipFile.builder().setFile(zip).get();
+            ArrayList<ZipArchiveEntry> regions = new ArrayList<>();
+            for (var e = file.getEntries(); e.hasMoreElements();) {
+                var entry = e.nextElement();
+                if (entry.isDirectory()||!entry.getName().startsWith(innerDirectory)) {
+                    continue;
+                }
+                var parts = entry.getName().split("/");
+                var name = parts[parts.length-1];
+                var sections = name.split("\\.");
+                if (sections.length != 4 || (!sections[0].equals("r")) || (!sections[3].equals("mca"))) {
+                    Logger.error("Unknown file: " + name);
+                    continue;
+                }
+                regions.add(entry);
+            }
+            this.importRegionsAsyncStart(regions.toArray(ZipArchiveEntry[]::new), (entry)->{
+                var buf = new MemoryBuffer(entry.getSize());
+                try (var channel = Channels.newChannel(file.getInputStream(entry))) {
+                    if (channel.read(buf.asByteBuffer()) != buf.size) {
+                        buf.free();
+                        throw new IllegalStateException("Could not read full zip entry");
+                    }
+                }
+
+                var parts = entry.getName().split("/");
+                var name = parts[parts.length-1];
+                var sections = name.split("\\.");
+                this.importRegion(buf, Integer.parseInt(sections[1]), Integer.parseInt(sections[2]));
+                buf.free();
+
+            }, updateCallback, onCompletion);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+    }
+
+    private <T> void importRegionsAsyncStart(T[] regionFiles, IImporterMethod<T> importer, UpdateCallback updateCallback, Consumer<Integer> onCompletion) {
         this.totalChunks.set(0);
         this.estimatedTotalChunks.set(0);
         this.chunksProcessed.set(0);
         this.updateCallback = updateCallback;
         this.worker = new Thread(() -> {
             this.isRunning = true;
-            var files = directory.listFiles();
-            if (files == null) {
-                onCompletion.accept(0);
-            }
-            Arrays.sort(files, File::compareTo);
-            this.estimatedTotalChunks.addAndGet(files.length*1024);
-            for (var file : files) {
-                if (!file.isFile()) {
-                    continue;
-                }
-                var name = file.getName();
-                var sections = name.split("\\.");
-                if (sections.length != 4 || (!sections[0].equals("r")) || (!sections[3].equals("mca"))) {
-                    Logger.error("Unknown file: " + name);
-                    continue;
-                }
-                int rx = Integer.parseInt(sections[1]);
-                int rz = Integer.parseInt(sections[2]);
+            this.estimatedTotalChunks.addAndGet(regionFiles.length*1024);
+            for (var file : regionFiles) {
                 this.estimatedTotalChunks.addAndGet(-1024);
                 try {
-                    this.importRegionFile(file.toPath(), rx, rz);
-                } catch (IOException e) {
+                    importer.importRegion(file);
+                } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
                 while ((this.totalChunks.get()-this.chunksProcessed.get() > 10_000) && this.isRunning) {
@@ -168,7 +215,9 @@ public class WorldImporter {
                     }
                 }
                 if (!this.isRunning) {
+                    this.threadPool.blockTillEmpty();
                     onCompletion.accept(this.totalChunks.get());
+                    this.worker = null;
                     return;
                 }
             }
@@ -186,31 +235,41 @@ public class WorldImporter {
         });
         this.worker.setName("World importer");
         this.worker.start();
-
     }
 
     public boolean isBusy() {
         return this.worker != null;
     }
 
-    private void importRegionFile(Path file, int x, int z) throws IOException {
-        try (var fileStream = FileChannel.open(file, StandardOpenOption.READ)) {
+    private void importRegionFile(File file) throws IOException {
+        var name = file.getName();
+        var sections = name.split("\\.");
+        if (sections.length != 4 || (!sections[0].equals("r")) || (!sections[3].equals("mca"))) {
+            Logger.error("Unknown file: " + name);
+            throw new IllegalStateException();
+        }
+        int rx = Integer.parseInt(sections[1]);
+        int rz = Integer.parseInt(sections[2]);
+
+        try (var fileStream = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
             var fileData = new MemoryBuffer(fileStream.size());
             if (fileStream.read(fileData.asByteBuffer(), 0) < 8192) {
                 fileData.free();
                 Logger.warn("Header of region file invalid");
                 return;
             }
-            this.importRegionFile(fileData, x, z);
+            this.importRegion(fileData, rx, rz);
             fileData.free();
         }
     }
 
 
-    private void importRegionFile(MemoryBuffer regionFile, int x, int z) throws IOException {
-        //if (true) return;
-
+    private void importRegion(MemoryBuffer regionFile, int x, int z) {
         //Find and load all saved chunks
+        if (regionFile.size < 8192) {//File not big enough
+            Logger.warn("Header of region file invalid");
+            return;
+        }
         for (int idx = 0; idx < 1024; idx++) {
             int sectorMeta = Integer.reverseBytes(MemoryUtil.memGetInt(regionFile.address+idx*4));//Assumes little endian
             if (sectorMeta == 0) {
@@ -221,6 +280,10 @@ public class WorldImporter {
             int sectorCount = sectorMeta&((1<<8)-1);
 
             //TODO: create memory copy for each section
+            if (regionFile.size < (sectorCount+sectorStart)*4096L) {
+                Logger.warn("Cannot access chunk sector as it goes out of bounds. start: " + sectorStart + " count: " + sectorCount + " fileSize: " + regionFile.size);
+                continue;
+            }
             var data = new MemoryBuffer(sectorCount*4096).cpyFrom(regionFile.address+sectorStart*4096L);
 
             boolean addedToQueue = false;

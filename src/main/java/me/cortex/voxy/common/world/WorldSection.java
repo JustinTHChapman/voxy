@@ -252,6 +252,10 @@ public final class WorldSection {
         return prev != next;
     }
 
+    public void _unsafeSetNonEmptyChildren(byte nonEmptyChildren) {
+        NON_EMPTY_CHILD_HANDLE.set(this, nonEmptyChildren);
+    }
+
     public static WorldSection _createRawUntrackedUnsafeSection(int lvl, int x, int y, int z) {
         return new WorldSection(lvl, x, y, z, null);
     }

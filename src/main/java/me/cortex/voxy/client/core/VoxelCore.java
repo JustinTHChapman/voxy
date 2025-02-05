@@ -4,15 +4,12 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
-import me.cortex.voxy.client.core.model.ColourDepthTextureData;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
-import me.cortex.voxy.client.core.model.ModelTextureBakery;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderDataFactory4;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
-import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.client.taskbar.Taskbar;
@@ -24,7 +21,7 @@ import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.minecraft.block.Blocks;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.ClientBossBar;
 import net.minecraft.client.render.Camera;
@@ -37,11 +34,12 @@ import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.system.MemoryUtil;
 
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import static org.lwjgl.opengl.GL30C.*;
 
@@ -73,8 +71,7 @@ public class VoxelCore {
     private final PostProcessing postProcessing;
     private final ServiceThreadPool serviceThreadPool;
 
-    private WorldImporter importer;
-    private UUID importerBossBarUUID;
+    public final WorldImportWrapper importer;
 
     public VoxelCore(ContextSelectionSystem.Selection worldSelection) {
         var cfg = worldSelection.getConfig();
@@ -82,6 +79,8 @@ public class VoxelCore {
 
         this.world = worldSelection.createEngine(this.serviceThreadPool);
         Logger.info("Initializing voxy core");
+
+        this.importer = new WorldImportWrapper(this.serviceThreadPool, this.world);
 
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
@@ -240,10 +239,7 @@ public class VoxelCore {
         //}
 
         //this.world.getMapper().forceResaveStates();
-        if (this.importer != null) {
-            Logger.info("Shutting down importer");
-            try {this.importer.shutdown();this.importer = null;} catch (Exception e) {Logger.error("Error shutting down importer", e);}
-        }
+        this.importer.shutdown();
         Logger.info("Shutting down rendering");
         try {this.renderer.shutdown();} catch (Exception e) {Logger.error("Error shutting down renderer", e);}
         Logger.info("Shutting down post processor");
@@ -253,47 +249,6 @@ public class VoxelCore {
         Logger.info("Shutting down service thread pool");
         this.serviceThreadPool.shutdown();
         Logger.info("Voxel core shut down");
-        //Remove bossbar
-        if (this.importerBossBarUUID != null) {
-            MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.remove(this.importerBossBarUUID);
-            Taskbar.INSTANCE.setIsNone();
-        }
-    }
-
-    public boolean createWorldImporter(World mcWorld, File worldPath) {
-        if (this.importer == null) {
-            this.importer = new WorldImporter(this.world, mcWorld, this.serviceThreadPool);
-        }
-        if (this.importer.isBusy()) {
-            return false;
-        }
-
-        Taskbar.INSTANCE.setProgress(0,10000);
-        Taskbar.INSTANCE.setIsProgression();
-
-        this.importerBossBarUUID = MathHelper.randomUuid();
-        var bossBar = new ClientBossBar(this.importerBossBarUUID, Text.of("Voxy world importer"), 0.0f, BossBar.Color.GREEN, BossBar.Style.PROGRESS, false, false, false);
-        MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.put(bossBar.getUuid(), bossBar);
-        long start = System.currentTimeMillis();
-        this.importer.importWorldAsyncStart(worldPath, (a,b)->
-                MinecraftClient.getInstance().executeSync(()-> {
-                    Taskbar.INSTANCE.setProgress(a, b);
-                    bossBar.setPercent(((float) a)/((float) b));
-                    bossBar.setName(Text.of("Voxy import: "+ a+"/"+b + " chunks"));
-                }),
-                chunkCount -> {
-                    MinecraftClient.getInstance().executeSync(()-> {
-                        MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.remove(this.importerBossBarUUID);
-                        this.importerBossBarUUID = null;
-                        long delta = System.currentTimeMillis() - start;
-
-                        String msg = "Voxy world import finished in " + (delta/1000) + " seconds, averaging " + (chunkCount/(delta/1000)) + " chunks per second";
-                        MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(Text.literal(msg));
-                        Logger.info(msg);
-                        Taskbar.INSTANCE.setIsNone();
-                    });
-                });
-        return true;
     }
 
     public WorldEngine getWorldEngine() {
