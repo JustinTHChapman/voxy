@@ -430,12 +430,13 @@ public class WorldImporter {
         }
         var blockStates = blockStatesRes.getPartialOrThrow();
         var biomes = this.biomeCodec.parse(NbtOps.INSTANCE, section.getCompound("biomes")).result().orElse(this.defaultBiomeProvider);
+
         VoxelizedSection csec = WorldConversionFactory.convert(
                 SECTION_CACHE.get().setPosition(x, y, z),
                 this.world.getMapper(),
                 blockStates,
                 biomes,
-                (bx, by, bz, state) -> {
+                (bx, by, bz) -> {
                     int block = 0;
                     int sky = 0;
                     if (blockLight != null) {

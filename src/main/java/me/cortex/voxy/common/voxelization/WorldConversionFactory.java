@@ -1,33 +1,124 @@
 package me.cortex.voxy.common.voxelization;
 
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.world.other.Mipper;
 import me.cortex.voxy.common.world.other.Mapper;
+import net.caffeinemc.mods.lithium.common.world.chunk.LithiumHashPalette;
 import net.minecraft.block.BlockState;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.world.biome.Biome;
-import net.minecraft.world.chunk.PalettedContainer;
-import net.minecraft.world.chunk.ReadableContainer;
+import net.minecraft.world.chunk.*;
 
 import java.util.WeakHashMap;
 
 public class WorldConversionFactory {
+    private static final class Cache {
+        private final int[] biomeCache = new int[4*4*4];
+        private final WeakHashMap<Mapper, Reference2IntOpenHashMap<BlockState>> localMapping = new WeakHashMap<>();
+        private int[] paletteCache = new int[1024];
+        private Reference2IntOpenHashMap<BlockState> getLocalMapping(Mapper mapper) {
+            return this.localMapping.computeIfAbsent(mapper, (a_)->new Reference2IntOpenHashMap<>());
+        }
+        private int[] getPaletteCache(int size) {
+            if (this.paletteCache.length < size) {
+                this.paletteCache = new int[size];
+            }
+            return this.paletteCache;
+        }
+    }
+
     //TODO: create a mapping for world/mapper -> local mapping
-    private static final ThreadLocal<Pair<int[], WeakHashMap<Mapper, Reference2IntOpenHashMap<BlockState>>>> THREAD_LOCAL = ThreadLocal.withInitial(()->new Pair<>(new int[4*4*4], new WeakHashMap<>()));
+    private static final ThreadLocal<Cache> THREAD_LOCAL = ThreadLocal.withInitial(Cache::new);
+
+    private static void setupLocalPalette(Palette<BlockState> vp,Reference2IntOpenHashMap<BlockState> blockCache, Mapper mapper, int[] pc) {
+        {
+            if (vp instanceof ArrayPalette<BlockState>) {
+                for (int i = 0; i < vp.getSize(); i++) {
+                    var state = vp.get(i);
+                    int blockId = -1;
+                    if (state != null) {
+                        blockId = blockCache.getOrDefault(state, -1);
+                        if (blockId == -1) {
+                            blockId = mapper.getIdForBlockState(state);
+                            blockCache.put(state, blockId);
+                        }
+                    }
+                    pc[i] = blockId;
+                }
+            } else if (vp instanceof LithiumHashPalette<BlockState>) {
+                for (int i = 0; i < vp.getSize(); i++) {
+                    BlockState state = null;
+                    int blockId = -1;
+                    try { state = vp.get(i); } catch (Exception e) {}
+                    if (state != null) {
+                        blockId = blockCache.getOrDefault(state, -1);
+                        if (blockId == -1) {
+                            blockId = mapper.getIdForBlockState(state);
+                            blockCache.put(state, blockId);
+                        }
+                    }
+                    pc[i] = blockId;
+                }
+            } else {
+                if (vp instanceof BiMapPalette<BlockState> pal) {
+                    //var map = pal.map;
+                    //TODO: heavily optimize this by reading the map directly
+
+                    for (int i = 0; i < vp.getSize(); i++) {
+                        BlockState state = null;
+                        int blockId = -1;
+                        try { state = vp.get(i); } catch (Exception e) {}
+                        if (state != null) {
+                            blockId = blockCache.getOrDefault(state, -1);
+                            if (blockId == -1) {
+                                blockId = mapper.getIdForBlockState(state);
+                                blockCache.put(state, blockId);
+                            }
+                        }
+                        pc[i] = blockId;
+                    }
+
+                } else if (vp instanceof SingularPalette<BlockState>) {
+                    int blockId = -1;
+                    var state = vp.get(0);
+                    if (state != null) {
+                        blockId = blockCache.getOrDefault(state, -1);
+                        if (blockId == -1) {
+                            blockId = mapper.getIdForBlockState(state);
+                            blockCache.put(state, blockId);
+                        }
+                    }
+                    pc[0] = blockId;
+                } else {
+                    Logger.error("Unknown palette type: " + vp);
+                }
+            }
+        }
+    }
 
     public static VoxelizedSection convert(VoxelizedSection section,
                                            Mapper stateMapper,
                                            PalettedContainer<BlockState> blockContainer,
                                            ReadableContainer<RegistryEntry<Biome>> biomeContainer,
                                            ILightingSupplier lightSupplier) {
-        var threadLocal = THREAD_LOCAL.get();
-        var blockCache = threadLocal.right().computeIfAbsent(stateMapper, (mapper)->new Reference2IntOpenHashMap<>());
-        var biomes = threadLocal.left();
+
+        //Cheat by creating a local pallet then read the data directly
+
+
+        var cache = THREAD_LOCAL.get();
+        var blockCache = cache.getLocalMapping(stateMapper);
+
+        var biomes = cache.biomeCache;
         var data = section.section;
 
-        int blockId = -1;
-        BlockState block = null;
+        var vp = blockContainer.data.palette;
+        var pc = cache.getPaletteCache(vp.getSize());
+
+        setupLocalPalette(vp, blockCache, stateMapper, pc);
+
+
         {
             int i = 0;
             for (int y = 0; y < 4; y++) {
@@ -41,29 +132,15 @@ public class WorldConversionFactory {
 
         var bDat = blockContainer.data;
         var bStor = bDat.storage;
-        var bPall = bDat.palette;
         int i = 0;
         for (int y = 0; y < 16; y++) {
             for (int z = 0; z < 16; z++) {
                 for (int x = 0; x < 16; x++) {
-                    var state = bPall.get(bStor.get(i++));
+                    int bId = pc[bStor.get(i++)];
 
-                    byte light = lightSupplier.supply(x,y,z,state);
-                    if (!(state.isAir() && (light==0))) {
-                        if (block != state) {
-                            if (state.isAir()) {
-                                block = state;
-                                blockId = 0;
-                            } else {
-                                blockId = blockCache.getOrDefault(state, -1);
-                                if (blockId == -1) {
-                                    blockId = stateMapper.getIdForBlockState(state);
-                                    blockCache.put(state, blockId);
-                                }
-                                block = state;
-                            }
-                        }
-                        data[G(x, y, z)] = Mapper.composeMappingId(light, blockId, biomes[((y&0b1100)<<2)|(z&0b1100)|(x>>2)]);
+                    byte light = lightSupplier.supply(x,y,z);
+                    if (!(bId==0 && (light==0))) {
+                        data[G(x, y, z)] = Mapper.composeMappingId(light, bId, biomes[((y&0b1100)<<2)|(z&0b1100)|(x>>2)]);
                     } else {
                         data[G(x, y, z)] = Mapper.AIR;
                     }

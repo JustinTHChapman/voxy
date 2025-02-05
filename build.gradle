@@ -77,6 +77,8 @@ dependencies {
     modRuntimeOnly "maven.modrinth:sodium:mc1.21.4-0.6.6-fabric"
     modCompileOnly "maven.modrinth:sodium:mc1.21.4-0.6.6-fabric"
 
+    modImplementation("maven.modrinth:lithium:mc1.21.4-0.14.7-fabric")
+
     //modRuntimeOnly "maven.modrinth:nvidium:0.2.6-beta"
     modCompileOnly "maven.modrinth:nvidium:0.2.8-beta"
 

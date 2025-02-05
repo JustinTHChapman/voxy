@@ -63,12 +63,17 @@ public class WorldImportWrapper {
         var bossBar = new ClientBossBar(this.importerBossBarUUID, Text.of("Voxy world importer"), 0.0f, BossBar.Color.GREEN, BossBar.Style.PROGRESS, false, false, false);
         MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.put(bossBar.getUuid(), bossBar);
         long start = System.currentTimeMillis();
-        factory.create(this.importer, (a, b)->
-                        MinecraftClient.getInstance().executeSync(()-> {
-                            Taskbar.INSTANCE.setProgress(a, Math.max(1,b));
-                            bossBar.setPercent(((float) a)/((float) Math.max(1,b)));
-                            bossBar.setName(Text.of("Voxy import: "+ a+"/"+b + " chunks"));
-                        }),
+        long[] ticker = new long[1];
+        factory.create(this.importer, (a, b)-> {
+                    if (System.currentTimeMillis() - ticker[0] > 50) {
+                        ticker[0] = System.currentTimeMillis();
+                        MinecraftClient.getInstance().executeSync(() -> {
+                            Taskbar.INSTANCE.setProgress(a, Math.max(1, b));
+                            bossBar.setPercent(((float) a) / ((float) Math.max(1, b)));
+                            bossBar.setName(Text.of("Voxy import: " + a + "/" + b + " chunks"));
+                        });
+                    }
+                },
                 chunkCount -> {
                     MinecraftClient.getInstance().executeSync(()-> {
                         MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.remove(this.importerBossBarUUID);

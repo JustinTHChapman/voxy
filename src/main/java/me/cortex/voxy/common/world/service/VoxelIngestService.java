@@ -41,16 +41,16 @@ public class VoxelIngestService {
                         this.world.getMapper(),
                         section.getBlockStateContainer(),
                         section.getBiomeContainer(),
-                        (x, y, z, state) -> {
+                        (x, y, z) -> {
                             if (lighting == null || ((lighting.first() != null && lighting.first().isUninitialized())&&(lighting.second()!=null&&lighting.second().isUninitialized()))) {
                                 return (byte) 0;
                             } else {
                                 //Lighting is hell
                                 int block = lighting.first()!=null?Math.min(15,lighting.first().get(x, y, z)):0;
                                 int sky = lighting.second()!=null?Math.min(15,lighting.second().get(x, y, z)):0;
-                                if (block<state.getLuminance()) {
-                                    block = state.getLuminance();
-                                }
+                                //if (block<state.getLuminance()) {
+                                //    block = state.getLuminance();
+                                //}
                                 return (byte) (sky|(block<<4));
                             }
                         }
