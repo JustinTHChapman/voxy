@@ -10,9 +10,11 @@ import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.PalettedContainer;
 import net.minecraft.world.chunk.ReadableContainer;
 
+import java.util.WeakHashMap;
+
 public class WorldConversionFactory {
     //TODO: create a mapping for world/mapper -> local mapping
-    private static final ThreadLocal<Pair<int[],Reference2IntOpenHashMap<BlockState>>> THREAD_LOCAL = ThreadLocal.withInitial(()->new Pair<>(new int[4*4*4], new Reference2IntOpenHashMap<>()));
+    private static final ThreadLocal<Pair<int[], WeakHashMap<Mapper, Reference2IntOpenHashMap<BlockState>>>> THREAD_LOCAL = ThreadLocal.withInitial(()->new Pair<>(new int[4*4*4], new WeakHashMap<>()));
 
     public static VoxelizedSection convert(VoxelizedSection section,
                                            Mapper stateMapper,
@@ -20,7 +22,7 @@ public class WorldConversionFactory {
                                            ReadableContainer<RegistryEntry<Biome>> biomeContainer,
                                            ILightingSupplier lightSupplier) {
         var threadLocal = THREAD_LOCAL.get();
-        var blockCache = threadLocal.right();
+        var blockCache = threadLocal.right().computeIfAbsent(stateMapper, (mapper)->new Reference2IntOpenHashMap<>());
         var biomes = threadLocal.left();
         var data = section.section;
 
