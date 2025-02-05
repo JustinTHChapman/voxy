@@ -40,7 +40,7 @@ public class WorldImportCommand {
                                         .then(ClientCommandManager.argument("innerPath", StringArgumentType.string())
                                                 .executes(WorldImportCommand::importZip))))
                         .then(ClientCommandManager.literal("cancel")
-                                .requires((ctx)->((IGetVoxelCore)MinecraftClient.getInstance().worldRenderer).getVoxelCore().importer.isImporterRunning())
+                                //.requires((ctx)->((IGetVoxelCore)MinecraftClient.getInstance().worldRenderer).getVoxelCore().importer.isImporterRunning())
                                 .executes((ctx)->{((IGetVoxelCore)MinecraftClient.getInstance().worldRenderer).getVoxelCore().importer.stopImporter(); return 0;}))
         );
     }
@@ -65,10 +65,31 @@ public class WorldImportCommand {
         return fileDirectorySuggester(MinecraftClient.getInstance().runDirectory.toPath().resolve("saves"), sb);
     }
     private static CompletableFuture<Suggestions> importBobbySuggester(CommandContext<FabricClientCommandSource> ctx, SuggestionsBuilder sb) {
-        return fileDirectorySuggester(new File(".bobby").toPath(), sb);
+        return fileDirectorySuggester(MinecraftClient.getInstance().runDirectory.toPath().resolve(".bobby"), sb);
     }
 
     private static CompletableFuture<Suggestions> fileDirectorySuggester(Path dir, SuggestionsBuilder sb) {
+        var str = sb.getRemaining().replace("\\\\", "\\").replace("\\", "/");
+        if (str.startsWith("\"")) {
+            str = str.substring(1);
+        }
+        if (str.endsWith("\"")) {
+            str = str.substring(0,str.length()-1);
+        }
+        var remaining = str;
+        if (str.contains("/")) {
+            int idx = str.lastIndexOf('/');
+            remaining = str.substring(idx+1);
+            try {
+                dir = dir.resolve(str.substring(0, idx));
+            } catch (Exception e) {
+                return Suggestions.empty();
+            }
+            str = str.substring(0, idx+1);
+        } else {
+            str = "";
+        }
+
         try {
             var worlds = Files.list(dir).toList();
             for (var world : worlds) {
@@ -76,23 +97,30 @@ public class WorldImportCommand {
                     continue;
                 }
                 var wn = world.getFileName().toString();
-                if (CommandSource.shouldSuggest(sb.getRemaining(), wn) || CommandSource.shouldSuggest(sb.getRemaining(), '"'+wn)) {
-                    if (wn.contains(" ")) {
-                        wn = '"' + wn + '"';
-                    }
-                    sb.suggest(wn);
+                if (wn.equals(remaining)) {
+                    continue;
+                }
+                if (CommandSource.shouldSuggest(remaining, wn) || CommandSource.shouldSuggest(remaining, '"'+wn)) {
+                    wn = str+wn + "/";
+                    sb.suggest(StringArgumentType.escapeIfRequired(wn));
                 }
             }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        } catch (IOException e) {}
 
         return sb.buildFuture();
     }
 
     private static int importWorld(CommandContext<FabricClientCommandSource> ctx) {
-        var file = new File("saves").toPath().resolve(ctx.getArgument("world_name", String.class)).resolve("region").toFile();
-        return fileBasedImporter(file)?0:1;
+        var name = ctx.getArgument("world_name", String.class);
+        var file = new File("saves").toPath().resolve(name);
+        name = name.toLowerCase();
+        if (name.endsWith("/")) {
+            name = name.substring(0, name.length()-1);
+        }
+        if (!(name.endsWith("region"))) {
+            file = file.resolve("region");
+        }
+        return fileBasedImporter(file.toFile())?0:1;
     }
 
     private static int importZip(CommandContext<FabricClientCommandSource> ctx) {
