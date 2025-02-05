@@ -4,12 +4,15 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.model.ColourDepthTextureData;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
+import me.cortex.voxy.client.core.model.ModelTextureBakery;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderDataFactory4;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
+import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.client.taskbar.Taskbar;
@@ -21,6 +24,7 @@ import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.ClientBossBar;
 import net.minecraft.client.render.Camera;
@@ -33,6 +37,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.system.MemoryUtil;
 
 import java.io.File;
 import java.util.*;
@@ -127,7 +132,19 @@ public class VoxelCore {
         ).mulLocal(makeProjectionMatrix(16, 16*3000));
     }
 
+    //private static final ModelTextureBakery mtb = new ModelTextureBakery(16, 16);
+    //private static final RawDownloadStream downstream = new RawDownloadStream(1<<20);
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
+        /*
+        int allocation = downstream.download(2*4*6*16*16, ptr->{
+        });
+        mtb.renderFacesToStream(Blocks.WHITE_STAINED_GLASS.getDefaultState(), 123456, false, downstream.getBufferId(), allocation);
+        downstream.submit();
+        downstream.tick();
+         */
+        //if (true) return;
+
+
         if (IrisUtil.irisShadowActive()) {
             return;
         }
@@ -187,7 +204,10 @@ public class VoxelCore {
 
         this.postProcessing.renderPost(projection, RenderSystem.getProjectionMatrix(), boundFB);
 
+
+
     }
+
 
     public void addDebugInfo(List<String> debug) {
         debug.add("");

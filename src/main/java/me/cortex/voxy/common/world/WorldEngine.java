@@ -1,12 +1,12 @@
 package me.cortex.voxy.common.world;
 
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.config.section.SectionStorage;
 import me.cortex.voxy.common.util.ThreadLocalMemoryBuffer;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
-import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 
 import java.util.Arrays;
@@ -24,7 +24,7 @@ public class WorldEngine {
     public interface ISectionChangeCallback {void accept(WorldSection section, int updateFlags);}
 
 
-    public final StorageBackend storage;
+    public final SectionStorage storage;
     private final Mapper mapper;
     private final ActiveSectionTracker sectionTracker;
     public final VoxelIngestService ingestService;
@@ -39,41 +39,19 @@ public class WorldEngine {
     public Mapper getMapper() {return this.mapper;}
 
 
-    public WorldEngine(StorageBackend storageBackend, ServiceThreadPool serviceThreadPool, int cacheCount) {
-        this(storageBackend, serviceThreadPool, MAX_LOD_LAYERS, cacheCount);
+    public WorldEngine(SectionStorage storage, ServiceThreadPool serviceThreadPool, int cacheCount) {
+        this(storage, serviceThreadPool, MAX_LOD_LAYERS, cacheCount);
     }
 
-    private WorldEngine(StorageBackend storageBackend, ServiceThreadPool serviceThreadPool, int maxMipLayers, int cacheCount) {
+    private WorldEngine(SectionStorage storage, ServiceThreadPool serviceThreadPool, int maxMipLayers, int cacheCount) {
         this.maxMipLevels = maxMipLayers;
-        this.storage = storageBackend;
+        this.storage = storage;
         this.mapper = new Mapper(this.storage);
         //4 cache size bits means that the section tracker has 16 separate maps that it uses
-        this.sectionTracker = new ActiveSectionTracker(4, this::unsafeLoadSection, cacheCount);
+        this.sectionTracker = new ActiveSectionTracker(4, storage::loadSection, cacheCount);
 
         this.savingService = new SectionSavingService(this, serviceThreadPool);
         this.ingestService  = new VoxelIngestService(this, serviceThreadPool);
-    }
-
-
-    private static final ThreadLocalMemoryBuffer MEMORY_CACHE = new ThreadLocalMemoryBuffer(SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE + 1024);
-    private int unsafeLoadSection(WorldSection into) {
-        var data = this.storage.getSectionData(into.key, MEMORY_CACHE.get().createUntrackedUnfreeableReference());
-        if (data != null) {
-            if (!SaveLoadSystem.deserialize(into, data)) {
-                this.storage.deleteSectionData(into.key);
-                //TODO: regenerate the section from children
-                Arrays.fill(into.data, Mapper.AIR);
-                Logger.error("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, removing");
-                return -1;
-            } else {
-                return 0;
-            }
-        } else {
-            //TODO: if we need to fetch an lod from a server, send the request here and block until the request is finished
-            // the response should be put into the local db so that future data can just use that
-            // the server can also send arbitrary updates to the client for arbitrary lods
-            return 1;
-        }
     }
 
     public WorldSection acquireIfExists(int lvl, int x, int y, int z) {

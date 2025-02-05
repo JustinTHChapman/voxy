@@ -1,13 +1,15 @@
 package me.cortex.voxy.client.saver;
 
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.common.storage.StorageBackend;
-import me.cortex.voxy.common.storage.compressors.ZSTDCompressor;
-import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.config.section.SectionStorageConfig;
+import me.cortex.voxy.common.config.section.SectionSerializationStorage;
+import me.cortex.voxy.common.config.section.SectionStorage;
+import me.cortex.voxy.common.config.compressors.ZSTDCompressor;
+import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.config.Serialization;
-import me.cortex.voxy.common.storage.config.StorageConfig;
-import me.cortex.voxy.common.storage.other.CompressionStorageAdaptor;
-import me.cortex.voxy.common.storage.rocksdb.RocksDBStorageBackend;
+import me.cortex.voxy.common.config.storage.other.CompressionStorageAdaptor;
+import me.cortex.voxy.common.config.storage.rocksdb.RocksDBStorageBackend;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import net.minecraft.client.MinecraftClient;
@@ -26,7 +28,7 @@ public class ContextSelectionSystem {
     public static class WorldConfig {
         public int minYOverride = Integer.MAX_VALUE;
         public int maxYOverride = Integer.MIN_VALUE;
-        public StorageConfig storageConfig;
+        public SectionStorageConfig sectionStorageConfig;
     }
     public static final String DEFAULT_STORAGE_CONFIG;
     static {
@@ -42,7 +44,10 @@ public class ContextSelectionSystem {
         compression.delegate = baseDB;
         compression.compressor = compressor;
 
-        config.storageConfig = compression;
+        var serializer = new SectionSerializationStorage.Config();
+        serializer.storage = compression;
+        config.sectionStorageConfig = serializer;
+
         DEFAULT_STORAGE_CONFIG = Serialization.GSON.toJson(config);
 
         if (Serialization.GSON.fromJson(DEFAULT_STORAGE_CONFIG, WorldConfig.class) == null) {
@@ -71,10 +76,12 @@ public class ContextSelectionSystem {
                     if (this.config == null) {
                         throw new IllegalStateException("Config deserialization null, reverting to default");
                     }
+                    if (this.config.sectionStorageConfig == null) {
+                        throw new IllegalStateException("Config section storage null, reverting to default");
+                    }
                     return;
                 } catch (Exception e) {
-                    System.err.println("Failed to load the storage configuration file, resetting it to default");
-                    e.printStackTrace();
+                    Logger.error("Failed to load the storage configuration file, resetting it to default, this will probably break your save if you used a custom storage config", e);
                 }
             }
 
@@ -89,16 +96,16 @@ public class ContextSelectionSystem {
             }
         }
 
-        public StorageBackend createStorageBackend() {
+        public SectionStorage createSectionStorageBackend() {
             var ctx = new ConfigBuildCtx();
             ctx.setProperty(ConfigBuildCtx.BASE_SAVE_PATH, this.selectionFolder.toString());
             ctx.setProperty(ConfigBuildCtx.WORLD_IDENTIFIER, this.worldId);
             ctx.pushPath(ConfigBuildCtx.DEFAULT_STORAGE_PATH);
-            return this.config.storageConfig.build(ctx);
+            return this.config.sectionStorageConfig.build(ctx);
         }
 
         public WorldEngine createEngine(ServiceThreadPool serviceThreadPool) {
-            return new WorldEngine(this.createStorageBackend(), serviceThreadPool, VoxyConfig.CONFIG.secondaryLruCacheSize);
+            return new WorldEngine(this.createSectionStorageBackend(), serviceThreadPool, VoxyConfig.CONFIG.secondaryLruCacheSize);
         }
 
         //Saves the config for the world selection or something, need to figure out how to make it work with dimensional configs maybe?

@@ -1,5 +1,6 @@
 package me.cortex.voxy.common.world.service;
 
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.SaveLoadSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
@@ -28,12 +29,11 @@ public class SectionSavingService {
         section.assertNotFree();
         try {
             section.inSaveQueue.set(false);
-            var saveData = SaveLoadSystem.serialize(section);
-            this.world.storage.setSectionData(section.key, saveData);
-            saveData.free();
+            this.world.storage.saveSection(section);
         } catch (Exception e) {
-            e.printStackTrace();
-            MinecraftClient.getInstance().executeSync(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("Voxy saver had an exception while executing please check logs and report error"), true));
+            String err = "Voxy saver had an exception while executing please check logs and report error";
+            Logger.error(err, e);
+            MinecraftClient.getInstance().executeSync(()->MinecraftClient.getInstance().player.sendMessage(Text.literal(err), true));
         }
         section.release();
     }

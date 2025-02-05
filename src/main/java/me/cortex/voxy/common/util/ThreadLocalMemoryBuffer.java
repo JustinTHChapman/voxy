@@ -1,11 +1,6 @@
 package me.cortex.voxy.common.util;
 
-import me.cortex.voxy.common.storage.compressors.ZSTDCompressor;
-
 import java.lang.ref.Cleaner;
-
-import static org.lwjgl.util.zstd.Zstd.ZSTD_createCCtx;
-import static org.lwjgl.util.zstd.Zstd.ZSTD_freeCCtx;
 
 public class ThreadLocalMemoryBuffer {
     private static final Cleaner CLEANER = Cleaner.create();

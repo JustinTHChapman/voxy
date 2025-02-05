@@ -4,8 +4,6 @@ import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
-import me.cortex.voxy.common.storage.config.CompressorConfig;
-import me.cortex.voxy.common.storage.config.StorageConfig;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.BufferedReader;

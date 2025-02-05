@@ -80,6 +80,10 @@ public final class WorldSection {
         ATOMIC_STATE_HANDLE.set(this, 1);
     }
 
+    public long[] _unsafeGetRawDataArray() {
+        return this.data;
+    }
+
     @Override
     public int hashCode() {
         return ((x*1235641+y)*8127451+z)*918267913+lvl;
@@ -120,7 +124,15 @@ public final class WorldSection {
             }
         }
         if ((state>>1)==0) {
-            this.tracker.tryUnload(this);
+            if (this.tracker != null) {
+                this.tracker.tryUnload(this);
+            } else {
+                //This should _ONLY_ ever happen when its an untracked section
+                // If it is, try release it
+                if (this.trySetFreed()) {
+                    this._releaseArray();
+                }
+            }
         }
         return state>>1;
     }
@@ -238,5 +250,9 @@ public final class WorldSection {
             next = (byte) (((int)NON_EMPTY_BLOCK_HANDLE.get(this))==0?0:0xFF);
         } while (!NON_EMPTY_CHILD_HANDLE.compareAndSet(this, prev, next));
         return prev != next;
+    }
+
+    public static WorldSection _createRawUntrackedUnsafeSection(int lvl, int x, int y, int z) {
+        return new WorldSection(lvl, x, y, z, null);
     }
 }

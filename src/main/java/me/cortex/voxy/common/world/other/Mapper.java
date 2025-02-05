@@ -1,11 +1,11 @@
 package me.cortex.voxy.common.world.other;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import me.cortex.voxy.common.storage.StorageBackend;
+import me.cortex.voxy.common.config.IMappingStorage;
+import me.cortex.voxy.common.config.section.SectionStorage;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
-import net.minecraft.block.RedstoneWireBlock;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
@@ -30,7 +30,7 @@ public class Mapper {
     private static final int BLOCK_STATE_TYPE = 1;
     private static final int BIOME_TYPE = 2;
 
-    private final StorageBackend storage;
+    private final IMappingStorage storage;
     public static final long UNKNOWN_MAPPING = -1;
     public static final long AIR = 0;
 
@@ -41,7 +41,7 @@ public class Mapper {
 
     private Consumer<StateEntry> newStateCallback;
     private Consumer<BiomeEntry> newBiomeCallback;
-    public Mapper(StorageBackend storage) {
+    public Mapper(IMappingStorage storage) {
         this.storage = storage;
         //Insert air since its a special entry (index 0)
         var airEntry = new StateEntry(0, Blocks.AIR.getDefaultState());
