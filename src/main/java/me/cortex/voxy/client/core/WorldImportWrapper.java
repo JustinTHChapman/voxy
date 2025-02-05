@@ -28,8 +28,16 @@ public class WorldImportWrapper {
     }
 
     public void shutdown() {
+
         Logger.info("Shutting down importer");
-        try {this.importer.shutdown();this.importer = null;} catch (Exception e) {Logger.error("Error shutting down importer", e);}
+        if (this.importer != null) {
+            try {
+                this.importer.shutdown();
+                this.importer = null;
+            } catch (Exception e) {
+                Logger.error("Error shutting down importer", e);
+            }
+        }
 
         //Remove bossbar
         if (this.importerBossBarUUID != null) {
