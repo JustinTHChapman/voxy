@@ -12,6 +12,7 @@ import org.tukaani.xz.*;
 import java.io.IOException;
 import java.io.InputStream;
 
+/*
 public class LZMACompressor implements StorageCompressor {
     private static final ThreadLocal<Pair<byte[], ResettableArrayCache>> CACHE_THREAD_LOCAL = ThreadLocal.withInitial(()->new Pair<>(new byte[SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE], new ResettableArrayCache(new ArrayCache())));
     private static final ThreadLocalMemoryBuffer SCRATCH = new ThreadLocalMemoryBuffer(SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE + 1024);
@@ -110,3 +111,4 @@ public class LZMACompressor implements StorageCompressor {
         }
     }
 }
+ */
