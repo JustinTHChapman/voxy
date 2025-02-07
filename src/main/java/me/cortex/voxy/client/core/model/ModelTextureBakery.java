@@ -330,14 +330,6 @@ public class ModelTextureBakery {
         glUniform1ui(4, streamOffset/4);
 
         glDispatchCompute(1,1,1);
-        glDispatchCompute(1,1,1);
-        glDispatchCompute(1,1,1);
-        glDispatchCompute(1,1,1);
-        glDispatchCompute(1,1,1);
-        glDispatchCompute(1,1,1);
-        glDispatchCompute(1,1,1);
-        glDispatchCompute(1,1,1);
-        glDispatchCompute(1,1,1);
     }
 
     private static void renderQuads(BufferBuilder builder, BlockState state, BakedModel model, MatrixStack stack, long randomValue) {
