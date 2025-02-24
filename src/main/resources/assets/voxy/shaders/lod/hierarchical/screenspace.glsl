@@ -135,6 +135,5 @@ bool shouldDecend() {
     }
     size *= 0.5f;//Half the size since we did both back and front area
 
-    //printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(size.x), float(size.y));
     return size > minSSS;
 }
