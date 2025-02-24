@@ -22,6 +22,9 @@ vec3 maxBB;
 vec2 size;
 float zThing;
 
+uint BASE_IDX = gl_LocalInvocationID.x*8;
+shared vec2[LOCAL_SIZE*8] screenPoints;
+
 //Sets up screenspace with the given node id, returns true on success false on failure/should not continue
 //Accesses data that is setup in the main traversal and is just shared to here
 void setupScreenspace(in UnpackedNode node) {
@@ -46,6 +49,7 @@ void setupScreenspace(in UnpackedNode node) {
     maxBB = minBB;
     zThing = -999999999999.0f;
 
+    screenPoints[BASE_IDX+0] = minBB.xy*0.5f+0.5f;
     for (int i = 1; i < 8; i++) {
         //NOTE!: cant this be precomputed and put in an array?? in the scene uniform??
         vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*(32<<node.lodLevel),1));//Size of section is 32x32x32 (need to change it to a bounding box in the future)
@@ -55,6 +59,7 @@ void setupScreenspace(in UnpackedNode node) {
         //TODO: CLIP TO VIEWPORT
         minBB = min(minBB, point);
         maxBB = max(maxBB, point);
+        screenPoints[BASE_IDX+i] = point.xy*0.5f+0.5f;
     }
 
     //TODO: MORE ACCURATLY DETERMIN SCREENSPACE AREA, this can be done by computing and adding
@@ -102,8 +107,34 @@ bool isCulledByHiz() {
     return culled;
 }
 
+
+float crossMag(vec2 a, vec2 b) {
+    return abs(a.x*b.y-b.x*a.y);
+}
+
 //Returns if we should decend into its children or not
 bool shouldDecend() {
+    float size = 0;
+    {//Faces from 0,0,0
+        vec2 base = screenPoints[BASE_IDX+0];
+        vec2 A = screenPoints[BASE_IDX+1]-base;
+        vec2 B = screenPoints[BASE_IDX+2]-base;
+        vec2 C = screenPoints[BASE_IDX+4]-base;
+        size += crossMag(A,B);
+        size += crossMag(A,C);
+        size += crossMag(C,B);
+    }
+    {//Faces from 1,1,1
+        vec2 base = screenPoints[BASE_IDX+7];
+        vec2 A = screenPoints[BASE_IDX+3]-base;
+        vec2 B = screenPoints[BASE_IDX+5]-base;
+        vec2 C = screenPoints[BASE_IDX+6]-base;
+        size += crossMag(A,B);
+        size += crossMag(A,C);
+        size += crossMag(C,B);
+    }
+    size *= 0.5f;//Half the size since we did both back and front area
+
     //printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(size.x), float(size.y));
-    return (size.x*size.y) > minSSS;
+    return size > minSSS;
 }
