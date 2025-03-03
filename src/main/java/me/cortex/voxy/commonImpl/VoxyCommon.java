@@ -11,13 +11,18 @@ public class VoxyCommon implements ModInitializer {
     public static final boolean IS_DEDICATED_SERVER;
 
     static {
-        ModContainer mod = (ModContainer) FabricLoader.getInstance().getModContainer("voxy").orElseThrow(NullPointerException::new);
-        var version = mod.getMetadata().getVersion().getFriendlyString();
-        var commit = mod.getMetadata().getCustomValue("commit").getAsString();
-        MOD_VERSION = version+"-"+commit;
-        IS_DEDICATED_SERVER = FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER;
-        Serialization.init();
-
+        ModContainer mod = (ModContainer) FabricLoader.getInstance().getModContainer("voxy").orElse(null);
+        if (mod == null) {
+            System.err.println("RUNNING WITHOUT MOD");
+            MOD_VERSION = "<UNKNOWN>";
+            IS_DEDICATED_SERVER = false;
+        } else {
+            var version = mod.getMetadata().getVersion().getFriendlyString();
+            var commit = mod.getMetadata().getCustomValue("commit").getAsString();
+            MOD_VERSION = version + "-" + commit;
+            IS_DEDICATED_SERVER = FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER;
+            Serialization.init();
+        }
     }
 
     @Override
