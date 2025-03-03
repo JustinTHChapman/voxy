@@ -452,6 +452,22 @@ public class NodeManager {
 
                 //TODO FINISH
 
+                //Delete all the request data
+                for (int i = 0; i < 8; i++) {
+                    if ((req.getMsk()&(1<<i))==0) continue;
+
+                    int mesh = req.getChildMesh(i);
+                    if (mesh != EMPTY_GEOMETRY_ID && mesh != NULL_GEOMETRY_ID)
+                        this.geometryManager.removeSection(mesh);
+
+                    //Unwatch the request position
+                    long childPos = makeChildPos(pos, i);
+                    if (!this.updateRouter.unwatch(childPos, WorldEngine.UPDATE_FLAGS)) {
+                        throw new IllegalStateException("Pos was not being watched");
+                    }
+                }
+
+
                 this.childRequests.release(reqId);//Release the request
             }
 
@@ -464,10 +480,13 @@ public class NodeManager {
             Logger.error("UNFINISHED OPERATION TODO: FIXME2");
 
             //Free geometry and related memory for this node
+
+            //TODO: DELETE GEOMETRY
+
             this.nodeData.free(nodeId);
             this.clearId(nodeId);
 
-            //Unwatch geometry
+            //Unwatch position
             if (!this.updateRouter.unwatch(pos, WorldEngine.UPDATE_FLAGS)) {
                 throw new IllegalStateException("Pos was not being watched");
             }
@@ -831,6 +850,7 @@ public class NodeManager {
             } else {
                 //Else make the parent node a leaf node and remove all the children
 
+                //THIS IS MOST IMPORTANT
                 //Logger.error("TODO: THIS 2");
             }
             //this.removeGeometryInternal(pos, nodeId);
