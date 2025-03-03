@@ -1,6 +1,7 @@
 package me.cortex.voxy.common.world.service;
 
 import it.unimi.dsi.fastutil.Pair;
+import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -9,6 +10,7 @@ import me.cortex.voxy.common.thread.ServiceThreadPool;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.ChunkNibbleArray;
+import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.WorldChunk;
 
 import java.util.Map;
@@ -18,8 +20,8 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class VoxelIngestService {
     private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
     private final ServiceSlice threads;
-    private final ConcurrentLinkedDeque<WorldChunk> ingestQueue = new ConcurrentLinkedDeque<>();
-    private final ConcurrentHashMap<Long, Pair<ChunkNibbleArray, ChunkNibbleArray>> captureLightMap = new ConcurrentHashMap<>(1000,0.75f, 7);
+    private record IngestSection(int cx, int cy, int cz, ChunkSection section, ChunkNibbleArray blockLight, ChunkNibbleArray skyLight){}
+    private final ConcurrentLinkedDeque<IngestSection> ingestQueue = new ConcurrentLinkedDeque<>();
 
     private final WorldEngine world;
     public VoxelIngestService(WorldEngine world, ServiceThreadPool pool) {
@@ -28,40 +30,56 @@ public class VoxelIngestService {
     }
 
     private void processJob() {
-        var chunk = this.ingestQueue.pop();
-        int i = chunk.getBottomSectionCoord() - 1;
-        for (var section : chunk.getSectionArray()) {
-            i++;
-            var lighting = this.captureLightMap.remove(ChunkSectionPos.from(chunk.getPos(), i).asLong());
-            if (section.isEmpty() && lighting==null) {//If the chunk section has lighting data, propagate it
-                this.world.insertUpdate(SECTION_CACHE.get().zero().setPosition(chunk.getPos().x, i, chunk.getPos().z));
-            } else {
-                VoxelizedSection csec = WorldConversionFactory.convert(
-                        SECTION_CACHE.get().setPosition(chunk.getPos().x, i, chunk.getPos().z),
-                        this.world.getMapper(),
-                        section.getBlockStateContainer(),
-                        section.getBiomeContainer(),
-                        (x, y, z) -> {
-                            if (lighting == null || ((lighting.first() != null && lighting.first().isUninitialized())&&(lighting.second()!=null&&lighting.second().isUninitialized()))) {
-                                return (byte) 0;
-                            } else {
-                                //Lighting is hell
-                                int block = lighting.first()!=null?Math.min(15,lighting.first().get(x, y, z)):0;
-                                int sky = lighting.second()!=null?Math.min(15,lighting.second().get(x, y, z)):0;
-                                //if (block<state.getLuminance()) {
-                                //    block = state.getLuminance();
-                                //}
-                                return (byte) (sky|(block<<4));
-                            }
-                        }
-                );
-                WorldConversionFactory.mipSection(csec, this.world.getMapper());
-                this.world.insertUpdate(csec);
+        var task = this.ingestQueue.pop();
+        var section = task.section;
+        var vs = SECTION_CACHE.get().setPosition(task.cx, task.cy, task.cz);
+
+        if (section.isEmpty() && task.blockLight==null && task.skyLight==null) {//If the chunk section has lighting data, propagate it
+            this.world.insertUpdate(vs.zero());
+        } else {
+            ILightingSupplier supplier = (x,y,z) -> (byte) 0;
+            var sla = task.skyLight;
+            var bla = task.blockLight;
+            boolean sl = sla != null && !sla.isUninitialized();
+            boolean bl = bla != null && !bla.isUninitialized();
+            if (sl || bl) {
+                if (sl && bl) {
+                    supplier = (x,y,z)-> {
+                        int block = Math.min(15,bla.get(x, y, z));
+                        int sky = Math.min(15,sla.get(x, y, z));
+                        return (byte) (sky|(block<<4));
+                    };
+                } else if (bl) {
+                    supplier = (x,y,z)-> {
+                        int block = Math.min(15,bla.get(x, y, z));
+                        int sky = 0;
+                        return (byte) (sky|(block<<4));
+                    };
+                } else {
+                    supplier = (x,y,z)-> {
+                        int block = 0;
+                        int sky = Math.min(15,sla.get(x, y, z));
+                        return (byte) (sky|(block<<4));
+                    };
+                }
             }
+            VoxelizedSection csec = WorldConversionFactory.convert(
+                    SECTION_CACHE.get(),
+                    this.world.getMapper(),
+                    section.getBlockStateContainer(),
+                    section.getBiomeContainer(),
+                    supplier
+            );
+            WorldConversionFactory.mipSection(csec, this.world.getMapper());
+            this.world.insertUpdate(csec);
         }
     }
 
-    private static void fetchLightingData(Map<Long, Pair<ChunkNibbleArray, ChunkNibbleArray>> out, WorldChunk chunk) {
+    private static boolean shouldIngestSection(ChunkSection section, int cx, int cy, int cz) {
+        return true;
+    }
+
+    public void enqueueIngest(WorldChunk chunk) {
         var lightingProvider = chunk.getWorld().getLightingProvider();
         var blp = lightingProvider.get(LightType.BLOCK);
         var slp = lightingProvider.get(LightType.SKY);
@@ -69,7 +87,7 @@ public class VoxelIngestService {
         int i = chunk.getBottomSectionCoord() - 1;
         for (var section : chunk.getSectionArray()) {
             i++;
-            if (section == null) continue;
+            if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
             //if (section.isEmpty()) continue;
             var pos = ChunkSectionPos.from(chunk.getPos(), i);
             var bl = blp.getLightSection(pos);
@@ -84,17 +102,14 @@ public class VoxelIngestService {
             } else {
                 sl = null;
             }
-            if (bl == null && sl == null) {
+
+            if ((bl == null && sl == null) && section.isEmpty()) {
                 continue;
             }
-            out.put(pos.asLong(), Pair.of(bl, sl));
-        }
-    }
 
-    public void enqueueIngest(WorldChunk chunk) {
-        fetchLightingData(this.captureLightMap, chunk);
-        this.ingestQueue.add(chunk);
-        this.threads.execute();
+            this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, section, bl, sl));
+            this.threads.execute();
+        }
     }
 
     public int getTaskCount() {
