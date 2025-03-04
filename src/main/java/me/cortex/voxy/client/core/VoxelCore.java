@@ -87,7 +87,6 @@ public class VoxelCore {
         Capabilities.init();//Ensure clinit is called
 
         this.renderer = new RenderService(this.world, this.serviceThreadPool);
-        Logger.info("Using " + this.renderer.getClass().getSimpleName());
         this.postProcessing = new PostProcessing();
 
         Logger.info("Voxy core initialized");
@@ -430,7 +429,7 @@ public class VoxelCore {
                 }
             }
             long delta = (System.currentTimeMillis()-start);
-            System.out.println("Time "+delta+"ms count: " + completedCounter.get() + " avg per mesh: " + ((double)delta/completedCounter.get()));
+            System.out.println("Time "+delta+"ms count: " + completedCounter.get() + " avg per mesh: " + ((double)delta/completedCounter.get()) + "ms");
             if (false)
                 break;
         }

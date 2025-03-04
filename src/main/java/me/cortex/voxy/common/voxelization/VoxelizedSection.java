@@ -10,9 +10,17 @@ public class VoxelizedSection {
     public int x;
     public int y;
     public int z;
-    final long[] section;
+    public final long[] section;
     public VoxelizedSection(long[] section) {
         this.section = section;
+    }
+
+    public static int getBaseIndexForLevel(int lvl) {
+        int offset = lvl==1?(1<<12):0;
+        offset |= lvl==2?(1<<12)|(1<<9):0;
+        offset |= lvl==3?(1<<12)|(1<<9)|(1<<6):0;
+        offset |= lvl==4?(1<<12)|(1<<9)|(1<<6)|(1<<3):0;
+        return offset;
     }
 
     public VoxelizedSection setPosition(int x, int y, int z) {

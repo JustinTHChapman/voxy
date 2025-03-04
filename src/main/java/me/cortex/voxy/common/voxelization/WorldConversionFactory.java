@@ -92,7 +92,7 @@ public class WorldConversionFactory {
                     }
                     pc[0] = blockId;
                 } else {
-                    Logger.error("Unknown palette type: " + vp);
+                    throw new IllegalStateException("Unknown palette type: " + vp);
                 }
             }
         }
