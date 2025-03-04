@@ -18,31 +18,29 @@ layout(binding = OUTPUT_BUFFER_BINDING, std430) restrict volatile buffer Minimum
 };
 
 //Returns the id of the max value
-uint atomicDerefMin(uint atId, uint id, uint value) {
-    uint existingId = minVisIds[atId];
+uint atomicDerefMax(uint atId, uint id, uint value) {
     while (true) {
+        const uint existingId = minVisIds[atId];
         //Check if the value is less than the dereferenced value, if its not, return our own id
         if (visiblity[existingId] <= value) {
             return id;
         }
         //Attempt to swap, since we know we are less than the existingId
-        atomicCompSwap(minVisIds[atId], existingId, id);
+        uint c = atomicCompSwap(minVisIds[atId], existingId, id);
         //Check if we did swap, else if we failed (or got reswapped else where) recheck
-        uint pExistingId = existingId;
-        existingId = minVisIds[atId];
-        if (existingId == id) {
-            return pExistingId;
+
+        //We did swap, (since the original mem contents was the existing id)
+        // which means existingId is now the max of the ptr
+        if (c == existingId) {
+            return existingId;
         }
     }
 }
 
 //TODO: optimize
-void bubbleSort(uint start, uint id, uint value) {
+void bubbleSort(uint start, uint id) {
     for (uint i = start; i < OUTPUT_SIZE; i++) {
-        uint nextId = atomicDerefMin(i, id, value);
-        //Else we need to bubble the value up
-        id = nextId;
-        value = visiblity[id];
+        id = atomicDerefMax(i, id, visiblity[id]);
     }
 }
 
@@ -57,8 +55,8 @@ void main() {
     }
     UnpackedNode node;
     unpackNode(node, gl_GlobalInvocationID.x);
-    if (isEmptyMesh(node) || (!hasMesh(node)) || (!hasChildren(node)) || all(equal(node.pos, ivec3(0)))) {
+    if (isEmptyMesh(node) || (!hasMesh(node))) {//|| (!hasChildren(node))
         return;
     }
-    bubbleSort(0, gl_GlobalInvocationID.x, vis);
+    bubbleSort(0, gl_GlobalInvocationID.x);
 }

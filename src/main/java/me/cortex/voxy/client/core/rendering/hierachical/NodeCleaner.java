@@ -1,6 +1,8 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
@@ -45,7 +47,7 @@ public class NodeCleaner {
             .define("MIN_ID_BUFFER_BINDING", 0)
             .define("NODE_BUFFER_BINDING", 1)
             .define("OUTPUT_BUFFER_BINDING", 2)
-            .define("QQQQQQ", 3)
+            .define("VISIBILITY_BUFFER_BINDING", 3)
             .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/cleaner/result_transformer.comp")
             .compile();
 
@@ -90,9 +92,10 @@ public class NodeCleaner {
         this.visibilityId++;
         this.clearIds();
 
-        if (this.shouldCleanGeometry() & false) {
+        if (this.shouldCleanGeometry() && false ) {
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
             this.outputBuffer.fill(this.nodeManager.maxNodeCount-2);//TODO: maybe dont set to zero??
+
 
             this.sorter.bind();
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, nodeDataBuffer.id);
@@ -108,7 +111,6 @@ public class NodeCleaner {
             glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 2, this.outputBuffer.id, 4*OUTPUT_COUNT, 8*OUTPUT_COUNT);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.visibilityBuffer.id);
 
-            //this.outputBuffer.fill(0);//TODO: maybe dont set to zero??
             glDispatchCompute(1,1,1);
 
             DownloadStream.INSTANCE.download(this.outputBuffer, 4*OUTPUT_COUNT, 8*OUTPUT_COUNT, this::onDownload);
@@ -122,16 +124,20 @@ public class NodeCleaner {
 
     private void onDownload(long ptr, long size) {
         //StringBuilder b = new StringBuilder();
+        Long2IntOpenHashMap aa = new Long2IntOpenHashMap();
         for (int i = 0; i < OUTPUT_COUNT; i++) {
             long pos = Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr + 8 * i))<<32;
             pos |= Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr + 8 * i + 4));
-            if (pos == 0) {
+            aa.addTo(pos, 1);
+            if (pos == -1) {
                 //TODO: investigate how or what this happens
                 continue;
             }
             this.nodeManager.removeNodeGeometry(pos);
             //b.append(", ").append(WorldEngine.pprintPos(pos));//.append(((int)((pos>>32)&0xFFFFFFFFL)));//
         }
+        int a = 0;
+
         //System.out.println(b);
     }
 

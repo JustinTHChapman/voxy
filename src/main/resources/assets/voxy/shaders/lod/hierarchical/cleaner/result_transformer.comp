@@ -13,11 +13,17 @@ layout(binding = OUTPUT_BUFFER_BINDING, std430) restrict writeonly buffer Output
     uvec2 outputBuffer[OUTPUT_SIZE];
 };
 
-layout(binding = QQQQQQ, std430) restrict buffer QQQ {
-    uint[] qq;
+layout(binding = VISIBILITY_BUFFER_BINDING, std430) restrict buffer VisibilityBuffer {
+    uint[] visibility;
 };
 
 void main() {
-    outputBuffer[gl_LocalInvocationID.x] = nodes[minVisIds[gl_LocalInvocationID.x]].xy;//Move the position of the node id into the output buffer
-    //outputBuffer[gl_LocalInvocationID.x].x = qq[minVisIds[gl_LocalInvocationID.x]];//
+    uvec4 node = nodes[minVisIds[gl_LocalInvocationID.x]];
+    uvec2 res = node.xy;
+    if (all(equal(node, uvec4(0)))) {//If its a empty node, TODO: DONT THINK THIS IS ACTUALLY CORRECT
+        res = uvec2(-1);
+    }
+    outputBuffer[gl_LocalInvocationID.x] = res;//Move the position of the node id into the output buffer
+
+    //outputBuffer[gl_LocalInvocationID.x].x = visibility[minVisIds[gl_LocalInvocationID.x]];//
 }
