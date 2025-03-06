@@ -1,12 +1,14 @@
 package me.cortex.voxy.common.world.service;
 
 import it.unimi.dsi.fastutil.Pair;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceSlice;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.commonImpl.IVoxyWorldGetter;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.ChunkNibbleArray;
@@ -20,12 +22,10 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class VoxelIngestService {
     private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
     private final ServiceSlice threads;
-    private record IngestSection(int cx, int cy, int cz, ChunkSection section, ChunkNibbleArray blockLight, ChunkNibbleArray skyLight){}
+    private record IngestSection(int cx, int cy, int cz, WorldEngine world, ChunkSection section, ChunkNibbleArray blockLight, ChunkNibbleArray skyLight){}
     private final ConcurrentLinkedDeque<IngestSection> ingestQueue = new ConcurrentLinkedDeque<>();
 
-    private final WorldEngine world;
-    public VoxelIngestService(WorldEngine world, ServiceThreadPool pool) {
-        this.world = world;
+    public VoxelIngestService(ServiceThreadPool pool) {
         this.threads = pool.createServiceNoCleanup("Ingest service", 100, ()-> this::processJob);
     }
 
@@ -35,7 +35,7 @@ public class VoxelIngestService {
         var vs = SECTION_CACHE.get().setPosition(task.cx, task.cy, task.cz);
 
         if (section.isEmpty() && task.blockLight==null && task.skyLight==null) {//If the chunk section has lighting data, propagate it
-            this.world.insertUpdate(vs.zero());
+            task.world.insertUpdate(vs.zero());
         } else {
             ILightingSupplier supplier = (x,y,z) -> (byte) 0;
             var sla = task.skyLight;
@@ -65,13 +65,13 @@ public class VoxelIngestService {
             }
             VoxelizedSection csec = WorldConversionFactory.convert(
                     SECTION_CACHE.get(),
-                    this.world.getMapper(),
+                    task.world.getMapper(),
                     section.getBlockStateContainer(),
                     section.getBiomeContainer(),
                     supplier
             );
-            WorldConversionFactory.mipSection(csec, this.world.getMapper());
-            this.world.insertUpdate(csec);
+            WorldConversionFactory.mipSection(csec, task.world.getMapper());
+            task.world.insertUpdate(csec);
         }
     }
 
@@ -80,6 +80,15 @@ public class VoxelIngestService {
     }
 
     public void enqueueIngest(WorldChunk chunk) {
+        var engine = ((IVoxyWorldGetter)chunk.getWorld()).getWorldEngine();
+        if (engine == null) {
+            Logger.error("Could not ingest chunk as does not have world engine");
+            return;
+        }
+        this.enqueueIngest(engine, chunk);
+    }
+
+    public void enqueueIngest(WorldEngine engine, WorldChunk chunk) {
         var lightingProvider = chunk.getWorld().getLightingProvider();
         var blp = lightingProvider.get(LightType.BLOCK);
         var slp = lightingProvider.get(LightType.SKY);
@@ -107,7 +116,7 @@ public class VoxelIngestService {
                 continue;
             }
 
-            this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, section, bl, sl));
+            this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));
             this.threads.execute();
         }
     }

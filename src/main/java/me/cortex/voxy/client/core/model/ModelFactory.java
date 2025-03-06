@@ -6,9 +6,6 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
-import me.cortex.voxy.client.core.IGetVoxelCore;
-import me.cortex.voxy.client.core.gl.GlBuffer;
-import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
@@ -40,13 +37,8 @@ import java.util.stream.Stream;
 
 import static me.cortex.voxy.client.core.model.ModelStore.MODEL_SIZE;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL11C.GL_NEAREST;
-import static org.lwjgl.opengl.GL11C.GL_NEAREST_MIPMAP_LINEAR;
-import static org.lwjgl.opengl.GL12C.GL_TEXTURE_MAX_LOD;
-import static org.lwjgl.opengl.GL12C.GL_TEXTURE_MIN_LOD;
 import static org.lwjgl.opengl.GL33.glDeleteSamplers;
 import static org.lwjgl.opengl.GL33.glGenSamplers;
-import static org.lwjgl.opengl.GL33C.glSamplerParameteri;
 import static org.lwjgl.opengl.GL45C.glTextureSubImage2D;
 
 //Manages the storage and updating of model states, textures and colours

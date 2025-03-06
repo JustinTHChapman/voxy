@@ -1,5 +1,8 @@
 package me.cortex.voxy.common;
 
+import me.cortex.voxy.commonImpl.VoxyCommon;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
 import org.slf4j.LoggerFactory;
 
 import java.util.stream.Collectors;
@@ -16,7 +19,11 @@ public class Logger {
             }
         }
         var stackEntry = new Throwable().getStackTrace()[1];
-        LOGGER.error("["+stackEntry.getClassName()+"]: "+ Stream.of(args).map(Object::toString).collect(Collectors.joining(" ")), throwable);
+        String error = "["+stackEntry.getClassName()+"]: "+ Stream.of(args).map(Object::toString).collect(Collectors.joining(" "));
+        LOGGER.error(error, throwable);
+        if (!VoxyCommon.IS_DEDICATED_SERVER) {
+            MinecraftClient.getInstance().executeSync(()->{var player = MinecraftClient.getInstance().player; if (player != null)  player.sendMessage(Text.literal(error), true);});
+        }
     }
 
     public static void warn(Object... args) {

@@ -21,6 +21,7 @@ public class VoxyConfig {
     public static VoxyConfig CONFIG = loadOrCreate();
 
     public boolean enabled = true;
+    public boolean enableRendering = true;
     public boolean ingestEnabled = true;
     //public int renderDistance = 128;
     public int serviceThreads = Math.max(Runtime.getRuntime().availableProcessors()/2, 1);

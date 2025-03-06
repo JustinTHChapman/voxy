@@ -282,6 +282,10 @@ public class Mapper {
         this.storage.flush();
     }
 
+    public void close() {
+
+    }
+
 
     public static final class StateEntry {
         public final int id;

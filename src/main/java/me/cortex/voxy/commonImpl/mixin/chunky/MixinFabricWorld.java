@@ -1,31 +1,18 @@
-package me.cortex.voxy.client.mixin.chunky;
+package me.cortex.voxy.commonImpl.mixin.chunky;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import me.cortex.voxy.client.Voxy;
-import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.IGetVoxelCore;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.server.world.ChunkHolder;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.server.world.OptionalChunk;
-import net.minecraft.server.world.ServerChunkLoadingManager;
-import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.WorldChunk;
-import org.joml.Matrix4f;
 import org.popcraft.chunky.mixin.ServerChunkCacheMixin;
 import org.popcraft.chunky.platform.FabricWorld;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Redirect;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
-import java.util.function.BiConsumer;
 
 @Mixin(FabricWorld.class)
 public class MixinFabricWorld {
@@ -34,9 +21,9 @@ public class MixinFabricWorld {
         var future = original.call(instance, i, j, chunkStatus, b);
         return future.thenApplyAsync(res->{
             res.ifPresent(chunk -> {
-                var core = ((IGetVoxelCore)(MinecraftClient.getInstance().worldRenderer)).getVoxelCore();
-                if (core != null && VoxyConfig.CONFIG.ingestEnabled) {
-                    core.enqueueIngest((WorldChunk) chunk);
+                var voxyInstance = VoxyCommon.getInstance();
+                if (voxyInstance != null) {
+                    voxyInstance.getIngestService().enqueueIngest((WorldChunk) chunk);
                 }
             });
             return res;

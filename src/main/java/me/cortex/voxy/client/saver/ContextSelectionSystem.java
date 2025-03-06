@@ -104,10 +104,6 @@ public class ContextSelectionSystem {
             return this.config.sectionStorageConfig.build(ctx);
         }
 
-        public WorldEngine createEngine(ServiceThreadPool serviceThreadPool) {
-            return new WorldEngine(this.createSectionStorageBackend(), serviceThreadPool, VoxyConfig.CONFIG.secondaryLruCacheSize);
-        }
-
         //Saves the config for the world selection or something, need to figure out how to make it work with dimensional configs maybe?
         // or just have per world config, cause when creating the world engine doing the string substitution would
         // make it automatically select the right id

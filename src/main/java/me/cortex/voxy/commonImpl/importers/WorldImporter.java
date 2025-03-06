@@ -9,6 +9,7 @@ import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceSlice;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.world.service.SectionSavingService;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -57,9 +59,13 @@ public class WorldImporter {
     private final ServiceSlice threadPool;
 
     private volatile boolean isRunning;
-    public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool) {
+    public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, SectionSavingService savingService) {
+        this(worldEngine, mcWorld, servicePool, ()->savingService.getTaskCount() < 4000);
+    }
+
+    public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, BooleanSupplier runChecker) {
         this.world = worldEngine;
-        this.threadPool = servicePool.createServiceNoCleanup("World importer", 1, ()->()->this.jobQueue.poll().run(), ()->this.world.savingService.getTaskCount() < 4000);
+        this.threadPool = servicePool.createServiceNoCleanup("World importer", 1, ()->()->this.jobQueue.poll().run(), runChecker);
 
         var biomeRegistry = mcWorld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
         var defaultBiome = biomeRegistry.getOrThrow(BiomeKeys.PLAINS);

@@ -7,6 +7,8 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 
 public class VoxyCommon implements ModInitializer {
+    private static VoxyInstance INSTANCE;
+
     public static final String MOD_VERSION;
     public static final boolean IS_DEDICATED_SERVER;
 
@@ -27,11 +29,6 @@ public class VoxyCommon implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        //this.serviceThreadPool = new ServiceThreadPool(VoxyConfig.CONFIG.serviceThreads);
-
-        //TODO: need to have a common config with server/client configs deriving from it
-        // maybe server/client extend it? or something? cause like client needs server config (at least partially sometimes)
-        // but server doesnt need client config
     }
 
     public static void breakpoint() {
@@ -43,5 +40,23 @@ public class VoxyCommon implements ModInitializer {
     private static final boolean GlobalVerificationDisableOverride = false;//System.getProperty("voxy.verificationDisableOverride", "false").equals("true");
     public static boolean isVerificationFlagOn(String name) {
         return (!GlobalVerificationDisableOverride) && System.getProperty("voxy."+name, "true").equals("true");
+    }
+
+    public static VoxyInstance getInstance() {
+        return INSTANCE;
+    }
+
+    public static void shutdownInstance() {
+        if (INSTANCE != null) {
+            INSTANCE.shutdown();
+            INSTANCE = null;
+        }
+    }
+
+    public static void createInstance() {
+        if (INSTANCE != null) {
+            throw new IllegalStateException("Cannot create multiple instances");
+        }
+        INSTANCE = new VoxyInstance(12);
     }
 }

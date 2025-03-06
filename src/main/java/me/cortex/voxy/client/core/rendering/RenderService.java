@@ -44,7 +44,10 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     private final MessageQueue<WorldSection> sectionUpdateQueue;
     private final MessageQueue<BuiltSection> geometryUpdateQueue;
 
+    private final WorldEngine world;
+
     public RenderService(WorldEngine world, ServiceThreadPool serviceThreadPool) {
+        this.world = world;
         this.modelService = new ModelBakerySubsystem(world.getMapper());
 
         //Max sections: ~500k
@@ -224,6 +227,11 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     }
 
     public void shutdown() {
+        //Cleanup callbacks
+        this.world.setDirtyCallback(null);
+        this.world.getMapper().setBiomeCallback(null);
+        this.world.getMapper().setStateCallback(null);
+
         this.modelService.shutdown();
         this.renderGen.shutdown();
         this.viewportSelector.free();

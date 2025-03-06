@@ -2,7 +2,8 @@ package me.cortex.voxy.client.config;
 
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
-import me.cortex.voxy.client.core.IGetVoxelCore;
+import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
@@ -35,9 +36,13 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
 
         builder.setSavingRunnable(() -> {
             //After saving the core should be reloaded/reset
-            var world = (IGetVoxelCore)MinecraftClient.getInstance().worldRenderer;
+            var world = MinecraftClient.getInstance().worldRenderer;
             if (world != null && ON_SAVE_RELOAD) {
-                world.reloadVoxelCore();
+                //Reload voxy
+                ((IGetVoxyRenderSystem)world).shutdownRenderer();
+                VoxyCommon.shutdownInstance();
+                VoxyCommon.createInstance();
+                ((IGetVoxyRenderSystem)world).createRenderer();
             }
             ON_SAVE_RELOAD = false;
             VoxyConfig.CONFIG.save();

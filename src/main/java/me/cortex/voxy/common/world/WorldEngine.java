@@ -2,18 +2,10 @@ package me.cortex.voxy.common.world;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.section.SectionStorage;
-import me.cortex.voxy.common.util.ThreadLocalMemoryBuffer;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
-import me.cortex.voxy.common.world.service.SectionSavingService;
-import me.cortex.voxy.common.world.service.VoxelIngestService;
-import me.cortex.voxy.common.thread.ServiceThreadPool;
 
-import java.util.Arrays;
 import java.util.List;
-
-//Use an LMDB backend to store the world, use a local inmemory cache for lod sections
-// automatically manages and invalidates sections of the world as needed
 public class WorldEngine {
     public static final int MAX_LOD_LAYERS = 5;
 
@@ -22,36 +14,35 @@ public class WorldEngine {
     public static final int UPDATE_FLAGS = UPDATE_TYPE_BLOCK_BIT | UPDATE_TYPE_CHILD_EXISTENCE_BIT;
 
     public interface ISectionChangeCallback {void accept(WorldSection section, int updateFlags);}
+    public interface ISectionSaveCallback {void save(WorldEngine engine, WorldSection section);}
 
 
     public final SectionStorage storage;
     private final Mapper mapper;
     private final ActiveSectionTracker sectionTracker;
-    public final VoxelIngestService ingestService;
-    public final SectionSavingService savingService;
     private ISectionChangeCallback dirtyCallback;
+    private ISectionSaveCallback saveCallback;
     private final int maxMipLevels;
 
     public void setDirtyCallback(ISectionChangeCallback callback) {
         this.dirtyCallback = callback;
     }
 
-    public Mapper getMapper() {return this.mapper;}
-
-
-    public WorldEngine(SectionStorage storage, ServiceThreadPool serviceThreadPool, int cacheCount) {
-        this(storage, serviceThreadPool, MAX_LOD_LAYERS, cacheCount);
+    public void setSaveCallback(ISectionSaveCallback callback) {
+        this.saveCallback = callback;
     }
 
-    private WorldEngine(SectionStorage storage, ServiceThreadPool serviceThreadPool, int maxMipLayers, int cacheCount) {
+    public Mapper getMapper() {return this.mapper;}
+    public WorldEngine(SectionStorage storage, int cacheCount) {
+        this(storage, MAX_LOD_LAYERS, cacheCount);
+    }
+
+    private WorldEngine(SectionStorage storage, int maxMipLayers, int cacheCount) {
         this.maxMipLevels = maxMipLayers;
         this.storage = storage;
         this.mapper = new Mapper(this.storage);
         //4 cache size bits means that the section tracker has 16 separate maps that it uses
-        this.sectionTracker = new ActiveSectionTracker(4, storage::loadSection, cacheCount);
-
-        this.savingService = new SectionSavingService(this, serviceThreadPool);
-        this.ingestService  = new VoxelIngestService(this, serviceThreadPool);
+        this.sectionTracker = new ActiveSectionTracker(4, storage::loadSection, cacheCount, this);
     }
 
     public WorldSection acquireIfExists(int lvl, int x, int y, int z) {
@@ -104,7 +95,9 @@ public class WorldEngine {
         if (this.dirtyCallback != null) {
             this.dirtyCallback.accept(section, changeState);
         }
-        this.savingService.enqueueSave(section);
+        if (this.saveCallback != null) {
+            this.saveCallback.save(this, section);
+        }
     }
 
 
@@ -207,10 +200,9 @@ public class WorldEngine {
     }
 
     public void shutdown() {
-        try {this.storage.flush();} catch (Exception e) {e.printStackTrace();}
+        try {this.mapper.close();} catch (Exception e) {Logger.error(e);}
+        try {this.storage.flush();} catch (Exception e) {Logger.error(e);}
         //Shutdown in this order to preserve as much data as possible
-        try {this.ingestService.shutdown();} catch (Exception e) {e.printStackTrace();}
-        try {this.savingService.shutdown();} catch (Exception e) {e.printStackTrace();}
-        try {this.storage.close();} catch (Exception e) {e.printStackTrace();}
+        try {this.storage.close();} catch (Exception e) {Logger.error(e);}
     }
 }

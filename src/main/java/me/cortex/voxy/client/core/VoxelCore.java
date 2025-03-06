@@ -66,28 +66,17 @@ import static org.lwjgl.opengl.GL30C.*;
 //REMOVE setRenderGen like holy hell
 public class VoxelCore {
     private final WorldEngine world;
-
-    private final RenderService renderer;
-    private final PostProcessing postProcessing;
-    private final ServiceThreadPool serviceThreadPool;
-
+    public final ServiceThreadPool serviceThreadPool;
     public final WorldImportWrapper importer;
 
     public VoxelCore(ContextSelectionSystem.Selection worldSelection) {
         var cfg = worldSelection.getConfig();
         this.serviceThreadPool = new ServiceThreadPool(VoxyConfig.CONFIG.serviceThreads);
 
-        this.world = worldSelection.createEngine(this.serviceThreadPool);
+        this.world = null;//worldSelection.createEngine(this.serviceThreadPool);
         Logger.info("Initializing voxy core");
 
         this.importer = new WorldImportWrapper(this.serviceThreadPool, this.world);
-
-        //Trigger the shared index buffer loading
-        SharedIndexBuffer.INSTANCE.id();
-        Capabilities.init();//Ensure clinit is called
-
-        this.renderer = new RenderService(this.world, this.serviceThreadPool);
-        this.postProcessing = new PostProcessing();
 
         Logger.info("Voxy core initialized");
 
@@ -99,130 +88,16 @@ public class VoxelCore {
         //this.testFullMesh();
     }
 
-    public void enqueueIngest(WorldChunk worldChunk) {
-        this.world.ingestService.enqueueIngest(worldChunk);
-    }
-
-    public void renderSetup(Frustum frustum, Camera camera) {
-        this.renderer.setup(camera);
-        PrintfDebugUtil.tick();
-    }
-
-    private static Matrix4f makeProjectionMatrix(float near, float far) {
-        //TODO: use the existing projection matrix use mulLocal by the inverse of the projection and then mulLocal our projection
-
-        var projection = new Matrix4f();
-        var client = MinecraftClient.getInstance();
-        var gameRenderer = client.gameRenderer;//tickCounter.getTickDelta(true);
-
-        float fov = gameRenderer.getFov(gameRenderer.getCamera(), client.getRenderTickCounter().getTickDelta(true), true);
-
-        projection.setPerspective(fov * 0.01745329238474369f,
-                (float) client.getWindow().getFramebufferWidth() / (float)client.getWindow().getFramebufferHeight(),
-                near, far);
-        return projection;
-    }
-
-    //TODO: Make a reverse z buffer
-    private static Matrix4f computeProjectionMat() {
-        return new Matrix4f(RenderSystem.getProjectionMatrix()).mulLocal(
-                makeProjectionMatrix(0.05f, MinecraftClient.getInstance().gameRenderer.getFarPlaneDistance()).invert()
-        ).mulLocal(makeProjectionMatrix(16, 16*3000));
-    }
-
-    //private static final ModelTextureBakery mtb = new ModelTextureBakery(16, 16);
-    //private static final RawDownloadStream downstream = new RawDownloadStream(1<<20);
-    public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
-        /*
-        int allocation = downstream.download(2*4*6*16*16, ptr->{
-        });
-        mtb.renderFacesToStream(Blocks.WHITE_STAINED_GLASS.getDefaultState(), 123456, false, downstream.getBufferId(), allocation);
-        downstream.submit();
-        downstream.tick();
-         */
-        //if (true) return;
-
-
-        if (IrisUtil.irisShadowActive()) {
-            return;
-        }
-
-        if (false) {
-            float CHANGE_PER_SECOND = 30;
-            //Auto fps targeting
-            if (MinecraftClient.getInstance().getCurrentFps() < 45) {
-                VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 256);
-            }
-
-            if (55 < MinecraftClient.getInstance().getCurrentFps()) {
-                VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 30);
-            }
-        }
-
-        //Do some very cheeky stuff for MiB
-        if (false) {
-            int sector = (((int)Math.floor(cameraX)>>4)+512)>>10;
-            cameraX -= sector<<14;//10+4
-            cameraY += (16+(256-32-sector*30))*16;
-        }
-
-        matrices.push();
-        matrices.translate(-cameraX, -cameraY, -cameraZ);
-        matrices.pop();
-
-        var projection = computeProjectionMat();//RenderSystem.getProjectionMatrix();
-        //var projection = RenderSystem.getProjectionMatrix();
-
-        var viewport = this.renderer.getViewport();
-        viewport
-                .setProjection(projection)
-                .setModelView(matrices.peek().getPositionMatrix())
-                .setCamera(cameraX, cameraY, cameraZ)
-                .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
-        viewport.frameId++;
-
-        int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
-        if (boundFB == 0) {
-            throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
-        }
-        //TODO: use the raw depth buffer texture instead
-        //int boundDepthBuffer = glGetNamedFramebufferAttachmentParameteri(boundFB, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-
-        //TODO:FIXME!!! ??
-        this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);
-
-        this.renderer.renderFarAwayOpaque(viewport);
-
-        //Compute the SSAO of the rendered terrain, TODO: fix it breaking depth or breaking _something_ am not sure what
-        this.postProcessing.computeSSAO(projection, matrices);
-
-        //We can render the translucent directly after as it is the furthest translucent objects
-        this.renderer.renderFarAwayTranslucent(viewport);
-
-
-        this.postProcessing.renderPost(projection, RenderSystem.getProjectionMatrix(), boundFB);
-
-
-
-    }
-
-
     public void addDebugInfo(List<String> debug) {
         debug.add("");
         debug.add("");
-        debug.add("Voxy Core: " + VoxyCommon.MOD_VERSION);
-        debug.add("MemoryBuffer, Count/Size (mb): " + MemoryBuffer.getCount() + "/" + (MemoryBuffer.getTotalSize()/1_000_000));
-        debug.add("GlBuffer, Count/Size (mb): " + GlBuffer.getCount() + "/" + (GlBuffer.getTotalSize()/1_000_000));
         /*
         debug.add("Ingest service tasks: " + this.world.ingestService.getTaskCount());
         debug.add("Saving service tasks: " + this.world.savingService.getTaskCount());
         debug.add("Render service tasks: " + this.renderGen.getTaskCount());
          */
-        debug.add("I/S tasks: " + this.world.ingestService.getTaskCount() + "/"+this.world.savingService.getTaskCount());
         this.world.addDebugData(debug);
-        this.renderer.addDebugData(debug);
 
-        PrintfDebugUtil.addToOut(debug);
     }
 
     //Note: when doing translucent rendering, only need to sort when generating the geometry, or when crossing into the center zone
@@ -230,8 +105,6 @@ public class VoxelCore {
     // since they are AABBS crossing the normal is impossible without one of the axis being equal
 
     public void shutdown() {
-        Logger.info("Flushing download stream");
-        DownloadStream.INSTANCE.flushWaitClear();
 
         //if (Thread.currentThread() != this.shutdownThread) {
         //    Runtime.getRuntime().removeShutdownHook(this.shutdownThread);
@@ -239,10 +112,6 @@ public class VoxelCore {
 
         //this.world.getMapper().forceResaveStates();
         this.importer.shutdown();
-        Logger.info("Shutting down rendering");
-        try {this.renderer.shutdown();} catch (Exception e) {Logger.error("Error shutting down renderer", e);}
-        Logger.info("Shutting down post processor");
-        if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {Logger.error("Error shutting down post processor", e);}}
         Logger.info("Shutting down world engine");
         try {this.world.shutdown();} catch (Exception e) {Logger.error("Error shutting down world engine", e);}
         Logger.info("Shutting down service thread pool");

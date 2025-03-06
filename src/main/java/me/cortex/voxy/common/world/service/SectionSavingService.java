@@ -16,34 +16,40 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 // might have some issues with threading if the same section is saved from multiple threads?
 public class SectionSavingService {
     private final ServiceSlice threads;
-    private final ConcurrentLinkedDeque<WorldSection> saveQueue = new ConcurrentLinkedDeque<>();
-    private final WorldEngine world;
+    private record SaveEntry(WorldEngine engine, WorldSection section) {}
+    private final ConcurrentLinkedDeque<SaveEntry> saveQueue = new ConcurrentLinkedDeque<>();
 
-    public SectionSavingService(WorldEngine worldEngine, ServiceThreadPool threadPool) {
-        this.world = worldEngine;
+    public SectionSavingService(ServiceThreadPool threadPool) {
         this.threads = threadPool.createServiceNoCleanup("Section saving service", 100, () -> this::processJob);
     }
 
     private void processJob() {
-        var section = this.saveQueue.pop();
+        var task = this.saveQueue.pop();
+        var section = task.section;
         section.assertNotFree();
         try {
             section.inSaveQueue.set(false);
-            this.world.storage.saveSection(section);
+            task.engine.storage.saveSection(section);
         } catch (Exception e) {
-            String err = "Voxy saver had an exception while executing please check logs and report error";
-            Logger.error(err, e);
-            MinecraftClient.getInstance().executeSync(()->MinecraftClient.getInstance().player.sendMessage(Text.literal(err), true));
+            Logger.error("Voxy saver had an exception while executing please check logs and report error", e);
         }
         section.release();
     }
 
     public void enqueueSave(WorldSection section) {
+        if (section._getSectionTracker() != null && section._getSectionTracker().engine != null) {
+            this.enqueueSave(section._getSectionTracker().engine, section);
+        } else {
+            Logger.error("Tried saving world section, but did not have world associated");
+        }
+    }
+
+    public void enqueueSave(WorldEngine in, WorldSection section) {
         //If its not enqueued for saving then enqueue it
         if (!section.inSaveQueue.getAndSet(true)) {
             //Acquire the section for use
             section.acquire();
-            this.saveQueue.add(section);
+            this.saveQueue.add(new SaveEntry(in, section));
             this.threads.execute();
         }
     }

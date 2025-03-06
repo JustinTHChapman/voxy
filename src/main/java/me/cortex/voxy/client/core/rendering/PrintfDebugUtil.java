@@ -1,6 +1,5 @@
 package me.cortex.voxy.client.core.rendering;
 
-import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.core.gl.shader.IShaderProcessor;
 import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;

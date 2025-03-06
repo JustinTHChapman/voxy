@@ -4,6 +4,7 @@ import me.cortex.voxy.client.taskbar.Taskbar;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.importers.WorldImporter;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.ClientBossBar;
@@ -28,7 +29,6 @@ public class WorldImportWrapper {
     }
 
     public void shutdown() {
-
         Logger.info("Shutting down importer");
         if (this.importer != null) {
             try {
@@ -58,7 +58,7 @@ public class WorldImportWrapper {
     }
     public boolean createWorldImporter(World mcWorld, IImporterFactory factory) {
         if (this.importer == null) {
-            this.importer = new WorldImporter(this.world, mcWorld, this.pool);
+            this.importer = new WorldImporter(this.world, mcWorld, this.pool, VoxyCommon.getInstance().getSavingService());
         }
         if (this.importer.isBusy()) {
             return false;

@@ -5,8 +5,8 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
-import me.cortex.voxy.client.core.IGetVoxelCore;
-import me.cortex.voxy.client.core.VoxelCore;
+import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.cortex.voxy.commonImpl.VoxyInstance;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
@@ -20,8 +20,9 @@ import java.util.concurrent.CompletableFuture;
 
 
 public class WorldImportCommand {
+    /*
     public static LiteralArgumentBuilder<FabricClientCommandSource> register() {
-        return ClientCommandManager.literal("voxy").requires((ctx)-> ((IGetVoxelCore)MinecraftClient.getInstance().worldRenderer).getVoxelCore() != null)
+        return ClientCommandManager.literal("voxy").requires((ctx)-> VoxyCommon.getInstance() != null)
                 .then(ClientCommandManager.literal("import")
                         .then(ClientCommandManager.literal("world")
                                 .then(ClientCommandManager.argument("world_name", StringArgumentType.string())
@@ -138,5 +139,5 @@ public class WorldImportCommand {
         String finalInnerDir = innerDir;
         return core.importer.createWorldImporter(instance.player.clientWorld,
                 (importer, up, done)->importer.importZippedRegionDirectoryAsyncStart(zip, finalInnerDir, up, done))?0:1;
-    }
+    }*/
 }

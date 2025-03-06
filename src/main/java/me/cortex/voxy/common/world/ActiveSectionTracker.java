@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import me.cortex.voxy.common.util.VolatileHolder;
 import me.cortex.voxy.common.world.other.Mapper;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 
@@ -18,10 +19,18 @@ public class ActiveSectionTracker {
     private final SectionLoader loader;
 
     private final int maxLRUSectionPerSlice;
-    private final Long2ObjectLinkedOpenHashMap<WorldSection>[] lruSecondaryCache;
+    private final Long2ObjectLinkedOpenHashMap<WorldSection>[] lruSecondaryCache;//TODO: THIS NEEDS TO BECOME A GLOBAL STATIC CACHE
+    @Nullable
+    public final WorldEngine engine;
+
+    public ActiveSectionTracker(int numSlicesBits, SectionLoader loader, int cacheSize) {
+        this(numSlicesBits, loader, cacheSize, null);
+    }
 
     @SuppressWarnings("unchecked")
-    public ActiveSectionTracker(int numSlicesBits, SectionLoader loader, int cacheSize) {
+    public ActiveSectionTracker(int numSlicesBits, SectionLoader loader, int cacheSize, WorldEngine engine) {
+        this.engine = engine;
+
         this.loader = loader;
         this.loadedSectionCache = new Long2ObjectOpenHashMap[1<<numSlicesBits];
         this.lruSecondaryCache = new Long2ObjectLinkedOpenHashMap[1<<numSlicesBits];

@@ -1,12 +1,15 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
-import me.cortex.voxy.client.Voxy;
-import me.cortex.voxy.client.core.IGetVoxelCore;
+import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.VoxelCore;
+import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
+import me.cortex.voxy.client.core.rendering.VoxyRenderSystem;
+import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.cortex.voxy.commonImpl.VoxyInstance;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.ObjectAllocator;
-import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.world.ClientWorld;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
@@ -15,81 +18,71 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(WorldRenderer.class)
-public abstract class MixinWorldRenderer implements IGetVoxelCore {
+public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
     @Shadow private Frustum frustum;
-
     @Shadow private @Nullable ClientWorld world;
-    @Unique private VoxelCore core;
+    @Unique private VoxyRenderSystem renderer;
 
     @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/WorldRenderer;setupTerrain(Lnet/minecraft/client/render/Camera;Lnet/minecraft/client/render/Frustum;ZZ)V", shift = At.Shift.AFTER))
     private void injectSetup(ObjectAllocator allocator, RenderTickCounter tickCounter, boolean renderBlockOutline, Camera camera, GameRenderer gameRenderer, Matrix4f positionMatrix, Matrix4f projectionMatrix, CallbackInfo ci) {
-        if (this.core != null) {
-            this.core.renderSetup(this.frustum, camera);
+        if (this.renderer != null) {
+            this.renderer.renderSetup(this.frustum, camera);
         }
     }
 
-    @Unique
-    public void populateCore() {
-        if (this.core != null) {
-            throw new IllegalStateException("Trying to create new core while a core already exists");
-        }
-        this.core = Voxy.createVoxelCore(this.world);
-    }
-
-    public VoxelCore getVoxelCore() {
-        return this.core;
+    @Override
+    public VoxyRenderSystem getVoxyRenderSystem() {
+        return this.renderer;
     }
 
     @Inject(method = "reload()V", at = @At("TAIL"))
-    private void resetVoxelCore(CallbackInfo ci) {
-        if (this.world != null && this.core != null) {
-            this.core.shutdown();
-            this.core = null;
-            if (VoxyConfig.CONFIG.enabled) {
-                this.populateCore();
-            }
+    private void reloadVoxyRenderer(CallbackInfo ci) {
+        this.shutdownRenderer();
+        if (this.world != null) {
+            this.createRenderer();
         }
     }
 
     @Inject(method = "setWorld", at = @At("TAIL"))
     private void initVoxelCore(ClientWorld world, CallbackInfo ci) {
         if (world == null) {
-            if (this.core != null) {
-                this.core.shutdown();
-                this.core = null;
-            }
-            return;
-        }
-
-        if (this.core != null) {
-            this.core.shutdown();
-            this.core = null;
-        }
-        if (VoxyConfig.CONFIG.enabled) {
-            this.populateCore();
-        }
-    }
-
-    @Override
-    public void reloadVoxelCore() {
-        if (this.core != null) {
-            this.core.shutdown();
-            this.core = null;
-        }
-        if (this.world != null && VoxyConfig.CONFIG.enabled) {
-            this.populateCore();
+            this.shutdownRenderer();
         }
     }
 
     @Inject(method = "close", at = @At("HEAD"))
     private void injectClose(CallbackInfo ci) {
-        if (this.core != null) {
-            this.core.shutdown();
-            this.core = null;
+        this.shutdownRenderer();
+    }
+
+    @Override
+    public void shutdownRenderer() {
+        if (this.renderer != null) {
+            this.renderer.shutdown();
+            this.renderer = null;
         }
+    }
+
+    @Override
+    public void createRenderer() {
+        if (this.renderer != null) throw new IllegalStateException("Cannot have multiple renderers");
+        if ((!VoxyConfig.CONFIG.enableRendering)||(!VoxyConfig.CONFIG.enabled)) {
+            Logger.info("Not creating renderer due to disabled");
+            return;
+        }
+        var instance = VoxyCommon.getInstance();
+        if (instance == null) {
+            Logger.error("Not creating renderer due to null instance");
+            return;
+        }
+        WorldEngine world = instance.getOrMakeWorld(this.world);
+        if (world == null) {
+            Logger.error("Null world selected");
+            return;
+        }
+        this.renderer = new VoxyRenderSystem(world, instance.getThreadPool());
     }
 }

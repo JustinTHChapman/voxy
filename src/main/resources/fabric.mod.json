@@ -18,7 +18,7 @@
   "environment": "*",
   "entrypoints": {
     "client": [
-      "me.cortex.voxy.client.Voxy"
+      "me.cortex.voxy.client.VoxyClient"
     ],
     "modmenu": [
       "me.cortex.voxy.client.config.VoxyConfigScreenFactory"

@@ -259,4 +259,8 @@ public final class WorldSection {
     public static WorldSection _createRawUntrackedUnsafeSection(int lvl, int x, int y, int z) {
         return new WorldSection(lvl, x, y, z, null);
     }
+
+    public ActiveSectionTracker _getSectionTracker() {
+        return this.tracker;
+    }
 }
