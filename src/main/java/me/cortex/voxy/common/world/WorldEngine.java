@@ -41,8 +41,8 @@ public class WorldEngine {
         this.maxMipLevels = maxMipLayers;
         this.storage = storage;
         this.mapper = new Mapper(this.storage);
-        //4 cache size bits means that the section tracker has 16 separate maps that it uses
-        this.sectionTracker = new ActiveSectionTracker(4, storage::loadSection, cacheCount, this);
+        //5 cache size bits means that the section tracker has 32 separate maps that it uses
+        this.sectionTracker = new ActiveSectionTracker(5, storage::loadSection, cacheCount, this);
     }
 
     public WorldSection acquireIfExists(int lvl, int x, int y, int z) {

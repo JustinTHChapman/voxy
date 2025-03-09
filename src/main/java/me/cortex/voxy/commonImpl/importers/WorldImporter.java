@@ -131,7 +131,9 @@ public class WorldImporter {
                 throw new RuntimeException(e);
             }
         }
-        this.threadPool.shutdown();
+        if (!this.threadPool.isFreed()) {
+            this.threadPool.shutdown();
+        }
     }
 
     private interface IImporterMethod <T> {
@@ -237,6 +239,8 @@ public class WorldImporter {
                 }
             }
             onCompletion.accept(this.totalChunks.get());
+
+            this.threadPool.shutdown();
             this.worker = null;
         });
         this.worker.setName("World importer");
