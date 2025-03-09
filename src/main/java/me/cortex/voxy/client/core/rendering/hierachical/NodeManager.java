@@ -476,12 +476,18 @@ public class NodeManager {
             // childRequest
             // this is only valid if this node is an inner node
 
-
             Logger.error("UNFINISHED OPERATION TODO: FIXME2");
+            for (int i = 0; i < 8; i++) {
+                if ((childExistence&(1<<i))==0) continue;
+
+                long childPos = makeChildPos(pos, i);
+                this.recurseRemoveNode(childPos);
+            }
 
             //Free geometry and related memory for this node
-
-            //TODO: DELETE GEOMETRY
+            int geometry = this.nodeData.getNodeGeometry(nodeId);
+            if (geometry != EMPTY_GEOMETRY_ID && geometry != NULL_GEOMETRY_ID)
+                this.geometryManager.removeSection(geometry);
 
             this.nodeData.free(nodeId);
             this.clearId(nodeId);

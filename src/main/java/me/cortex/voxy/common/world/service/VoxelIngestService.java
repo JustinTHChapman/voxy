@@ -79,10 +79,12 @@ public class VoxelIngestService {
         return true;
     }
 
-    public void enqueueIngest(WorldChunk chunk) {
+    public void enqueueIngest(WorldChunk chunk, boolean ignoreOnNullWorld) {
         var engine = ((IVoxyWorldGetter)chunk.getWorld()).getWorldEngine();
         if (engine == null) {
-            Logger.error("Could not ingest chunk as does not have world engine");
+            if (!ignoreOnNullWorld) {
+                Logger.error("Could not ingest chunk as does not have world engine");
+            }
             return;
         }
         this.enqueueIngest(engine, chunk);

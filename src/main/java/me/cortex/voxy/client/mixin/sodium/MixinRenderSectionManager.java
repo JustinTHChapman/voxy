@@ -20,7 +20,7 @@ public class MixinRenderSectionManager {
         //TODO: Am not quite sure if this is right
         var instance = VoxyCommon.getInstance();
         if (instance != null && VoxyConfig.CONFIG.ingestEnabled) {
-            instance.getIngestService().enqueueIngest(this.level.getChunk(x, z));
+            instance.getIngestService().enqueueIngest(this.level.getChunk(x, z), false);
         }
     }
 }

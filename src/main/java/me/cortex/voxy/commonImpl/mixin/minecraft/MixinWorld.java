@@ -4,6 +4,7 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.IVoxyWorldGetter;
 import me.cortex.voxy.commonImpl.IVoxyWorldSetter;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -18,7 +19,9 @@ public class MixinWorld implements IVoxyWorldGetter, IVoxyWorldSetter {
     @Inject(method = "close", at = @At("HEAD"))
     private void closeVoxyWorld(CallbackInfo ci) {
         if (this.voxyWorld != null) {
-            try {this.voxyWorld.shutdown();this.voxyWorld = null;} catch (Exception e) {
+            //TODO: FIXME: DONT DO THIS, this is a hack to ensure everything is saved
+            var instance = VoxyCommon.getInstance();
+            try {instance.stopWorld(this.voxyWorld); this.voxyWorld = null;} catch (Exception e) {
                 Logger.error("Failed to shutdown voxy  world engine.", e);
             }
         }

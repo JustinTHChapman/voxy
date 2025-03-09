@@ -17,7 +17,6 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 public class WorldImportWrapper {
-
     private WorldImporter importer;
     private final ServiceThreadPool pool;
     private final WorldEngine world;

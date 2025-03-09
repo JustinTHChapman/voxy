@@ -23,7 +23,11 @@ public class MixinFabricWorld {
             res.ifPresent(chunk -> {
                 var voxyInstance = VoxyCommon.getInstance();
                 if (voxyInstance != null) {
-                    voxyInstance.getIngestService().enqueueIngest((WorldChunk) chunk);
+                    try {
+                        voxyInstance.getIngestService().enqueueIngest((WorldChunk) chunk, true);
+                    } catch (Exception e) {
+
+                    }
                 }
             });
             return res;

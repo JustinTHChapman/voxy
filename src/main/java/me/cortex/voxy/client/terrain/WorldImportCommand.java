@@ -20,7 +20,7 @@ import java.util.concurrent.CompletableFuture;
 
 
 public class WorldImportCommand {
-    /*
+
     public static LiteralArgumentBuilder<FabricClientCommandSource> register() {
         return ClientCommandManager.literal("voxy").requires((ctx)-> VoxyCommon.getInstance() != null)
                 .then(ClientCommandManager.literal("import")
@@ -42,14 +42,16 @@ public class WorldImportCommand {
                                                 .executes(WorldImportCommand::importZip))))
                         .then(ClientCommandManager.literal("cancel")
                                 //.requires((ctx)->((IGetVoxelCore)MinecraftClient.getInstance().worldRenderer).getVoxelCore().importer.isImporterRunning())
-                                .executes((ctx)->{((IGetVoxelCore)MinecraftClient.getInstance().worldRenderer).getVoxelCore().importer.stopImporter(); return 0;}))
+                                .executes(WorldImportCommand::cancelImport))
         );
     }
 
     private static boolean fileBasedImporter(File directory) {
-        var instance = MinecraftClient.getInstance();
-        var core = ((IGetVoxelCore)instance.worldRenderer).getVoxelCore();
-        return core.importer.createWorldImporter(instance.player.clientWorld,
+        var instance = VoxyCommon.getInstance();
+        if (instance == null) {
+            return false;
+        }
+        return instance.importWrapper.createWorldImporter(MinecraftClient.getInstance().player.clientWorld,
                 (importer, up, done)->importer.importRegionDirectoryAsyncStart(directory, up, done));
     }
 
@@ -131,13 +133,21 @@ public class WorldImportCommand {
             innerDir = ctx.getArgument("innerPath", String.class);
         } catch (Exception e) {}
 
-        var instance = MinecraftClient.getInstance();
-        var core = ((IGetVoxelCore)instance.worldRenderer).getVoxelCore();
-        if (core == null) {
+        var instance = VoxyCommon.getInstance();
+        if (instance == null) {
             return 1;
         }
         String finalInnerDir = innerDir;
-        return core.importer.createWorldImporter(instance.player.clientWorld,
+        return instance.importWrapper.createWorldImporter(MinecraftClient.getInstance().player.clientWorld,
                 (importer, up, done)->importer.importZippedRegionDirectoryAsyncStart(zip, finalInnerDir, up, done))?0:1;
-    }*/
+    }
+
+    private static int cancelImport(CommandContext<FabricClientCommandSource> fabricClientCommandSourceCommandContext) {
+        var instance = VoxyCommon.getInstance();
+        if (instance == null) {
+            return 1;
+        }
+        instance.importWrapper.stopImporter();
+        return 0;
+    }
 }

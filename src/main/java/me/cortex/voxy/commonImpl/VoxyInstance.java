@@ -1,7 +1,10 @@
 package me.cortex.voxy.commonImpl;
 
+import me.cortex.voxy.client.core.WorldImportWrapper;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.config.section.SectionStorage;
+import me.cortex.voxy.common.config.storage.StorageBackend;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -9,12 +12,16 @@ import me.cortex.voxy.common.world.service.SectionSavingService;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import net.minecraft.client.world.ClientWorld;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+//TODO: add thread access verification (I.E. only accessible on a single thread)
 public class VoxyInstance {
     private final ServiceThreadPool threadPool;
     private final SectionSavingService savingService;
     private final VoxelIngestService ingestService;
+    private final Set<WorldEngine> activeWorlds = new HashSet<>();
 
     public VoxyInstance(int threadCount) {
         this.threadPool = new ServiceThreadPool(threadCount);
@@ -60,6 +67,13 @@ public class VoxyInstance {
         }
     }
 
+    private WorldEngine createWorld(SectionStorage storage) {
+        var world = new WorldEngine(storage, 1024);
+        world.setSaveCallback(this.savingService::enqueueSave);
+        this.activeWorlds.add(world);
+        return world;
+    }
+
     private static final ContextSelectionSystem SELECTOR = new ContextSelectionSystem();
 
     public WorldEngine getOrMakeWorld(ClientWorld world) {
@@ -68,8 +82,19 @@ public class VoxyInstance {
             vworld = new WorldEngine(SELECTOR.getBestSelectionOrCreate(world).createSectionStorageBackend(), 1024);
             vworld.setSaveCallback(this.savingService::enqueueSave);
             ((IVoxyWorldSetter)world).setWorldEngine(vworld);
+            this.importWrapper = new WorldImportWrapper(this.threadPool, vworld);
         }
         return vworld;
     }
 
+
+    public WorldImportWrapper importWrapper;
+
+    public void stopWorld(WorldEngine world) {
+        if (this.importWrapper != null) {
+            this.importWrapper.stopImporter();
+        }
+        this.flush();
+        world.shutdown();
+    }
 }

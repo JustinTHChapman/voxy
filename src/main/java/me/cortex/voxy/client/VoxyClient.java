@@ -11,9 +11,8 @@ import net.minecraft.client.world.ClientWorld;
 public class VoxyClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
-        /*
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(WorldImportCommand.register());
-        });*/
+        });
     }
 }
