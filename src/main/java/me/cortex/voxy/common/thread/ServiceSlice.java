@@ -13,7 +13,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 public class ServiceSlice extends TrackedObject {
-    private final String name;
+    final String name;
     final int weightPerJob;
     volatile boolean alive = true;
     private final ServiceThreadPool threadPool;

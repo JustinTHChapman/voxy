@@ -3,6 +3,7 @@ package me.cortex.voxy.common.thread;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
 
+import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -204,7 +205,11 @@ public class ServiceThreadPool {
 
     public void shutdown() {
         if (this.serviceSlices.length != 0) {
-            throw new IllegalStateException("All service slices must be shutdown before thread pool can exit");
+            String remaining = "";
+            for (var service : this.serviceSlices) {
+                remaining += service.name + ", ";
+            }
+            throw new IllegalStateException("All service slices must be shutdown before thread pool can exit. Remaining: " + remaining);
         }
 
         //Wait for the tasks to finish
