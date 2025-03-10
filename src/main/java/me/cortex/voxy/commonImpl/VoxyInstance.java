@@ -4,7 +4,6 @@ import me.cortex.voxy.client.core.WorldImportWrapper;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.section.SectionStorage;
-import me.cortex.voxy.common.config.storage.StorageBackend;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -74,13 +73,22 @@ public class VoxyInstance {
         return world;
     }
 
-    private static final ContextSelectionSystem SELECTOR = new ContextSelectionSystem();
+    //There are 4 possible "states" for world selection/management
+    // 1) dedicated server
+    // 2) client singleplayer
+    // 3) client singleplayer as lan host (so also a server)
+    // 4) client multiplayer (remote server)
 
+    //The thing with singleplayer is that it is more efficent to make it bound to clientworld (think)
+    // so if make into singleplayer as host, would need to reload the system into that mode
+    // so that the world renderer uses the WorldEngine of the server
+
+    private static final ContextSelectionSystem SELECTOR = new ContextSelectionSystem();
+    public WorldImportWrapper importWrapper;
     public WorldEngine getOrMakeWorld(ClientWorld world) {
         var vworld = ((IVoxyWorldGetter)world).getWorldEngine();
         if (vworld == null) {
-            vworld = new WorldEngine(SELECTOR.getBestSelectionOrCreate(world).createSectionStorageBackend(), 1024);
-            vworld.setSaveCallback(this.savingService::enqueueSave);
+            vworld = this.createWorld(SELECTOR.getBestSelectionOrCreate(world).createSectionStorageBackend());
             ((IVoxyWorldSetter)world).setWorldEngine(vworld);
             this.importWrapper = new WorldImportWrapper(this.threadPool, vworld);
         }
@@ -88,13 +96,24 @@ public class VoxyInstance {
     }
 
 
-    public WorldImportWrapper importWrapper;
 
     public void stopWorld(WorldEngine world) {
+        if (!this.activeWorlds.contains(world)) {
+            if (world.isLive()) {
+                throw new IllegalStateException("World cannot be live and not in world set");
+            }
+            throw new IllegalStateException("Cannot close world which is not part of instance");
+        }
+        if (!world.isLive()) {
+            throw new IllegalStateException("World cannot be in world set and not alive");
+        }
+
         if (this.importWrapper != null) {
             this.importWrapper.stopImporter();
         }
         this.flush();
+
         world.shutdown();
+        this.activeWorlds.remove(world);
     }
 }

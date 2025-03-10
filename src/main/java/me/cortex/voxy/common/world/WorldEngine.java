@@ -23,6 +23,7 @@ public class WorldEngine {
     private ISectionChangeCallback dirtyCallback;
     private ISectionSaveCallback saveCallback;
     private final int maxMipLevels;
+    private volatile boolean isLive = true;
 
     public void setDirtyCallback(ISectionChangeCallback callback) {
         this.dirtyCallback = callback;
@@ -33,6 +34,7 @@ public class WorldEngine {
     }
 
     public Mapper getMapper() {return this.mapper;}
+    public boolean isLive() {return this.isLive;}
     public WorldEngine(SectionStorage storage, int cacheCount) {
         this(storage, MAX_LOD_LAYERS, cacheCount);
     }
@@ -46,18 +48,22 @@ public class WorldEngine {
     }
 
     public WorldSection acquireIfExists(int lvl, int x, int y, int z) {
+        if (!this.isLive) throw new IllegalStateException("World is not live");
         return this.sectionTracker.acquire(lvl, x, y, z, true);
     }
 
     public WorldSection acquire(int lvl, int x, int y, int z) {
+        if (!this.isLive) throw new IllegalStateException("World is not live");
         return this.sectionTracker.acquire(lvl, x, y, z, false);
     }
 
     public WorldSection acquire(long pos) {
+        if (!this.isLive) throw new IllegalStateException("World is not live");
         return this.sectionTracker.acquire(pos, false);
     }
 
     public WorldSection acquireIfExists(long pos) {
+        if (!this.isLive) throw new IllegalStateException("World is not live");
         return this.sectionTracker.acquire(pos, true);
     }
 
@@ -92,6 +98,7 @@ public class WorldEngine {
     }
 
     public void markDirty(WorldSection section, int changeState) {
+        if (!this.isLive) throw new IllegalStateException("World is not live");
         if (this.dirtyCallback != null) {
             this.dirtyCallback.accept(section, changeState);
         }
@@ -106,6 +113,7 @@ public class WorldEngine {
 
     //NOTE: THIS RUNS ON THE THREAD IT WAS EXECUTED ON, when this method exits, the calling method may assume that VoxelizedSection is no longer needed
     public void insertUpdate(VoxelizedSection section) {//TODO: add a bitset of levels to update and if it should force update
+        if (!this.isLive) throw new IllegalStateException("World is not live");
         boolean shouldCheckEmptiness = false;
         WorldSection previousSection = null;
 
@@ -200,6 +208,7 @@ public class WorldEngine {
     }
 
     public void shutdown() {
+        this.isLive = false;
         try {this.mapper.close();} catch (Exception e) {Logger.error(e);}
         try {this.storage.flush();} catch (Exception e) {Logger.error(e);}
         //Shutdown in this order to preserve as much data as possible
