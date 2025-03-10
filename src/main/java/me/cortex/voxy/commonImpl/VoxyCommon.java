@@ -7,8 +7,6 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 
 public class VoxyCommon implements ModInitializer {
-    private static VoxyInstance INSTANCE;
-
     public static final String MOD_VERSION;
     public static final boolean IS_DEDICATED_SERVER;
 
@@ -27,20 +25,23 @@ public class VoxyCommon implements ModInitializer {
         }
     }
 
-    @Override
-    public void onInitialize() {
+    //This is hardcoded like this because people do not understand what they are doing
+    private static final boolean GlobalVerificationDisableOverride = false;//System.getProperty("voxy.verificationDisableOverride", "false").equals("true");
+    public static boolean isVerificationFlagOn(String name) {
+        return (!GlobalVerificationDisableOverride) && System.getProperty("voxy."+name, "true").equals("true");
     }
 
     public static void breakpoint() {
         int breakpoint = 0;
     }
 
-
-    //This is hardcoded like this because people do not understand what they are doing
-    private static final boolean GlobalVerificationDisableOverride = false;//System.getProperty("voxy.verificationDisableOverride", "false").equals("true");
-    public static boolean isVerificationFlagOn(String name) {
-        return (!GlobalVerificationDisableOverride) && System.getProperty("voxy."+name, "true").equals("true");
+    @Override
+    public void onInitialize() {
     }
+
+    public interface IInstanceFactory {VoxyInstance create();}
+    private static VoxyInstance INSTANCE;
+    private static IInstanceFactory FACTORY;
 
     public static VoxyInstance getInstance() {
         return INSTANCE;
@@ -57,6 +58,9 @@ public class VoxyCommon implements ModInitializer {
         if (INSTANCE != null) {
             throw new IllegalStateException("Cannot create multiple instances");
         }
-        INSTANCE = new VoxyInstance(12);
+        if (FACTORY == null) {
+            throw new IllegalStateException("Instance factory null");
+        }
+        INSTANCE = FACTORY.create();
     }
 }

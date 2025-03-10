@@ -2,6 +2,7 @@ package me.cortex.voxy.common.world;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.section.SectionStorage;
+import me.cortex.voxy.common.util.TrackedObject;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 
@@ -16,6 +17,7 @@ public class WorldEngine {
     public interface ISectionChangeCallback {void accept(WorldSection section, int updateFlags);}
     public interface ISectionSaveCallback {void save(WorldEngine engine, WorldSection section);}
 
+    private final TrackedObject thisTracker = TrackedObject.createTrackedObject(this);
 
     public final SectionStorage storage;
     private final Mapper mapper;
@@ -207,7 +209,8 @@ public class WorldEngine {
         debug.add("ACC/SCC: " + this.sectionTracker.getLoadedCacheCount()+"/"+this.sectionTracker.getSecondaryCacheSize());//Active cache count, Secondary cache counts
     }
 
-    public void shutdown() {
+    public void free() {
+        this.thisTracker.free();
         this.isLive = false;
         try {this.mapper.close();} catch (Exception e) {Logger.error(e);}
         try {this.storage.flush();} catch (Exception e) {Logger.error(e);}

@@ -18,6 +18,10 @@ public abstract class TrackedObject {
         this.ref = register(shouldTrack, this);
     }
 
+    protected TrackedObject(Object forObj, boolean shouldTrack) {
+        this.ref = register(shouldTrack, forObj);
+    }
+
     protected void free0() {
         if (this.isFreed()) {
             throw new IllegalStateException("Object " + this + " was double freed.");
@@ -78,4 +82,20 @@ public abstract class TrackedObject {
         }
         return new Ref(cleanable, freed);
     }
+
+    public static final class TrackedObjectObject extends TrackedObject {
+        private TrackedObjectObject(Object forObj) {
+            super(forObj, true);
+        }
+
+        @Override
+        public void free() {
+            this.free0();
+        }
+    }
+
+    public static TrackedObject createTrackedObject(Object forObj) {
+        return new TrackedObjectObject(forObj);
+    }
+
 }

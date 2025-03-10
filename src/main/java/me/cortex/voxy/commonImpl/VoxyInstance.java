@@ -17,10 +17,10 @@ import java.util.Set;
 
 //TODO: add thread access verification (I.E. only accessible on a single thread)
 public class VoxyInstance {
-    private final ServiceThreadPool threadPool;
-    private final SectionSavingService savingService;
-    private final VoxelIngestService ingestService;
-    private final Set<WorldEngine> activeWorlds = new HashSet<>();
+    protected final ServiceThreadPool threadPool;
+    protected final SectionSavingService savingService;
+    protected final VoxelIngestService ingestService;
+    protected final Set<WorldEngine> activeWorlds = new HashSet<>();
 
     public VoxyInstance(int threadCount) {
         this.threadPool = new ServiceThreadPool(threadCount);
@@ -66,7 +66,7 @@ public class VoxyInstance {
         }
     }
 
-    private WorldEngine createWorld(SectionStorage storage) {
+    protected WorldEngine createWorld(SectionStorage storage) {
         var world = new WorldEngine(storage, 1024);
         world.setSaveCallback(this.savingService::enqueueSave);
         this.activeWorlds.add(world);
@@ -83,6 +83,30 @@ public class VoxyInstance {
     // so if make into singleplayer as host, would need to reload the system into that mode
     // so that the world renderer uses the WorldEngine of the server
 
+    public void stopWorld(WorldEngine world) {
+        if (!this.activeWorlds.contains(world)) {
+            if (world.isLive()) {
+                throw new IllegalStateException("World cannot be live and not in world set");
+            }
+            throw new IllegalStateException("Cannot close world which is not part of instance");
+        }
+        if (!world.isLive()) {
+            throw new IllegalStateException("World cannot be in world set and not alive");
+        }
+
+
+        if (this.importWrapper != null) {
+            this.importWrapper.stopImporter();
+            this.importWrapper = null;
+        }
+
+        this.flush();
+
+
+        world.free();
+        this.activeWorlds.remove(world);
+    }
+
     private static final ContextSelectionSystem SELECTOR = new ContextSelectionSystem();
     public WorldImportWrapper importWrapper;
     public WorldEngine getOrMakeWorld(ClientWorld world) {
@@ -95,25 +119,4 @@ public class VoxyInstance {
         return vworld;
     }
 
-
-
-    public void stopWorld(WorldEngine world) {
-        if (!this.activeWorlds.contains(world)) {
-            if (world.isLive()) {
-                throw new IllegalStateException("World cannot be live and not in world set");
-            }
-            throw new IllegalStateException("Cannot close world which is not part of instance");
-        }
-        if (!world.isLive()) {
-            throw new IllegalStateException("World cannot be in world set and not alive");
-        }
-
-        if (this.importWrapper != null) {
-            this.importWrapper.stopImporter();
-        }
-        this.flush();
-
-        world.shutdown();
-        this.activeWorlds.remove(world);
-    }
 }

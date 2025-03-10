@@ -113,7 +113,7 @@ public class VoxelCore {
         //this.world.getMapper().forceResaveStates();
         this.importer.shutdown();
         Logger.info("Shutting down world engine");
-        try {this.world.shutdown();} catch (Exception e) {Logger.error("Error shutting down world engine", e);}
+        try {this.world.free();} catch (Exception e) {Logger.error("Error shutting down world engine", e);}
         Logger.info("Shutting down service thread pool");
         this.serviceThreadPool.shutdown();
         Logger.info("Voxel core shut down");
