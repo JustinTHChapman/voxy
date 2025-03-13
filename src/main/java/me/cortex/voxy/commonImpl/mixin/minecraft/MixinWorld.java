@@ -16,17 +16,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinWorld implements IVoxyWorldGetter, IVoxyWorldSetter {
     @Unique private WorldEngine voxyWorld;
 
-    @Inject(method = "close", at = @At("HEAD"))
-    private void closeVoxyWorld(CallbackInfo ci) {
-        if (this.voxyWorld != null) {
-            //TODO: FIXME: DONT DO THIS, this is a hack to ensure everything is saved
-            var instance = VoxyCommon.getInstance();
-            try {instance.stopWorld(this.voxyWorld); this.voxyWorld = null;} catch (Exception e) {
-                Logger.error("Failed to shutdown voxy  world engine.", e);
-            }
-        }
-    }
-
     @Override
     public WorldEngine getWorldEngine() {
         return this.voxyWorld;

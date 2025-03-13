@@ -164,4 +164,8 @@ public class ServiceSlice extends TrackedObject {
         this.threadPool.steal(this);
         return true;
     }
+
+    public boolean isAlive() {
+        return this.alive;
+    }
 }

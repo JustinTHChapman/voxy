@@ -23,10 +23,11 @@ public class MixinMinecraftClient {
         VoxyCommon.shutdownInstance();
     }
 
+    /*
     @Inject(method = "joinWorld", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/MinecraftClient;setWorld(Lnet/minecraft/client/world/ClientWorld;)V", shift = At.Shift.BEFORE))
     private void voxy$injectInitialization(ClientWorld world, DownloadingTerrainScreen.WorldEntryReason worldEntryReason, CallbackInfo ci) {
         if (VoxyConfig.CONFIG.enabled) {
             VoxyCommon.createInstance();
         }
-    }
+    }*/
 }

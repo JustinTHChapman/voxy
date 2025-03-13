@@ -5,6 +5,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.VoxyInstance;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
@@ -47,7 +48,7 @@ public class WorldImportCommand {
     }
 
     private static boolean fileBasedImporter(File directory) {
-        var instance = VoxyCommon.getInstance();
+        var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
             return false;
         }
@@ -133,7 +134,7 @@ public class WorldImportCommand {
             innerDir = ctx.getArgument("innerPath", String.class);
         } catch (Exception e) {}
 
-        var instance = VoxyCommon.getInstance();
+        var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
             return 1;
         }
@@ -143,7 +144,7 @@ public class WorldImportCommand {
     }
 
     private static int cancelImport(CommandContext<FabricClientCommandSource> fabricClientCommandSourceCommandContext) {
-        var instance = VoxyCommon.getInstance();
+        var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
             return 1;
         }

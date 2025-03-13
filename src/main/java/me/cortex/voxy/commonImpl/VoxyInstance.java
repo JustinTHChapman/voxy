@@ -23,6 +23,7 @@ public class VoxyInstance {
     protected final Set<WorldEngine> activeWorlds = new HashSet<>();
 
     public VoxyInstance(int threadCount) {
+        Logger.info("Initializing voxy instance");
         this.threadPool = new ServiceThreadPool(threadCount);
         this.savingService = new SectionSavingService(this.threadPool);
         this.ingestService = new VoxelIngestService(this.threadPool);
@@ -36,9 +37,22 @@ public class VoxyInstance {
 
     public void shutdown() {
         Logger.info("Shutdown voxy instance");
+
         try {this.ingestService.shutdown();} catch (Exception e) {Logger.error(e);}
         try {this.savingService.shutdown();} catch (Exception e) {Logger.error(e);}
+
+        if (!this.activeWorlds.isEmpty()) {
+            Logger.error("Not all worlds shutdown, force closing " + this.activeWorlds.size() + " worlds");
+            for (var world : new HashSet<>(this.activeWorlds)) {//Create a clone
+                this.stopWorld(world);
+            }
+        }
+
         try {this.threadPool.shutdown();} catch (Exception e) {Logger.error(e);}
+
+        if (!this.activeWorlds.isEmpty()) {
+            throw new IllegalStateException("Not all worlds shutdown");
+        }
     }
 
     public ServiceThreadPool getThreadPool() {
@@ -94,29 +108,9 @@ public class VoxyInstance {
             throw new IllegalStateException("World cannot be in world set and not alive");
         }
 
-
-        if (this.importWrapper != null) {
-            this.importWrapper.stopImporter();
-            this.importWrapper = null;
-        }
-
         this.flush();
-
 
         world.free();
         this.activeWorlds.remove(world);
     }
-
-    private static final ContextSelectionSystem SELECTOR = new ContextSelectionSystem();
-    public WorldImportWrapper importWrapper;
-    public WorldEngine getOrMakeWorld(ClientWorld world) {
-        var vworld = ((IVoxyWorldGetter)world).getWorldEngine();
-        if (vworld == null) {
-            vworld = this.createWorld(SELECTOR.getBestSelectionOrCreate(world).createSectionStorageBackend());
-            ((IVoxyWorldSetter)world).setWorldEngine(vworld);
-            this.importWrapper = new WorldImportWrapper(this.threadPool, vworld);
-        }
-        return vworld;
-    }
-
 }

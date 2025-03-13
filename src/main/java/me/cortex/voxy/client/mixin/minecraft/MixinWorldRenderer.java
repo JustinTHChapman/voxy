@@ -1,11 +1,12 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
-import me.cortex.voxy.client.VoxyClient;
+import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.rendering.VoxyRenderSystem;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.commonImpl.IVoxyWorldGetter;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.VoxyInstance;
 import net.minecraft.client.render.*;
@@ -46,10 +47,24 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
         }
     }
 
-    @Inject(method = "setWorld", at = @At("TAIL"))
+    @Unique private ClientWorld refCopy;
+
+    @Inject(method = "setWorld", at = @At("HEAD"))
     private void initVoxelCore(ClientWorld world, CallbackInfo ci) {
+        this.refCopy = this.world;
+    }
+
+    @Inject(method = "setWorld", at = @At("TAIL"))
+    private void voxy$setWorld(ClientWorld world, CallbackInfo ci) {
         if (world == null) {
             this.shutdownRenderer();
+        }
+        //Release the client world
+        if (this.refCopy != null) {
+            var engine = ((IVoxyWorldGetter)this.refCopy).getWorldEngine();
+            if (engine != null) {
+                VoxyCommon.getInstance().stopWorld(engine);
+            }
         }
     }
 
@@ -73,12 +88,12 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             Logger.info("Not creating renderer due to disabled");
             return;
         }
-        var instance = VoxyCommon.getInstance();
+        var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
             Logger.error("Not creating renderer due to null instance");
             return;
         }
-        WorldEngine world = instance.getOrMakeWorld(this.world);
+        WorldEngine world = instance.getOrMakeRenderWorld(this.world);
         if (world == null) {
             Logger.error("Null world selected");
             return;
