@@ -91,8 +91,10 @@ public class WorldImportWrapper {
                         MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(Text.literal(msg));
                         Logger.info(msg);
                         Taskbar.INSTANCE.setIsNone();
-                        this.importer.shutdown();
-                        this.importer = null;
+                        if (this.importer != null) {
+                            this.importer.shutdown();
+                            this.importer = null;
+                        }
                     });
                 });
         return true;
