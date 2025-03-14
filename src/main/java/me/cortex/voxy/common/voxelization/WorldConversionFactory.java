@@ -8,6 +8,8 @@ import me.cortex.voxy.common.world.other.Mapper;
 import net.caffeinemc.mods.lithium.common.world.chunk.LithiumHashPalette;
 import net.minecraft.block.BlockState;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.util.collection.EmptyPaletteStorage;
+import net.minecraft.util.collection.PackedIntegerArray;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.*;
 
@@ -99,6 +101,89 @@ public class WorldConversionFactory {
     }
 
     public static VoxelizedSection convert(VoxelizedSection section,
+                                           Mapper stateMapper,
+                                           PalettedContainer<BlockState> blockContainer,
+                                           ReadableContainer<RegistryEntry<Biome>> biomeContainer,
+                                           ILightingSupplier lightSupplier) {
+
+        //Cheat by creating a local pallet then read the data directly
+
+
+        var cache = THREAD_LOCAL.get();
+        var blockCache = cache.getLocalMapping(stateMapper);
+
+        var biomes = cache.biomeCache;
+        var data = section.section;
+
+        var vp = blockContainer.data.palette;
+        var pc = cache.getPaletteCache(vp.getSize());
+
+        setupLocalPalette(vp, blockCache, stateMapper, pc);
+
+
+        {
+            int i = 0;
+            for (int y = 0; y < 4; y++) {
+                for (int z = 0; z < 4; z++) {
+                    for (int x = 0; x < 4; x++) {
+                        biomes[i++] = stateMapper.getIdForBiome(biomeContainer.get(x, y, z));
+                    }
+                }
+            }
+        }
+
+        //TODO: EmptyPaletteStorage (it only refs idx 0)
+        if (blockContainer.data.storage instanceof PackedIntegerArray bStor) {
+            var bDat = bStor.getData();
+            int iterPerLong = (64 / bStor.getElementBits()) - 1;
+
+            int MSK = (1 << bStor.getElementBits()) - 1;
+            int eBits = bStor.getElementBits();
+
+            long sample = 0;
+            int c = 0;
+            int dec = 0;
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        if (dec-- == 0) {
+                            sample = bDat[c++];
+                            dec = iterPerLong;
+                        }
+                        int bId = pc[(int) (sample & MSK)];
+                        sample >>>= eBits;
+
+                        byte light = lightSupplier.supply(x, y, z);
+                        if (!(bId == 0 && (light == 0))) {
+                            data[G(x, y, z)] = Mapper.composeMappingId(light, bId, biomes[((y & 0b1100) << 2) | (z & 0b1100) | (x >> 2)]);
+                        } else {
+                            data[G(x, y, z)] = Mapper.AIR;
+                        }
+                    }
+                }
+            }
+        } else {
+            if (!(blockContainer.data.storage instanceof EmptyPaletteStorage)) {
+                throw new IllegalStateException();
+            }
+            int bId = pc[0];
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    for (int x = 0; x < 16; x++) {
+                        byte light = lightSupplier.supply(x, y, z);
+                        if (!(bId == 0 && (light == 0))) {
+                            data[G(x, y, z)] = Mapper.composeMappingId(light, bId, biomes[((y & 0b1100) << 2) | (z & 0b1100) | (x >> 2)]);
+                        } else {
+                            data[G(x, y, z)] = Mapper.AIR;
+                        }
+                    }
+                }
+            }
+        }
+        return section;
+    }
+
+    public static VoxelizedSection convertOld(VoxelizedSection section,
                                            Mapper stateMapper,
                                            PalettedContainer<BlockState> blockContainer,
                                            ReadableContainer<RegistryEntry<Biome>> biomeContainer,
