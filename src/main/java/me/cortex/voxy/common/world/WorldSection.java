@@ -93,13 +93,31 @@ public final class WorldSection {
         int prev, next;
         do {
             prev = (int) ATOMIC_STATE_HANDLE.get(this);
+            if ((prev&1) == 0) {
+                //The object has been release so early exit
+                return false;
+            }
+            next = prev + 2;
+        } while (!ATOMIC_STATE_HANDLE.compareAndSet(this, prev, next));
+        return (next&1) != 0;
+
+
+        /*
+        int prev, next;
+        do {
+            prev = (int) ATOMIC_STATE_HANDLE.get(this);
             next = ((prev&1) != 0)?prev+2:prev;
         } while (!ATOMIC_STATE_HANDLE.compareAndSet(this, prev, next));
         return (next&1) != 0;
+         */
     }
 
     public int acquire() {
-        int state =((int)  ATOMIC_STATE_HANDLE.getAndAdd(this, 2)) + 2;
+        return this.acquire(1);
+    }
+
+    public int acquire(int count) {
+        int state =((int)  ATOMIC_STATE_HANDLE.getAndAdd(this, count<<1)) + (count<<1);
         if (VERIFY_WORLD_SECTION_EXECUTION) {
             if ((state & 1) == 0) {
                 throw new IllegalStateException("Tried to acquire unloaded section");
@@ -258,9 +276,5 @@ public final class WorldSection {
 
     public static WorldSection _createRawUntrackedUnsafeSection(int lvl, int x, int y, int z) {
         return new WorldSection(lvl, x, y, z, null);
-    }
-
-    public ActiveSectionTracker _getSectionTracker() {
-        return this.tracker;
     }
 }

@@ -46,7 +46,7 @@ public class WorldEngine {
         this.storage = storage;
         this.mapper = new Mapper(this.storage);
         //5 cache size bits means that the section tracker has 32 separate maps that it uses
-        this.sectionTracker = new ActiveSectionTracker(5, storage::loadSection, cacheCount, this);
+        this.sectionTracker = new ActiveSectionTracker(7, storage::loadSection, cacheCount, this);
     }
 
     public WorldSection acquireIfExists(int lvl, int x, int y, int z) {

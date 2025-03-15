@@ -81,7 +81,7 @@ public class VoxyInstance {
     }
 
     protected WorldEngine createWorld(SectionStorage storage) {
-        var world = new WorldEngine(storage, 1024);
+        var world = new WorldEngine(storage, 2048);
         world.setSaveCallback(this.savingService::enqueueSave);
         this.activeWorlds.add(world);
         return world;
