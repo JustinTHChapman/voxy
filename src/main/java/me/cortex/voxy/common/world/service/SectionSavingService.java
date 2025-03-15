@@ -36,13 +36,14 @@ public class SectionSavingService {
         section.release();
     }
 
+    /*
     public void enqueueSave(WorldSection section) {
         if (section._getSectionTracker() != null && section._getSectionTracker().engine != null) {
             this.enqueueSave(section._getSectionTracker().engine, section);
         } else {
             Logger.error("Tried saving world section, but did not have world associated");
         }
-    }
+    }*/
 
     public void enqueueSave(WorldEngine in, WorldSection section) {
         //If its not enqueued for saving then enqueue it
