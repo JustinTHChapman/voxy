@@ -11,8 +11,7 @@ public final class NodeStore {
     public static final int MAX_GEOMETRY_ID = (1<<24)-3;
     private static final int SENTINEL_NULL_GEOMETRY_ID = (1<<24)-1;
     private static final int SENTINEL_EMPTY_GEOMETRY_ID = (1<<24)-2;
-    private static final int SENTINEL_NULL_NODE_ID = NODE_ID_MSK -1;
-    private static final int SENTINEL_REQUEST_ID = REQUEST_ID_MSK -1;
+    private static final int SENTINEL_NULL_NODE_ID = NODE_ID_MSK;
     private static final int LONGS_PER_NODE = 4;
     private static final int INCREMENT_SIZE = 1<<16;
     private final HierarchicalBitSet allocationSet;
@@ -42,7 +41,7 @@ public final class NodeStore {
 
     public int allocate(int count) {
         if (count <= 0) {
-            throw new IllegalArgumentException("Count cannot be <= 0");
+            throw new IllegalArgumentException("Count cannot be <= 0 was " + count);
         }
         int id = this.allocationSet.allocateNextConsecutiveCounted(count);
         if (id < 0) {
@@ -86,7 +85,7 @@ public final class NodeStore {
         int idx = id2idx(nodeId);
         this.localNodeData[idx] = -1;//Position
         this.localNodeData[idx+1] = GEOMETRY_ID_MSK|(((long)NODE_ID_MSK)<<24);
-        this.localNodeData[idx+2] = 0;
+        this.localNodeData[idx+2] = REQUEST_ID_MSK;
         this.localNodeData[idx+3] = 0;
     }
 
@@ -276,5 +275,8 @@ public final class NodeStore {
 
     public int getEndNodeId() {
         return this.allocationSet.getMaxIndex();
+    }
+    public int getNodeCount() {
+        return this.allocationSet.getCount();
     }
 }

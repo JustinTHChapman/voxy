@@ -105,7 +105,7 @@ public class ActiveSectionTracker {
             return section;
         } else {
             while ((section = holder.obj) == null)
-                Thread.onSpinWait();
+                Thread.yield();
 
             synchronized (cache) {
                 if (section.tryAcquire()) {

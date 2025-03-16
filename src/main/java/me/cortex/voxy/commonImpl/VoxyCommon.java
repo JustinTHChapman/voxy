@@ -1,5 +1,6 @@
 package me.cortex.voxy.commonImpl;
 
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.Serialization;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.ModInitializer;
@@ -9,14 +10,17 @@ import net.fabricmc.loader.api.ModContainer;
 public class VoxyCommon implements ModInitializer {
     public static final String MOD_VERSION;
     public static final boolean IS_DEDICATED_SERVER;
+    public static final boolean IS_IN_MINECRAFT;
 
     static {
         ModContainer mod = (ModContainer) FabricLoader.getInstance().getModContainer("voxy").orElse(null);
         if (mod == null) {
-            System.err.println("RUNNING WITHOUT MOD");
+            IS_IN_MINECRAFT = false;
+            Logger.error("Running voxy without minecraft");
             MOD_VERSION = "<UNKNOWN>";
             IS_DEDICATED_SERVER = false;
         } else {
+            IS_IN_MINECRAFT = true;
             var version = mod.getMetadata().getVersion().getFriendlyString();
             var commit = mod.getMetadata().getCustomValue("commit").getAsString();
             MOD_VERSION = version + "-" + commit;

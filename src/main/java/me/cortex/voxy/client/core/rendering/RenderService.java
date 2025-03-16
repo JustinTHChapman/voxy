@@ -4,7 +4,6 @@ import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
-import me.cortex.voxy.client.core.rendering.building.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
 import me.cortex.voxy.client.core.rendering.hierachical.NodeManager;
@@ -78,7 +77,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, this.nodeCleaner);
 
-        world.setDirtyCallback(router::forward);
+        world.setDirtyCallback(router::forwardEvent);
 
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
@@ -154,7 +153,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     private int q = -60;
     public void setup(Camera camera) {
         final int W = 32;
-        final int H = 2;
+        final int H = 3;
         boolean SIDED = false;
         for (int i = 0; i<64 && q<((W*2+1)*(W*2+1)*H)&&q++>=0;i++) {
             this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, (q%(W*2+1))-(SIDED?0:W), ((q/(W*2+1))/(W*2+1))-1, ((q/(W*2+1))%(W*2+1))-(SIDED?0:W)));

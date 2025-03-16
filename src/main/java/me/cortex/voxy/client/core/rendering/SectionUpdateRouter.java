@@ -1,8 +1,6 @@
-package me.cortex.voxy.client.core.rendering.building;
+package me.cortex.voxy.client.core.rendering;
 
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 
@@ -10,7 +8,7 @@ import java.util.function.LongConsumer;
 
 import static me.cortex.voxy.common.world.WorldEngine.UPDATE_TYPE_BLOCK_BIT;
 
-public class SectionUpdateRouter {
+public class SectionUpdateRouter implements ISectionWatcher {
     private static final int SLICES = 1<<3;
     public interface IChildUpdate {void accept(WorldSection section);}
 
@@ -78,7 +76,7 @@ public class SectionUpdateRouter {
         }
     }
 
-    public void forward(WorldSection section, int type) {
+    public void forwardEvent(WorldSection section, int type) {
         final long position = section.key;
         var set = this.slices[getSliceIndex(position)];
         byte types = 0;
