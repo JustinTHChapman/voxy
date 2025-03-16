@@ -183,59 +183,6 @@ public class WorldConversionFactory {
         return section;
     }
 
-    public static VoxelizedSection convertOld(VoxelizedSection section,
-                                           Mapper stateMapper,
-                                           PalettedContainer<BlockState> blockContainer,
-                                           ReadableContainer<RegistryEntry<Biome>> biomeContainer,
-                                           ILightingSupplier lightSupplier) {
-
-        //Cheat by creating a local pallet then read the data directly
-
-
-        var cache = THREAD_LOCAL.get();
-        var blockCache = cache.getLocalMapping(stateMapper);
-
-        var biomes = cache.biomeCache;
-        var data = section.section;
-
-        var vp = blockContainer.data.palette;
-        var pc = cache.getPaletteCache(vp.getSize());
-
-        setupLocalPalette(vp, blockCache, stateMapper, pc);
-
-
-        {
-            int i = 0;
-            for (int y = 0; y < 4; y++) {
-                for (int z = 0; z < 4; z++) {
-                    for (int x = 0; x < 4; x++) {
-                        biomes[i++] = stateMapper.getIdForBiome(biomeContainer.get(x, y, z));
-                    }
-                }
-            }
-        }
-
-        var bDat = blockContainer.data;
-        var bStor = bDat.storage;
-        int i = 0;
-        for (int y = 0; y < 16; y++) {
-            for (int z = 0; z < 16; z++) {
-                for (int x = 0; x < 16; x++) {
-                    //TODO: replace .get with a raw enumeration
-                    int bId = pc[bStor.get(i++)];
-
-                    byte light = lightSupplier.supply(x,y,z);
-                    if (!(bId==0 && (light==0))) {
-                        data[G(x, y, z)] = Mapper.composeMappingId(light, bId, biomes[((y&0b1100)<<2)|(z&0b1100)|(x>>2)]);
-                    } else {
-                        data[G(x, y, z)] = Mapper.AIR;
-                    }
-                }
-            }
-        }
-        return section;
-    }
-
     private static int G(int x, int y, int z) {
         return ((y<<8)|(z<<4)|x);
     }

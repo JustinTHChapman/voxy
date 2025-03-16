@@ -155,19 +155,6 @@ public class WorldEngine {
                     didStateChange |= newId != oldId;
                 }
             }
-            /*
-            //This loop can be heavily optimized, the get and set can be extracted and manually done
-            // the 3 for loops can be replaced by a single loop that iterates over a bitmask
-            for (int y = by; y < (16>>lvl)+by; y++) {
-                for (int z = bz; z < (16>>lvl)+bz; z++) {
-                    for (int x = bx; x < (16>>lvl)+bx; x++) {
-                        long newId = section.get(lvl, x-bx, y-by, z-bz);
-                        long oldId = worldSection.set(x, y, z, newId);
-                        nonAirCountDelta += Mapper.isAir(oldId)==Mapper.isAir(newId)?0:(Mapper.isAir(newId)?-1:1 );
-                        didStateChange |= newId != oldId;
-                    }
-                }
-            }*/
 
             if (nonAirCountDelta != 0) {
                 worldSection.addNonEmptyBlockCount(nonAirCountDelta);
