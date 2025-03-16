@@ -147,7 +147,7 @@ public class WorldEngine {
                 int secMsk = 0xF >> lvl;
                 secMsk |= (secMsk << 5) | (secMsk << 10);
                 var secD = worldSection.data;
-                for (int i = 0; i < 0xFFF >> (lvl * 3); i++) {
+                for (int i = 0; i <= 0xFFF >> (lvl * 3); i++) {
                     int secIdx = Integer.expand(i, secMsk)+baseSec;
                     long newId = section.section[baseVIdx+i];
                     long oldId = secD[secIdx]; secD[secIdx] = newId;
