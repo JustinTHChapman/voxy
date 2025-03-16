@@ -3,6 +3,8 @@ package me.cortex.voxy.client.config;
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
+import me.cortex.voxy.commonImpl.IVoxyWorldGetter;
+import me.cortex.voxy.commonImpl.IVoxyWorldSetter;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
@@ -36,13 +38,24 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
 
         builder.setSavingRunnable(() -> {
             //After saving the core should be reloaded/reset
-            var world = MinecraftClient.getInstance().worldRenderer;
-            if (world != null && ON_SAVE_RELOAD) {
+            var worldRenderer = MinecraftClient.getInstance().worldRenderer;
+            var world = MinecraftClient.getInstance().world;
+            if (worldRenderer != null && world != null && ON_SAVE_RELOAD) {
                 //Reload voxy
-                ((IGetVoxyRenderSystem)world).shutdownRenderer();
+                ((IGetVoxyRenderSystem)worldRenderer).shutdownRenderer();
+
+                //This is a hack inserted for the client world thing
+                //TODO: FIXME: MAKE BETTER
+                var engine = ((IVoxyWorldGetter)world).getWorldEngine();
+                if (engine != null) {
+                    VoxyCommon.getInstance().stopWorld(engine);
+                }
+                ((IVoxyWorldSetter)world).setWorldEngine(null);
+
+
                 VoxyCommon.shutdownInstance();
                 VoxyCommon.createInstance();
-                ((IGetVoxyRenderSystem)world).createRenderer();
+                ((IGetVoxyRenderSystem)worldRenderer).createRenderer();
             }
             ON_SAVE_RELOAD = false;
             VoxyConfig.CONFIG.save();
@@ -69,6 +82,12 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setTooltip(Text.translatable("voxy.config.general.ingest.tooltip"))
                 .setSaveConsumer(val -> config.ingestEnabled = val)
                 .setDefaultValue(DEFAULT.ingestEnabled)
+                .build());
+
+        category.addEntry(entryBuilder.startBooleanToggle(Text.translatable("voxy.config.general.rendering"), config.enableRendering)
+                .setTooltip(Text.translatable("voxy.config.general.rendering.tooltip"))
+                .setSaveConsumer(val -> {if (config.enableRendering != val) reload(); config.enableRendering = val;})
+                .setDefaultValue(DEFAULT.enableRendering)
                 .build());
 
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.subDivisionSize"), (int) config.subDivisionSize, 25, 256)

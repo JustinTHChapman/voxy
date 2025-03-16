@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.mixin.sodium;
 
+import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
@@ -20,7 +21,14 @@ public class MixinRenderSectionManager {
         //TODO: Am not quite sure if this is right
         var instance = VoxyCommon.getInstance();
         if (instance != null && VoxyConfig.CONFIG.ingestEnabled) {
-            instance.getIngestService().enqueueIngest(this.level.getChunk(x, z), false);
+            var chunk = this.level.getChunk(x, z);
+            var world = chunk.getWorld();
+            if (world instanceof ClientWorld cw) {
+                var engine = ((VoxyClientInstance)instance).getOrMakeRenderWorld(cw);
+                if (engine != null) {
+                    instance.getIngestService().enqueueIngest(engine, chunk);
+                }
+            }
         }
     }
 }

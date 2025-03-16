@@ -143,7 +143,7 @@ public class NodeManager {
         long pos = sectionResult.position;
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
-            Logger.error("Got geometry update for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, discarding!");
+            Logger.warn("Got geometry update for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, discarding!");
             sectionResult.free();
             return;
         }
@@ -988,7 +988,7 @@ public class NodeManager {
 
         if (childExistence == 0) {
             if (!this.topLevelNodes.contains(pos)) {//Top level nodes are special, as they can have a request with child existence of 0 for performance reasons
-                Logger.warn("Not creating a leaf request with existence mask of 0");
+                Logger.warn("Not creating a leaf request with existence mask of 0 at pos", WorldEngine.pprintPos(pos));
                 this.nodeData.unmarkRequestInFlight(nodeId);
                 this.invalidateNode(nodeId);
                 return;

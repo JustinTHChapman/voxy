@@ -91,6 +91,9 @@ public class VoxelIngestService {
     }
 
     public void enqueueIngest(WorldEngine engine, WorldChunk chunk) {
+        if (!engine.isLive()) {
+            throw new IllegalStateException("Tried inserting chunk into WorldEngine that was not alive");
+        }
         var lightingProvider = chunk.getWorld().getLightingProvider();
         var blp = lightingProvider.get(LightType.BLOCK);
         var slp = lightingProvider.get(LightType.SKY);

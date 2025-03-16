@@ -31,6 +31,10 @@ public class VoxyClientInstance extends VoxyInstance {
             vworld = this.createWorld(SELECTOR.getBestSelectionOrCreate(world).createSectionStorageBackend());
             ((IVoxyWorldSetter)world).setWorldEngine(vworld);
             this.importWrapper = new WorldImportWrapper(this.threadPool, vworld);
+        } else {
+            if (!this.activeWorlds.contains(vworld)) {
+                throw new IllegalStateException("World referenced does not exist in instance");
+            }
         }
         return vworld;
     }

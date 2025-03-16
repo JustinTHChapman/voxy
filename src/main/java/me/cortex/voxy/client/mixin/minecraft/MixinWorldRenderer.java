@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.rendering.VoxyRenderSystem;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.IVoxyWorldGetter;
+import me.cortex.voxy.commonImpl.IVoxyWorldSetter;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.VoxyInstance;
 import net.minecraft.client.render.*;
@@ -50,7 +51,7 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
     @Unique private ClientWorld refCopy;
 
     @Inject(method = "setWorld", at = @At("HEAD"))
-    private void initVoxelCore(ClientWorld world, CallbackInfo ci) {
+    private void voxy$captureSetWorld(ClientWorld world, CallbackInfo ci) {
         this.refCopy = this.world;
     }
 
@@ -65,6 +66,7 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             if (engine != null) {
                 VoxyCommon.getInstance().stopWorld(engine);
             }
+            ((IVoxyWorldSetter)this.refCopy).setWorldEngine(null);
         }
     }
 
