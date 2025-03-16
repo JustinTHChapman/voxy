@@ -243,7 +243,7 @@ public class NodeManager {
     public void processChildChange(long pos, byte childExistence) {
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
-            Logger.error("Got child change for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, ignoring!");
+            Logger.warn("Got child change for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, ignoring!");
             return;
         }
 
