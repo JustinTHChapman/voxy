@@ -51,6 +51,10 @@ void addRequest(inout UnpackedNode node) {
 }
 
 void enqueueChildren(in UnpackedNode node) {
+    if (childListIsEmpty(node)) {//Occures in a very rare case/instance so just handle it gracefully
+        return;
+    }
+
     uint children = getChildCount(node);
     pushNodesInit(children);
     uint ptr = getChildPtr(node);

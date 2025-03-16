@@ -28,6 +28,7 @@ struct UnpackedNode {
 };
 
 #define NULL_NODE ((1<<24)-1)
+#define EMPTY_QUEUE_ID ((1<<24)-2)
 #define NULL_MESH ((1<<24)-1)
 #define EMPTY_MESH ((1<<24)-2)
 
@@ -61,6 +62,10 @@ bool isEmptyMesh(in UnpackedNode node) {
 
 bool hasChildren(in UnpackedNode node) {
     return node.childPtr != NULL_NODE;
+}
+
+bool childListIsEmpty(in UnpackedNode node) {
+    return node.childPtr == EMPTY_QUEUE_ID;
 }
 
 bool isEmpty(in UnpackedNode node) {
