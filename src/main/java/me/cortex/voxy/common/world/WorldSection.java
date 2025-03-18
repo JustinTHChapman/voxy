@@ -8,7 +8,9 @@ import java.lang.invoke.VarHandle;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Deque;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 //Represents a loaded world section at a specific detail level
 // holds a 32x32x32 region of detail
@@ -35,7 +37,8 @@ public final class WorldSection {
     //TODO: should make it dynamically adjust the size allowance based on memory pressure/WorldSection allocation rate (e.g. is it doing a world import)
     private static final int ARRAY_REUSE_CACHE_SIZE = 300;//500;//32*32*32*8*ARRAY_REUSE_CACHE_SIZE == number of bytes
     //TODO: maybe just swap this to a ConcurrentLinkedDeque
-    private static final Deque<long[]> ARRAY_REUSE_CACHE = new ArrayDeque<>(1024);
+    private static final AtomicInteger ARRAY_REUSE_CACHE_COUNT = new AtomicInteger(0);
+    private static final ConcurrentLinkedDeque<long[]> ARRAY_REUSE_CACHE = new ConcurrentLinkedDeque<>();
 
 
     public final int lvl;
@@ -66,13 +69,11 @@ public final class WorldSection {
         this.key = WorldEngine.getWorldSectionId(lvl, x, y, z);
         this.tracker = tracker;
 
-        if (!ARRAY_REUSE_CACHE.isEmpty()) {
-            synchronized (ARRAY_REUSE_CACHE) {
-                this.data = ARRAY_REUSE_CACHE.poll();
-            }
-        }
+        this.data = ARRAY_REUSE_CACHE.poll();
         if (this.data == null) {
             this.data = new long[32 * 32 * 32];
+        } else {
+            ARRAY_REUSE_CACHE_COUNT.decrementAndGet();
         }
     }
 
@@ -170,10 +171,9 @@ public final class WorldSection {
         if (VERIFY_WORLD_SECTION_EXECUTION && this.data == null) {
             throw new IllegalStateException();
         }
-        if (ARRAY_REUSE_CACHE.size() < ARRAY_REUSE_CACHE_SIZE) {
-            synchronized (ARRAY_REUSE_CACHE) {
-                ARRAY_REUSE_CACHE.add(this.data);
-            }
+        if (ARRAY_REUSE_CACHE_COUNT.get() < ARRAY_REUSE_CACHE_SIZE) {
+            ARRAY_REUSE_CACHE.add(this.data);
+            ARRAY_REUSE_CACHE_COUNT.incrementAndGet();
         }
         this.data = null;
     }
