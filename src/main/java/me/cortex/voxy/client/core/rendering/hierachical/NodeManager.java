@@ -1122,9 +1122,11 @@ public class NodeManager {
             Logger.error("Tried removing geometry for pos: " + WorldEngine.pprintPos(pos) + " but its type was a request, ignoring!");
             return;
         }
+        this.clearId(nodeId);
+
         if (nodeType == NODE_TYPE_INNER) {
             this.clearGeometryInternal(pos, nodeId);
-            this.clearId(nodeId);
+        //    this.clearId(nodeId);
         } else {//NODE_TYPE_LEAF
             //TODO: here we need to make the parent node a leaf node...
             // TODO? think about maybe only doing it if all children of the parent are leaf nodes aswell
@@ -1142,18 +1144,39 @@ public class NodeManager {
                 }
 
             } else {
-                this.processInnerGeometryRemoval(pos);
+                this.processLeafGeometryRemoval(pos);
             }
         }
     }
 
-    private void processInnerGeometryRemoval(long cPos) {
+    private void processLeafGeometryRemoval(long cPos) {
         long pPos = makeParentPos(cPos);
         int pId = this.activeSectionMap.get(pPos);
         if (pId == -1) throw new IllegalStateException("Parent node must exist");
         if ((pId & NODE_TYPE_MSK) != NODE_TYPE_INNER)
             throw new IllegalStateException("Parent node must be an inner node");
         pId &= NODE_ID_MSK;
+
+        {//Check all children are leaf nodes
+            int cPtr = this.nodeData.getChildPtr(pId);
+            if (cPtr != SENTINEL_EMPTY_CHILD_PTR) {
+                if (cPtr == -1) {
+                    throw new IllegalStateException();
+                }
+                int cCnt = this.nodeData.getChildPtrCount(pId);
+                for (int i = 0; i < cCnt; i++) {
+                    if (!this.nodeData.nodeExists(i+cPtr))
+                        throw new IllegalStateException();
+                    long cp = this.nodeData.nodePosition(i+cPtr);
+                    long cn = this.activeSectionMap.get(cp);
+                    if (cn==-1)
+                        throw new IllegalStateException();
+                    //If a child is not a leaf, return
+                    if ((cn&NODE_TYPE_MSK)!=NODE_TYPE_LEAF)
+                        return;
+                }
+            }
+        }
 
         int pGeo = this.nodeData.getNodeGeometry(pId);
         if (pGeo == NULL_GEOMETRY_ID) {
