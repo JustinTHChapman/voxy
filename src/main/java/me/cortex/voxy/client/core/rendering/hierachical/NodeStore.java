@@ -191,12 +191,21 @@ public final class NodeStore {
     public void markRequestInFlight(int nodeId) {
         this.localNodeData[id2idx(nodeId)+1] |= 1L<<63;
     }
-
     public void unmarkRequestInFlight(int nodeId) {
         this.localNodeData[id2idx(nodeId)+1] &= ~(1L<<63);
     }
     public boolean isNodeRequestInFlight(int nodeId) {
         return ((this.localNodeData[id2idx(nodeId)+1]>>63)&1)!=0;
+    }
+
+    public void markNodeGeometryInFlight(int nodeId) {
+        this.localNodeData[id2idx(nodeId)+1] |= 1L<<59;
+    }
+    public void unmarkNodeGeometryInFlight(int nodeId) {
+        this.localNodeData[id2idx(nodeId)+1] &= ~(1L<<59);
+    }
+    public boolean isNodeGeometryInFlight(int nodeId) {
+        return (this.localNodeData[id2idx(nodeId)+1]&(1L<<59))!=0;
     }
 
     public int getNodeType(int nodeId) {

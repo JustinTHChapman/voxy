@@ -1,25 +1,21 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
-import it.unimi.dsi.fastutil.Stack;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntFunction;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.rendering.ISectionWatcher;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
-import me.cortex.voxy.client.core.rendering.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.HierarchicalBitSet;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.common.world.WorldSection;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.function.IntSupplier;
 import java.util.stream.IntStream;
 
 import static me.cortex.voxy.common.world.WorldEngine.*;
@@ -71,7 +67,7 @@ public class TestNodeManager {
 
         @Override
         public void downloadAndRemove(int id, Consumer<BuiltSection> callback) {
-            throw new IllegalStateException();
+            this.removeSection(id);
         }
 
         @Override
@@ -114,6 +110,11 @@ public class TestNodeManager {
             }
             Logger.info("UnWatching pos", WorldEngine.pprintPos(position), "removing types", getPrettyTypes(types), "was watching", getPrettyTypes(current), "new types", getPrettyTypes(newTypes));
             return newTypes == 0;//Returns true on removal
+        }
+
+        @Override
+        public int get(long position) {
+            return this.updateTypes.getOrDefault(position, (byte) 0);
         }
 
         private static String[] getPrettyTypes(int msk) {
@@ -234,26 +235,38 @@ public class TestNodeManager {
         }
     }
 
+
+    private static class Node {
+        private final long pos;
+        private final Node[] children = new Node[8];
+        private byte childExistenceMask;
+        private boolean hasMesh;
+        private Node(long pos) {
+            this.pos = pos;
+        }
+    }
+
     public static void main(String[] args) {
         Logger.INSERT_CLASS = false;
-        int ITER_COUNT = 5_000;
+        int ITER_COUNT = 5000;
         int INNER_ITER_COUNT = 100_000;
+        boolean GEO_REM = true;
 
         AtomicInteger finished = new AtomicInteger();
         HashSet<List<StackTraceElement>> seenTraces = new HashSet<>();
 
         Logger.SHUTUP = true;
 
-        if (false) {
+        if (true) {
             for (int q = 0; q < ITER_COUNT; q++) {
                 //Logger.info("Iteration "+ q);
-                if (runTest(INNER_ITER_COUNT, q, seenTraces)) {
+                if (runTest(INNER_ITER_COUNT, q, seenTraces, GEO_REM)) {
                     finished.incrementAndGet();
                 }
             }
         } else {
             IntStream.range(0, ITER_COUNT).parallel().forEach(i->{
-                if (runTest(INNER_ITER_COUNT, i, seenTraces)) {
+                if (runTest(INNER_ITER_COUNT, i, seenTraces, GEO_REM)) {
                     finished.incrementAndGet();
                 }
             });
@@ -269,7 +282,7 @@ public class TestNodeManager {
         return WorldEngine.getWorldSectionId(lvl, r.nextInt(bound), r.nextInt(bound), r.nextInt(bound));
     }
 
-    private static boolean runTest(int ITERS, int testIdx, Set<List<StackTraceElement>> traces) {
+    private static boolean runTest(int ITERS, int testIdx, Set<List<StackTraceElement>> traces, boolean geoRemoval) {
         long POS_A = WorldEngine.getWorldSectionId(4, 0, 0, 0);
 
         Random r = new Random(testIdx * 1234L);
@@ -279,7 +292,7 @@ public class TestNodeManager {
             test.putTopPos(POS_A);
             for (int i = 0; i < ITERS; i++) {
                 long pos = rPos(r);
-                int op = r.nextInt(3);
+                int op = r.nextInt(4);
                 int extra = r.nextInt(256);
                 boolean hasGeometry = r.nextBoolean();
                 if (op == 0) {
@@ -290,6 +303,9 @@ public class TestNodeManager {
                 }
                 if (op == 2) {
                     test.meshUpdate(pos, extra, hasGeometry ? 100 : 0);
+                }
+                if (op == 3 && geoRemoval) {
+                    test.nodeManager.removeNodeGeometry(pos);
                 }
                 test.printNodeChanges();
                 test.verifyIntegrity();
@@ -525,8 +541,8 @@ public class TestNodeManager {
 
     private long makeParentPos(long pos) {
         int lvl = WorldEngine.getLevel(pos);
-        if (lvl == MAX_LOD_LAYERS-1) {
-            throw new IllegalArgumentException("Cannot create a parent higher than LoD " + (MAX_LOD_LAYERS-1));
+        if (lvl == MAX_LOD_LAYER) {
+            throw new IllegalArgumentException("Cannot create a parent higher than LoD " + (MAX_LOD_LAYER));
         }
         return WorldEngine.getWorldSectionId(lvl+1,
                 WorldEngine.getX(pos)>>1,
