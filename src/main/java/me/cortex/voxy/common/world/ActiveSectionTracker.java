@@ -7,6 +7,7 @@ import me.cortex.voxy.common.world.other.Mapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class ActiveSectionTracker {
 
@@ -16,6 +17,7 @@ public class ActiveSectionTracker {
     //Loaded section world cache, TODO: get rid of VolatileHolder and use something more sane
 
     private final Long2ObjectOpenHashMap<VolatileHolder<WorldSection>>[] loadedSectionCache;
+    private final ReentrantLock[] locks;
     private final SectionLoader loader;
 
     private final int maxLRUSectionPerSlice;
@@ -34,10 +36,12 @@ public class ActiveSectionTracker {
         this.loader = loader;
         this.loadedSectionCache = new Long2ObjectOpenHashMap[1<<numSlicesBits];
         this.lruSecondaryCache = new Long2ObjectLinkedOpenHashMap[1<<numSlicesBits];
+        this.locks = new ReentrantLock[1<<numSlicesBits];
         this.maxLRUSectionPerSlice = (cacheSize+(1<<numSlicesBits)-1)/(1<<numSlicesBits);
         for (int i = 0; i < this.loadedSectionCache.length; i++) {
             this.loadedSectionCache[i] = new Long2ObjectOpenHashMap<>(1024);
             this.lruSecondaryCache[i] = new Long2ObjectLinkedOpenHashMap<>(this.maxLRUSectionPerSlice);
+            this.locks[i] = new ReentrantLock();
         }
     }
 
@@ -48,10 +52,13 @@ public class ActiveSectionTracker {
     public WorldSection acquire(long key, boolean nullOnEmpty) {
         int index = this.getCacheArrayIndex(key);
         var cache = this.loadedSectionCache[index];
+        final var lock = this.locks[index];
         VolatileHolder<WorldSection> holder = null;
         boolean isLoader = false;
         WorldSection section;
-        synchronized (cache) {
+
+        lock.lock();
+        {
             holder = cache.get(key);
             if (holder == null) {
                 holder = new VolatileHolder<>();
@@ -61,12 +68,14 @@ public class ActiveSectionTracker {
             section = holder.obj;
             if (section != null) {
                 section.acquire();
+                lock.unlock();
                 return section;
             }
             if (isLoader) {
                 section = this.lruSecondaryCache[index].remove(key);
             }
         }
+        lock.unlock();
 
         //If this thread was the one to create the reference then its the thread to load the section
         if (isLoader) {
@@ -107,19 +116,25 @@ public class ActiveSectionTracker {
             while ((section = holder.obj) == null)
                 Thread.yield();
 
-            synchronized (cache) {
+            //lock.lock();
+            {//Dont think need to lock here
                 if (section.tryAcquire()) {
                     return section;
                 }
             }
+            //lock.unlock();
             return this.acquire(key, nullOnEmpty);
         }
     }
 
     void tryUnload(WorldSection section) {
         int index = this.getCacheArrayIndex(section.key);
-        var cache = this.loadedSectionCache[index];
-        synchronized (cache) {
+        final var cache = this.loadedSectionCache[index];
+        WorldSection prev = null;
+        WorldSection lruEntry = null;
+        final var lock = this.locks[index];
+        lock.lock();
+        {
             if (section.trySetFreed()) {
                 var cached = cache.remove(section.key);
                 var obj = cached.obj;
@@ -129,15 +144,20 @@ public class ActiveSectionTracker {
 
                 //Add section to secondary cache while primary is locked
                 var lruCache = this.lruSecondaryCache[index];
-                var prev = lruCache.put(section.key, section);
-                if (prev != null) {
-                    prev._releaseArray();
-                }
+                prev = lruCache.put(section.key, section);
                 //If cache is bigger than its ment to be, remove the least recently used and free it
                 if (this.maxLRUSectionPerSlice < lruCache.size()) {
-                    lruCache.removeFirst()._releaseArray();
+                    lruEntry = lruCache.removeFirst();
                 }
             }
+        }
+        lock.unlock();
+
+        if (prev != null) {
+            prev._releaseArray();
+        }
+        if (lruEntry != null) {
+            lruEntry._releaseArray();
         }
     }
 

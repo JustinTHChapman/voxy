@@ -46,7 +46,7 @@ public class RenderGenerationService {
 
         this.threads = serviceThreadPool.createService("Section mesh generation service", 100, ()->{
             //Thread local instance of the factory
-            var factory = new RenderDataFactory4(this.world, this.modelBakery.factory, this.emitMeshlets);
+            var factory = new RenderDataFactory45(this.world, this.modelBakery.factory, this.emitMeshlets);
             return new Pair<>(() -> {
                 this.processJob(factory);
             }, factory::free);
@@ -75,7 +75,7 @@ public class RenderGenerationService {
     }
 
     //TODO: add a generated render data cache
-    private void processJob(RenderDataFactory4 factory) {
+    private void processJob(RenderDataFactory45 factory) {
         BuildTask task;
         synchronized (this.taskQueue) {
             task = this.taskQueue.removeFirst();
@@ -133,7 +133,9 @@ public class RenderGenerationService {
                 queuedTask.hasDoneModelRequest = true;//Mark (or remark) the section as having chunks requested
 
                 if (queuedTask == task) {//use the == not .equal to see if we need to release a permit
-                    this.threads.execute();//Since we put in queue, release permit
+                    if (this.threads.isAlive()) {//Only execute if were not dead
+                        this.threads.execute();//Since we put in queue, release permit
+                    }
 
                     //If we did put it in the queue, dont release the section
                     shouldFreeSection = false;
@@ -186,11 +188,25 @@ public class RenderGenerationService {
     */
 
     public void shutdown() {
+        //Steal and free as much work as possible
+        while (this.threads.steal()) {
+            synchronized (this.taskQueue) {
+                var task = this.taskQueue.removeFirst();
+                if (task.section != null) {
+                    task.section.release();
+                }
+            }
+        }
+
+        //Shutdown the threads
         this.threads.shutdown();
 
         //Cleanup any remaining data
         while (!this.taskQueue.isEmpty()) {
-            this.taskQueue.removeFirst();
+            var task = this.taskQueue.removeFirst();
+            if (task.section != null) {
+                task.section.release();
+            }
         }
     }
 

@@ -191,13 +191,14 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         if (true /* firstInvocationThisFrame */) {
             DownloadStream.INSTANCE.tick();
 
-            this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
 
             this.sectionUpdateQueue.consume();
             this.geometryUpdateQueue.consume();
             if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
                 UploadStream.INSTANCE.commit();
             }
+            this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
+
             //this needs to go after, due to geometry updates committed by the nodeManager
             this.sectionRenderer.getGeometryManager().tick();
         }

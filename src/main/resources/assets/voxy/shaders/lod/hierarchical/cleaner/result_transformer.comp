@@ -17,13 +17,19 @@ layout(binding = VISIBILITY_BUFFER_BINDING, std430) restrict buffer VisibilityBu
     uint[] visibility;
 };
 
+layout(location=0) uniform uint visibilityCounter;
 void main() {
-    uvec4 node = nodes[minVisIds[gl_LocalInvocationID.x]];
+    uint id = minVisIds[gl_LocalInvocationID.x];
+    uvec4 node = nodes[id];
     uvec2 res = node.xy;
     if (all(equal(node, uvec4(0)))) {//If its a empty node, TODO: DONT THINK THIS IS ACTUALLY CORRECT
         res = uvec2(-1);
     }
     outputBuffer[gl_LocalInvocationID.x] = res;//Move the position of the node id into the output buffer
 
-    //outputBuffer[gl_LocalInvocationID.x].x = visibility[minVisIds[gl_LocalInvocationID.x]];//
+    //This is an evil hack to not spam the same node 500 times in a row
+    //TODO: maybe instead set this to the current frame index
+//    visibility[id] += 30;
+    visibility[id] = visibilityCounter;
+
 }

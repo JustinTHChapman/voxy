@@ -13,7 +13,7 @@ public class VoxyClientInstance extends VoxyInstance {
     public WorldImportWrapper importWrapper;
 
     public VoxyClientInstance() {
-        super(12);
+        super(14);
     }
 
     @Override

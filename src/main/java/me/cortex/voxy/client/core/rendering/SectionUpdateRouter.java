@@ -76,6 +76,13 @@ public class SectionUpdateRouter implements ISectionWatcher {
         }
     }
 
+    public int get(long position) {
+        var set = this.slices[getSliceIndex(position)];
+        synchronized (set) {
+            return set.getOrDefault(position, (byte) 0);
+        }
+    }
+
     public void forwardEvent(WorldSection section, int type) {
         final long position = section.key;
         var set = this.slices[getSliceIndex(position)];

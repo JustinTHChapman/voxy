@@ -18,6 +18,8 @@ public class HierarchicalBitSet {
         }
     }
 
+    private int endId = -1;
+
     public HierarchicalBitSet() {
         this(1<<(6*4));
     }
@@ -55,11 +57,12 @@ public class HierarchicalBitSet {
             }
         }
         this.cnt++;
-
+        this.endId += ret==(this.endId+1)?1:0;
         return ret;
     }
 
     private void set(int idx) {
+        this.endId += idx==(this.endId+1)?1:0;
         long dp = this.D[idx>>6] |= 1L<<(idx&0x3f);
         if (dp==-1) {
             idx >>= 6;
@@ -139,6 +142,13 @@ public class HierarchicalBitSet {
         long v = this.D[idx>>6];
         boolean wasSet = (v&(1L<<(idx&0x3f)))!=0;
         this.cnt -= wasSet?1:0;
+
+        if (wasSet && idx == this.endId) {
+            //Need to go back until we find the endIdx bit
+            for (this.endId--; this.endId>=0 && !this.isSet(this.endId); this.endId--);
+            //this.endId++;
+        }
+
         this.D[idx>>6] = v&~(1L<<(idx&0x3f));
         idx >>= 6;
         this.C[idx>>6] &= ~(1L<<(idx&0x3f));
@@ -146,6 +156,7 @@ public class HierarchicalBitSet {
         this.B[idx>>6] &= ~(1L<<(idx&0x3f));
         idx >>= 6;
         this.A &= ~(1L<<(idx&0x3f));
+
         return wasSet;
     }
 
@@ -162,7 +173,7 @@ public class HierarchicalBitSet {
 
 
     public int getMaxIndex() {
-        throw new IllegalStateException();
+        return this.endId;
     }
 
 
@@ -172,6 +183,25 @@ public class HierarchicalBitSet {
             if (h.allocateNext() != i) {
                 throw new IllegalStateException("At:" + i);
             }
+            if (h.endId != i) {
+                throw new IllegalStateException();
+            }
+        }
+        for (int i = 0; i < 1<<18; i++) {
+            if (!h.free(i)) {
+                throw new IllegalStateException();
+            }
+        }
+        for (int i = (1<<19)-1; i != (1<<18)-1; i--) {
+            if (h.endId != i) {
+                throw new IllegalStateException();
+            }
+            if (!h.free(i)) {
+                throw new IllegalStateException();
+            }
+        }
+        if (h.endId != -1) {
+            throw new IllegalStateException();
         }
     }
 

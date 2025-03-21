@@ -8,9 +8,6 @@ layout(binding = NODE_DATA_BINDING, std430) restrict buffer NodeData {
 
 //First 2 are joined to be the position
 
-
-
-
 //All node access and setup into global variables
 //TODO: maybe make it global vars
 struct UnpackedNode {
@@ -32,7 +29,7 @@ struct UnpackedNode {
 #define NULL_MESH ((1<<24)-1)
 #define EMPTY_MESH ((1<<24)-2)
 
-void unpackNode(out UnpackedNode node, uint nodeId) {
+uvec4 unpackNode(out UnpackedNode node, uint nodeId) {
     uvec4 compactedNode = nodes[nodeId];
     node.nodeId = nodeId;
     node.lodLevel = compactedNode.x >> 28;
@@ -50,6 +47,7 @@ void unpackNode(out UnpackedNode node, uint nodeId) {
     node.meshPtr = compactedNode.z&0xFFFFFFu;
     node.childPtr = compactedNode.w&0xFFFFFFu;
     node.flags = ((compactedNode.z>>24)&0xFFu) | (((compactedNode.w>>24)&0xFFu)<<8);
+    return compactedNode;
 }
 
 bool hasMesh(in UnpackedNode node) {

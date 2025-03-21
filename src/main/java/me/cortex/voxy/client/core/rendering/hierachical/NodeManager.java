@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering.hierachical;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -90,10 +91,16 @@ public class NodeManager {
     private final LongOpenHashSet topLevelNodes = new LongOpenHashSet();
     private int activeNodeRequestCount;
 
-    public interface ClearIdCallback {void clearId(int id);}
-    private ClearIdCallback clearIdCallback;
-    public void setClearIdCallback(ClearIdCallback callback) {this.clearIdCallback = callback;}
-    private void clearId(int id) { if (this.clearIdCallback != null) this.clearIdCallback.clearId(id); }
+    public interface ICleaner {
+        void alloc(int id);
+        void move(int from, int to);
+        void free(int id);
+    }
+    private ICleaner cleanerInterface;
+    public void setClear(ICleaner callback) {this.cleanerInterface = callback;}
+    private void clearAllocId(int id) { if (this.cleanerInterface != null) this.cleanerInterface.alloc(id); }
+    private void clearMoveId(int from, int to) { if (this.cleanerInterface != null) this.cleanerInterface.move(from, to); }
+    private void clearFreeId(int id) { if (this.cleanerInterface != null) this.cleanerInterface.free(id); }
 
     public NodeManager(int maxNodeCount, AbstractSectionGeometryManager geometryManager, ISectionWatcher watcher) {
         if (!MathUtil.isPowerOfTwo(maxNodeCount)) {
@@ -153,7 +160,7 @@ public class NodeManager {
         long pos = sectionResult.position;
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
-            Logger.warn("Got geometry update for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, discarding!");
+            //Logger.warn("Got geometry update for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, discarding!");
             sectionResult.free();
             return;
         }
@@ -495,6 +502,10 @@ public class NodeManager {
                             //copy the previous entry to its new location
                             this.nodeData.copyNode(prevChildId, newChildId);
 
+                            this.clearAllocId(newChildId);
+                            this.clearMoveId(prevChildId, newChildId);
+                            this.clearFreeId(prevChildId);
+
                             int prevNodeId = this.activeSectionMap.get(cPos);
                             if ((prevNodeId & NODE_TYPE_MSK) == NODE_TYPE_REQUEST) {
                                 throw new IllegalStateException();
@@ -503,6 +514,7 @@ public class NodeManager {
                                 throw new IllegalStateException("State inconsistency");
                             }
                             this.activeSectionMap.put(cPos, (prevNodeId & NODE_TYPE_MSK) | newChildId);
+
                             //Release the old entry
                             this.nodeData.free(prevChildId);
                             //Need to invalidate the old and the new
@@ -722,7 +734,7 @@ public class NodeManager {
                     this.geometryManager.removeSection(geometry);
 
                 this.nodeData.free(nodeId);
-                this.clearId(nodeId);
+                this.clearFreeId(nodeId);
                 this.invalidateNode(nodeId);
 
                 //Unwatch position
@@ -756,6 +768,7 @@ public class NodeManager {
         //Assume that this is always a top node
         // FIXME: DONT DO THIS
         this.topLevelNodeIds.add(id);
+        this.clearAllocId(id);
     }
 
     private void finishRequest(int requestId, NodeChildRequest request) {
@@ -813,13 +826,15 @@ public class NodeManager {
                 this.nodeData.setNodeGeometry(childNodeId, request.getChildMesh(childIdx));
                 //Mark for update
                 this.invalidateNode(childNodeId);
-                this.clearId(childNodeId);//Clear the id
+                //this.clearId(childNodeId);//Clear the id
 
                 //Put in map
                 int pid = this.activeSectionMap.put(childPos, childNodeId|NODE_TYPE_LEAF);
                 if ((pid&NODE_TYPE_MSK) != NODE_TYPE_REQUEST) {
                     throw new IllegalStateException("Put node in map from request but type was not request: " + pid + " " + WorldEngine.pprintPos(childPos));
                 }
+
+                this.clearAllocId(childNodeId);
             }
             //Free request
             this.childRequests.release(requestId);
@@ -912,6 +927,7 @@ public class NodeManager {
                     if ((pid&NODE_TYPE_MSK) != NODE_TYPE_REQUEST) {
                         throw new IllegalStateException("Put node in map from request but type was not request: " + pid + " " + WorldEngine.pprintPos(childPos));
                     }
+                    this.clearAllocId(childId);
                 } else {
                     prevChildId++;
 
@@ -919,6 +935,10 @@ public class NodeManager {
 
                     //Its a previous entry, copy it to its new location
                     this.nodeData.copyNode(prevChildId, childId);
+
+                    this.clearAllocId(childId);
+                    this.clearMoveId(prevChildId, childId);
+                    this.clearFreeId(prevChildId);
 
                     int prevNodeId = this.activeSectionMap.get(pos);
                     if ((prevNodeId&NODE_TYPE_MSK) == NODE_TYPE_REQUEST) {
@@ -1113,7 +1133,7 @@ public class NodeManager {
     public void removeNodeGeometry(long pos) {
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
-            Logger.warn("Got geometry removal for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, ignoring!");
+            //Logger.warn("Got geometry removal for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, ignoring!");
             return;
         }
         int nodeType = nodeId&NODE_TYPE_MSK;
@@ -1122,7 +1142,7 @@ public class NodeManager {
             Logger.error("Tried removing geometry for pos: " + WorldEngine.pprintPos(pos) + " but its type was a request, ignoring!");
             return;
         }
-        this.clearId(nodeId);
+        //this.clearId(nodeId);
 
         if (nodeType == NODE_TYPE_INNER) {
             this.clearGeometryInternal(pos, nodeId);
@@ -1157,7 +1177,8 @@ public class NodeManager {
             throw new IllegalStateException("Parent node must be an inner node");
         pId &= NODE_ID_MSK;
 
-        {//Check all children are leaf nodes
+        if (false) {//Check all children are leaf nodes
+            //TODO: make a better way to do this (i.e. gpu driven)
             int cPtr = this.nodeData.getChildPtr(pId);
             if (cPtr != SENTINEL_EMPTY_CHILD_PTR) {
                 if (cPtr == -1) {
@@ -1172,8 +1193,11 @@ public class NodeManager {
                     if (cn==-1)
                         throw new IllegalStateException();
                     //If a child is not a leaf, return
-                    if ((cn&NODE_TYPE_MSK)!=NODE_TYPE_LEAF)
+                    if ((cn&NODE_TYPE_MSK)!=NODE_TYPE_LEAF) {
+
+                        this.clearAllocId(this.activeSectionMap.get(cPos)&NODE_ID_MSK);
                         return;
+                    }
                 }
             }
         }
@@ -1185,7 +1209,7 @@ public class NodeManager {
         } else {
             //Convert to leaf node
             this.recurseRemoveChildNodes(pPos);//TODO: make this download/fetch the data instead of just deleting it
-            this.clearId(pId);
+            //this.clearId(pId);
 
             int old = this.activeSectionMap.put(pPos, NODE_TYPE_LEAF|pId);
             if (old == -1)
@@ -1552,9 +1576,9 @@ public class NodeManager {
     }
 
     public void verifyIntegrity() {
-        this.verifyIntegrity(null);
+        this.verifyIntegrity(null, null);
     }
-    public void verifyIntegrity(LongSet watchingPosSet) {
+    public void verifyIntegrity(LongSet watchingPosSet, IntSet nodes) {
         //Should verify integrity of node manager, everything
         // should traverse from top (root positions) down
         // after it should check if there is anything it hasnt tracked, if so thats badd
@@ -1591,6 +1615,14 @@ public class NodeManager {
                 throw new IllegalStateException();
             }
             if (!thisMap.containsAll(watchingPosSet)) {
+                throw new IllegalStateException();
+            }
+        }
+        if (nodes != null) {
+            if (!nodes.containsAll(seenNodes)) {
+                throw new IllegalStateException();
+            }
+            if (!seenNodes.containsAll(nodes)) {
                 throw new IllegalStateException();
             }
         }

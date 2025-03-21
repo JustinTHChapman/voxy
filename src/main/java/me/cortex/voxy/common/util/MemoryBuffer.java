@@ -61,7 +61,7 @@ public class MemoryBuffer extends TrackedObject {
     }
 
     public MemoryBuffer copy() {
-        var copy = new MemoryBuffer(false, this.size, size, freeable);
+        var copy = new MemoryBuffer(this.size);
         this.cpyTo(copy.address);
         return copy;
     }

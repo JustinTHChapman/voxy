@@ -137,7 +137,7 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
         this.geometry.downloadRemove(oldMetadata.geometryPtr, buffer ->
             callback.accept(new BuiltSection(oldMetadata.position, oldMetadata.childExistence, oldMetadata.aabb, buffer.copy(), oldMetadata.offsets))
         );
-        this.geometry.free(oldMetadata.geometryPtr);
+        //this.geometry.free(oldMetadata.geometryPtr);
         this.invalidatedSectionIds.add(id);
     }
 

@@ -250,6 +250,13 @@ public final class NodeStore {
 
     //Writes out a nodes data to the ptr in the compacted/reduced format
     public void writeNode(long ptr, int nodeId) {
+        if (!this.nodeExists(nodeId)) {
+            MemoryUtil.memPutLong(ptr, -1);
+            MemoryUtil.memPutLong(ptr + 8, -1);
+            MemoryUtil.memPutLong(ptr + 16, -1);
+            MemoryUtil.memPutLong(ptr + 24, -1);
+            return;
+        }
         long pos = this.nodePosition(nodeId);
         MemoryUtil.memPutInt(ptr, (int) (pos>>32)); ptr += 4;
         MemoryUtil.memPutInt(ptr, (int) pos); ptr += 4;

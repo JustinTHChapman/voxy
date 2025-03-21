@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntFunction;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -76,6 +77,28 @@ public class TestNodeManager {
         }
     }
 
+    private static class CleanerImp implements NodeManager.ICleaner {
+        private final IntOpenHashSet active = new IntOpenHashSet();
+
+        @Override
+        public void alloc(int id) {
+            if (!this.active.add(id)) {
+                throw new IllegalStateException();
+            }
+        }
+
+        @Override
+        public void move(int from, int to) {
+
+        }
+
+        @Override
+        public void free(int id) {
+            if (!this.active.remove(id)) {
+                throw new IllegalStateException();
+            }
+        }
+    }
     private static class Watcher implements ISectionWatcher {
         private final Long2ByteOpenHashMap updateTypes = new Long2ByteOpenHashMap();
 
@@ -137,11 +160,14 @@ public class TestNodeManager {
         public final MemoryGeometryManager geometryManager;
         public final NodeManager nodeManager;
         public final Watcher watcher;
+        public final CleanerImp cleaner;
 
         public TestBase() {
             this.watcher = new Watcher();
+            this.cleaner = new CleanerImp();
             this.geometryManager = new MemoryGeometryManager(1<<20, 1<<30);
             this.nodeManager = new NodeManager(1 << 21, this.geometryManager, this.watcher);
+            this.nodeManager.setClear(this.cleaner);
         }
 
         public void putTopPos(long pos) {
@@ -208,7 +234,7 @@ public class TestNodeManager {
         }
 
         public void verifyIntegrity() {
-            this.nodeManager.verifyIntegrity(this.watcher.updateTypes.keySet());
+            this.nodeManager.verifyIntegrity(this.watcher.updateTypes.keySet(), this.cleaner.active);
         }
     }
 

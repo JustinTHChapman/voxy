@@ -4,7 +4,7 @@
 
 //#define OUTPUT_SIZE 128
 
-layout(local_size_x=128, local_size_y=1) in;
+layout(local_size_x=WORK_SIZE, local_size_y=1) in;
 //256 workgroup
 
 #import <voxy:lod/hierarchical/node.glsl>
@@ -54,9 +54,36 @@ void main() {
         return;
     }
     UnpackedNode node;
-    unpackNode(node, gl_GlobalInvocationID.x);
+    if (unpackNode(node, gl_GlobalInvocationID.x)==uvec4(-1)) {
+        return;//Unallocated node
+    }
+
     if (isEmptyMesh(node) || (!hasMesh(node))) {//|| (!hasChildren(node))
         return;
     }
+    //TODO: FIXME: DONT HARDCODE TOP LEVEL LOD LEVEL
+    if (node.lodLevel == 4) {// (!hasChildren(node)) -> Assume leaf node
+        return;//Cannot remove geometry from top level node
+    }
+
+    /*THIS IS COMPLETLY WRONG, we need to check if all the children of the parent of the child are leaf nodes
+    // not this node
+
+    //Very sneeky hack, ensure all children are leaf nodes
+    if (hasChildren(node)&&!childListIsEmpty(node)) {
+        uint ptr = getChildPtr(node);
+        uint cnt = getChildCount(node);
+        for (uint i = 0; i < cnt; i++) {
+            UnpackedNode child;
+            unpackNode(child, i+ptr);
+            if (hasChildren(child)) {
+                return;
+            }
+        }
+    }
+    */
+
+
+
     bubbleSort(0, gl_GlobalInvocationID.x);
 }

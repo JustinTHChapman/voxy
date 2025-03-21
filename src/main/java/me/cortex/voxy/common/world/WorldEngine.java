@@ -8,7 +8,7 @@ import me.cortex.voxy.common.world.other.Mapper;
 
 import java.util.List;
 public class WorldEngine {
-    public static final int MAX_LOD_LAYERS = 5;
+    public static final int MAX_LOD_LAYER = 4;
 
     public static final int UPDATE_TYPE_BLOCK_BIT = 1;
     public static final int UPDATE_TYPE_CHILD_EXISTENCE_BIT = 2;
@@ -38,7 +38,7 @@ public class WorldEngine {
     public Mapper getMapper() {return this.mapper;}
     public boolean isLive() {return this.isLive;}
     public WorldEngine(SectionStorage storage, int cacheCount) {
-        this(storage, MAX_LOD_LAYERS, cacheCount);
+        this(storage, MAX_LOD_LAYER+1, cacheCount);//The +1 is because its from 1 not from 0
     }
 
     private WorldEngine(SectionStorage storage, int maxMipLayers, int cacheCount) {
@@ -46,7 +46,7 @@ public class WorldEngine {
         this.storage = storage;
         this.mapper = new Mapper(this.storage);
         //5 cache size bits means that the section tracker has 32 separate maps that it uses
-        this.sectionTracker = new ActiveSectionTracker(7, storage::loadSection, cacheCount, this);
+        this.sectionTracker = new ActiveSectionTracker(10, storage::loadSection, cacheCount, this);
     }
 
     public WorldSection acquireIfExists(int lvl, int x, int y, int z) {
