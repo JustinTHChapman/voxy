@@ -46,6 +46,7 @@ public class DHImporter {
     private final RegistryEntry.Reference<Biome> defaultBiome;
     private final Registry<Biome> biomeRegistry;
     private final Registry<Block> blockRegistry;
+    private Thread runner;
 
     private record Task(int x, int z, int fmt, int compression){}
     private final ConcurrentLinkedDeque<Task> tasks = new ConcurrentLinkedDeque<>();
@@ -58,12 +59,12 @@ public class DHImporter {
     public DHImporter(File file, WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, SectionSavingService savingService) {
         this.engine = worldEngine;
         this.world = mcWorld;
-        this.bottomOfWorld = mcWorld.getBottomY();
         this.biomeRegistry = mcWorld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
         this.defaultBiome = this.biomeRegistry.getOrThrow(BiomeKeys.PLAINS);
         this.blockRegistry = mcWorld.getRegistryManager().getOrThrow(RegistryKeys.BLOCK);
 
-        int worldHeight = 640+64;
+        this.bottomOfWorld = mcWorld.getBottomY();
+        int worldHeight = mcWorld.getHeight();
         this.worldHeightSections = (worldHeight+15)/16;
 
         String con = "jdbc:sqlite:" + file.getPath();
@@ -93,31 +94,41 @@ public class DHImporter {
 
 
     public void runImport() {
-        try (var stmt = this.db.createStatement()){
-            var resSet = stmt.executeQuery("SELECT PosX,PosZ,CompressionMode,DataFormatVersion FROM FullData WHERE DetailLevel = 0;");
-            int i = 0;
-            while (resSet.next()) {
-                int x = resSet.getInt(1);
-                int z = resSet.getInt(2);
-                int compression = resSet.getInt(3);
-                int format = resSet.getInt(4);
-                if (format != 1) {
-                    Logger.warn("Unknown format mode: " + compression);
-                    continue;
+        this.runner = new Thread(()-> {
+            try (var stmt = this.db.createStatement()) {
+                var resSet = stmt.executeQuery("SELECT PosX,PosZ,CompressionMode,DataFormatVersion FROM FullData WHERE DetailLevel = 0;");
+                int i = 0;
+                while (resSet.next()) {
+                    int x = resSet.getInt(1);
+                    int z = resSet.getInt(2);
+                    int compression = resSet.getInt(3);
+                    int format = resSet.getInt(4);
+                    if (format != 1) {
+                        Logger.warn("Unknown format mode: " + compression);
+                        continue;
+                    }
+                    if (compression != 3) {
+                        Logger.warn("Unknown compression mode: " + compression);
+                        continue;
+                    }
+                    this.tasks.add(new Task(x, z, format, compression));
+                    this.threadPool.execute();
+                    i++;
+                    while (this.tasks.size() > 100) {
+                        try {
+                            Thread.sleep(500);
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
                 }
-                if (compression != 3) {
-                    Logger.warn("Unknown compression mode: " + compression);
-                    continue;
-                }
-                this.tasks.add(new Task(x,z,format,compression));
-                this.threadPool.execute();
-                i++;
+                resSet.close();
+                Logger.info("Importing " + i + " DH section");
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
-            resSet.close();
-            Logger.info("Importing " + i + " DH section");
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
+        });
+        this.runner.start();
     }
 
     private static void readStream(InputStream in, ResettableArrayCache cache, byte[] into) throws IOException {
@@ -259,7 +270,7 @@ public class DHImporter {
                         System.arraycopy(storage, (sz|(sy<<2))<<12, section.section, 0, 16 * 16 * 16);
                         WorldConversionFactory.mipSection(section, this.engine.getMapper());
 
-                        section.setPosition(X*4+(x>>4), sy-(this.bottomOfWorld>>4), (Z*4)+sz);
+                        section.setPosition(X*4+(x>>4), sy+(this.bottomOfWorld>>4), (Z*4)+sz);
                         this.engine.insertUpdate(section);
                     }
                 }
