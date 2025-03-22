@@ -17,6 +17,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ColorHelper;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.random.LocalRandom;
@@ -201,6 +202,7 @@ public class ModelTextureBakery {
         }
 
         renderLayer.endDrawing();
+
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_BLEND);
 
@@ -228,7 +230,22 @@ public class ModelTextureBakery {
             blockEntityModel.renderOut();
         }
 
-        var bb = new BufferBuilder(this.allocator, VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
+        var bb = new BufferBuilder(this.allocator, VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR) {
+            @Override
+            public void vertex(float x, float y, float z, int color, float u, float v, int overlay, int light, float normalX, float normalY, float normalZ) {
+                super.vertex(x, y, z, ColorHelper.getArgb(0,0,1), u, v, overlay, light, normalX, normalY, normalZ);
+            }
+
+            @Override
+            public VertexConsumer color(int argb) {
+                return super.color(ColorHelper.getArgb(0,0,1));
+            }
+
+            @Override
+            public VertexConsumer color(int red, int green, int blue, int alpha) {
+                return super.color(0, 0, 1, 255);
+            }
+        };
         if (!renderFluid) {
             //TODO: need to do 2 variants for quads, one which have coloured, ones that dont, might be able to pull a spare bit
             // at the end whether or not a pixel should be mixed with texture
