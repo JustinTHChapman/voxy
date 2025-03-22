@@ -30,7 +30,7 @@ public class ContextSelectionSystem {
         public int maxYOverride = Integer.MIN_VALUE;
         public SectionStorageConfig sectionStorageConfig;
     }
-    public static final String DEFAULT_STORAGE_CONFIG;
+    public static final WorldConfig DEFAULT_STORAGE_CONFIG;
     static {
         var config = new WorldConfig();
 
@@ -48,11 +48,7 @@ public class ContextSelectionSystem {
         serializer.storage = compression;
         config.sectionStorageConfig = serializer;
 
-        DEFAULT_STORAGE_CONFIG = Serialization.GSON.toJson(config);
-
-        if (Serialization.GSON.fromJson(DEFAULT_STORAGE_CONFIG, WorldConfig.class) == null) {
-            throw new IllegalStateException();
-        }
+        DEFAULT_STORAGE_CONFIG = config;
     }
 
     public static class Selection {
@@ -86,13 +82,13 @@ public class ContextSelectionSystem {
             }
 
             try {
-                this.config = Serialization.GSON.fromJson(VoxyConfig.CONFIG.defaultSaveConfig, WorldConfig.class);
+                this.config = DEFAULT_STORAGE_CONFIG;
                 this.save();
             } catch (Exception e) {
                 throw new RuntimeException("Failed to deserialize the default config, aborting!", e);
             }
             if (this.config == null) {
-                throw new IllegalStateException("Config is still null: \n"+VoxyConfig.CONFIG.defaultSaveConfig);
+                throw new IllegalStateException("Config is still null\n");
             }
         }
 
@@ -132,12 +128,12 @@ public class ContextSelectionSystem {
         } else {
             var netHandle = MinecraftClient.getInstance().interactionManager;
             if (netHandle == null) {
-                System.err.println("Network handle null");
+                Logger.error("Network handle null");
                 basePath = basePath.resolve("UNKNOWN");
             } else {
                 var info = netHandle.networkHandler.getServerInfo();
                 if (info == null) {
-                    System.err.println("Server info null");
+                    Logger.error("Server info null");
                     basePath = basePath.resolve("UNKNOWN");
                 } else {
                     if (info.isRealm()) {

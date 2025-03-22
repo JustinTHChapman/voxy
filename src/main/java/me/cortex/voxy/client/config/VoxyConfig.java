@@ -4,6 +4,7 @@ import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
+import me.cortex.voxy.common.Logger;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.FileReader;
@@ -27,28 +28,17 @@ public class VoxyConfig {
     public int serviceThreads = Math.max(Runtime.getRuntime().availableProcessors()/2, 1);
     public float subDivisionSize = 128;
     public int secondaryLruCacheSize = 1024;
-    public String defaultSaveConfig;
-    //public int renderQuality = 256;//Smaller is higher quality
-
 
     public static VoxyConfig loadOrCreate() {
         var path = getConfigPath();
         if (Files.exists(path)) {
             try (FileReader reader = new FileReader(path.toFile())) {
-                var cfg = GSON.fromJson(reader, VoxyConfig.class);
-
-
-                //TODO: dont always override it
-                cfg.defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
-
-                return cfg;
+                return GSON.fromJson(reader, VoxyConfig.class);
             } catch (IOException e) {
-                System.err.println("Could not parse config");
-                e.printStackTrace();
+                Logger.error("Could not parse config",e);
             }
         }
         var config = new VoxyConfig();
-        config.defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
         config.save();
         return config;
     }
@@ -56,8 +46,7 @@ public class VoxyConfig {
         try {
             Files.writeString(getConfigPath(), GSON.toJson(this));
         } catch (IOException e) {
-            System.err.println("Failed to write config file");
-            e.printStackTrace();
+            Logger.error("Failed to write config file", e);
         }
     }
 

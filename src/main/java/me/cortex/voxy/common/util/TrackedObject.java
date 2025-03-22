@@ -1,5 +1,6 @@
 package me.cortex.voxy.common.util;
 
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 
 import java.lang.ref.Cleaner;
@@ -70,13 +71,7 @@ public abstract class TrackedObject {
             }
             cleanable = cleaner.register(obj, () -> {
                 if (!freed[0]) {
-                    System.err.println("Object named: " + clazz + " was not freed, location at:\n");
-                    if (trace != null) {
-                        trace.printStackTrace();
-                    } else {
-                        System.err.println("Enable allocation stack tracing");
-                    }
-                    System.err.flush();
+                    Logger.error("Object named: " + clazz + " was not freed, location at:\n", trace==null?"Enable allocation stack tracing":trace);
                 }
             });
         }

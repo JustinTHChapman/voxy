@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.gl.shader;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlDebug;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.TrackedObject;
 import org.lwjgl.opengl.GL20C;
 
@@ -143,7 +144,7 @@ public class Shader extends TrackedObject {
             String log = GL20C.glGetProgramInfoLog(program);
 
             if (!log.isEmpty()) {
-                System.err.println(log);
+                Logger.error(log);
             }
         }
 
