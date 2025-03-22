@@ -100,15 +100,18 @@ public abstract class ScanMesher2D {
         if (count == 0) return;
         //TODO: replace with much better method, TODO: check this is right!!
         this.putNext(0);
-        this.emitRanged(((1<<(count-1))-1)<<(this.currentIndex&31));
-        this.currentIndex += count-1;
+        if (1<count) {
+            this.emitRanged(((1 << (count - 1)) - 1) << (this.currentIndex & 31));
+            this.currentIndex += count - 1;
+        }
         /*
         for (int i = 0; i < count; i++) {
             this.putNext(0);
         }*/
     }
 
-    public final void resetScanlineRowIndex() {
+    public final void reset() {
+        this.rowBitset = 0;
         this.currentSum = 0;
         this.currentData = 0;
         this.currentIndex = 0;
@@ -132,12 +135,13 @@ public abstract class ScanMesher2D {
         for (int i = 0; i < 32; i++) {
             this.putNext(0);
         }*/
-
         //TODO: check this is correct
-        this.skip(32-(this.currentIndex&31));
-        this.emitRanged(-1);
+        if (this.currentIndex != 0) {
+            this.skip(32 - (this.currentIndex & 31));
+            this.emitRanged(-1);
+        }
 
-        this.resetScanlineRowIndex();
+        this.reset();
     }
 
     protected abstract void emitQuad(int x, int z, int length, int width, long data);

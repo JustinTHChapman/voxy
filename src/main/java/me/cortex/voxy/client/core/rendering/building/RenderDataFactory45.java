@@ -332,7 +332,7 @@ public class RenderDataFactory45 {
                                 if (Mapper.getBlockId(neighborId) != 0) {//Not air
                                     long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
                                     if (ModelQueries.isFullyOpaque(meta)) {//Dont mesh this face
-                                        this.blockMesher.putNext(0);
+                                        this.blockMesher.skip(1);
                                         continue;
                                     }
                                 }
@@ -535,6 +535,10 @@ public class RenderDataFactory45 {
             }
         }
 
+        for (var mesher : this.xAxisMeshers) {
+            mesher.finish();
+        }
+
         //Generate the side faces, hackily, using 0 and 1 mesher
         if (true) {
             var ma = this.xAxisMeshers[0];
@@ -543,6 +547,7 @@ public class RenderDataFactory45 {
             mb.finish();
             ma.doAuxiliaryFaceOffset = false;
             mb.doAuxiliaryFaceOffset = false;
+
             for (int y = 0; y < 32; y++) {
                 int skipA = 0;
                 int skipB = 0;
@@ -584,14 +589,11 @@ public class RenderDataFactory45 {
                 ma.skip(skipA);
                 mb.skip(skipB);
             }
+
             ma.finish();
             mb.finish();
             ma.doAuxiliaryFaceOffset = true;
             mb.doAuxiliaryFaceOffset = true;
-        }
-
-        for (var mesher : this.xAxisMeshers) {
-            mesher.finish();
         }
     }
 
@@ -607,10 +609,25 @@ public class RenderDataFactory45 {
 
     //section is already acquired and gets released by the parent
     public BuiltSection generateMesh(WorldSection section) {
+        //TODO: FIXME: because of the exceptions that are thrown when aquiring modelId
+        // this can result in the state of all block meshes and well _everything_ from being incorrect
+        //THE EXCEPTION THAT THIS THROWS CAUSES MAJOR ISSUES
+
         //Copy section data to end of array so that can mutate array while reading safely
         section.copyDataTo(this.sectionData, 32*32*32);
 
+        //We must reset _everything_ that could have changed as we dont exactly know the state due to how the model id exception
+        // throwing system works
         this.quadCount = 0;
+
+        {//Reset all the block meshes
+            this.blockMesher.reset();
+            this.blockMesher.doAuxiliaryFaceOffset = true;
+            for (var mesher : this.xAxisMeshers) {
+                mesher.reset();
+                mesher.doAuxiliaryFaceOffset = true;
+            }
+        }
 
         this.minX = Integer.MAX_VALUE;
         this.minY = Integer.MAX_VALUE;
