@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering.util;
 
 import me.cortex.voxy.client.core.gl.GlFence;
 import me.cortex.voxy.client.core.gl.GlPersistentMappedBuffer;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.AllocationArena;
 
 import java.util.ArrayDeque;
@@ -33,6 +34,7 @@ public class RawDownloadStream {
     public int download(int size, IDownloadCompletedCallback callback) {
         int allocation = (int) this.allocationArena.alloc(size);
         if (allocation == AllocationArena.SIZE_LIMIT) {
+            Logger.warn("Raw download stream full, preemptively committing, this could cause bad things to happen");
             //Hit the download limit, attempt to free
             glFinish();
             this.tick();
