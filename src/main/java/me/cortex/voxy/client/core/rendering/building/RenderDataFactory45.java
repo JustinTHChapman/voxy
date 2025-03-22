@@ -356,6 +356,51 @@ public class RenderDataFactory45 {
                 }
                 this.blockMesher.doAuxiliaryFaceOffset = true;
             }
+
+
+            if (false) {//Non fully opaque geometry
+                //Note: think is ok to just reuse.. blockMesher
+                this.blockMesher.axis = axis;
+                for (int layer = 0; layer < 32; layer++) {
+                    this.blockMesher.auxiliaryPosition = layer;
+                    for (int other = 0; other < 32; other++) {//TODO: need to do the faces that border sections
+                        int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
+
+                        int msk = this.nonOpaqueMasks[pidx];
+
+                        if (msk == 0) {
+                            this.blockMesher.skip(32);
+                            continue;
+                        }
+
+
+                        int cIdx = -1;
+                        while (msk != 0) {
+                            int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
+                            int delta = index - cIdx - 1;
+                            cIdx = index; //index--;
+                            if (delta != 0) this.blockMesher.skip(delta);
+                            msk &= ~Integer.lowestOneBit(msk);
+
+                            {
+                                int idx = index + (pidx * 32);
+
+                                //TODO: swap this out for something not getting the next entry
+                                long A = this.sectionData[idx * 2];
+
+                                //Example thing thats just wrong but as example
+                                this.blockMesher.putNext((long) (false ? 0L : 1L) |
+                                        ((A & 0xFFFFL) << 26) |
+                                        (((0xFFL) & 0xFF) << 55) |
+                                        ((A&(0x1FFL<<24))<<(46-24))
+                                );
+                            }
+                        }
+                        this.blockMesher.endRow();
+                    }
+                    this.blockMesher.finish();
+                }
+            }
         }
     }
 

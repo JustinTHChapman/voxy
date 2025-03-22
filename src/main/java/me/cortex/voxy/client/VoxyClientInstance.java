@@ -1,5 +1,6 @@
 package me.cortex.voxy.client;
 
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.WorldImportWrapper;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -13,7 +14,7 @@ public class VoxyClientInstance extends VoxyInstance {
     public WorldImportWrapper importWrapper;
 
     public VoxyClientInstance() {
-        super(14);
+        super(VoxyConfig.CONFIG.serviceThreads);
     }
 
     @Override
