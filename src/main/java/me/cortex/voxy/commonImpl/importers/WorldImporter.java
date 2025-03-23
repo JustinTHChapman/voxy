@@ -42,12 +42,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-public class WorldImporter {
-
-    public interface UpdateCallback {
-        void update(int finished, int outof);
-    }
-
+public class WorldImporter implements IDataImporter {
     private final WorldEngine world;
     private final ReadableContainer<RegistryEntry<Biome>> defaultBiomeProvider;
     private final Codec<ReadableContainer<RegistryEntry<Biome>>> biomeCodec;
@@ -122,6 +117,17 @@ public class WorldImporter {
     }
 
 
+    @Override
+    public void runImport(IUpdateCallback updateCallback, ICompletionCallback completionCallback) {
+        if (this.isRunning || this.worker == null) {
+            throw new IllegalStateException();
+        }
+        this.isRunning = true;
+        this.updateCallback = updateCallback;
+        this.completionCallback = completionCallback;
+        this.worker.start();
+    }
+
     public void shutdown() {
         this.isRunning = false;
         if (this.worker != null) {
@@ -141,8 +147,9 @@ public class WorldImporter {
     }
 
     private volatile Thread worker;
-    private UpdateCallback updateCallback;
-    public void importRegionDirectoryAsyncStart(File directory, UpdateCallback updateCallback, Consumer<Integer> onCompletion) {
+    private IUpdateCallback updateCallback;
+    private ICompletionCallback completionCallback;
+    public void importRegionDirectoryAsyncStart(File directory) {
         var files = directory.listFiles((dir, name) -> {
             var sections = name.split("\\.");
             if (sections.length != 4 || (!sections[0].equals("r")) || (!sections[3].equals("mca"))) {
@@ -152,14 +159,13 @@ public class WorldImporter {
             return true;
         });
         if (files == null) {
-            onCompletion.accept(0);
             return;
         }
         Arrays.sort(files, File::compareTo);
-        this.importRegionsAsyncStart(files, this::importRegionFile, updateCallback, onCompletion);
+        this.importRegionsAsyncStart(files, this::importRegionFile);
     }
 
-    public void importZippedRegionDirectoryAsyncStart(File zip, String innerDirectory, UpdateCallback updateCallback, Consumer<Integer> onCompletion) {
+    public void importZippedRegionDirectoryAsyncStart(File zip, String innerDirectory) {
         try {
             innerDirectory = innerDirectory.replace("\\\\", "\\").replace("\\", "/");
             var file = ZipFile.builder().setFile(zip).get();
@@ -193,20 +199,18 @@ public class WorldImporter {
                 this.importRegion(buf, Integer.parseInt(sections[1]), Integer.parseInt(sections[2]));
                 buf.free();
 
-            }, updateCallback, onCompletion);
+            });
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
     }
 
-    private <T> void importRegionsAsyncStart(T[] regionFiles, IImporterMethod<T> importer, UpdateCallback updateCallback, Consumer<Integer> onCompletion) {
+    private <T> void importRegionsAsyncStart(T[] regionFiles, IImporterMethod<T> importer) {
         this.totalChunks.set(0);
         this.estimatedTotalChunks.set(0);
         this.chunksProcessed.set(0);
-        this.updateCallback = updateCallback;
         this.worker = new Thread(() -> {
-            this.isRunning = true;
             this.estimatedTotalChunks.addAndGet(regionFiles.length*1024);
             for (var file : regionFiles) {
                 this.estimatedTotalChunks.addAndGet(-1024);
@@ -224,7 +228,7 @@ public class WorldImporter {
                 }
                 if (!this.isRunning) {
                     this.threadPool.blockTillEmpty();
-                    onCompletion.accept(this.totalChunks.get());
+                    this.completionCallback.onCompletion(this.totalChunks.get());
                     this.worker = null;
                     return;
                 }
@@ -238,17 +242,20 @@ public class WorldImporter {
                     throw new RuntimeException(e);
                 }
             }
-            onCompletion.accept(this.totalChunks.get());
+            this.completionCallback.onCompletion(this.totalChunks.get());
 
             this.threadPool.shutdown();
             this.worker = null;
         });
         this.worker.setName("World importer");
-        this.worker.start();
     }
 
     public boolean isBusy() {
-        return this.worker != null;
+        return this.isRunning || this.worker != null;
+    }
+
+    public boolean isRunning() {
+        return this.isRunning || this.worker != null;
     }
 
     private void importRegionFile(File file) throws IOException {
@@ -406,7 +413,7 @@ public class WorldImporter {
             Logger.error("Exception importing world chunk:",e);
         }
 
-        this.updateCallback.update(this.chunksProcessed.incrementAndGet(), this.estimatedTotalChunks.get());
+        this.updateCallback.onUpdate(this.chunksProcessed.incrementAndGet(), this.estimatedTotalChunks.get());
     }
 
     private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);

@@ -32,11 +32,11 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class DHImporter {
+public class DHImporter implements IDataImporter {
     private final Connection db;
     private final WorldEngine engine;
     private final ServiceSlice threadPool;
@@ -47,8 +47,16 @@ public class DHImporter {
     private final Registry<Biome> biomeRegistry;
     private final Registry<Block> blockRegistry;
     private Thread runner;
+    private volatile boolean isRunning = false;
+    private final AtomicInteger processedChunks = new AtomicInteger();
+    private int totalChunks;
+    private IUpdateCallback updateCallback;
 
-    private record Task(int x, int z, int fmt, int compression){}
+    private record Task(int x, int z, int fmt, int compression) {
+        public long distanceFromZero() {
+            return ((long)this.x)*this.x+((long)this.z)*this.z;
+        }
+    }
     private final ConcurrentLinkedDeque<Task> tasks = new ConcurrentLinkedDeque<>();
     private record WorkCTX(PreparedStatement stmt, ResettableArrayCache cache, long[] storageCache, byte[] colScratch, VoxelizedSection section) {
         public WorkCTX(PreparedStatement stmt, int worldHeight) {
@@ -93,41 +101,64 @@ public class DHImporter {
     }
 
 
-    public void runImport() {
+    public void runImport(IUpdateCallback updateCallback, ICompletionCallback completionCallback) {
+        if (this.isRunning()) {
+            throw new IllegalStateException();
+        }
+        this.updateCallback = updateCallback;
         this.runner = new Thread(()-> {
+            Queue<Task> taskQ = new PriorityQueue<>(Comparator.comparingLong(Task::distanceFromZero));
             try (var stmt = this.db.createStatement()) {
                 var resSet = stmt.executeQuery("SELECT PosX,PosZ,CompressionMode,DataFormatVersion FROM FullData WHERE DetailLevel = 0;");
-                int i = 0;
                 while (resSet.next()) {
                     int x = resSet.getInt(1);
                     int z = resSet.getInt(2);
                     int compression = resSet.getInt(3);
                     int format = resSet.getInt(4);
                     if (format != 1) {
-                        Logger.warn("Unknown format mode: " + compression);
+                        Logger.warn("Unknown format mode: " + format);
                         continue;
                     }
                     if (compression != 3) {
                         Logger.warn("Unknown compression mode: " + compression);
                         continue;
                     }
-                    this.tasks.add(new Task(x, z, format, compression));
-                    this.threadPool.execute();
-                    i++;
-                    while (this.tasks.size() > 100) {
-                        try {
-                            Thread.sleep(500);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
+                    taskQ.add(new Task(x, z, format, compression));
                 }
                 resSet.close();
-                Logger.info("Importing " + i + " DH section");
+
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
+
+            this.totalChunks = taskQ.size() * (4*4);//(since there are 4*4 chunks to every dh section)
+
+            while (this.isRunning&&!taskQ.isEmpty()) {
+                this.tasks.add(taskQ.poll());
+                this.threadPool.execute();
+
+                while (this.tasks.size() > 100 && this.isRunning) {
+                    try {
+                        Thread.sleep(500);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+
+            while (!this.tasks.isEmpty()) {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            completionCallback.onCompletion(this.processedChunks.get());
+            this.shutdown();
         });
+        this.isRunning = true;
+        this.runner.setDaemon(true);
         this.runner.start();
     }
 
@@ -273,6 +304,9 @@ public class DHImporter {
                         section.setPosition(X*4+(x>>4), sy+(this.bottomOfWorld>>4), (Z*4)+sz);
                         this.engine.insertUpdate(section);
                     }
+
+                    int count = this.processedChunks.incrementAndGet();
+                    this.updateCallback.onUpdate(count, this.totalChunks);
                 }
                 Arrays.fill(storage, 0);
                 //Process batch
@@ -281,6 +315,9 @@ public class DHImporter {
         stream.close();
     }
     private void importSection(PreparedStatement dataFetchStmt, WorkCTX ctx, Task task) {
+        if (!this.isRunning) {
+            return;
+        }
         try {
             dataFetchStmt.setInt(1, task.x);
             dataFetchStmt.setInt(2, task.z);
@@ -296,12 +333,30 @@ public class DHImporter {
     }
 
     public void shutdown() {
+        if (!this.isRunning) {
+            return;
+        }
+        this.isRunning = false;
+        try {
+            if (this.runner != Thread.currentThread()) {
+                this.runner.join();
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         this.threadPool.shutdown();
         try {
             this.db.close();
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+        this.updateCallback = null;
+        this.runner = null;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return this.isRunning;
     }
 
     private static VarHandle create(Class<?> viewArrayClass) {

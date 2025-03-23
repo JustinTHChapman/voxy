@@ -53,7 +53,7 @@ public class WorldImportCommand {
             return false;
         }
         return instance.importWrapper.createWorldImporter(MinecraftClient.getInstance().player.clientWorld,
-                (importer, up, done)->importer.importRegionDirectoryAsyncStart(directory, up, done));
+                (importer)->importer.importRegionDirectoryAsyncStart(directory));
     }
 
     private static int importRaw(CommandContext<FabricClientCommandSource> ctx) {
@@ -140,7 +140,7 @@ public class WorldImportCommand {
         }
         String finalInnerDir = innerDir;
         return instance.importWrapper.createWorldImporter(MinecraftClient.getInstance().player.clientWorld,
-                (importer, up, done)->importer.importZippedRegionDirectoryAsyncStart(zip, finalInnerDir, up, done))?0:1;
+                (importer)->importer.importZippedRegionDirectoryAsyncStart(zip, finalInnerDir))?0:1;
     }
 
     private static int cancelImport(CommandContext<FabricClientCommandSource> fabricClientCommandSourceCommandContext) {

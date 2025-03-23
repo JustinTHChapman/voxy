@@ -53,13 +53,14 @@ public class WorldImportWrapper {
     }
 
     public interface IImporterFactory {
-        void create(WorldImporter importer, WorldImporter.UpdateCallback updateCallback, Consumer<Integer> onCompletion);
+        void setup(WorldImporter importer);
     }
+
     public boolean createWorldImporter(World mcWorld, IImporterFactory factory) {
         if (this.importer == null) {
             this.importer = new WorldImporter(this.world, mcWorld, this.pool, VoxyCommon.getInstance().getSavingService());
         }
-        if (this.importer.isBusy()) {
+        if (this.importer.isRunning()) {
             return false;
         }
 
@@ -69,9 +70,13 @@ public class WorldImportWrapper {
         this.importerBossBarUUID = MathHelper.randomUuid();
         var bossBar = new ClientBossBar(this.importerBossBarUUID, Text.of("Voxy world importer"), 0.0f, BossBar.Color.GREEN, BossBar.Style.PROGRESS, false, false, false);
         MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.put(bossBar.getUuid(), bossBar);
+
+        factory.setup(this.importer);
+
         long start = System.currentTimeMillis();
         long[] ticker = new long[1];
-        factory.create(this.importer, (a, b)-> {
+
+        this.importer.runImport((a, b)-> {
                     if (System.currentTimeMillis() - ticker[0] > 50) {
                         ticker[0] = System.currentTimeMillis();
                         MinecraftClient.getInstance().executeSync(() -> {
@@ -97,6 +102,7 @@ public class WorldImportWrapper {
                         }
                     });
                 });
+
         return true;
     }
 
