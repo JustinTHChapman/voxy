@@ -4,8 +4,7 @@ import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL20C;
 
-import static org.lwjgl.opengl.GL11.GL_VENDOR;
-import static org.lwjgl.opengl.GL11.glGetString;
+import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL32.glGetInteger64;
 import static org.lwjgl.opengl.GL43C.GL_MAX_SHADER_STORAGE_BLOCK_SIZE;
 
@@ -33,7 +32,7 @@ public class Capabilities {
 
         this.ssboMaxSize = glGetInteger64(GL_MAX_SHADER_STORAGE_BLOCK_SIZE);
 
-        this.isMesa = "Mesa".equalsIgnoreCase(glGetString(GL_VENDOR));
+        this.isMesa = glGetString(GL_VERSION).toLowerCase().contains("mesa");
     }
 
     public static void init() {
