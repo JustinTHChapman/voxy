@@ -359,6 +359,7 @@ public class RenderDataFactory45 {
 
 
             if (false) {//Non fully opaque geometry
+                this.blockMesher.doAuxiliaryFaceOffset = false;
                 //Note: think is ok to just reuse.. blockMesher
                 this.blockMesher.axis = axis;
                 for (int layer = 0; layer < 32; layer++) {
@@ -400,6 +401,7 @@ public class RenderDataFactory45 {
                     }
                     this.blockMesher.finish();
                 }
+                this.blockMesher.doAuxiliaryFaceOffset = true;
             }
         }
     }

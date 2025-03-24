@@ -274,8 +274,8 @@ public class TestNodeManager {
 
     public static void main(String[] args) {
         Logger.INSERT_CLASS = false;
-        int ITER_COUNT = 5000;
-        int INNER_ITER_COUNT = 100_000;
+        int ITER_COUNT = 50_000;
+        int INNER_ITER_COUNT = 500_000;
         boolean GEO_REM = true;
 
         AtomicInteger finished = new AtomicInteger();
@@ -283,7 +283,7 @@ public class TestNodeManager {
 
         Logger.SHUTUP = true;
 
-        if (true) {
+        if (false) {
             for (int q = 0; q < ITER_COUNT; q++) {
                 //Logger.info("Iteration "+ q);
                 if (runTest(INNER_ITER_COUNT, q, seenTraces, GEO_REM)) {

@@ -92,10 +92,10 @@ public class TextureUtils {
     private static float u2fdepth(int depth) {
         float depthF = (float) ((double)depth/((1<<24)-1));
         //https://registry.khronos.org/OpenGL-Refpages/gl4/html/glDepthRange.xhtml
-        // due to this and the unsigned bullshit, i believe the depth value needs to get multiplied by 2
+        // due to this and the unsigned bullshit, believe the depth value needs to get multiplied by 2
 
         //Shouldent be needed due to the compute bake copy
-        //depthF *= 2;
+        depthF *= 2;
         if (depthF > 1.00001f) {
             System.err.println("Warning: Depth greater than 1");
             depthF = 1.0f;

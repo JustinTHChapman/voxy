@@ -119,31 +119,37 @@ public class NodeCleaner {
         this.setIds(this.freeIds, -1);
 
         if (this.shouldCleanGeometry()) {
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-            this.outputBuffer.fill(this.nodeManager.maxNodeCount-2);//TODO: maybe dont set to zero??
+            var gm = this.nodeManager.getGeometryManager();
+
+            int c = (int) (((((double) gm.getUsedCapacity() / gm.geometryCapacity) - 0.75) * 4 * 10) + 1);
+            c = 1;
+            for (int i = 0; i < c; i++) {
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+                this.outputBuffer.fill(this.nodeManager.maxNodeCount - 2);//TODO: maybe dont set to zero??
 
 
-            this.sorter.bind();
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, nodeDataBuffer.id);
+                this.sorter.bind();
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, nodeDataBuffer.id);
 
 
-            //TODO: choose whether this is in nodeSpace or section/geometryId space
-            //
-            glDispatchCompute((this.nodeManager.getCurrentMaxNodeId()+SORTING_WORKER_SIZE-1)/SORTING_WORKER_SIZE, 1, 1);
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+                //TODO: choose whether this is in nodeSpace or section/geometryId space
+                //
+                glDispatchCompute((this.nodeManager.getCurrentMaxNodeId() + SORTING_WORKER_SIZE - 1) / SORTING_WORKER_SIZE, 1, 1);
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
-            this.resultTransformer.bind();
-            glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, this.outputBuffer.id, 0, 4*OUTPUT_COUNT);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nodeDataBuffer.id);
-            glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 2, this.outputBuffer.id, 4*OUTPUT_COUNT, 8*OUTPUT_COUNT);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.visibilityBuffer.id);
-            glUniform1ui(0, this.visibilityId);
+                this.resultTransformer.bind();
+                glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, this.outputBuffer.id, 0, 4 * OUTPUT_COUNT);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nodeDataBuffer.id);
+                glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 2, this.outputBuffer.id, 4 * OUTPUT_COUNT, 8 * OUTPUT_COUNT);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.visibilityBuffer.id);
+                glUniform1ui(0, this.visibilityId);
 
-            glDispatchCompute(1,1,1);
-            //glFinish();
+                glDispatchCompute(1, 1, 1);
+                //glFinish();
 
-            DownloadStream.INSTANCE.download(this.outputBuffer, 4*OUTPUT_COUNT, 8*OUTPUT_COUNT, this::onDownload);
-            //glFinish();
+                DownloadStream.INSTANCE.download(this.outputBuffer, 4 * OUTPUT_COUNT, 8 * OUTPUT_COUNT, this::onDownload);
+                //glFinish();
+            }
         }
     }
 

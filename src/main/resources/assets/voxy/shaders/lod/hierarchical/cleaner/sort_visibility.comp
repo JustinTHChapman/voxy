@@ -18,7 +18,8 @@ layout(binding = OUTPUT_BUFFER_BINDING, std430) restrict volatile buffer Minimum
 };
 
 //Returns the id of the max value
-uint atomicDerefMax(uint atId, uint id, uint value) {
+uint atomicDerefMaxExchange(uint atId, uint id) {
+    const uint value = visiblity[id];
     while (true) {
         const uint existingId = minVisIds[atId];
         //Check if the value is less than the dereferenced value, if its not, return our own id
@@ -26,7 +27,7 @@ uint atomicDerefMax(uint atId, uint id, uint value) {
             return id;
         }
         //Attempt to swap, since we know we are less than the existingId
-        uint c = atomicCompSwap(minVisIds[atId], existingId, id);
+        const uint c = atomicCompSwap(minVisIds[atId], existingId, id);
         //Check if we did swap, else if we failed (or got reswapped else where) recheck
 
         //We did swap, (since the original mem contents was the existing id)
@@ -40,7 +41,7 @@ uint atomicDerefMax(uint atId, uint id, uint value) {
 //TODO: optimize
 void bubbleSort(uint start, uint id) {
     for (uint i = start; i < OUTPUT_SIZE; i++) {
-        id = atomicDerefMax(i, id, visiblity[id]);
+        id = atomicDerefMaxExchange(i, id);
     }
 }
 
@@ -50,6 +51,9 @@ void main() {
     //}
     //First do a min sort/set of min OUTPUT_SIZE values of the set
     uint vis = visiblity[gl_GlobalInvocationID.x];
+    if (vis == uint(-1)) {
+        return;
+    }
     if (visiblity[minVisIds[OUTPUT_SIZE-1]] <= vis) {
         return;
     }

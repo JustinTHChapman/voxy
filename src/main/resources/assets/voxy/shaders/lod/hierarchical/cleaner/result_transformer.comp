@@ -22,7 +22,7 @@ void main() {
     uint id = minVisIds[gl_LocalInvocationID.x];
     uvec4 node = nodes[id];
     uvec2 res = node.xy;
-    if (all(equal(node, uvec4(0)))) {//If its a empty node, TODO: DONT THINK THIS IS ACTUALLY CORRECT
+    if (all(equal(node, uvec4(-1)))) {//If its a empty node, TODO: DONT THINK THIS IS ACTUALLY CORRECT
         res = uvec2(-1);
     }
     outputBuffer[gl_LocalInvocationID.x] = res;//Move the position of the node id into the output buffer
@@ -30,6 +30,6 @@ void main() {
     //This is an evil hack to not spam the same node 500 times in a row
     //TODO: maybe instead set this to the current frame index
 //    visibility[id] += 30;
-    visibility[id] = visibilityCounter;
+    visibility[id] = visibilityCounter + 60;
 
 }
