@@ -247,10 +247,9 @@ public class WorldImporter implements IDataImporter {
                     throw new RuntimeException(e);
                 }
             }
-            this.completionCallback.onCompletion(this.totalChunks.get());
-
-            this.threadPool.shutdown();
             this.worker = null;
+            this.threadPool.shutdown();
+            this.completionCallback.onCompletion(this.totalChunks.get());
         });
         this.worker.setName("World importer");
     }
@@ -260,7 +259,7 @@ public class WorldImporter implements IDataImporter {
     }
 
     public boolean isRunning() {
-        return this.isRunning || this.worker != null;
+        return this.isRunning || (this.worker != null && this.worker.isAlive());
     }
 
     private void importRegionFile(File file) throws IOException {

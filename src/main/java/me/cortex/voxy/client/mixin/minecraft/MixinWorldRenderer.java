@@ -83,6 +83,10 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             Logger.info("Not creating renderer due to disabled");
             return;
         }
+        if (this.world == null) {
+            Logger.error("Not creating renderer due to null world");
+            return;
+        }
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
             Logger.error("Not creating renderer due to null instance");

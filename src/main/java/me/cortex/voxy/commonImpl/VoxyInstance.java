@@ -13,6 +13,7 @@ import net.minecraft.client.world.ClientWorld;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 //TODO: add thread access verification (I.E. only accessible on a single thread)
 public class VoxyInstance {
@@ -39,6 +40,7 @@ public class VoxyInstance {
         debug.add("Voxy Core: " + VoxyCommon.MOD_VERSION);
         debug.add("MemoryBuffer, Count/Size (mb): " + MemoryBuffer.getCount() + "/" + (MemoryBuffer.getTotalSize()/1_000_000));
         debug.add("I/S: " + this.ingestService.getTaskCount() + "/" + this.savingService.getTaskCount());
+        debug.add("AWSC: [" + this.activeWorlds.stream().map(a->""+a.getActiveSectionCount()).collect(Collectors.joining(", ")) + "]");//Active world section count
     }
 
     public void shutdown() {

@@ -107,9 +107,9 @@ public class ImportManager {
     }
 
     private synchronized void jobFinished(ImportTask task) {
-        if (!task.isCompleted()) {
-            throw new IllegalStateException();
-        }
+        //if (!task.isCompleted()) {
+        //    throw new IllegalStateException();
+        //}
 
         var remTask = this.activeImporters.remove(task.importer.getEngine());
         if (remTask != null) {

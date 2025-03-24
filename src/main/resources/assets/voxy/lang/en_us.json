@@ -8,6 +8,9 @@
   "voxy.config.general.enabled": "Enable Voxy",
   "voxy.config.general.enabled.tooltip": "Fully enables or disables voxy",
 
+  "voxy.config.general.rendering": "Voxy Rendering",
+  "voxy.config.general.rendering.tooltip": "Enables or disables voxy rendering",
+
   "voxy.config.general.ingest": "Chunk Ingest",
   "voxy.config.general.ingest.tooltip": "Enables or disables voxies ability to convert new chunks into LoDs",
 

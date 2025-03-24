@@ -196,6 +196,11 @@ public class WorldEngine {
         debug.add("ACC/SCC: " + this.sectionTracker.getLoadedCacheCount()+"/"+this.sectionTracker.getSecondaryCacheSize());//Active cache count, Secondary cache counts
     }
 
+    public int getActiveSectionCount() {
+        return this.sectionTracker.getLoadedCacheCount();
+    }
+
+
     public void free() {
         this.thisTracker.free();
         this.isLive = false;
