@@ -337,6 +337,8 @@ public class DHImporter implements IDataImporter {
             return;
         }
         this.isRunning = false;
+        while (!this.tasks.isEmpty())
+            this.tasks.poll();
         try {
             if (this.runner != Thread.currentThread()) {
                 this.runner.join();
@@ -357,6 +359,11 @@ public class DHImporter implements IDataImporter {
     @Override
     public boolean isRunning() {
         return this.isRunning;
+    }
+
+    @Override
+    public WorldEngine getEngine() {
+        return this.engine;
     }
 
     private static VarHandle create(Class<?> viewArrayClass) {

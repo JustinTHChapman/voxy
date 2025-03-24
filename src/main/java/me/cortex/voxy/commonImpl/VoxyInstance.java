@@ -1,5 +1,6 @@
 package me.cortex.voxy.commonImpl;
 
+import me.cortex.voxy.client.core.WorldImportWrapper;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.section.SectionStorage;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
@@ -20,11 +21,18 @@ public class VoxyInstance {
     protected final VoxelIngestService ingestService;
     protected final Set<WorldEngine> activeWorlds = new HashSet<>();
 
+    protected final ImportManager importManager;
+
     public VoxyInstance(int threadCount) {
         Logger.info("Initializing voxy instance");
         this.threadPool = new ServiceThreadPool(threadCount);
         this.savingService = new SectionSavingService(this.threadPool);
         this.ingestService = new VoxelIngestService(this.threadPool);
+        this.importManager = this.createImportManager();
+    }
+
+    protected ImportManager createImportManager() {
+        return new ImportManager();
     }
 
     public void addDebug(List<String> debug) {
@@ -35,6 +43,12 @@ public class VoxyInstance {
 
     public void shutdown() {
         Logger.info("Shutdown voxy instance");
+
+        if (!this.activeWorlds.isEmpty()) {
+            for (var world : this.activeWorlds) {
+                this.importManager.cancelImport(world);
+            }
+        }
 
         try {this.ingestService.shutdown();} catch (Exception e) {Logger.error(e);}
         try {this.savingService.shutdown();} catch (Exception e) {Logger.error(e);}
@@ -63,6 +77,10 @@ public class VoxyInstance {
 
     public SectionSavingService getSavingService() {
         return this.savingService;
+    }
+
+    public ImportManager getImportManager() {
+        return this.importManager;
     }
 
     public void flush() {
@@ -105,6 +123,8 @@ public class VoxyInstance {
         if (!world.isLive()) {
             throw new IllegalStateException("World cannot be in world set and not alive");
         }
+
+        this.importManager.cancelImport(world);
 
         this.flush();
 

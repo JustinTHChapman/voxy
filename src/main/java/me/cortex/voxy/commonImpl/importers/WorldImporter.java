@@ -128,6 +128,11 @@ public class WorldImporter implements IDataImporter {
         this.worker.start();
     }
 
+    @Override
+    public WorldEngine getEngine() {
+        return this.world;
+    }
+
     public void shutdown() {
         this.isRunning = false;
         if (this.worker != null) {
@@ -149,7 +154,7 @@ public class WorldImporter implements IDataImporter {
     private volatile Thread worker;
     private IUpdateCallback updateCallback;
     private ICompletionCallback completionCallback;
-    public void importRegionDirectoryAsyncStart(File directory) {
+    public void importRegionDirectoryAsync(File directory) {
         var files = directory.listFiles((dir, name) -> {
             var sections = name.split("\\.");
             if (sections.length != 4 || (!sections[0].equals("r")) || (!sections[3].equals("mca"))) {
@@ -162,10 +167,10 @@ public class WorldImporter implements IDataImporter {
             return;
         }
         Arrays.sort(files, File::compareTo);
-        this.importRegionsAsyncStart(files, this::importRegionFile);
+        this.importRegionsAsync(files, this::importRegionFile);
     }
 
-    public void importZippedRegionDirectoryAsyncStart(File zip, String innerDirectory) {
+    public void importZippedRegionDirectoryAsync(File zip, String innerDirectory) {
         try {
             innerDirectory = innerDirectory.replace("\\\\", "\\").replace("\\", "/");
             var file = ZipFile.builder().setFile(zip).get();
@@ -184,7 +189,7 @@ public class WorldImporter implements IDataImporter {
                 }
                 regions.add(entry);
             }
-            this.importRegionsAsyncStart(regions.toArray(ZipArchiveEntry[]::new), (entry)->{
+            this.importRegionsAsync(regions.toArray(ZipArchiveEntry[]::new), (entry)->{
                 var buf = new MemoryBuffer(entry.getSize());
                 try (var channel = Channels.newChannel(file.getInputStream(entry))) {
                     if (channel.read(buf.asByteBuffer()) != buf.size) {
@@ -206,7 +211,7 @@ public class WorldImporter implements IDataImporter {
 
     }
 
-    private <T> void importRegionsAsyncStart(T[] regionFiles, IImporterMethod<T> importer) {
+    private <T> void importRegionsAsync(T[] regionFiles, IImporterMethod<T> importer) {
         this.totalChunks.set(0);
         this.estimatedTotalChunks.set(0);
         this.chunksProcessed.set(0);

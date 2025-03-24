@@ -8,6 +8,8 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.VoxyInstance;
+import me.cortex.voxy.commonImpl.importers.DHImporter;
+import me.cortex.voxy.commonImpl.importers.WorldImporter;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
@@ -41,10 +43,34 @@ public class WorldImportCommand {
                                         .executes(WorldImportCommand::importZip)
                                         .then(ClientCommandManager.argument("innerPath", StringArgumentType.string())
                                                 .executes(WorldImportCommand::importZip))))
+                        .then(ClientCommandManager.literal("distant_horizons")
+                                .then(ClientCommandManager.argument("sqlDbPath", StringArgumentType.string())
+                                        .executes(WorldImportCommand::importDistantHorizons)))
                         .then(ClientCommandManager.literal("cancel")
-                                //.requires((ctx)->((IGetVoxelCore)MinecraftClient.getInstance().worldRenderer).getVoxelCore().importer.isImporterRunning())
                                 .executes(WorldImportCommand::cancelImport))
         );
+    }
+
+    private static int importDistantHorizons(CommandContext<FabricClientCommandSource> ctx) {
+        var instance = (VoxyClientInstance)VoxyCommon.getInstance();
+        if (instance == null) {
+            return 1;
+        }
+        var dbFile = new File(ctx.getArgument("sqlDbPath", String.class));
+        if (!dbFile.exists()) {
+            return 1;
+        }
+        if (dbFile.isDirectory()) {
+            dbFile = dbFile.toPath().resolve("DistantHorizons.sqlite").toFile();
+            if (!dbFile.exists()) {
+                return 1;
+            }
+        }
+
+        File dbFile_ = dbFile;
+        var engine = instance.getOrMakeRenderWorld(MinecraftClient.getInstance().player.clientWorld);
+        return instance.getImportManager().makeAndRunIfNone(engine, ()->
+                new DHImporter(dbFile_, engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.getSavingService()))?0:1;
     }
 
     private static boolean fileBasedImporter(File directory) {
@@ -52,8 +78,12 @@ public class WorldImportCommand {
         if (instance == null) {
             return false;
         }
-        return instance.importWrapper.createWorldImporter(MinecraftClient.getInstance().player.clientWorld,
-                (importer)->importer.importRegionDirectoryAsyncStart(directory));
+        var engine = instance.getOrMakeRenderWorld(MinecraftClient.getInstance().player.clientWorld);
+        return instance.getImportManager().makeAndRunIfNone(engine, ()->{
+            var importer = new WorldImporter(engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.getSavingService());
+            importer.importRegionDirectoryAsync(directory);
+            return importer;
+        });
     }
 
     private static int importRaw(CommandContext<FabricClientCommandSource> ctx) {
@@ -139,8 +169,13 @@ public class WorldImportCommand {
             return 1;
         }
         String finalInnerDir = innerDir;
-        return instance.importWrapper.createWorldImporter(MinecraftClient.getInstance().player.clientWorld,
-                (importer)->importer.importZippedRegionDirectoryAsyncStart(zip, finalInnerDir))?0:1;
+
+        var engine = instance.getOrMakeRenderWorld(MinecraftClient.getInstance().player.clientWorld);
+        return instance.getImportManager().makeAndRunIfNone(engine, ()->{
+            var importer = new WorldImporter(engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.getSavingService());
+            importer.importZippedRegionDirectoryAsync(zip, finalInnerDir);
+            return importer;
+        })?0:1;
     }
 
     private static int cancelImport(CommandContext<FabricClientCommandSource> fabricClientCommandSourceCommandContext) {
@@ -148,7 +183,7 @@ public class WorldImportCommand {
         if (instance == null) {
             return 1;
         }
-        instance.importWrapper.stopImporter();
-        return 0;
+        var world = instance.getOrMakeRenderWorld(MinecraftClient.getInstance().player.clientWorld);
+        return instance.getImportManager().cancelImport(world)?0:1;
     }
 }
