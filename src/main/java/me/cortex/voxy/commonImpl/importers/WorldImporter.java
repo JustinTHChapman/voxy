@@ -396,7 +396,8 @@ public class WorldImporter implements IDataImporter {
         }
 
         //Dont process non full chunk sections
-        if (ChunkStatus.byId(chunk.getString("Status")) != ChunkStatus.FULL) {
+        var status = ChunkStatus.byId(chunk.getString("Status"));
+        if (status != ChunkStatus.FULL && status != ChunkStatus.EMPTY) {//We also import empty since they are from data upgrade
             this.totalChunks.decrementAndGet();
             return;
         }
