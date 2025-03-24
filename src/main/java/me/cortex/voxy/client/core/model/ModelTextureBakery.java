@@ -80,11 +80,12 @@ public class ModelTextureBakery {
         this.height = height;
         this.colourTex = new GlTexture().store(GL_RGBA8, 1, width, height).name("ModelBakeryColour");
         this.depthTex = new GlTexture().store(GL_DEPTH24_STENCIL8, 1, width, height).name("ModelBakeryDepth");
+        glTextureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
         this.depthTexView = this.depthTex.createView();
+        glTextureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
 
         this.framebuffer = new GlFramebuffer().bind(GL_COLOR_ATTACHMENT0, this.colourTex).bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthTex).verify().name("ModelFramebuffer");
 
-        glTextureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
         glTextureParameteri(this.depthTexView.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
 
         this.copyOutShader = Shader.make()
@@ -159,6 +160,7 @@ public class ModelTextureBakery {
 
         glClearColor(0,0,0,0);
         glClearDepth(1);
+        glClearStencil(0);
         glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);
 
         glEnable(GL_STENCIL_TEST);
@@ -332,6 +334,8 @@ public class ModelTextureBakery {
         this.emitToStream(streamBuffer, streamOffset);
     }
 
+    //TODO: FIXME: Mesa is broken when trying to read from a sampler of GL_STENCIL_INDEX
+    // it seems to just ignore the value set in GL_DEPTH_STENCIL_TEXTURE_MODE
     private void emitToStream(int streamBuffer, int streamOffset) {
         if (streamOffset%4 != 0) {
             throw new IllegalArgumentException();
@@ -339,10 +343,13 @@ public class ModelTextureBakery {
         this.copyOutShader.bind();
         glActiveTexture(GL_TEXTURE0);
         GL11C.glBindTexture(GL11.GL_TEXTURE_2D, this.colourTex.id);
+        glBindSampler(0, 0);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL11.GL_TEXTURE_2D, this.depthTex.id);
+        glBindSampler(1, 0);
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL11.GL_TEXTURE_2D, this.depthTexView.id);
+        glBindSampler(2, 0);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, streamBuffer);
         glUniform1ui(4, streamOffset/4);
 

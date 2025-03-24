@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
+import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
@@ -261,6 +262,12 @@ public class ModelFactory {
 
         int checkMode = blockRenderLayer==RenderLayer.getSolid()?TextureUtils.WRITE_CHECK_STENCIL:TextureUtils.WRITE_CHECK_ALPHA;
 
+        if (Capabilities.INSTANCE.isMesa) {
+            //Mesa does not work with GL_DEPTH_STENCIL_TEXTURE_MODE GL_STENCIL_INDEX
+            // the sampler in the compute shader always reads zero even when stencil is guarenteed not to be zero
+            // (e.g. clearing with stencil 10)
+            checkMode = TextureUtils.WRITE_CHECK_ALPHA;
+        }
 
 
 

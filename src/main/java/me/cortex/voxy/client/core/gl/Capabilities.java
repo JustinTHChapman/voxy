@@ -4,6 +4,8 @@ import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL20C;
 
+import static org.lwjgl.opengl.GL11.GL_VENDOR;
+import static org.lwjgl.opengl.GL11.glGetString;
 import static org.lwjgl.opengl.GL32.glGetInteger64;
 import static org.lwjgl.opengl.GL43C.GL_MAX_SHADER_STORAGE_BLOCK_SIZE;
 
@@ -14,6 +16,7 @@ public class Capabilities {
     public final boolean meshShaders;
     public final boolean INT64_t;
     public final long ssboMaxSize;
+    public final boolean isMesa;
     public Capabilities() {
         var cap = GL.getCapabilities();
         this.meshShaders = cap.GL_NV_mesh_shader && cap.GL_NV_representative_fragment_test;
@@ -29,6 +32,8 @@ public class Capabilities {
                 """);
 
         this.ssboMaxSize = glGetInteger64(GL_MAX_SHADER_STORAGE_BLOCK_SIZE);
+
+        this.isMesa = "Mesa".equalsIgnoreCase(glGetString(GL_VENDOR));
     }
 
     public static void init() {
