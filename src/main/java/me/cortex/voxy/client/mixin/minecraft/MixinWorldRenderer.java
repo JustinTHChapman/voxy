@@ -48,25 +48,18 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
         }
     }
 
-    @Unique private ClientWorld refCopy;
-
     @Inject(method = "setWorld", at = @At("HEAD"))
     private void voxy$captureSetWorld(ClientWorld world, CallbackInfo ci) {
-        this.refCopy = this.world;
-    }
-
-    @Inject(method = "setWorld", at = @At("TAIL"))
-    private void voxy$setWorld(ClientWorld world, CallbackInfo ci) {
-        if (world == null) {
+        if (this.world != world) {
             this.shutdownRenderer();
-        }
-        //Release the client world
-        if (this.refCopy != null) {
-            var engine = ((IVoxyWorldGetter)this.refCopy).getWorldEngine();
-            if (engine != null) {
-                VoxyCommon.getInstance().stopWorld(engine);
+
+            if (this.world != null) {
+                var engine = ((IVoxyWorldGetter)this.world).getWorldEngine();
+                if (engine != null) {
+                    VoxyCommon.getInstance().stopWorld(engine);
+                }
+                ((IVoxyWorldSetter)this.world).setWorldEngine(null);
             }
-            ((IVoxyWorldSetter)this.refCopy).setWorldEngine(null);
         }
     }
 
