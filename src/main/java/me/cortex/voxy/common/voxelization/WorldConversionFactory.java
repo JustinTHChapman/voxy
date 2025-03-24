@@ -123,9 +123,13 @@ public class WorldConversionFactory {
 
         var vp = blockContainer.data.palette;
         var pc = cache.getPaletteCache(vp.getSize());
+        IdListPalette<BlockState> bps = null;
 
-        setupLocalPalette(vp, blockCache, stateMapper, pc);
-
+        if (blockContainer.data.palette instanceof IdListPalette<BlockState> _bps) {
+            bps = _bps;
+        } else {
+            setupLocalPalette(vp, blockCache, stateMapper, pc);
+        }
 
         {
             int i = 0;
@@ -138,7 +142,8 @@ public class WorldConversionFactory {
             }
         }
 
-        //TODO: EmptyPaletteStorage (it only refs idx 0)
+
+
         if (blockContainer.data.storage instanceof PackedIntegerArray bStor) {
             var bDat = bStor.getData();
             int iterPerLong = (64 / bStor.getElementBits()) - 1;
@@ -156,7 +161,12 @@ public class WorldConversionFactory {
                             sample = bDat[c++];
                             dec = iterPerLong;
                         }
-                        int bId = pc[(int) (sample & MSK)];
+                        int bId;
+                        if (bps == null) {
+                            bId = pc[(int) (sample & MSK)];
+                        } else {
+                            bId = stateMapper.getIdForBlockState(bps.get((int) (sample&MSK)));
+                        }
                         sample >>>= eBits;
 
                         byte light = lightSupplier.supply(x, y, z);
