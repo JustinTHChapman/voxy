@@ -152,9 +152,6 @@ public class RenderDataFactory45 {
                 RenderDataFactory45.this.minZ = Math.min(RenderDataFactory45.this.minZ, z);
                 RenderDataFactory45.this.maxZ = Math.max(RenderDataFactory45.this.maxZ, z + width);
             }
-            if (auxPos > 32 || x+length>32 || z+width>32) {
-                int aa = 0;
-            }
         }
     }
 
@@ -277,122 +274,125 @@ public class RenderDataFactory45 {
         }
     }
 
+    private void generateYZOpaqueInnerGeometry(int axis) {
+        for (int layer = 0; layer < 31; layer++) {
+            this.blockMesher.auxiliaryPosition = layer;
+            for (int other = 0; other < 32; other++) {//TODO: need to do the faces that border sections
+                int pidx = axis==0 ?(layer*32+other):(other*32+layer);
+                int skipAmount = axis==0?32:1;
+
+                int current = this.opaqueMasks[pidx];
+                int next = this.opaqueMasks[pidx + skipAmount];
+
+                int msk = current ^ next;
+                if (msk == 0) {
+                    this.blockMesher.skip(32);
+                    continue;
+                }
+
+                //TODO: For boarder sections, should NOT EMIT neighbors faces
+                int faceForwardMsk = msk & current;
+                int cIdx = -1;
+                while (msk != 0) {
+                    int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
+                    int delta = index - cIdx - 1;
+                    cIdx = index; //index--;
+                    if (delta != 0) this.blockMesher.skip(delta);
+                    msk &= ~Integer.lowestOneBit(msk);
+
+                    int facingForward = ((faceForwardMsk >> index) & 1);
+
+                    {
+                        int idx = index + (pidx*32);
+
+                        //TODO: swap this out for something not getting the next entry
+                        long A = this.sectionData[idx * 2];
+                        long B = this.sectionData[(idx + skipAmount * 32) * 2];
+
+                        //Flip data with respect to facing direction
+                        long selfModel = facingForward == 1 ? A : B;
+                        long nextModel = facingForward == 1 ? B : A;
+
+                        //Example thing thats just wrong but as example
+                        this.blockMesher.putNext(((long) facingForward) |//Facing
+                                ((selfModel & 0xFFFF) << 26) | //ModelId
+                                (((nextModel>>16)&0xFF) << 55) |//Lighting
+                                ((selfModel&(0x1FFL<<24))<<(46-24))//biomeId
+                        );
+                    }
+                }
+                this.blockMesher.endRow();
+            }
+            this.blockMesher.finish();
+        }
+    }
+
+    private void generateYZOpaqueOuterGeometry(int axis) {
+        this.blockMesher.doAuxiliaryFaceOffset = false;
+        //Hacky generate section side faces (without check neighbor section)
+        for (int side = 0; side < 2; side++) {//-, +
+            int layer = side == 0 ? 0 : 31;
+            this.blockMesher.auxiliaryPosition = layer;
+            for (int other = 0; other < 32; other++) {
+                int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
+                int msk = this.opaqueMasks[pidx];
+                if (msk == 0) {
+                    this.blockMesher.skip(32);
+                    continue;
+                }
+
+                int cIdx = -1;
+                while (msk != 0) {
+                    int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
+                    int delta = index - cIdx - 1;
+                    cIdx = index; //index--;
+                    if (delta != 0) this.blockMesher.skip(delta);
+                    msk &= ~Integer.lowestOneBit(msk);
+
+                    {
+                        int idx = index + (pidx * 32);
+
+
+                        int neighborIdx = ((axis+1)*32*32 * 2)+(side)*32*32;
+                        long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
+
+                        if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                            long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
+                            if (ModelQueries.isFullyOpaque(meta)) {//Dont mesh this face
+                                this.blockMesher.skip(1);
+                                continue;
+                            }
+                        }
+
+
+                        //TODO: swap this out for something not getting the next entry
+                        long A = this.sectionData[idx * 2];
+
+                        //Example thing thats just wrong but as example
+                        this.blockMesher.putNext((side == 0 ? 0L : 1L) |
+                                ((A & 0xFFFFL) << 26) |
+                                (((long)Mapper.getLightId(neighborId)) << 55) |
+                                ((A&(0x1FFL<<24))<<(46-24))
+                        );
+                    }
+                }
+                this.blockMesher.endRow();
+            }
+
+            this.blockMesher.finish();
+        }
+        this.blockMesher.doAuxiliaryFaceOffset = true;
+    }
+
     private void generateYZFaces() {
         for (int axis = 0; axis < 2; axis++) {//Y then Z
             this.blockMesher.axis = axis;
-            if (true) {
-                for (int layer = 0; layer < 31; layer++) {
-                    this.blockMesher.auxiliaryPosition = layer;
-                    for (int other = 0; other < 32; other++) {//TODO: need to do the faces that border sections
-                        int pidx = axis==0 ?(layer*32+other):(other*32+layer);
-                        int skipAmount = axis==0?32:1;
 
-                        int current = this.opaqueMasks[pidx];
-                        int next = this.opaqueMasks[pidx + skipAmount];
-
-                        int msk = current ^ next;
-                        if (msk == 0) {
-                            this.blockMesher.skip(32);
-                            continue;
-                        }
-
-                        //TODO: For boarder sections, should NOT EMIT neighbors faces
-                        int faceForwardMsk = msk & current;
-                        int cIdx = -1;
-                        while (msk != 0) {
-                            int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
-                            int delta = index - cIdx - 1;
-                            cIdx = index; //index--;
-                            if (delta != 0) this.blockMesher.skip(delta);
-                            msk &= ~Integer.lowestOneBit(msk);
-
-                            int facingForward = ((faceForwardMsk >> index) & 1);
-
-                            {
-                                int idx = index + (pidx*32);
-
-                                //TODO: swap this out for something not getting the next entry
-                                long A = this.sectionData[idx * 2];
-                                long B = this.sectionData[(idx + skipAmount * 32) * 2];
-
-                                //Flip data with respect to facing direction
-                                long selfModel = facingForward == 1 ? A : B;
-                                long nextModel = facingForward == 1 ? B : A;
-
-                                //Example thing thats just wrong but as example
-                                this.blockMesher.putNext(((long) facingForward) |//Facing
-                                        ((selfModel & 0xFFFF) << 26) | //ModelId
-                                        (((nextModel>>16)&0xFF) << 55) |//Lighting
-                                        ((selfModel&(0x1FFL<<24))<<(46-24))//biomeId
-                                );
-                            }
-                        }
-                        this.blockMesher.endRow();
-                    }
-                    this.blockMesher.finish();
-                }
-            }
-
-            if (true) {
-                this.blockMesher.doAuxiliaryFaceOffset = false;
-                //Hacky generate section side faces (without check neighbor section)
-                for (int side = 0; side < 2; side++) {//-, +
-                    int layer = side == 0 ? 0 : 31;
-                    this.blockMesher.auxiliaryPosition = layer;
-                    for (int other = 0; other < 32; other++) {
-                        int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
-                        int msk = this.opaqueMasks[pidx];
-                        if (msk == 0) {
-                            this.blockMesher.skip(32);
-                            continue;
-                        }
-
-                        int cIdx = -1;
-                        while (msk != 0) {
-                            int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
-                            int delta = index - cIdx - 1;
-                            cIdx = index; //index--;
-                            if (delta != 0) this.blockMesher.skip(delta);
-                            msk &= ~Integer.lowestOneBit(msk);
-
-                            {
-                                int idx = index + (pidx * 32);
-
-
-                                int neighborIdx = ((axis+1)*32*32 * 2)+(side)*32*32;
-                                long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
-
-                                if (Mapper.getBlockId(neighborId) != 0) {//Not air
-                                    long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
-                                    if (ModelQueries.isFullyOpaque(meta)) {//Dont mesh this face
-                                        this.blockMesher.skip(1);
-                                        continue;
-                                    }
-                                }
-
-
-                                //TODO: swap this out for something not getting the next entry
-                                long A = this.sectionData[idx * 2];
-
-                                //Example thing thats just wrong but as example
-                                this.blockMesher.putNext((side == 0 ? 0L : 1L) |
-                                        ((A & 0xFFFFL) << 26) |
-                                        (((long)Mapper.getLightId(neighborId)) << 55) |
-                                        ((A&(0x1FFL<<24))<<(46-24))
-                                );
-                            }
-                        }
-                        this.blockMesher.endRow();
-                    }
-
-                    this.blockMesher.finish();
-                }
-                this.blockMesher.doAuxiliaryFaceOffset = true;
-            }
+            this.generateYZOpaqueInnerGeometry(axis);
+            this.generateYZOpaqueOuterGeometry(axis);
 
 
             if (false) {//Non fully opaque geometry
-                this.blockMesher.doAuxiliaryFaceOffset = false;
                 //Note: think is ok to just reuse.. blockMesher
                 this.blockMesher.axis = axis;
                 for (int layer = 0; layer < 32; layer++) {
@@ -434,7 +434,6 @@ public class RenderDataFactory45 {
                     }
                     this.blockMesher.finish();
                 }
-                this.blockMesher.doAuxiliaryFaceOffset = true;
             }
         }
     }
@@ -451,7 +450,8 @@ public class RenderDataFactory45 {
     }
 
     private static final long X_I_MSK = 0x4210842108421L;
-    private void generateXFaces() {
+
+    private void generateXOpaqueInnerGeometry() {
         for (int y = 0; y < 32; y++) {
             long sumA = 0;
             long sumB = 0;
@@ -569,66 +569,72 @@ public class RenderDataFactory45 {
                 }
             }
         }
+    }
+
+    private void generateXOuterOpaqueGeometry() {
+        //Generate the side faces, hackily, using 0 and 31 mesher
+
+        var ma = this.xAxisMeshers[0];
+        var mb = this.xAxisMeshers[31];
+        ma.finish();
+        mb.finish();
+        ma.doAuxiliaryFaceOffset = false;
+        mb.doAuxiliaryFaceOffset = false;
+
+        for (int y = 0; y < 32; y++) {
+            int skipA = 0;
+            int skipB = 0;
+            for (int z = 0; z < 32; z++) {
+                int i = y*32+z;
+                int msk = this.opaqueMasks[i];
+                if ((msk & 1) != 0) {//-x
+                    long neighborId = this.neighboringFaces[i];
+                    boolean oki = true;
+                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                        long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
+                        if (ModelQueries.isFullyOpaque(meta)) {
+                            oki = false;
+                        }
+                    }
+                    if (oki) {
+                        ma.skip(skipA); skipA = 0;
+                        long A = this.sectionData[(i<<5) * 2];
+                        ma.putNext(0L | ((A&0xFFFF)<<26) | (((long)Mapper.getLightId(neighborId))<<55)|((A&(0x1FFL<<24))<<(46-24)));
+                    } else {skipA++;}
+                } else {skipA++;}
+
+                if ((msk & (1<<31)) != 0) {//+x
+                    long neighborId = this.neighboringFaces[i+32*32];
+                    boolean oki = true;
+                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                        long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
+                        if (ModelQueries.isFullyOpaque(meta)) {
+                            oki = false;
+                        }
+                    }
+                    if (oki) {
+                        mb.skip(skipB); skipB = 0;
+                        long A = this.sectionData[(i*32+31) * 2];
+                        mb.putNext(1L | ((A&0xFFFF)<<26) | (((long)Mapper.getLightId(neighborId))<<55)|((A&(0x1FFL<<24))<<(46-24)));
+                    } else {skipB++;}
+                } else {skipB++;}
+            }
+            ma.skip(skipA);
+            mb.skip(skipB);
+        }
+
+        ma.finish();
+        mb.finish();
+        ma.doAuxiliaryFaceOffset = true;
+        mb.doAuxiliaryFaceOffset = true;
+    }
+
+    private void generateXFaces() {
+        this.generateXOpaqueInnerGeometry();
+        this.generateXOuterOpaqueGeometry();
 
         for (var mesher : this.xAxisMeshers) {
             mesher.finish();
-        }
-
-        //Generate the side faces, hackily, using 0 and 1 mesher
-        if (true) {
-            var ma = this.xAxisMeshers[0];
-            var mb = this.xAxisMeshers[31];
-            ma.finish();
-            mb.finish();
-            ma.doAuxiliaryFaceOffset = false;
-            mb.doAuxiliaryFaceOffset = false;
-
-            for (int y = 0; y < 32; y++) {
-                int skipA = 0;
-                int skipB = 0;
-                for (int z = 0; z < 32; z++) {
-                    int i = y*32+z;
-                    int msk = this.opaqueMasks[i];
-                    if ((msk & 1) != 0) {//-x
-                        long neighborId = this.neighboringFaces[i];
-                        boolean oki = true;
-                        if (Mapper.getBlockId(neighborId) != 0) {//Not air
-                            long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
-                            if (ModelQueries.isFullyOpaque(meta)) {
-                                oki = false;
-                            }
-                        }
-                        if (oki) {
-                            ma.skip(skipA); skipA = 0;
-                            long A = this.sectionData[(i<<5) * 2];
-                            ma.putNext(0L | ((A&0xFFFF)<<26) | (((long)Mapper.getLightId(neighborId))<<55)|((A&(0x1FFL<<24))<<(46-24)));
-                        } else {skipA++;}
-                    } else {skipA++;}
-
-                    if ((msk & (1<<31)) != 0) {//+x
-                        long neighborId = this.neighboringFaces[i+32*32];
-                        boolean oki = true;
-                        if (Mapper.getBlockId(neighborId) != 0) {//Not air
-                            long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
-                            if (ModelQueries.isFullyOpaque(meta)) {
-                                oki = false;
-                            }
-                        }
-                        if (oki) {
-                            mb.skip(skipB); skipB = 0;
-                            long A = this.sectionData[(i*32+31) * 2];
-                            mb.putNext(1L | ((A&0xFFFF)<<26) | (((long)Mapper.getLightId(neighborId))<<55)|((A&(0x1FFL<<24))<<(46-24)));
-                        } else {skipB++;}
-                    } else {skipB++;}
-                }
-                ma.skip(skipA);
-                mb.skip(skipB);
-            }
-
-            ma.finish();
-            mb.finish();
-            ma.doAuxiliaryFaceOffset = true;
-            mb.doAuxiliaryFaceOffset = true;
         }
     }
 
