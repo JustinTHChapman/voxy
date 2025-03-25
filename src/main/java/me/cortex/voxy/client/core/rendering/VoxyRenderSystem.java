@@ -4,18 +4,23 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.model.ColourDepthTextureData;
+import me.cortex.voxy.client.core.model.ModelTextureBakery;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
+import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldEngine;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
 
@@ -67,11 +72,30 @@ public class VoxyRenderSystem {
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
         /*
         int allocation = downstream.download(2*4*6*16*16, ptr->{
+            ColourDepthTextureData[] textureData = new ColourDepthTextureData[6];
+            final int FACE_SIZE = 16*16;
+            for (int face = 0; face < 6; face++) {
+                long faceDataPtr = ptr + (FACE_SIZE*4)*face*2;
+                int[] colour = new int[FACE_SIZE];
+                int[] depth = new int[FACE_SIZE];
+
+                //Copy out colour
+                for (int i = 0; i < FACE_SIZE; i++) {
+                    //De-interpolate results
+                    colour[i] = MemoryUtil.memGetInt(faceDataPtr+ (i*4*2));
+                    depth[i] = MemoryUtil.memGetInt(faceDataPtr+ (i*4*2)+4);
+                }
+
+                textureData[face] = new ColourDepthTextureData(colour, depth, 16, 16);
+            }
+
+            int a = 0;
         });
-        mtb.renderFacesToStream(Blocks.WHITE_STAINED_GLASS.getDefaultState(), 123456, false, downstream.getBufferId(), allocation);
+        mtb.renderFacesToStream(Blocks.GRASS_BLOCK.getDefaultState(), 123456, false, downstream.getBufferId(), allocation);
         downstream.submit();
         downstream.tick();
          */
+
         //if (true) return;
 
 
