@@ -54,7 +54,7 @@ public class RenderDataFactory45 {
     private final class Mesher extends ScanMesher2D {
         public int auxiliaryPosition = 0;
         public boolean doAuxiliaryFaceOffset = true;
-        public int axis = 0;
+        public int axis = 0;//Y,Z,X
 
         //Note x, z are in top right
         @Override
@@ -118,10 +118,43 @@ public class RenderDataFactory45 {
             encodedPosition |= z << (axis==1?16:11);
             encodedPosition |= auxPos << (axis==0?16:(axis==1?11:21));
 
-            long quad = data | encodedPosition;
+            long quad = data | Integer.toUnsignedLong(encodedPosition);
 
 
             MemoryUtil.memPutLong(RenderDataFactory45.this.directionalQuadBufferPtr + (RenderDataFactory45.this.directionalQuadCounters[face]++)*8L + face*8L*(1<<16), quad);
+
+            //Update AABB bounds
+            if (axis == 0) {//Y
+                RenderDataFactory45.this.minY = Math.min(RenderDataFactory45.this.minY, auxPos);
+                RenderDataFactory45.this.maxY = Math.max(RenderDataFactory45.this.maxY, auxPos);
+
+                RenderDataFactory45.this.minX = Math.min(RenderDataFactory45.this.minX, x);
+                RenderDataFactory45.this.maxX = Math.max(RenderDataFactory45.this.maxX, x + length);
+
+                RenderDataFactory45.this.minZ = Math.min(RenderDataFactory45.this.minZ, z);
+                RenderDataFactory45.this.maxZ = Math.max(RenderDataFactory45.this.maxZ, z + width);
+            } else if (axis == 1) {//Z
+                RenderDataFactory45.this.minZ = Math.min(RenderDataFactory45.this.minZ, auxPos);
+                RenderDataFactory45.this.maxZ = Math.max(RenderDataFactory45.this.maxZ, auxPos);
+
+                RenderDataFactory45.this.minX = Math.min(RenderDataFactory45.this.minX, x);
+                RenderDataFactory45.this.maxX = Math.max(RenderDataFactory45.this.maxX, x + length);
+
+                RenderDataFactory45.this.minY = Math.min(RenderDataFactory45.this.minY, z);
+                RenderDataFactory45.this.maxY = Math.max(RenderDataFactory45.this.maxY, z + width);
+            } else {//X
+                RenderDataFactory45.this.minX = Math.min(RenderDataFactory45.this.minX, auxPos);
+                RenderDataFactory45.this.maxX = Math.max(RenderDataFactory45.this.maxX, auxPos);
+
+                RenderDataFactory45.this.minY = Math.min(RenderDataFactory45.this.minY, x);
+                RenderDataFactory45.this.maxY = Math.max(RenderDataFactory45.this.maxY, x + length);
+
+                RenderDataFactory45.this.minZ = Math.min(RenderDataFactory45.this.minZ, z);
+                RenderDataFactory45.this.maxZ = Math.max(RenderDataFactory45.this.maxZ, z + width);
+            }
+            if (auxPos > 32 || x+length>32 || z+width>32) {
+                int aa = 0;
+            }
         }
     }
 
@@ -670,14 +703,17 @@ public class RenderDataFactory45 {
             coff += size;
         }
 
+        if (this.minX<0 || this.minY<0 || this.minZ<0 || 32<this.maxX || 32<this.maxY || 32<this.maxZ) {
+            throw new IllegalStateException();
+        }
 
         int aabb = 0;
-        aabb |= 0;
-        aabb |= 0<<5;
-        aabb |= 0<<10;
-        aabb |= (31)<<15;
-        aabb |= (31)<<20;
-        aabb |= (31)<<25;
+        aabb |= this.minX;
+        aabb |= this.minY<<5;
+        aabb |= this.minZ<<10;
+        aabb |= (this.maxX-this.minX-1)<<15;
+        aabb |= (this.maxY-this.minY-1)<<20;
+        aabb |= (this.maxZ-this.minZ-1)<<25;
 
         return new BuiltSection(section.key, section.getNonEmptyChildren(), aabb, buff, offsets);
 
