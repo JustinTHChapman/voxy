@@ -45,13 +45,14 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
     private final WorldEngine world;
 
+    @SuppressWarnings("unchecked")
     public RenderService(WorldEngine world, ServiceThreadPool serviceThreadPool) {
         this.world = world;
         this.modelService = new ModelBakerySubsystem(world.getMapper());
 
         //Max sections: ~500k
         //Max geometry: 1 gb
-        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<31)-1024);
+        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<32)-1024);
         Logger.info("Using renderer: " + this.sectionRenderer.getClass().getSimpleName());
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
@@ -81,73 +82,6 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
-
-
-
-        //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(0, 0,0,0));
-        //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
-
-
-        /*
-        for (int x = 0; x <= 25000>>9; x++) {
-            for (int y = -1; y <= 1; y++) {
-                for (int z = 0; z <= 25000>>9; z++) {
-                    this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
-                }
-            }
-        }*/
-
-        if (true) {
-            if (true) {
-                if (true) {
-                    return;
-                }
-                final int H_WIDTH = 10;//50;
-                for (int x = -H_WIDTH; x <= H_WIDTH; x++) {
-                    for (int z = -H_WIDTH; z <= H_WIDTH; z++) {
-                        for (int y = -1; y <= 0; y++) {
-                            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
-                        }
-                    }
-                }
-            } else {
-                for (int x = -75; x <= 75; x++) {
-                    for (int z = -75; z <= 75; z++) {
-                        for (int y = 0; y <= 1; y++) {
-                            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
-                        }
-                    }
-                }
-            }
-
-        } else {
-            /*
-            for (int x = -5; x <= 5; x++) {
-                for (int z = -5; z <= 5; z++) {
-                    for (int y = -5; y <= 5; y++) {
-                        this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
-                    }
-                }
-            }
-            for (int x = -5; x <= 5; x++) {
-                for (int z = -5; z <= 5; z++) {
-                    for (int y = -5; y <= 5; y++) {
-                        this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x+16, y, z));
-                    }
-                }
-            }*/
-            for (int x = -3; x <= 3; x++) {
-                for (int z = -3; z <= 3; z++) {
-                    for (int y = -8; y <= 7; y++) {
-                        this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, x, y, z));
-                    }
-                }
-            }
-        }
-
-
-        //this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, 0,0,0));
-
     }
 
     private int q = -60;
