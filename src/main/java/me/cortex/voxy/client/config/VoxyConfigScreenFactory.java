@@ -3,8 +3,7 @@ package me.cortex.voxy.client.config;
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.commonImpl.IVoxyWorldGetter;
-import me.cortex.voxy.commonImpl.IVoxyWorldSetter;
+import me.cortex.voxy.commonImpl.IVoxyWorld;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
@@ -40,7 +39,7 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
         builder.setSavingRunnable(() -> {
             //After saving the core should be reloaded/reset
             var worldRenderer = MinecraftClient.getInstance().worldRenderer;
-            var world = MinecraftClient.getInstance().world;
+            var world = ((IVoxyWorld) MinecraftClient.getInstance().world);
             if (worldRenderer != null && (ON_SAVE_RELOAD_ALL||ON_SAVE_RELOAD_RENDERER)) {
                 //Shudown renderer
                 ((IGetVoxyRenderSystem) worldRenderer).shutdownRenderer();
@@ -49,11 +48,11 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
             if (world != null && ON_SAVE_RELOAD_ALL) {
                 //This is a hack inserted for the client world thing
                 //TODO: FIXME: MAKE BETTER
-                var engine = ((IVoxyWorldGetter) world).getWorldEngine();
+                var engine = world.getWorldEngine();
                 if (engine != null) {
                     VoxyCommon.getInstance().stopWorld(engine);
                 }
-                ((IVoxyWorldSetter) world).setWorldEngine(null);
+                world.setWorldEngine(null);
             }
             //Shutdown instance
             if (ON_SAVE_RELOAD_ALL) {

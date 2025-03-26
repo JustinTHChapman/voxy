@@ -202,6 +202,11 @@ public class WorldEngine {
 
 
     public void free() {
+        //Cannot free while there are loaded sections
+        if (this.sectionTracker.getLoadedCacheCount() != 0) {
+            throw new IllegalStateException();
+        }
+
         this.thisTracker.free();
         this.isLive = false;
         try {this.mapper.close();} catch (Exception e) {Logger.error(e);}

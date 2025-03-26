@@ -54,8 +54,8 @@ void setupScreenspace(in UnpackedNode node) {
         //NOTE!: cant this be precomputed and put in an array?? in the scene uniform??
         vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*(32<<node.lodLevel),1));//Size of section is 32x32x32 (need to change it to a bounding box in the future)
         pPoint += base;
-        zThing = max(pPoint.z, zThing);
         vec3 point = pPoint.xyz/pPoint.w;
+        zThing = max(point.z, zThing);
         //TODO: CLIP TO VIEWPORT
         minBB = min(minBB, point);
         maxBB = max(maxBB, point);
@@ -80,7 +80,7 @@ void setupScreenspace(in UnpackedNode node) {
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
-    return any(lessThanEqual(maxBB, vec3(0.0f))) || any(lessThanEqual(vec3(1.0f), minBB)) || zThing < 0;
+    return any(lessThanEqual(maxBB, vec3(0.0f))) || any(lessThanEqual(vec3(1.0f), minBB)) || zThing < 0;//
 
     //|| any(lessThanEqual(minBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), maxBB));
 }

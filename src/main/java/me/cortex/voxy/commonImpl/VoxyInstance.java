@@ -128,6 +128,18 @@ public class VoxyInstance {
 
         this.importManager.cancelImport(world);
 
+        if (world.getActiveSectionCount() != 0) {
+            Logger.warn("Waiting for world to finish use");
+            while (world.getActiveSectionCount() != 0) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+        //TODO: maybe replace the flush with an atomic "in queue" counter that is per world
         this.flush();
 
         world.free();

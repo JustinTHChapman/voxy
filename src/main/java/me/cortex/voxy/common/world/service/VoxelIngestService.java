@@ -1,6 +1,5 @@
 package me.cortex.voxy.common.world.service;
 
-import it.unimi.dsi.fastutil.Pair;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
@@ -8,15 +7,13 @@ import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceSlice;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
-import me.cortex.voxy.commonImpl.IVoxyWorldGetter;
+import me.cortex.voxy.commonImpl.IVoxyWorld;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.ChunkNibbleArray;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.WorldChunk;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class VoxelIngestService {
@@ -80,7 +77,7 @@ public class VoxelIngestService {
     }
 
     public void enqueueIngest(WorldChunk chunk, boolean ignoreOnNullWorld) {
-        var engine = ((IVoxyWorldGetter)chunk.getWorld()).getWorldEngine();
+        var engine = ((IVoxyWorld)chunk.getWorld()).getWorldEngine();
         if (engine == null) {
             if (!ignoreOnNullWorld) {
                 Logger.error("Could not ingest chunk as does not have world engine");

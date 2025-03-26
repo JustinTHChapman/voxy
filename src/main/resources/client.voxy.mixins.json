@@ -4,7 +4,7 @@
   "compatibilityLevel": "JAVA_17",
   "client": [
     "minecraft.MixinClientCommonNetworkHandler",
-    "minecraft.MixinClientPlayNetworkHandler",
+    "minecraft.MixinClientLoginNetworkHandler",
     "minecraft.MixinDebugHud",
     "minecraft.MixinMinecraftClient",
     "minecraft.MixinThreadExecutor",

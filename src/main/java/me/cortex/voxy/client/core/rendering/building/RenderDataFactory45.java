@@ -421,7 +421,11 @@ public class RenderDataFactory45 {
 
                                 //TODO: swap this out for something not getting the next entry
                                 long A = this.sectionData[idx * 2];
-
+                                long B = this.sectionData[idx * 2+1];
+                                if (ModelQueries.isFluid(B)) {
+                                    this.blockMesher.putNext(0);
+                                    continue;
+                                }
                                 //Example thing thats just wrong but as example
                                 this.blockMesher.putNext((long) (false ? 0L : 1L) |
                                         ((A & 0xFFFFL) << 26) |

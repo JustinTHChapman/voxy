@@ -6,10 +6,8 @@ import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.rendering.VoxyRenderSystem;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.commonImpl.IVoxyWorldGetter;
-import me.cortex.voxy.commonImpl.IVoxyWorldSetter;
+import me.cortex.voxy.commonImpl.IVoxyWorld;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import me.cortex.voxy.commonImpl.VoxyInstance;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.ObjectAllocator;
 import net.minecraft.client.world.ClientWorld;
@@ -54,11 +52,11 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             this.shutdownRenderer();
 
             if (this.world != null) {
-                var engine = ((IVoxyWorldGetter)this.world).getWorldEngine();
+                var engine = ((IVoxyWorld)this.world).getWorldEngine();
                 if (engine != null) {
                     VoxyCommon.getInstance().stopWorld(engine);
                 }
-                ((IVoxyWorldSetter)this.world).setWorldEngine(null);
+                ((IVoxyWorld)this.world).setWorldEngine(null);
             }
         }
     }
