@@ -21,8 +21,8 @@ accessible field net/minecraft/client/network/ClientPlayerInteractionManager net
 accessible method net/minecraft/client/render/GameRenderer getFov (Lnet/minecraft/client/render/Camera;FZ)F
 accessible method net/minecraft/client/render/RenderPhase$TextureBase getId ()Ljava/util/Optional;
 
-accessible field net/minecraft/client/render/LightmapTextureManager lightmapFramebuffer Lnet/minecraft/client/gl/SimpleFramebuffer;
-
 accessible field net/minecraft/world/chunk/PalettedContainer data Lnet/minecraft/world/chunk/PalettedContainer$Data;
 accessible field net/minecraft/world/chunk/PalettedContainer$Data storage Lnet/minecraft/util/collection/PaletteStorage;
 accessible field net/minecraft/world/chunk/PalettedContainer$Data palette Lnet/minecraft/world/chunk/Palette;
+
+accessible field net/minecraft/client/gl/GlGpuBuffer id I

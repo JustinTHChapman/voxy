@@ -1,12 +1,16 @@
 package me.cortex.voxy.client.core.model;
 
+import com.mojang.blaze3d.vertex.VertexFormat;
+import me.cortex.voxy.common.Logger;
 import net.minecraft.block.BlockEntityProvider;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.*;
+import net.minecraft.client.texture.GlTexture;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -115,11 +119,11 @@ public class BakedBlockEntityModel {
                         System.err.println("ERROR: Empty texture id for layer: " + layer);
                     } else {
                         var texture = MinecraftClient.getInstance().getTextureManager().getTexture(textureId);
-                        glBindTexture(GL_TEXTURE_2D, texture.getGlId());
+                        glBindTexture(GL_TEXTURE_2D, ((GlTexture)texture.getGlTexture()).getGlId());
                     }
                 }
                 layer.putInto(bb);
-                BufferRenderer.draw(bb.end());
+                BudgetBufferRenderer.draw(bb.end());
             }
         }
     }
@@ -134,10 +138,9 @@ public class BakedBlockEntityModel {
         entity.setWorld(MinecraftClient.getInstance().world);
         if (renderer != null) {
             try {
-                renderer.render(entity, 0.0f, new MatrixStack(), layer->map.computeIfAbsent(layer, BakedVertices::new), 0, 0);
+                renderer.render(entity, 0.0f, new MatrixStack(), layer->map.computeIfAbsent(layer, BakedVertices::new), 0, 0, new Vec3d(0,0,0));
             } catch (Exception e) {
-                System.err.println("Unable to bake block entity: " + entity);
-                e.printStackTrace();
+                Logger.error("Unable to bake block entity: " + entity, e);
             }
         }
         entity.markRemoved();

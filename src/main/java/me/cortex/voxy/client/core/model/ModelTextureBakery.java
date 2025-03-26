@@ -1,6 +1,6 @@
 package me.cortex.voxy.client.core.model;
 
-import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
@@ -11,7 +11,7 @@ import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.render.*;
-import net.minecraft.client.render.model.BakedModel;
+import net.minecraft.client.render.model.BlockStateModel;
 import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.fluid.FluidState;
@@ -188,7 +188,7 @@ public class ModelTextureBakery {
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         glStencilMask(0xFF);
 
-        int texId = MinecraftClient.getInstance().getTextureManager().getTexture(Identifier.of("minecraft", "textures/atlas/blocks.png")).getGlId();
+        int texId = ((net.minecraft.client.texture.GlTexture)MinecraftClient.getInstance().getTextureManager().getTexture(Identifier.of("minecraft", "textures/atlas/blocks.png")).getGlTexture()).getGlId();
 
         final int TEXTURE_SIZE = this.width*this.height *4;//NOTE! assume here that both depth and colour are 4 bytes in size
         for (int i = 0; i < FACE_VIEWS.size(); i++) {
@@ -217,10 +217,10 @@ public class ModelTextureBakery {
     }
 
     private final BufferAllocator allocator = new BufferAllocator(786432);
-    private void captureViewToStream(BlockState state, BakedModel model, BakedBlockEntityModel blockEntityModel, MatrixStack stack, long randomValue, int face, boolean renderFluid, int textureId, Matrix4f projection, int streamBuffer, int streamOffset) {
+    private void captureViewToStream(BlockState state, BlockStateModel model, BakedBlockEntityModel blockEntityModel, MatrixStack stack, long randomValue, int face, boolean renderFluid, int textureId, Matrix4f projection, int streamBuffer, int streamOffset) {
         this.rasterShader.bind();
         glActiveTexture(GL_TEXTURE0);
-        GlUniform.uniform1(0, 0);
+        glUniform1i(0, 0);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         float[] mat = new float[4*4];
@@ -251,7 +251,7 @@ public class ModelTextureBakery {
         if (!renderFluid) {
             //TODO: need to do 2 variants for quads, one which have coloured, ones that dont, might be able to pull a spare bit
             // at the end whether or not a pixel should be mixed with texture
-            renderQuads(bb, state, model, new MatrixStack(), randomValue);
+            renderQuads(bb, model, new MatrixStack(), randomValue);
         } else {
             MinecraftClient.getInstance().getBlockRenderManager().renderFluid(BlockPos.ORIGIN, new BlockRenderView() {
                 @Override
@@ -282,7 +282,7 @@ public class ModelTextureBakery {
 
                 @Override
                 public BlockState getBlockState(BlockPos pos) {
-                    if (pos.equals(Direction.byId(face).getVector())) {
+                    if (pos.equals(Direction.byIndex(face).getVector())) {
                         return Blocks.AIR.getDefaultState();
                     }
 
@@ -300,7 +300,7 @@ public class ModelTextureBakery {
 
                 @Override
                 public FluidState getFluidState(BlockPos pos) {
-                    if (pos.equals(Direction.byId(face).getVector())) {
+                    if (pos.equals(Direction.byIndex(face).getVector())) {
                         return Blocks.AIR.getDefaultState().getFluidState();
                     }
                     //if (pos.getY() == 1) {
@@ -324,7 +324,7 @@ public class ModelTextureBakery {
         glBindTexture(GL_TEXTURE_2D, textureId);
         try {
             //System.err.println("REPLACE THE UPLOADING WITH THREAD SAFE VARIENT");
-            BufferRenderer.draw(bb.end());
+            BudgetBufferRenderer.draw(bb.end());
         } catch (IllegalStateException e) {
             //System.err.println("Got empty buffer builder! for block " + state);
         }
@@ -356,13 +356,15 @@ public class ModelTextureBakery {
         glDispatchCompute(1,1,1);
     }
 
-    private static void renderQuads(BufferBuilder builder, BlockState state, BakedModel model, MatrixStack stack, long randomValue) {
+    private static void renderQuads(BufferBuilder builder, BlockStateModel model, MatrixStack stack, long randomValue) {
         for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
-            var quads = model.getQuads(state, direction, new LocalRandom(randomValue));
-            for (var quad : quads) {
-                //TODO: mark pixels that have
-                int meta = 1;
-                builder.quad(stack.peek(), quad, ((meta>>16)&0xff)/255f, ((meta>>8)&0xff)/255f, (meta&0xff)/255f, 1.0f, 0, 0);
+            for (var part : model.getParts(new LocalRandom(randomValue))) {
+                var quads = part.getQuads(direction);
+                for (var quad : quads) {
+                    //TODO: mark pixels that have
+                    int meta = 1;
+                    builder.quad(stack.peek(), quad, ((meta >> 16) & 0xff) / 255f, ((meta >> 8) & 0xff) / 255f, (meta & 0xff) / 255f, 1.0f, 0, 0);
+                }
             }
         }
     }

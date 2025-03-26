@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import net.minecraft.client.MinecraftClient;
 import org.lwjgl.system.MemoryUtil;
@@ -36,6 +37,6 @@ public class LightMapHelper {
     public static void bind(int lightingIndex) {
         //glBindBufferBase(GL_SHADER_STORAGE_BUFFER, lightingBufferIndex, LIGHT_MAP_BUFFER.id);
         //glBindSampler(lightingIndex, SAMPLER);
-        glBindTextureUnit(lightingIndex, MinecraftClient.getInstance().gameRenderer.getLightmapTextureManager().lightmapFramebuffer.getColorAttachment());
+        glBindTextureUnit(lightingIndex, ((net.minecraft.client.texture.GlTexture)(MinecraftClient.getInstance().gameRenderer.getLightmapTextureManager().getGlTexture())).getGlId());
     }
 }

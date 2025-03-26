@@ -1,7 +1,5 @@
 package me.cortex.voxy.client.core.model;
 
-import com.mojang.blaze3d.platform.GlConst;
-import com.mojang.blaze3d.platform.GlStateManager;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
@@ -597,7 +595,7 @@ public class ModelFactory {
     private float[] computeModelDepth(ColourDepthTextureData[] textures, int checkMode) {
         float[] res = new float[6];
         for (var dir : Direction.values()) {
-            var data = textures[dir.getId()];
+            var data = textures[dir.getIndex()];
             float fd = TextureUtils.computeDepth(data, TextureUtils.DEPTH_MODE_AVG, checkMode);//Compute the min float depth, smaller means closer to the camera, range 0-1
             int depth = Math.round(fd * MODEL_TEXTURE_SIZE);
             //If fd is -1, it means that there was nothing rendered on that face and it should be discarded
@@ -642,10 +640,10 @@ public class ModelFactory {
             int x = X + (subTex>>1)*MODEL_TEXTURE_SIZE;
             int y = Y + (subTex&1)*MODEL_TEXTURE_SIZE;
 
-            GlStateManager._pixelStore(GlConst.GL_UNPACK_ROW_LENGTH, 0);
-            GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_PIXELS, 0);
-            GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_ROWS, 0);
-            GlStateManager._pixelStore(GlConst.GL_UNPACK_ALIGNMENT, 4);
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+            glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+            glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
             var current = textures[subTex].colour();
             var next = new int[current.length>>1];
             final int layers = Integer.numberOfTrailingZeros(MODEL_TEXTURE_SIZE);

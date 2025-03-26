@@ -396,22 +396,22 @@ public class WorldImporter implements IDataImporter {
         }
 
         //Dont process non full chunk sections
-        var status = ChunkStatus.byId(chunk.getString("Status"));
+        var status = ChunkStatus.byId(chunk.getString("Status", null));
         if (status != ChunkStatus.FULL && status != ChunkStatus.EMPTY) {//We also import empty since they are from data upgrade
             this.totalChunks.decrementAndGet();
             return;
         }
 
         try {
-            int x = chunk.getInt("xPos");
-            int z = chunk.getInt("zPos");
+            int x = chunk.getInt("xPos", Integer.MIN_VALUE);
+            int z = chunk.getInt("zPos", Integer.MIN_VALUE);
             if (x>>5 != regionX || z>>5 != regionZ) {
                 Logger.error("Chunk position is not located in correct region, expected: (" + regionX + ", " + regionZ+"), got: " + "(" + (x>>5) + ", " + (z>>5)+"), importing anyway");
             }
 
-            for (var sectionE : chunk.getList("sections", NbtElement.COMPOUND_TYPE)) {
+            for (var sectionE : chunk.getList("sections").orElseThrow()) {
                 var section = (NbtCompound) sectionE;
-                int y = section.getInt("Y");
+                int y = section.getInt("Y", Integer.MIN_VALUE);
                 this.importSectionNBT(x, y, z, section);
             }
         } catch (Exception e) {
@@ -421,6 +421,7 @@ public class WorldImporter implements IDataImporter {
         this.updateCallback.onUpdate(this.chunksProcessed.incrementAndGet(), this.estimatedTotalChunks.get());
     }
 
+    private static final byte[] EMPTY = new byte[0];
     private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
     private static final Codec<PalettedContainer<BlockState>> BLOCK_STATE_CODEC = PalettedContainer.createPalettedContainerCodec(Block.STATE_IDS, BlockState.CODEC, PalettedContainer.PaletteProvider.BLOCK_STATE, Blocks.AIR.getDefaultState());
     private void importSectionNBT(int x, int y, int z, NbtCompound section) {
@@ -428,8 +429,8 @@ public class WorldImporter implements IDataImporter {
             return;
         }
 
-        byte[] blockLightData = section.getByteArray("BlockLight");
-        byte[] skyLightData = section.getByteArray("SkyLight");
+        byte[] blockLightData = section.getByteArray("BlockLight").orElse(EMPTY);
+        byte[] skyLightData = section.getByteArray("SkyLight").orElse(EMPTY);
 
         ChunkNibbleArray blockLight;
         if (blockLightData.length != 0) {
@@ -445,13 +446,13 @@ public class WorldImporter implements IDataImporter {
             skyLight = null;
         }
 
-        var blockStatesRes = BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states"));
+        var blockStatesRes = BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states").get());
         if (!blockStatesRes.hasResultOrPartial()) {
             //TODO: if its only partial, it means should try to upgrade the nbt format with datafixerupper probably
             return;
         }
         var blockStates = blockStatesRes.getPartialOrThrow();
-        var biomes = this.biomeCodec.parse(NbtOps.INSTANCE, section.getCompound("biomes")).result().orElse(this.defaultBiomeProvider);
+        var biomes = this.biomeCodec.parse(NbtOps.INSTANCE, section.getCompound("biomes").get()).result().orElse(this.defaultBiomeProvider);
 
         VoxelizedSection csec = WorldConversionFactory.convert(
                 SECTION_CACHE.get().setPosition(x, y, z),
