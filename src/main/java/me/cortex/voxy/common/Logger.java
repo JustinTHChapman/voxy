@@ -28,7 +28,13 @@ public class Logger {
         String error = (INSERT_CLASS?("["+stackEntry.getClassName()+"]: "):"") + Stream.of(args).map(Logger::objToString).collect(Collectors.joining(" "));
         LOGGER.error(error, throwable);
         if (VoxyCommon.IS_IN_MINECRAFT && !VoxyCommon.IS_DEDICATED_SERVER) {
-            MinecraftClient.getInstance().executeSync(()->{var player = MinecraftClient.getInstance().player; if (player != null)  player.sendMessage(Text.literal(error), true);});
+            var instance = MinecraftClient.getInstance();
+            if (instance != null) {
+                instance.executeSync(() -> {
+                    var player = MinecraftClient.getInstance().player;
+                    if (player != null) player.sendMessage(Text.literal(error), true);
+                });
+            }
         }
     }
 

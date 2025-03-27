@@ -277,7 +277,8 @@ public class RenderDataFactory45 {
     private void generateYZOpaqueInnerGeometry(int axis) {
         for (int layer = 0; layer < 31; layer++) {
             this.blockMesher.auxiliaryPosition = layer;
-            for (int other = 0; other < 32; other++) {//TODO: need to do the faces that border sections
+            int cSkip = 0;
+            for (int other = 0; other < 32; other++) {
                 int pidx = axis==0 ?(layer*32+other):(other*32+layer);
                 int skipAmount = axis==0?32:1;
 
@@ -286,9 +287,12 @@ public class RenderDataFactory45 {
 
                 int msk = current ^ next;
                 if (msk == 0) {
-                    this.blockMesher.skip(32);
+                    cSkip += 32;
                     continue;
                 }
+
+                this.blockMesher.skip(cSkip);
+                cSkip = 0;
 
                 //TODO: For boarder sections, should NOT EMIT neighbors faces
                 int faceForwardMsk = msk & current;
@@ -321,6 +325,7 @@ public class RenderDataFactory45 {
                         );
                     }
                 }
+
                 this.blockMesher.endRow();
             }
             this.blockMesher.finish();
@@ -333,13 +338,17 @@ public class RenderDataFactory45 {
         for (int side = 0; side < 2; side++) {//-, +
             int layer = side == 0 ? 0 : 31;
             this.blockMesher.auxiliaryPosition = layer;
+            int cSkips = 0;
             for (int other = 0; other < 32; other++) {
                 int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
                 int msk = this.opaqueMasks[pidx];
                 if (msk == 0) {
-                    this.blockMesher.skip(32);
+                    cSkips += 32;
                     continue;
                 }
+
+                this.blockMesher.skip(cSkips);
+                cSkips = 0;
 
                 int cIdx = -1;
                 while (msk != 0) {
@@ -384,6 +393,54 @@ public class RenderDataFactory45 {
         this.blockMesher.doAuxiliaryFaceOffset = true;
     }
 
+    private void generateYZNonOpaqueInnerGeometry(int axis) {
+        //Note: think is ok to just reuse.. blockMesher
+        this.blockMesher.axis = axis;
+        for (int layer = 0; layer < 32; layer++) {
+            this.blockMesher.auxiliaryPosition = layer;
+            for (int other = 0; other < 32; other++) {//TODO: need to do the faces that border sections
+                int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
+
+                int msk = this.nonOpaqueMasks[pidx];
+
+                if (msk == 0) {
+                    this.blockMesher.skip(32);
+                    continue;
+                }
+
+
+                int cIdx = -1;
+                while (msk != 0) {
+                    int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
+                    int delta = index - cIdx - 1;
+                    cIdx = index; //index--;
+                    if (delta != 0) this.blockMesher.skip(delta);
+                    msk &= ~Integer.lowestOneBit(msk);
+
+                    {
+                        int idx = index + (pidx * 32);
+
+                        //TODO: swap this out for something not getting the next entry
+                        long A = this.sectionData[idx * 2];
+                        long B = this.sectionData[idx * 2+1];
+                        if (ModelQueries.isTranslucent(B)) {
+                            this.blockMesher.putNext(0);
+                            continue;
+                        }
+                        //Example thing thats just wrong but as example
+                        this.blockMesher.putNext((long) (false ? 0L : 1L) |
+                                ((A & 0xFFFFL) << 26) |
+                                (((0xFFL) & 0xFF) << 55) |
+                                ((A&(0x1FFL<<24))<<(46-24))
+                        );
+                    }
+                }
+                this.blockMesher.endRow();
+            }
+            this.blockMesher.finish();
+        }
+    }
+
     private void generateYZFaces() {
         for (int axis = 0; axis < 2; axis++) {//Y then Z
             this.blockMesher.axis = axis;
@@ -391,54 +448,7 @@ public class RenderDataFactory45 {
             this.generateYZOpaqueInnerGeometry(axis);
             this.generateYZOpaqueOuterGeometry(axis);
 
-
-            if (false) {//Non fully opaque geometry
-                //Note: think is ok to just reuse.. blockMesher
-                this.blockMesher.axis = axis;
-                for (int layer = 0; layer < 32; layer++) {
-                    this.blockMesher.auxiliaryPosition = layer;
-                    for (int other = 0; other < 32; other++) {//TODO: need to do the faces that border sections
-                        int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
-
-                        int msk = this.nonOpaqueMasks[pidx];
-
-                        if (msk == 0) {
-                            this.blockMesher.skip(32);
-                            continue;
-                        }
-
-
-                        int cIdx = -1;
-                        while (msk != 0) {
-                            int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
-                            int delta = index - cIdx - 1;
-                            cIdx = index; //index--;
-                            if (delta != 0) this.blockMesher.skip(delta);
-                            msk &= ~Integer.lowestOneBit(msk);
-
-                            {
-                                int idx = index + (pidx * 32);
-
-                                //TODO: swap this out for something not getting the next entry
-                                long A = this.sectionData[idx * 2];
-                                long B = this.sectionData[idx * 2+1];
-                                if (ModelQueries.isFluid(B)) {
-                                    this.blockMesher.putNext(0);
-                                    continue;
-                                }
-                                //Example thing thats just wrong but as example
-                                this.blockMesher.putNext((long) (false ? 0L : 1L) |
-                                        ((A & 0xFFFFL) << 26) |
-                                        (((0xFFL) & 0xFF) << 55) |
-                                        ((A&(0x1FFL<<24))<<(46-24))
-                                );
-                            }
-                        }
-                        this.blockMesher.endRow();
-                    }
-                    this.blockMesher.finish();
-                }
-            }
+            //this.generateYZNonOpaqueInnerGeometry(axis);
         }
     }
 
