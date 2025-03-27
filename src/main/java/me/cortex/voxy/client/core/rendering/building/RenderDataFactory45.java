@@ -20,6 +20,14 @@ import java.util.Map;
 public class RenderDataFactory45 {
     private static final boolean VERIFY_MESHING = VoxyCommon.isVerificationFlagOn("verifyMeshing");
 
+    //TODO: MAKE a render cache that caches each WorldSection directional face generation, cause then can just pull that directly
+    // instead of needing to regen the entire thing
+
+    //Ok so the idea for fluid rendering is to make it use a seperate mesher and use a different code path for it
+    // since fluid states are explicitly overlays over the base block
+    // can do funny stuff like double rendering
+
+
     private final WorldEngine world;
     private final ModelFactory modelMan;
 
@@ -121,7 +129,10 @@ public class RenderDataFactory45 {
             long quad = data | Integer.toUnsignedLong(encodedPosition);
 
 
+
             MemoryUtil.memPutLong(RenderDataFactory45.this.directionalQuadBufferPtr + (RenderDataFactory45.this.directionalQuadCounters[face]++)*8L + face*8L*(1<<16), quad);
+
+
 
             //Update AABB bounds
             if (axis == 0) {//Y

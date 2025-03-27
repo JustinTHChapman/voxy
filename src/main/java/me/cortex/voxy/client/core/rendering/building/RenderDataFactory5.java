@@ -131,32 +131,12 @@ public class RenderDataFactory5 {
         this.modelMan = modelManager;
     }
 
-
-    //TODO: MAKE a render cache that caches each WorldSection directional face generation, cause then can just pull that directly
-    // instead of needing to regen the entire thing
-
-
-    //Ok so the idea for fluid rendering is to make it use a seperate mesher and use a different code path for it
-    // since fluid states are explicitly overlays over the base block
-    // can do funny stuff like double rendering
-
-    private static final boolean USE_UINT64 = Capabilities.INSTANCE.INT64_t;
-    public static final int QUADS_PER_MESHLET = 14;
-    private static void writePos(long ptr, long pos) {
-        if (USE_UINT64) {
-            MemoryUtil.memPutLong(ptr, pos);
-        } else {
-            MemoryUtil.memPutInt(ptr, (int) (pos>>32));
-            MemoryUtil.memPutInt(ptr + 4, (int)pos);
-        }
-    }
-
-    private void prepareSectionData() {
+    private int prepareSectionData() {
         final var sectionData = this.sectionData;
         int opaque = 0;
         int notEmpty = 0;
 
-        int neighborAcquireMsk = 0;
+        int neighborAcquireMsk = 0;//-+x, -+y, -+Z
         for (int i = 0; i < 32*32*32;) {
             long block = sectionData[i + 32 * 32 * 32];//Get the block mapping
 
@@ -178,10 +158,26 @@ public class RenderDataFactory5 {
             if ((i & 31) == 0) {
                 this.opaqueMasks[(i >> 5) - 1] = opaque;
                 this.nonOpaqueMasks[(i >> 5) - 1] = notEmpty^opaque;
+
+                int neighborMsk = 0;
+                //-+x
+                neighborMsk |= notEmpty&1;
+                neighborMsk |= (notEmpty>>>30)&0b10;
+
+                //notEmpty = (notEmpty != 0)?1:0;
+                neighborMsk |= notEmpty!=0&&((i>>5)&0x1F)==0?0b100:0;//-z
+                neighborMsk |= notEmpty!=0&&((i>>5)&0x1F)==31?0b1000:0;//+z
+                neighborMsk |= notEmpty!=0&&(i>>10)==0?0b10000:0;//-y
+                neighborMsk |= notEmpty!=0&&(i>>10)==31?0b100000:0;//+y
+
+                neighborAcquireMsk |= neighborMsk;
+
+
                 opaque = 0;
                 notEmpty = 0;
             }
         }
+        return neighborAcquireMsk;
     }
 
 
