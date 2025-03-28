@@ -5,7 +5,10 @@ import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.model.ColourDepthTextureData;
+import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelTextureBakery;
+import me.cortex.voxy.client.core.rendering.building.RenderDataFactory45;
+import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
@@ -13,6 +16,9 @@ import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.common.world.WorldSection;
+import me.cortex.voxy.common.world.other.Mapper;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
@@ -22,19 +28,25 @@ import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.lwjgl.opengl.GL11C.glFinish;
 import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
 
 public class VoxyRenderSystem {
     private final RenderService renderer;
     private final PostProcessing postProcessing;
+    private final WorldEngine worldIn;
 
     public VoxyRenderSystem(WorldEngine world, ServiceThreadPool threadPool) {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         Capabilities.init();//Ensure clinit is called
 
+        this.worldIn = world;
         this.renderer = new RenderService(world, threadPool);
         this.postProcessing = new PostProcessing();
     }
@@ -172,5 +184,130 @@ public class VoxyRenderSystem {
         try {this.renderer.shutdown();} catch (Exception e) {Logger.error("Error shutting down renderer", e);}
         Logger.info("Shutting down post processor");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {Logger.error("Error shutting down post processor", e);}}
+    }
+
+
+
+
+
+
+
+    private void testMeshingPerformance() {
+        var modelService = new ModelBakerySubsystem(this.worldIn.getMapper());
+        var factory = new RenderDataFactory45(this.worldIn, modelService.factory, false);
+
+        List<WorldSection> sections = new ArrayList<>();
+
+        System.out.println("Loading sections");
+        for (int x = -17; x <= 17; x++) {
+            for (int z = -17; z <= 17; z++) {
+                for (int y = -1; y <= 4; y++) {
+                    var section = this.worldIn.acquire(0, x, y, z);
+
+                    int nonAir = 0;
+                    for (long state : section.copyData()) {
+                        nonAir += Mapper.isAir(state)?0:1;
+                        modelService.requestBlockBake(Mapper.getBlockId(state));
+                    }
+
+                    if (nonAir > 500 && Math.abs(x) <= 16 && Math.abs(z) <= 16) {
+                        sections.add(section);
+                    } else {
+                        section.release();
+                    }
+                }
+            }
+        }
+
+        System.out.println("Baking models");
+        {
+            //Bake everything
+            while (!modelService.areQueuesEmpty()) {
+                modelService.tick();
+                glFinish();
+            }
+        }
+
+        System.out.println("Ready!");
+
+        {
+            int iteration = 0;
+            while (true) {
+                long start = System.currentTimeMillis();
+                for (var section : sections) {
+                    var mesh = factory.generateMesh(section);
+
+                    mesh.free();
+                }
+                long delta = System.currentTimeMillis() - start;
+                System.out.println("Iteration: " + (iteration++) + " took " + delta + "ms, for an average of " + ((float)delta/sections.size()) + "ms per section");
+                //System.out.println("Quad count: " + factory.quadCount);
+            }
+        }
+    }
+
+    private void testFullMesh() {
+        var modelService = new ModelBakerySubsystem(this.worldIn.getMapper());
+        var completedCounter = new AtomicInteger();
+        var generationService = new RenderGenerationService(this.worldIn, modelService, VoxyCommon.getInstance().getThreadPool(), a-> {completedCounter.incrementAndGet(); a.free();}, false);
+
+
+        var r = new Random(12345);
+        {
+            for (int i = 0; i < 10_000; i++) {
+                int x = (r.nextInt(256*2+2)-256)>>1;//-32
+                int z = (r.nextInt(256*2+2)-256)>>1;//-32
+                int y = r.nextInt(10)-2;
+                int lvl = 0;//r.nextInt(5);
+                long key = WorldEngine.getWorldSectionId(lvl, x>>lvl, y>>lvl, z>>lvl);
+                generationService.enqueueTask(key);
+            }
+            int i = 0;
+            while (true) {
+                modelService.tick();
+                if (i++%5000==0)
+                    System.out.println(completedCounter.get());
+                glFinish();
+                List<String> a = new ArrayList<>();
+                generationService.addDebugData(a);
+                if (a.getFirst().endsWith(" 0")) {
+                    break;
+                }
+            }
+        }
+
+        System.out.println("Running benchmark");
+        while (true)
+        {
+            completedCounter.set(0);
+            long start = System.currentTimeMillis();
+            int C = 200_000;
+            for (int i = 0; i < C; i++) {
+                int x = (r.nextInt(256 * 2 + 2) - 256) >> 1;//-32
+                int z = (r.nextInt(256 * 2 + 2) - 256) >> 1;//-32
+                int y = r.nextInt(10) - 2;
+                int lvl = 0;//r.nextInt(5);
+                long key = WorldEngine.getWorldSectionId(lvl, x >> lvl, y >> lvl, z >> lvl);
+                generationService.enqueueTask(key);
+            }
+            //int i = 0;
+            while (true) {
+                //if (i++%5000==0)
+                //    System.out.println(completedCounter.get());
+                modelService.tick();
+                glFinish();
+                List<String> a = new ArrayList<>();
+                generationService.addDebugData(a);
+                if (a.getFirst().endsWith(" 0")) {
+                    break;
+                }
+            }
+            long delta = (System.currentTimeMillis()-start);
+            System.out.println("Time "+delta+"ms count: " + completedCounter.get() + " avg per mesh: " + ((double)delta/completedCounter.get()) + "ms");
+            if (false)
+                break;
+        }
+        generationService.shutdown();
+        modelService.shutdown();
     }
 }

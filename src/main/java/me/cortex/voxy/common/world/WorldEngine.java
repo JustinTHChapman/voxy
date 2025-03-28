@@ -5,6 +5,8 @@ import me.cortex.voxy.common.config.section.SectionStorage;
 import me.cortex.voxy.common.util.TrackedObject;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
+import me.cortex.voxy.commonImpl.VoxyInstance;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 public class WorldEngine {
@@ -24,7 +26,6 @@ public class WorldEngine {
     private final ActiveSectionTracker sectionTracker;
     private ISectionChangeCallback dirtyCallback;
     private ISectionSaveCallback saveCallback;
-    private final int maxMipLevels;
     private volatile boolean isLive = true;
 
     public void setDirtyCallback(ISectionChangeCallback callback) {
@@ -37,12 +38,16 @@ public class WorldEngine {
 
     public Mapper getMapper() {return this.mapper;}
     public boolean isLive() {return this.isLive;}
+
+    public final @Nullable VoxyInstance instanceIn;
+
     public WorldEngine(SectionStorage storage, int cacheCount) {
-        this(storage, MAX_LOD_LAYER+1, cacheCount);//The +1 is because its from 1 not from 0
+        this(storage, cacheCount, null);
     }
 
-    private WorldEngine(SectionStorage storage, int maxMipLayers, int cacheCount) {
-        this.maxMipLevels = maxMipLayers;
+    public WorldEngine(SectionStorage storage, int cacheCount, @Nullable VoxyInstance instance) {
+        this.instanceIn = instance;
+
         this.storage = storage;
         this.mapper = new Mapper(this.storage);
         //5 cache size bits means that the section tracker has 32 separate maps that it uses
@@ -119,7 +124,7 @@ public class WorldEngine {
         boolean shouldCheckEmptiness = false;
         WorldSection previousSection = null;
 
-        for (int lvl = 0; lvl < this.maxMipLevels; lvl++) {
+        for (int lvl = 0; lvl < MAX_LOD_LAYER+1; lvl++) {
             var worldSection = this.acquire(lvl, section.x >> (lvl + 1), section.y >> (lvl + 1), section.z >> (lvl + 1));
 
             int emptinessStateChange = 0;
