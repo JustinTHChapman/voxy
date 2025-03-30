@@ -1,5 +1,7 @@
 package me.cortex.voxy.client.core.rendering;
 
+import io.netty.util.internal.MathUtil;
+import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
@@ -52,7 +54,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         //Max sections: ~500k
         //Max geometry: 1 gb
-        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<31)-1024);
+        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/);
         Logger.info("Using renderer: " + this.sectionRenderer.getClass().getSimpleName());
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard

@@ -168,6 +168,7 @@ public class RenderDataFactory45 {
 
 
     private final Mesher blockMesher = new Mesher();
+    private final Mesher seondaryblockMesher = new Mesher();//Used for dual non-opaque geometry
 
     public RenderDataFactory45(WorldEngine world, ModelFactory modelManager, boolean emitMeshlets) {
         this.world = world;
@@ -406,26 +407,36 @@ public class RenderDataFactory45 {
 
     private void generateYZNonOpaqueInnerGeometry(int axis) {
         //Note: think is ok to just reuse.. blockMesher
+        this.seondaryblockMesher.doAuxiliaryFaceOffset = false;
         this.blockMesher.axis = axis;
-        for (int layer = 0; layer < 32; layer++) {
+        this.seondaryblockMesher.axis = axis;
+        for (int layer = 0; layer < 32; layer++) {//(should be 1->31, then have outer face mesher)
             this.blockMesher.auxiliaryPosition = layer;
+            this.seondaryblockMesher.auxiliaryPosition = layer;
+            int cSkip = 0;
             for (int other = 0; other < 32; other++) {//TODO: need to do the faces that border sections
                 int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
 
                 int msk = this.nonOpaqueMasks[pidx];
 
                 if (msk == 0) {
-                    this.blockMesher.skip(32);
+                    cSkip += 32;
                     continue;
                 }
 
+                this.blockMesher.skip(cSkip);
+                this.seondaryblockMesher.skip(cSkip);
+                cSkip = 0;
 
                 int cIdx = -1;
                 while (msk != 0) {
                     int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
                     int delta = index - cIdx - 1;
                     cIdx = index; //index--;
-                    if (delta != 0) this.blockMesher.skip(delta);
+                    if (delta != 0) {
+                        this.blockMesher.skip(delta);
+                        this.seondaryblockMesher.skip(delta);
+                    }
                     msk &= ~Integer.lowestOneBit(msk);
 
                     {
@@ -436,10 +447,17 @@ public class RenderDataFactory45 {
                         long B = this.sectionData[idx * 2+1];
                         if (ModelQueries.isTranslucent(B)) {
                             this.blockMesher.putNext(0);
+                            this.seondaryblockMesher.putNext(0);
                             continue;
                         }
+
                         //Example thing thats just wrong but as example
                         this.blockMesher.putNext((long) (false ? 0L : 1L) |
+                                ((A & 0xFFFFL) << 26) |
+                                (((0xFFL) & 0xFF) << 55) |
+                                ((A&(0x1FFL<<24))<<(46-24))
+                        );
+                        this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
                                 ((A & 0xFFFFL) << 26) |
                                 (((0xFFL) & 0xFF) << 55) |
                                 ((A&(0x1FFL<<24))<<(46-24))
@@ -447,8 +465,10 @@ public class RenderDataFactory45 {
                     }
                 }
                 this.blockMesher.endRow();
+                this.seondaryblockMesher.endRow();
             }
             this.blockMesher.finish();
+            this.seondaryblockMesher.finish();
         }
     }
 
@@ -654,6 +674,11 @@ public class RenderDataFactory45 {
         mb.doAuxiliaryFaceOffset = true;
     }
 
+
+    private void generateXNonOpaqueInnerGeometry() {
+
+    }
+
     private void generateXFaces() {
         this.generateXOpaqueInnerGeometry();
         this.generateXOuterOpaqueGeometry();
@@ -689,6 +714,8 @@ public class RenderDataFactory45 {
         {//Reset all the block meshes
             this.blockMesher.reset();
             this.blockMesher.doAuxiliaryFaceOffset = true;
+            this.seondaryblockMesher.reset();
+            this.seondaryblockMesher.doAuxiliaryFaceOffset = true;
             for (var mesher : this.xAxisMeshers) {
                 mesher.reset();
                 mesher.doAuxiliaryFaceOffset = true;
