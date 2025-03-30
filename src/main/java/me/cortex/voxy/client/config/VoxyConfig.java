@@ -3,7 +3,6 @@ package me.cortex.voxy.client.config;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.Logger;
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -24,7 +23,7 @@ public class VoxyConfig {
     public boolean enabled = true;
     public boolean enableRendering = true;
     public boolean ingestEnabled = true;
-    //public int renderDistance = 128;
+    public int sectionRenderDistance = 16;
     public int serviceThreads = Math.max(Runtime.getRuntime().availableProcessors()/2, 1);
     public float subDivisionSize = 128;
     public int secondaryLruCacheSize = 1024;

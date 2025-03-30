@@ -1,6 +1,5 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -87,7 +86,7 @@ public class NodeManager {
     private final Long2IntOpenHashMap activeSectionMap = new Long2IntOpenHashMap();
     private final NodeStore nodeData;
     public final int maxNodeCount;
-    private final IntArrayList topLevelNodeIds = new IntArrayList();
+    private final IntOpenHashSet topLevelNodeIds = new IntOpenHashSet();
     private final LongOpenHashSet topLevelNodes = new LongOpenHashSet();
     private int activeNodeRequestCount;
 
@@ -133,24 +132,26 @@ public class NodeManager {
     }
 
     public void removeTopLevelNode(long pos) {
+        if (!this.topLevelNodes.remove(pos)) {
+            throw new IllegalStateException("Position not in top level map");
+        }
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
-            Logger.error("Tried removing top level pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, discarding!");
-            return;
+            throw new IllegalStateException("Tried removing top level pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, discarding!");
         }
-        //TODO: assert is top level node
+        if ((nodeId&NODE_TYPE_MSK)!=NODE_TYPE_REQUEST) {
+            int id = nodeId&NODE_ID_MSK;
+            if (!this.topLevelNodeIds.remove(id)) {
+                throw new IllegalStateException("Node id was not in top level node ids: " + nodeId + " pos: " + WorldEngine.pprintPos(pos));
+            }
+        }
 
-        //TODO:FIXME augment topLevelNodeIds with a hashmap from node id to array index
-        // OR!! just ensure the list is always ordered?? maybe? idk i think hashmap is best
-        // since the array list might get shuffled as nodes are removed
-        // since need to move the entry at the end of the array to fill a hole made
-
-        // remove from topLevelNodes aswell
-
+        //Remove the entire thing
+        this.recurseRemoveNode(pos);
     }
 
 
-    IntArrayList getTopLevelNodeIds() {
+    IntOpenHashSet getTopLevelNodeIds() {
         return this.topLevelNodeIds;
     }
 
@@ -599,6 +600,35 @@ public class NodeManager {
         this._recurseRemoveNode(pos, false);
     }
 
+
+    private void _removeRequest(int reqId, NodeChildRequest req, long pos) {
+        //Delete all the request data
+        for (int i = 0; i < 8; i++) {
+            if ((req.getMsk()&(1<<i))==0) continue;
+
+            int mesh = req.getChildMesh(i);
+            if (mesh != EMPTY_GEOMETRY_ID && mesh != NULL_GEOMETRY_ID)
+                this.geometryManager.removeSection(mesh);
+
+            //Unwatch the request position
+            long childPos = makeChildPos(pos, i);
+            //Remove from section tracker
+            int cId = this.activeSectionMap.remove(childPos);
+            if (cId == -1) {
+                throw new IllegalStateException("Child not in activeMap");
+            }
+            if ((cId&NODE_TYPE_MSK) != NODE_TYPE_REQUEST || (cId&REQUEST_TYPE_MSK) != REQUEST_TYPE_CHILD || (cId&NODE_ID_MSK) != reqId) {
+                throw new IllegalStateException("Invalid child active state map: " + cId);
+            }
+            if (!this.watcher.unwatch(childPos, WorldEngine.UPDATE_FLAGS)) {
+                throw new IllegalStateException("Pos was not being watched");
+            }
+        }
+
+        this.childRequests.release(reqId);//Release the request
+        this.activeNodeRequestCount--;
+    }
+
     //Recursivly fully removes all nodes and children
     private void _recurseRemoveNode(long pos, boolean onlyRemoveChildren) {
         //NOTE: this also removes from the section map
@@ -612,8 +642,8 @@ public class NodeManager {
             throw new IllegalStateException("Cannot remove pos that doesnt exist");
         }
         int type = nodeId&NODE_TYPE_MSK;
-        nodeId &= NODE_ID_MSK;
         if (type == NODE_TYPE_INNER || type == NODE_TYPE_LEAF) {
+            nodeId &= NODE_ID_MSK;
             if (!this.nodeData.nodeExists(nodeId)) {
                 throw new IllegalStateException("Node exists in section map but not in nodeData");
             }
@@ -628,34 +658,8 @@ public class NodeManager {
                 var req = this.childRequests.get(reqId);
                 childExistence ^= req.getMsk();
 
-                //TODO FINISH
+                this._removeRequest(reqId, req, pos);
 
-                //Delete all the request data
-                for (int i = 0; i < 8; i++) {
-                    if ((req.getMsk()&(1<<i))==0) continue;
-
-                    int mesh = req.getChildMesh(i);
-                    if (mesh != EMPTY_GEOMETRY_ID && mesh != NULL_GEOMETRY_ID)
-                        this.geometryManager.removeSection(mesh);
-
-                    //Unwatch the request position
-                    long childPos = makeChildPos(pos, i);
-                    //Remove from section tracker
-                    int cId = this.activeSectionMap.remove(childPos);
-                    if (cId == -1) {
-                        throw new IllegalStateException("Child not in activeMap");
-                    }
-                    if ((cId&NODE_TYPE_MSK) != NODE_TYPE_REQUEST || (cId&REQUEST_TYPE_MSK) != REQUEST_TYPE_CHILD || (cId&NODE_ID_MSK) != reqId) {
-                        throw new IllegalStateException("Invalid child active state map: " + cId);
-                    }
-                    if (!this.watcher.unwatch(childPos, WorldEngine.UPDATE_FLAGS)) {
-                        throw new IllegalStateException("Pos was not being watched");
-                    }
-                }
-
-
-                this.childRequests.release(reqId);//Release the request
-                this.activeNodeRequestCount--;
                 if (onlyRemoveChildren) {
                     this.nodeData.unmarkRequestInFlight(nodeId);
                     this.nodeData.setNodeRequest(nodeId, NULL_REQUEST_ID);
@@ -745,10 +749,33 @@ public class NodeManager {
                 //TODO: probably need this.clearId(nodeId);
                 this.invalidateNode(nodeId);
             }
-        } else {
+        } else if (type == NODE_TYPE_REQUEST) {
+            if (!this.watcher.unwatch(pos, WorldEngine.UPDATE_FLAGS)) {
+                throw new IllegalStateException("Pos was not being watched");
+            }
+            if ((nodeId&REQUEST_TYPE_MSK) == REQUEST_TYPE_SINGLE) {
+                nodeId &= NODE_ID_MSK;
 
-            Logger.error("UNFINISHED OPERATION TODO: FIXME3");
-            //NOTE: There are request type singles and request type child!!!!
+                var req = this.singleRequests.get(nodeId);
+                if (req.getPosition() != pos)
+                    throw new IllegalStateException();
+
+                this.singleRequests.release(nodeId);
+                if (req.hasMeshSet()) {
+                    int mesh = req.getMesh();
+                    if (mesh != EMPTY_GEOMETRY_ID && mesh != NULL_GEOMETRY_ID)
+                        this.geometryManager.removeSection(mesh);
+                }
+
+            } else {
+                nodeId &= NODE_ID_MSK;
+                var req = this.childRequests.get(nodeId);
+                if (req.getPosition() != pos)
+                    throw new IllegalStateException();
+                this._removeRequest(nodeId, req, pos);
+            }
+        } else {
+            throw new IllegalStateException();
         }
     }
 

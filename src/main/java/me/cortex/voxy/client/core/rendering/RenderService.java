@@ -86,18 +86,15 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
     }
 
-    private int q = -60;
+    public void addTopLevelNode(long pos) {
+        this.nodeManager.insertTopLevelNode(pos);
+    }
+
+    public void removeTopLevelNode(long pos) {
+        this.nodeManager.removeTopLevelNode(pos);
+    }
+
     public void setup(Camera camera) {
-        final int W = 32;
-        final int H = 2;
-        boolean SIDED = false;
-        for (int i = 0; i<64 && q<((W*2+1)*(W*2+1)*H)&&q++>=0;i++) {
-            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, (q%(W*2+1))-(SIDED?0:W), ((q/(W*2+1))/(W*2+1))-1, ((q/(W*2+1))%(W*2+1))-(SIDED?0:W)));
-        }
-        if (q==((W*2+1)*(W*2+1)*H)) {
-            q++;
-            Logger.info("Finished loading render distance");
-        }
         this.modelService.tick();
     }
 

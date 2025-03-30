@@ -13,6 +13,7 @@ import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;
+import me.cortex.voxy.client.core.util.RingTracker;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -40,6 +41,7 @@ public class VoxyRenderSystem {
     private final RenderService renderer;
     private final PostProcessing postProcessing;
     private final WorldEngine worldIn;
+    private final RenderDistanceTracker renderDistanceTracker;
 
     public VoxyRenderSystem(WorldEngine world, ServiceThreadPool threadPool) {
         //Trigger the shared index buffer loading
@@ -49,10 +51,23 @@ public class VoxyRenderSystem {
         this.worldIn = world;
         this.renderer = new RenderService(world, threadPool);
         this.postProcessing = new PostProcessing();
+
+        this.renderDistanceTracker = new RenderDistanceTracker(10,
+                MinecraftClient.getInstance().world.getBottomSectionCoord()>>5,
+                (MinecraftClient.getInstance().world.getTopSectionCoord()-1)>>5,
+                this.renderer::addTopLevelNode,
+                this.renderer::removeTopLevelNode);
+
+        this.renderDistanceTracker.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
     }
 
+    public void setRenderDistance(int renderDistance) {
+        this.renderDistanceTracker.setRenderDistance(renderDistance);
+    }
 
     public void renderSetup(Frustum frustum, Camera camera) {
+        this.renderDistanceTracker.setCenterAndProcess(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
+
         this.renderer.setup(camera);
         PrintfDebugUtil.tick();
     }

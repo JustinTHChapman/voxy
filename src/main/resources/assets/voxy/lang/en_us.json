@@ -2,8 +2,6 @@
   "voxy.config.title": "Voxy config",
 
   "voxy.config.general": "General",
-  "voxy.config.threads": "Threads",
-  "voxy.config.storage": "Storage",
 
   "voxy.config.general.enabled": "Enable Voxy",
   "voxy.config.general.enabled.tooltip": "Fully enables or disables voxy",
@@ -18,5 +16,8 @@
   "voxy.config.general.serviceThreads.tooltip": "Number of threads the ServiceThreadPool can use",
 
   "voxy.config.general.subDivisionSize": "Pixels^2 of subdivision size",
-  "voxy.config.general.subDivisionSize.tooltip": "Maximum size in pixels (squared) of screenspace AABB before subdiving to smaller LoDs (Smaller being higher quality)"
+  "voxy.config.general.subDivisionSize.tooltip": "Maximum size in pixels (squared) of screenspace AABB before subdiving to smaller LoDs (Smaller being higher quality)",
+
+  "voxy.config.general.renderDistance": "Render distance",
+  "voxy.config.general.renderDistance.tooltip": "Render distance of voxy, each unit is equivalent to 32 chunks in vanilla (i.e. to get to vanilla render distance multiply by 32)"
 }

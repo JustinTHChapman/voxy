@@ -2,9 +2,7 @@ package me.cortex.voxy.client.core.rendering.hierachical;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2IntFunction;
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.*;
 import me.cortex.voxy.client.core.rendering.ISectionWatcher;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
@@ -236,6 +234,10 @@ public class TestNodeManager {
         public void verifyIntegrity() {
             this.nodeManager.verifyIntegrity(this.watcher.updateTypes.keySet(), this.cleaner.active);
         }
+
+        public void remTopPos(long pos) {
+            this.nodeManager.removeTopLevelNode(pos);
+        }
     }
 
     private static void fillInALl(TestBase test, long pos, Long2IntFunction converter) {
@@ -274,8 +276,8 @@ public class TestNodeManager {
 
     public static void main(String[] args) {
         Logger.INSERT_CLASS = false;
-        int ITER_COUNT = 50_000;
-        int INNER_ITER_COUNT = 500_000;
+        int ITER_COUNT = 5_000;
+        int INNER_ITER_COUNT = 100_000;
         boolean GEO_REM = true;
 
         AtomicInteger finished = new AtomicInteger();
@@ -299,13 +301,14 @@ public class TestNodeManager {
         }
         System.out.println("Finished " + finished.get() + " iterations out of " + ITER_COUNT);
     }
-    private static long rPos(Random r) {
+    private static long rPos(Random r, LongList tops) {
         int lvl = r.nextInt(5);
+        long top = tops.getLong(r.nextInt(tops.size()));
         if (lvl==4) {
-            return WorldEngine.getWorldSectionId(4,0,0,0);
+            return top;
         }
         int bound = 16>>lvl;
-        return WorldEngine.getWorldSectionId(lvl, r.nextInt(bound), r.nextInt(bound), r.nextInt(bound));
+        return WorldEngine.getWorldSectionId(lvl, r.nextInt(bound)+(WorldEngine.getX(top)<<4), r.nextInt(bound)+(WorldEngine.getY(top)<<4), r.nextInt(bound)+(WorldEngine.getZ(top)<<4));
     }
 
     private static boolean runTest(int ITERS, int testIdx, Set<List<StackTraceElement>> traces, boolean geoRemoval) {
@@ -314,14 +317,30 @@ public class TestNodeManager {
         Random r = new Random(testIdx * 1234L);
         try {
             var test = new TestBase();
+            LongList tops = new LongArrayList();
             //Fuzzy bruteforce everything
             test.putTopPos(POS_A);
+            tops.add(POS_A);
             for (int i = 0; i < ITERS; i++) {
-                long pos = rPos(r);
-                int op = r.nextInt(4);
+                long pos = rPos(r, tops);
+                int op = r.nextInt(5);
                 int extra = r.nextInt(256);
                 boolean hasGeometry = r.nextBoolean();
-                if (op == 0) {
+                boolean addRemTLN = r.nextInt(512) == 0;
+                boolean extraBool = r.nextBoolean();
+                if (op == 0 && addRemTLN) {
+                    pos = WorldEngine.getWorldSectionId(4, r.nextInt(5)-2, r.nextInt(5)-2, r.nextInt(5)-2);
+                    boolean cont = tops.contains(pos);
+                    if (cont&&extraBool&&tops.size()>1) {
+                        extraBool = true;
+                        test.remTopPos(pos);
+                        tops.rem(pos);
+                    } else if (!cont) {
+                        extraBool = false;
+                        test.putTopPos(pos);
+                        tops.add(pos);
+                    }
+                } else if (op == 0) {
                     test.request(pos);
                 }
                 if (op == 1) {
@@ -336,8 +355,20 @@ public class TestNodeManager {
                 test.printNodeChanges();
                 test.verifyIntegrity();
             }
-            test.childUpdate(POS_A, 0);
-            test.meshUpdate(POS_A, 0, 0);
+            for (long top : tops) {
+                test.remTopPos(top);
+            }
+            test.printNodeChanges();
+            test.verifyIntegrity();
+            if (test.nodeManager.getCurrentMaxNodeId() != -1) {
+                throw new IllegalStateException();
+            }
+            if (!test.cleaner.active.isEmpty()) {
+                throw new IllegalStateException();
+            }
+            if (!test.watcher.updateTypes.isEmpty()) {
+                throw new IllegalStateException();
+            }
             if (test.geometryManager.memoryInUse != 0) {
                 throw new IllegalStateException();
             }

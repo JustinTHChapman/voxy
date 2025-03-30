@@ -112,6 +112,18 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setDefaultValue((int) DEFAULT.subDivisionSize)
                 .build());
 
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.renderDistance"), config.sectionRenderDistance, 2, 64)
+                .setTooltip(Text.translatable("voxy.config.general.renderDistance.tooltip"))
+                .setSaveConsumer(val -> {
+                    config.sectionRenderDistance = val;
+                    var wrenderer =((IGetVoxyRenderSystem)(MinecraftClient.getInstance().worldRenderer));
+                    if (wrenderer != null && wrenderer.getVoxyRenderSystem() != null) {
+                        wrenderer.getVoxyRenderSystem().setRenderDistance(val);
+                    }
+                })
+                .setDefaultValue(DEFAULT.sectionRenderDistance)
+                .build());
+
         //category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.lruCacheSize"), config.secondaryLruCacheSize, 16, 1<<13)
         //        .setTooltip(Text.translatable("voxy.config.general.lruCacheSize.tooltip"))
         //        .setSaveConsumer(val ->{if (config.secondaryLruCacheSize != val) reload(); config.secondaryLruCacheSize = val;})

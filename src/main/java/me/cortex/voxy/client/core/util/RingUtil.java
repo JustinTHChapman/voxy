@@ -65,7 +65,7 @@ public class RingUtil {
     public static int[] generatingBoundingCorner2D(int radius) {
         IntOpenHashSet points = new IntOpenHashSet();
         //Do 2 pass (x and y) to generate and cover all points
-        for (int i = 0; i <= radius; i++) {
+        for (int i = 1; i <= radius; i++) {
             int other = (int) Math.floor(Math.sqrt(radius*radius - i*i));
             //add points (x,other) and (other,x) as it covers the full spectrum
             points.add((i<<16)|other);
