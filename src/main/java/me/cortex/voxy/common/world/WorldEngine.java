@@ -106,6 +106,9 @@ public class WorldEngine {
 
     public void markDirty(WorldSection section, int changeState) {
         if (!this.isLive) throw new IllegalStateException("World is not live");
+        if (section.tracker != this.sectionTracker) {
+            throw new IllegalStateException("Section is not from here");
+        }
         if (this.dirtyCallback != null) {
             this.dirtyCallback.accept(section, changeState);
         }

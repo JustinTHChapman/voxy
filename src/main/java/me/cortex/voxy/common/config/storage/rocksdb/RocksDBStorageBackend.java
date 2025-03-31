@@ -21,6 +21,7 @@ public class RocksDBStorageBackend extends StorageBackend {
     private final ColumnFamilyHandle worldSections;
     private final ColumnFamilyHandle idMappings;
     private final ReadOptions sectionReadOps;
+    private final WriteOptions sectionWriteOps;
 
     //NOTE: closes in order
     private final List<AbstractImmutableNativeReference> closeList = new ArrayList<>();
@@ -59,7 +60,8 @@ public class RocksDBStorageBackend extends StorageBackend {
 
         final DBOptions options = new DBOptions()
                 .setCreateIfMissing(true)
-                .setCreateMissingColumnFamilies(true);
+                .setCreateMissingColumnFamilies(true)
+                .setMaxTotalWalSize(1024*1024*512);//512 mb max WAL size
 
         List<ColumnFamilyHandle> handles = new ArrayList<>();
 
@@ -69,12 +71,14 @@ public class RocksDBStorageBackend extends StorageBackend {
                     handles);
 
             this.sectionReadOps = new ReadOptions();
+            this.sectionWriteOps = new WriteOptions();
 
             this.closeList.addAll(handles);
             this.closeList.add(this.db);
             this.closeList.add(options);
             this.closeList.add(cfOpts);
             this.closeList.add(this.sectionReadOps);
+            this.closeList.add(this.sectionWriteOps);
 
             this.worldSections = handles.get(1);
             this.idMappings = handles.get(2);
@@ -87,7 +91,19 @@ public class RocksDBStorageBackend extends StorageBackend {
 
     @Override
     public void iterateStoredSectionPositions(LongConsumer consumer) {
-        throw new IllegalStateException("Not yet implemented");
+        try (var stack = MemoryStack.stackPush()) {
+            ByteBuffer keyBuff = stack.calloc(8);
+            long keyBuffPtr = MemoryUtil.memAddress(keyBuff);
+            var iter = this.db.newIterator(this.worldSections, this.sectionReadOps);
+            iter.seekToFirst();
+            while (iter.isValid()) {
+                iter.key(keyBuff);
+                long key = Long.reverseBytes(MemoryUtil.memGetLong(keyBuffPtr));
+                consumer.accept(key);
+                iter.next();
+            }
+            iter.close();
+        }
     }
 
     @Override
@@ -117,10 +133,10 @@ public class RocksDBStorageBackend extends StorageBackend {
     //TODO: FIXME, use the ByteBuffer variant
     @Override
     public void setSectionData(long key, MemoryBuffer data) {
-        try {
-            var buffer = new byte[(int) data.size];
-            UnsafeUtil.memcpy(data.address, buffer);
-            this.db.put(this.worldSections, longToBytes(key), buffer);
+        try (var stack = MemoryStack.stackPush()) {
+            var keyBuff = stack.calloc(8);
+            MemoryUtil.memPutLong(MemoryUtil.memAddress(keyBuff), Long.reverseBytes(key));
+            this.db.put(this.worldSections, this.sectionWriteOps, keyBuff, data.asByteBuffer());
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }

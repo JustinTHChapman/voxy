@@ -173,6 +173,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.nodeCleaner.free();
         //Release all the unprocessed built geometry
         this.geometryUpdateQueue.clear(BuiltSection::free);
+        this.sectionUpdateQueue.clear(WorldSection::release);//Release anything thats in the queue
     }
 
     public Viewport<?> getViewport() {

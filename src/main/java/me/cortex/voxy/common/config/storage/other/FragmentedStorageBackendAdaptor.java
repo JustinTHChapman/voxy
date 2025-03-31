@@ -34,7 +34,9 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
 
     @Override
     public void iterateStoredSectionPositions(LongConsumer consumer) {
-        throw new IllegalStateException("Not yet implemented");
+        for (var backend : this.backends) {
+            backend.iterateStoredSectionPositions(consumer);
+        }
     }
 
     //TODO: reencode the key to be shifted one less OR

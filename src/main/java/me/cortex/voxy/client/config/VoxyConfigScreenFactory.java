@@ -115,10 +115,12 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.renderDistance"), config.sectionRenderDistance, 2, 64)
                 .setTooltip(Text.translatable("voxy.config.general.renderDistance.tooltip"))
                 .setSaveConsumer(val -> {
-                    config.sectionRenderDistance = val;
-                    var wrenderer =((IGetVoxyRenderSystem)(MinecraftClient.getInstance().worldRenderer));
-                    if (wrenderer != null && wrenderer.getVoxyRenderSystem() != null) {
-                        wrenderer.getVoxyRenderSystem().setRenderDistance(val);
+                    if (config.sectionRenderDistance != val) {
+                        config.sectionRenderDistance = val;
+                        var wrenderer = ((IGetVoxyRenderSystem) (MinecraftClient.getInstance().worldRenderer));
+                        if (wrenderer != null && wrenderer.getVoxyRenderSystem() != null) {
+                            wrenderer.getVoxyRenderSystem().setRenderDistance(val);
+                        }
                     }
                 })
                 .setDefaultValue(DEFAULT.sectionRenderDistance)
