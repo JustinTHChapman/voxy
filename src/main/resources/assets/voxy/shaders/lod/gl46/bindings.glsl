@@ -118,7 +118,7 @@ layout(binding = LIGHTING_SAMPLER_BINDING) uniform sampler2D lightSampler;
 
 vec4 getLighting(uint index) {
     int i2 = int(index);
-    return texture(lightSampler, vec2((i2>>4)&0xF, i2&0xF)/16.0f);
+    return texelFetch(lightSampler, ivec2((i2>>4)&0xF, i2&0xF), 0);
 }
 #endif
 

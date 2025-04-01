@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.model;
 
+import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import me.cortex.voxy.common.Logger;
 import net.minecraft.block.BlockEntityProvider;
@@ -11,6 +12,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -104,27 +106,24 @@ public class BakedBlockEntityModel {
         this.layers = layers;
     }
 
-    public void renderOut() {
-        //TODO:FIXME: CANT RUN ON RENDER THREAD
-        if (false) {
-            System.err.println("Model entity baking not yet supported offthread baking");
-        } else {
-            var vc = Tessellator.getInstance();
-            for (var layer : this.layers) {
-                if (layer.isEmpty()) continue;
-                var bb = vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
-                if (layer.layer instanceof RenderLayer.MultiPhase mp) {
-                    Identifier textureId = mp.phases.texture.getId().orElse(null);
-                    if (textureId == null) {
-                        System.err.println("ERROR: Empty texture id for layer: " + layer);
-                    } else {
-                        var texture = MinecraftClient.getInstance().getTextureManager().getTexture(textureId);
-                        glBindTexture(GL_TEXTURE_2D, ((GlTexture)texture.getGlTexture()).getGlId());
-                    }
+    public void renderOut(Matrix4f matrix, GpuTexture texture) {
+        var vc = Tessellator.getInstance();
+        for (var layer : this.layers) {
+            if (layer.isEmpty()) continue;
+            if (layer.layer instanceof RenderLayer.MultiPhase mp) {
+                Identifier textureId = mp.phases.texture.getId().orElse(null);
+                if (textureId == null) {
+                    System.err.println("ERROR: Empty texture id for layer: " + layer);
+                } else {
+                    texture = MinecraftClient.getInstance().getTextureManager().getTexture(textureId).getGlTexture();
                 }
-                layer.putInto(bb);
-                //BudgetBufferRenderer.draw(bb.end());
             }
+
+            var bb = vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
+            layer.putInto(bb);
+            var mesh = bb.endNullable();
+            if (mesh!=null)
+                BudgetBufferRenderer.draw(mesh, texture, matrix);
         }
     }
 

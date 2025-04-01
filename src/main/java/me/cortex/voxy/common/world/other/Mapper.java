@@ -71,7 +71,7 @@ public class Mapper {
     }
 
     public static long withLight(long id, int light) {
-        return (id&(~(0xFFL<<56)))|(Integer.toUnsignedLong(light)<<56);
+        return (id&(~(0xFFL<<56)))|(Integer.toUnsignedLong(light&0xFF)<<56);
     }
 
     public void setStateCallback(Consumer<StateEntry> stateCallback) {
@@ -181,7 +181,7 @@ public class Mapper {
 
     //TODO:FIXME: IS VERY SLOW NEED TO MAKE IT LOCK FREE, or at minimum use a concurrent map
     public long getBaseId(byte light, BlockState state, RegistryEntry<Biome> biome) {
-        if (state.isAir()) return ((long)light)<<56;//Special case and fast return for air, dont care about the biome
+        if (state.isAir()) return Byte.toUnsignedLong(light) <<56;//Special case and fast return for air, dont care about the biome
         return composeMappingId(light, this.getIdForBlockState(state), this.getIdForBiome(biome));
     }
 

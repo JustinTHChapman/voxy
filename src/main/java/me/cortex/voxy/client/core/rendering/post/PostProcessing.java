@@ -10,18 +10,13 @@ import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11C;
 
 import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
-import static org.lwjgl.opengl.ARBFramebufferObject.*;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glBindImageTexture;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.opengl.GL15.GL_READ_WRITE;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
-import static org.lwjgl.opengl.GL20C.glGetUniformLocation;
-import static org.lwjgl.opengl.GL20C.glGetUniformfv;
+import static org.lwjgl.opengl.GL30C.*;
+import static org.lwjgl.opengl.GL30C.GL_DEPTH24_STENCIL8;
 import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
-import static org.lwjgl.opengl.GL44C.glBindImageTextures;
-import static org.lwjgl.opengl.GL45C.glBlitNamedFramebuffer;
-import static org.lwjgl.opengl.GL45C.glTextureParameterf;
+import static org.lwjgl.opengl.GL45C.*;
 
 public class PostProcessing {
     private final GlFramebuffer framebuffer;
@@ -72,16 +67,15 @@ public class PostProcessing {
             glTextureParameterf(this.colour.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTextureParameterf(this.colourSSAO.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             glTextureParameterf(this.colourSSAO.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            //glTextureParameterf(this.depthStencil.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            //glTextureParameterf(this.depthStencil.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTextureParameterf(this.depthStencil.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
 
-            this.framebuffer.bind(GL_COLOR_ATTACHMENT0, this.colour);
-            this.framebuffer.bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthStencil);
-            this.framebuffer.verify();
+            this.framebuffer.bind(GL_COLOR_ATTACHMENT0, this.colour)
+                    .bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthStencil)
+                    .verify();
 
-            this.framebufferSSAO.bind(GL_COLOR_ATTACHMENT0, this.colourSSAO);
-            this.framebufferSSAO.bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthStencil);
-            this.framebufferSSAO.verify();
+            this.framebufferSSAO.bind(GL_COLOR_ATTACHMENT0, this.colourSSAO)
+                    .bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthStencil)
+                    .verify();
         }
     }
 
@@ -154,13 +148,9 @@ public class PostProcessing {
         mat.get(data);
         glUniformMatrix4fv(4, false, data);//invMVP
 
-        glActiveTexture(GL_TEXTURE0);
         glBindImageTexture(0, this.colourSSAO.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
-        glActiveTexture(GL_TEXTURE1);
-        GL11C.glBindTexture(GL_TEXTURE_2D, this.depthStencil.id);
-        glTexParameteri (GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
-        glActiveTexture(GL_TEXTURE2);
-        GL11C.glBindTexture(GL_TEXTURE_2D, this.colour.id);
+        glBindTextureUnit(1, this.depthStencil.id);
+        glBindTextureUnit(2, this.colour.id);
 
         glDispatchCompute((this.width+31)/32, (this.height+31)/32, 1);
 
