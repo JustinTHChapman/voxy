@@ -83,13 +83,28 @@ public class GPUSelectorWindows2 {
         return 0;
     }
 
-    private record AdapterInfo(int type, long luid, int vendor, int device, int subSystem) {
+    private static int queryAdapterIcd(int handle, String[] out) {
+        int ret;
+        try (var stack = MemoryStack.stackPush()) {
+            var buff = stack.calloc(260*2+8).order(ByteOrder.nativeOrder());
+            //KMTQAITYPE_UMOPENGLINFO
+            if ((ret=query(handle, 2, buff))<0) {
+                return ret;
+            }
+            int len = Math.min(MemoryUtil.memLengthNT2(buff), 260*2);
+            out[0] = MemoryUtil.memUTF16(buff.limit(len));
+        }
+        return 0;
+    }
+
+    private record AdapterInfo(String icdPath, int type, long luid, int vendor, int device, int subSystem) {
         @Override
         public String toString() {
             String LUID = Integer.toHexString((int) ((luid>>>32)&0xFFFFFFFFL))+"-"+Integer.toHexString((int) (luid&0xFFFFFFFFL));
-            return "{type=%s, luid=%s, vendor=%s, device=%s, subSys=%s}".formatted(Integer.toString(type),LUID, Integer.toHexString(vendor), Integer.toHexString(device), Integer.toHexString(subSystem));
+            return "{type=%s, luid=%s, vendor=%s, device=%s, subSys=%s, icd=\"%s\"}".formatted(Integer.toString(type),LUID, Integer.toHexString(vendor), Integer.toHexString(device), Integer.toHexString(subSystem), icdPath);
         }
     }
+
     private record PCIDeviceId(int vendor, int device, int subVendor, int subSystem, int revision, int busType) {}
     private static int queryPCIAddress(int handle, int index, PCIDeviceId[] deviceOut) {
         int ret = 0;
@@ -139,6 +154,16 @@ public class GPUSelectorWindows2 {
                     continue;
                 }
 
+                String[] icd = new String[1];
+                if ((ret = queryAdapterIcd(handle, icd))<0) {
+                    Logger.error("Query icd error: " + ret);
+                    //We errored
+                    if (closeHandle(handle) < 0) {
+                        throw new IllegalStateException();
+                    }
+                    continue;
+                }
+
 
                 PCIDeviceId[] out = new PCIDeviceId[1];
                 //Get the root adapter device
@@ -152,7 +177,7 @@ public class GPUSelectorWindows2 {
                 }
 
                 int subSys = (out[0].subSystem<<16)|out[0].subVendor;//It seems the pci subsystem address is a joined integer
-                consumer.accept(new AdapterInfo(type[0], luid, out[0].vendor, out[0].device, subSys));
+                consumer.accept(new AdapterInfo(icd[0], type[0], luid, out[0].vendor, out[0].device, subSys));
 
                 if (closeHandle(handle) < 0) {
                     throw new IllegalStateException();
@@ -173,7 +198,7 @@ public class GPUSelectorWindows2 {
             l >>= 8;
         }
     }
-    private static byte[] createFinishedHDCStub(long luid, long D3DKMTOpenAdapterFromLuid) {
+    private static byte[] createFinishedHDCStub(long luid) {
         byte[] stub = new byte[HDC_STUB.length];
         for (int i = 0; i < stub.length; i++) {
             stub[i] = (byte) HDC_STUB[i];
@@ -187,6 +212,13 @@ public class GPUSelectorWindows2 {
     private static final long D3DKMTOpenAdapterFromHdc = apiGetFunctionAddressOptional(GDI32.getLibrary(), "D3DKMTOpenAdapterFromHdc");
     private static final long VirtualProtect = apiGetFunctionAddressOptional(Kernel32.getLibrary(), "VirtualProtect");
 
+    private static byte[] toByteArray(int... array) {
+        byte[] res = new byte[array.length];
+        for (int i = 0; i < array.length; i++) {
+            res[i] = (byte) array[i];
+        }
+        return res;
+    }
     private static void VirtualProtect(long addr, long size) {
         try (var stack = MemoryStack.stackPush()) {
             var oldProtection = stack.calloc(4);
@@ -204,38 +236,62 @@ public class GPUSelectorWindows2 {
             return;
         }
         Logger.info("AdapterLuid callback at: " + Long.toHexString(D3DKMTOpenAdapterFromLuid));
-        var stub = createFinishedHDCStub(adapterLuid, D3DKMTOpenAdapterFromLuid);
+        var stub = createFinishedHDCStub(adapterLuid);
 
         VirtualProtect(D3DKMTOpenAdapterFromHdc, stub.length);
         memcpy(D3DKMTOpenAdapterFromHdc, stub);
     }
 
 
-    private static void installQueryStub() {
+    private static byte[] createIntelStub(long origA, long origB, long jmpA, long jmpB) {
+        byte[] stub = toByteArray(0xFE, 0x0D, 0x63, 0x00, 0x00, 0x00, 0x80, 0x3D, 0x5C, 0x00, 0x00, 0x00, 0x02, 0x75, 0x07, 0x48, 0x31, 0xC0, 0x48, 0xF7, 0xD0, 0xC3, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x48, 0x8B, 0x0D, 0x43, 0x00, 0x00, 0x00, 0x48, 0x89, 0x08, 0x48, 0x8B, 0x0D, 0x41, 0x00, 0x00, 0x00, 0x48, 0x89, 0x48, 0x08, 0x80, 0x3D, 0x2D, 0x00, 0x00, 0x00, 0x00, 0x74, 0x1D, 0x50, 0xFF, 0xD0, 0x58, 0x48, 0x8B, 0x0D, 0x31, 0x00, 0x00, 0x00, 0x48, 0x89, 0x08, 0x48, 0x8B, 0x0D, 0x2F, 0x00, 0x00, 0x00, 0x48, 0x89, 0x48, 0x08, 0x48, 0x31, 0xC0, 0xC3, 0x48, 0x8B, 0x41, 0x08, 0xC7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x31, 0xC0, 0xC3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0);
+        insertLong(D3DKMTQueryAdapterInfo, stub, 24);
+        stub[0x69] = 3;
+        insertLong(origA, stub, 0x6a);
+        insertLong(origB, stub, 0x6a+8);
+        insertLong(jmpA, stub, 0x6a+16);
+        insertLong(jmpB, stub, 0x6a+24);
+        return stub;
+    }
+
+    private static byte[] createSimpleStub(long origA, long origB) {
+        byte[] stub = toByteArray(0x48, 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0x48, 0x8B, 0x0D, 0x15, 0x00, 0x00, 0x00, 0x48, 0x89, 0x08, 0x48, 0x8B, 0x0D, 0x13, 0x00, 0x00, 0x00, 0x48, 0x89, 0x48, 0x08, 0x48, 0x31, 0xC0, 0x48, 0xF7, 0xD0, 0xC3, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0);
+        insertLong(D3DKMTQueryAdapterInfo, stub, 2);
+        insertLong(origA, stub, 38);
+        insertLong(origB, stub, 38+8);
+        return stub;
+    }
+
+    private static void installQueryStub(boolean installIntelBypass) {
         if (D3DKMTQueryAdapterInfo == 0 || VirtualProtect == 0) {
             return;
         }
-
         VirtualProtect(D3DKMTQueryAdapterInfo, 0x10);
+        int MAX_STUB_SIZE = 1024;
+        long stubPtr = MemoryUtil.nmemAlloc(MAX_STUB_SIZE);
+        VirtualProtect(stubPtr, MAX_STUB_SIZE);
+        Logger.info("Do stub at: " + Long.toHexString(stubPtr));
 
-        var fixAndRetStub = new byte[] { 0x48, (byte) 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, 0x48, (byte) 0x8B, 0x0D, 0x15, 0x00, 0x00, 0x00, 0x48, (byte) 0x89, 0x08, 0x48, (byte) 0x8B, 0x0D, 0x13, 0x00, 0x00, 0x00, 0x48, (byte) 0x89, 0x48, 0x08, 0x48, 0x31, (byte) 0xC0, 0x48, (byte) 0xF7, (byte) 0xD0, (byte) 0xC3, 0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0};
-        long stubPtr = MemoryUtil.nmemAlloc(fixAndRetStub.length);
-        VirtualProtect(stubPtr, fixAndRetStub.length);
-
-
-        insertLong(D3DKMTQueryAdapterInfo, fixAndRetStub, 2);
-        insertLong((MemoryUtil.memGetLong(D3DKMTQueryAdapterInfo)), fixAndRetStub, 38);
-        insertLong((MemoryUtil.memGetLong(D3DKMTQueryAdapterInfo+8)), fixAndRetStub, 38+8);
-
-        memcpy(stubPtr, fixAndRetStub);
-        Logger.info("Restore stub at: " + Long.toHexString(stubPtr));
-
+        long origA = MemoryUtil.memGetLong(D3DKMTQueryAdapterInfo);
+        long origB = MemoryUtil.memGetLong(D3DKMTQueryAdapterInfo+8);
 
         var jmpStub = new byte[]{ 0x48, (byte) 0xB8, 0, 0, 0, 0, 0, 0, 0, 0, (byte) 0xFF, (byte) 0xE0};
         insertLong(stubPtr, jmpStub, 2);
 
         memcpy(D3DKMTQueryAdapterInfo, jmpStub);
         Logger.info("D3DKMTQueryAdapterInfo at: " + Long.toHexString(D3DKMTQueryAdapterInfo));
+
+        long jmpA = MemoryUtil.memGetLong(D3DKMTQueryAdapterInfo);
+        long jmpB = MemoryUtil.memGetLong(D3DKMTQueryAdapterInfo+8);
+
+        byte[] stub;
+        if (installIntelBypass) {
+            stub = createIntelStub(origA, origB, jmpA, jmpB);
+        } else {
+            stub = createSimpleStub(origA, origB);
+        }
+        memcpy(stubPtr, stub);
+        Logger.info("QueryAdapterInfo stubs installed");
     }
 
 
@@ -251,7 +307,7 @@ public class GPUSelectorWindows2 {
         var adapter = adapters.get(index);
 
         installHDCStub(adapter.luid);
-        installQueryStub();
+        installQueryStub(adapter.icdPath.matches("\\\\ig[a-z0-9]+icd(32|64)\\.dll$"));
 
         setPCIProperties(1/*USER*/, adapter.vendor, adapter.device, adapter.subSystem);
         setPCIProperties(2/*USER GLOBAL*/, adapter.vendor, adapter.device, adapter.subSystem);
