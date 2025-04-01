@@ -7,12 +7,14 @@ import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceSlice;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.commonImpl.IVoxyWorld;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.ChunkNibbleArray;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.WorldChunk;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -32,44 +34,49 @@ public class VoxelIngestService {
         var vs = SECTION_CACHE.get().setPosition(task.cx, task.cy, task.cz);
 
         if (section.isEmpty() && task.blockLight==null && task.skyLight==null) {//If the chunk section has lighting data, propagate it
-            task.world.insertUpdate(vs.zero());
+            WorldUpdater.insertUpdate(task.world, vs.zero());
         } else {
-            ILightingSupplier supplier = (x,y,z) -> (byte) 0;
-            var sla = task.skyLight;
-            var bla = task.blockLight;
-            boolean sl = sla != null && !sla.isUninitialized();
-            boolean bl = bla != null && !bla.isUninitialized();
-            if (sl || bl) {
-                if (sl && bl) {
-                    supplier = (x,y,z)-> {
-                        int block = Math.min(15,bla.get(x, y, z));
-                        int sky = Math.min(15,sla.get(x, y, z));
-                        return (byte) (sky|(block<<4));
-                    };
-                } else if (bl) {
-                    supplier = (x,y,z)-> {
-                        int block = Math.min(15,bla.get(x, y, z));
-                        int sky = 0;
-                        return (byte) (sky|(block<<4));
-                    };
-                } else {
-                    supplier = (x,y,z)-> {
-                        int block = 0;
-                        int sky = Math.min(15,sla.get(x, y, z));
-                        return (byte) (sky|(block<<4));
-                    };
-                }
-            }
             VoxelizedSection csec = WorldConversionFactory.convert(
                     SECTION_CACHE.get(),
                     task.world.getMapper(),
                     section.getBlockStateContainer(),
                     section.getBiomeContainer(),
-                    supplier
+                    getLightingSupplier(task)
             );
             WorldConversionFactory.mipSection(csec, task.world.getMapper());
-            task.world.insertUpdate(csec);
+            WorldUpdater.insertUpdate(task.world, csec);
         }
+    }
+
+    @NotNull
+    private static ILightingSupplier getLightingSupplier(IngestSection task) {
+        ILightingSupplier supplier = (x,y,z) -> (byte) 0;
+        var sla = task.skyLight;
+        var bla = task.blockLight;
+        boolean sl = sla != null && !sla.isUninitialized();
+        boolean bl = bla != null && !bla.isUninitialized();
+        if (sl || bl) {
+            if (sl && bl) {
+                supplier = (x,y,z)-> {
+                    int block = Math.min(15,bla.get(x, y, z));
+                    int sky = Math.min(15,sla.get(x, y, z));
+                    return (byte) (sky|(block<<4));
+                };
+            } else if (bl) {
+                supplier = (x,y,z)-> {
+                    int block = Math.min(15,bla.get(x, y, z));
+                    int sky = 0;
+                    return (byte) (sky|(block<<4));
+                };
+            } else {
+                supplier = (x,y,z)-> {
+                    int block = 0;
+                    int sky = Math.min(15,sla.get(x, y, z));
+                    return (byte) (sky|(block<<4));
+                };
+            }
+        }
+        return supplier;
     }
 
     private static boolean shouldIngestSection(ChunkSection section, int cx, int cy, int cz) {

@@ -136,25 +136,4 @@ public class VoxelCore {
 
 
 
-
-    private void testDbPerformance() {
-        Random r = new Random(123456);
-        r.nextLong();
-        long start = System.currentTimeMillis();
-        int c = 0;
-        for (int i = 0; i < 500_000; i++) {
-            if (i == 20_000) {
-                c = 0;
-                start = System.currentTimeMillis();
-            }
-            c++;
-            int x = (r.nextInt(256*2+2)-256)>>1;//-32
-            int z = (r.nextInt(256*2+2)-256)>>1;//-32
-            int y = 0;
-            int lvl = 0;//r.nextInt(5);
-            this.world.acquire(WorldEngine.getWorldSectionId(lvl, x>>lvl, y>>lvl, z>>lvl)).release();
-        }
-        long delta = System.currentTimeMillis() - start;
-        System.out.println("Total "+delta+"ms " + ((double)delta/c) + "ms average" );
-    }
 }

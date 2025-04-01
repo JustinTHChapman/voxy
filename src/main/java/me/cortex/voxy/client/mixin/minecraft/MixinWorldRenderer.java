@@ -52,11 +52,7 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             this.shutdownRenderer();
 
             if (this.world != null) {
-                var engine = ((IVoxyWorld)this.world).getWorldEngine();
-                if (engine != null) {
-                    VoxyCommon.getInstance().stopWorld(engine);
-                }
-                ((IVoxyWorld)this.world).setWorldEngine(null);
+                ((IVoxyWorld)this.world).shutdownEngine();
             }
         }
     }

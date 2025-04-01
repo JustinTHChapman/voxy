@@ -7,6 +7,7 @@ import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
 import net.minecraft.block.Block;
@@ -231,6 +232,9 @@ public class DHImporter implements IDataImporter {
                             Logger.warn("Could not find block state with data", encEntry.substring(b));
                         }
                     }
+                    if (block  == Blocks.AIR) {
+                        Logger.warn("Could not find block entry with id:", bId);
+                    }
                     blockId = this.engine.getMapper().getIdForBlockState(state);
                 }
             }
@@ -295,6 +299,7 @@ public class DHImporter implements IDataImporter {
                     }
                 }
             }
+
             if ((x+1)%16==0) {
                 for (int sz = 0; sz < 4; sz++) {
                     for (int sy = 0; sy < this.worldHeightSections; sy++) {
@@ -302,7 +307,7 @@ public class DHImporter implements IDataImporter {
                         WorldConversionFactory.mipSection(section, this.engine.getMapper());
 
                         section.setPosition(X*4+(x>>4), sy+(this.bottomOfWorld>>4), (Z*4)+sz);
-                        this.engine.insertUpdate(section);
+                        WorldUpdater.insertUpdate(this.engine, section);
                     }
 
                     int count = this.processedChunks.incrementAndGet();

@@ -46,13 +46,7 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
             }
             //Shutdown world
             if (world != null && ON_SAVE_RELOAD_ALL) {
-                //This is a hack inserted for the client world thing
-                //TODO: FIXME: MAKE BETTER
-                var engine = world.getWorldEngine();
-                if (engine != null) {
-                    VoxyCommon.getInstance().stopWorld(engine);
-                }
-                world.setWorldEngine(null);
+                world.shutdownEngine();
             }
             //Shutdown instance
             if (ON_SAVE_RELOAD_ALL) {

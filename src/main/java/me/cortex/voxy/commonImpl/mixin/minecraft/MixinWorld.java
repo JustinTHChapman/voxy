@@ -25,4 +25,12 @@ public class MixinWorld implements IVoxyWorld {
         }
         this.voxyWorld = engine;
     }
+
+    @Override
+    public void shutdownEngine() {
+        if (this.voxyWorld != null && this.voxyWorld.instanceIn != null) {
+            this.voxyWorld.instanceIn.stopWorld(this.voxyWorld);
+            this.setWorldEngine(null);
+        }
+    }
 }

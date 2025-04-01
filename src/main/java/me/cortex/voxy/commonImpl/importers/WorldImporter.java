@@ -9,6 +9,7 @@ import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceSlice;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.common.world.service.SectionSavingService;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -472,7 +473,6 @@ public class WorldImporter implements IDataImporter {
         );
 
         WorldConversionFactory.mipSection(csec, this.world.getMapper());
-
-        this.world.insertUpdate(csec);
+        WorldUpdater.insertUpdate(this.world, csec);
     }
 }
