@@ -8,6 +8,7 @@
     "minecraft.MixinDebugHud",
     "minecraft.MixinMinecraftClient",
     "minecraft.MixinThreadExecutor",
+    "minecraft.MixinWindow",
     "minecraft.MixinWorldRenderer",
     "sodium.MixinDefaultChunkRenderer",
     "sodium.MixinRenderSectionManager"

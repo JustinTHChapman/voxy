@@ -30,22 +30,22 @@ public class SaveLoadSystem {
         return x|(y<<10)|(z<<5);
     }
 
-
-    private static final ThreadLocal<short[]> SHORT_CACHE = ThreadLocal.withInitial(()->new short[32*32*32]);
-    private static final ThreadLocal<long[]> LONG_CACHE = ThreadLocal.withInitial(()->new long[32*32*32]);
-    private static final ThreadLocal<Long2ShortOpenHashMap> OTHER_THING_CACHE = ThreadLocal.withInitial(()-> {
-        var thing = new Long2ShortOpenHashMap(512);
-        thing.defaultReturnValue((short) -1);
-        return thing;
-    });
-
+    private record SerializationCache(long[] blockStateCache, short[] compressedCache, long[] lutCache, Long2ShortOpenHashMap lutMapCache) {
+        public SerializationCache() {
+            this(new long[WorldSection.SECTION_VOLUME], new short[WorldSection.SECTION_VOLUME], new long[WorldSection.SECTION_VOLUME], new Long2ShortOpenHashMap(512));
+            this.lutMapCache.defaultReturnValue((short) -1);
+        }
+    }
+    private static final ThreadLocal<SerializationCache> CACHE = ThreadLocal.withInitial(SerializationCache::new);
 
     //TODO: Cache like long2short and the short and other data to stop allocs
     public static MemoryBuffer serialize(WorldSection section) {
-        var data = section.copyData();
-        var compressed = SHORT_CACHE.get();
-        Long2ShortOpenHashMap LUT = OTHER_THING_CACHE.get();LUT.clear();
-        long[] lutValues = LONG_CACHE.get();//If there are more than this many states in a section... im concerned
+        var cache = CACHE.get();
+        var data = cache.blockStateCache;
+        section.copyDataTo(data);
+        var compressed = cache.compressedCache;
+        Long2ShortOpenHashMap LUT = cache.lutMapCache; LUT.clear();
+        long[] lutValues = cache.lutCache;//If there are more than this many states in a section... im concerned
         short lutIndex = 0;
         long pHash = 99;
         for (int i = 0; i < data.length; i++) {
@@ -103,7 +103,7 @@ public class SaveLoadSystem {
             throw new IllegalStateException("lutLen impossibly large, max size should be 32768 but got size " + lutLen);
         }
         //TODO: cache this in a thread local
-        long[] lut = LONG_CACHE.get();
+        long[] lut = CACHE.get().lutCache;
         long hash = 0;
         if (VERIFY_HASH_ON_LOAD) {
             hash = key ^ (lutLen * 1293481298141L);

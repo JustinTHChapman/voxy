@@ -5,6 +5,8 @@ import me.cortex.voxy.common.config.section.SectionStorage;
 import me.cortex.voxy.common.util.TrackedObject;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
+import me.cortex.voxy.commonImpl.VoxyInstance;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 public class WorldEngine {
@@ -24,8 +26,7 @@ public class WorldEngine {
     private final ActiveSectionTracker sectionTracker;
     private ISectionChangeCallback dirtyCallback;
     private ISectionSaveCallback saveCallback;
-    private final int maxMipLevels;
-    private volatile boolean isLive = true;
+    volatile boolean isLive = true;
 
     public void setDirtyCallback(ISectionChangeCallback callback) {
         this.dirtyCallback = callback;
@@ -37,12 +38,16 @@ public class WorldEngine {
 
     public Mapper getMapper() {return this.mapper;}
     public boolean isLive() {return this.isLive;}
+
+    public final @Nullable VoxyInstance instanceIn;
+
     public WorldEngine(SectionStorage storage, int cacheCount) {
-        this(storage, MAX_LOD_LAYER+1, cacheCount);//The +1 is because its from 1 not from 0
+        this(storage, cacheCount, null);
     }
 
-    private WorldEngine(SectionStorage storage, int maxMipLayers, int cacheCount) {
-        this.maxMipLevels = maxMipLayers;
+    public WorldEngine(SectionStorage storage, int cacheCount, @Nullable VoxyInstance instance) {
+        this.instanceIn = instance;
+
         this.storage = storage;
         this.mapper = new Mapper(this.storage);
         //5 cache size bits means that the section tracker has 32 separate maps that it uses
@@ -101,94 +106,14 @@ public class WorldEngine {
 
     public void markDirty(WorldSection section, int changeState) {
         if (!this.isLive) throw new IllegalStateException("World is not live");
+        if (section.tracker != this.sectionTracker) {
+            throw new IllegalStateException("Section is not from here");
+        }
         if (this.dirtyCallback != null) {
             this.dirtyCallback.accept(section, changeState);
         }
         if (this.saveCallback != null) {
             this.saveCallback.save(this, section);
-        }
-    }
-
-
-    //TODO: move this to auxilery class  so that it can take into account larger than 4 mip levels
-    //Executes an update to the world and automatically updates all the parent mip layers up to level 4 (e.g. where 1 chunk section is 1 block big)
-
-    //NOTE: THIS RUNS ON THE THREAD IT WAS EXECUTED ON, when this method exits, the calling method may assume that VoxelizedSection is no longer needed
-    public void insertUpdate(VoxelizedSection section) {//TODO: add a bitset of levels to update and if it should force update
-        if (!this.isLive) throw new IllegalStateException("World is not live");
-        boolean shouldCheckEmptiness = false;
-        WorldSection previousSection = null;
-
-        for (int lvl = 0; lvl < this.maxMipLevels; lvl++) {
-            var worldSection = this.acquire(lvl, section.x >> (lvl + 1), section.y >> (lvl + 1), section.z >> (lvl + 1));
-
-            int emptinessStateChange = 0;
-            //Propagate the child existence state of the previous iteration to this section
-            if (lvl != 0 && shouldCheckEmptiness) {
-                emptinessStateChange = worldSection.updateEmptyChildState(previousSection);
-                //We kept the previous section acquired, so we need to release it
-                previousSection.release();
-                previousSection = null;
-            }
-
-
-            int msk = (1<<(lvl+1))-1;
-            int bx = (section.x&msk)<<(4-lvl);
-            int by = (section.y&msk)<<(4-lvl);
-            int bz = (section.z&msk)<<(4-lvl);
-
-            int nonAirCountDelta = 0;
-            boolean didStateChange = false;
-
-
-            {//Do a bunch of funny math
-                int baseVIdx = VoxelizedSection.getBaseIndexForLevel(lvl);
-                int baseSec = bx | (bz << 5) | (by << 10);
-                int secMsk = 0xF >> lvl;
-                secMsk |= (secMsk << 5) | (secMsk << 10);
-                var secD = worldSection.data;
-                for (int i = 0; i <= 0xFFF >> (lvl * 3); i++) {
-                    int secIdx = Integer.expand(i, secMsk)+baseSec;
-                    long newId = section.section[baseVIdx+i];
-                    long oldId = secD[secIdx]; secD[secIdx] = newId;
-                    nonAirCountDelta += Mapper.isAir(oldId) == Mapper.isAir(newId) ? 0 : (Mapper.isAir(newId) ? -1 : 1);
-                    didStateChange |= newId != oldId;
-                }
-            }
-
-            if (nonAirCountDelta != 0) {
-                worldSection.addNonEmptyBlockCount(nonAirCountDelta);
-                if (lvl == 0) {
-                    emptinessStateChange = worldSection.updateLvl0State() ? 2 : 0;
-                }
-            }
-
-            if (didStateChange||(emptinessStateChange!=0)) {
-                this.markDirty(worldSection, (didStateChange?UPDATE_TYPE_BLOCK_BIT:0)|(emptinessStateChange!=0?UPDATE_TYPE_CHILD_EXISTENCE_BIT:0));
-            }
-
-            //Need to release the section after using it
-            if (didStateChange||(emptinessStateChange==2)) {
-                if (emptinessStateChange==2) {
-                    //Major state emptiness change, bubble up
-                    shouldCheckEmptiness = true;
-                    //Dont release the section, it will be released on the next loop
-                    previousSection = worldSection;
-                } else {
-                    //Propagate up without state change
-                    shouldCheckEmptiness = false;
-                    previousSection = null;
-                    worldSection.release();
-                }
-            } else {
-                //If nothing changed just need to release, dont need to update parent mips
-                worldSection.release();
-                break;
-            }
-        }
-
-        if (previousSection != null) {
-            previousSection.release();
         }
     }
 

@@ -1,4 +1,3 @@
-#line 1
 uint extractDetail(SectionMeta section) {
     return section.posA>>28;
 }

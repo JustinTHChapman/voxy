@@ -216,8 +216,9 @@ public class HierarchicalOcclusionTraverser {
             //TODO: Move the first queue to a persistent list so its not updated every frame
 
             ptr = UploadStream.INSTANCE.upload(this.scratchQueueA, 0, 4L*initialQueueSize);
-            for (int i = 0; i < initialQueueSize; i++) {
-                MemoryUtil.memPutInt(ptr + 4L*i, this.nodeManager.getTopLevelNodeIds().getInt(i));
+            int i = 0;
+            for (int node : this.nodeManager.getTopLevelNodeIds()) {
+                MemoryUtil.memPutInt(ptr + 4L*(i++), node);
             }
 
             UploadStream.INSTANCE.commit();

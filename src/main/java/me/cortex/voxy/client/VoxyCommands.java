@@ -63,12 +63,8 @@ public class VoxyCommands {
             ((IGetVoxyRenderSystem)wr).shutdownRenderer();
         }
         var w = ((IVoxyWorld)MinecraftClient.getInstance().world);
-        if (w != null) {
-            if (w.getWorldEngine() != null) {
-                instance.stopWorld(w.getWorldEngine());
-            }
-            w.setWorldEngine(null);
-        }
+        if (w != null) w.shutdownEngine();
+
         VoxyCommon.shutdownInstance();
         VoxyCommon.createInstance();
         if (wr!=null) {

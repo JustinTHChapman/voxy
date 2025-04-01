@@ -5,4 +5,5 @@ import me.cortex.voxy.common.world.WorldEngine;
 public interface IVoxyWorld {
     WorldEngine getWorldEngine();
     void setWorldEngine(WorldEngine engine);
+    void shutdownEngine();
 }

@@ -18,6 +18,10 @@ public class ThreadLocalMemoryBuffer {
         this.threadLocal = ThreadLocal.withInitial(()->createMemoryBuffer(size));
     }
 
+    public static MemoryBuffer create(long size) {
+        return createMemoryBuffer(size);
+    }
+
     public MemoryBuffer get() {
         return this.threadLocal.get();
     }

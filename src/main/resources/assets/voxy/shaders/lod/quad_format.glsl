@@ -1,4 +1,3 @@
-#line 1
 #ifdef GL_ARB_gpu_shader_int64
 #define Quad uint64_t
 

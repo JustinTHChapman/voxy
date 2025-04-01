@@ -1,4 +1,3 @@
-#line 1
 //TODO: FIXME: this isnt actually correct cause depending on the face (i think) it could be 1/64 th of a position off
 // but im going to assume that since we are dealing with huge render distances, this shouldent matter that much
 float extractFaceIndentation(uint faceData) {

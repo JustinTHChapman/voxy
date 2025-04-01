@@ -1,5 +1,7 @@
 package me.cortex.voxy.client.core.rendering;
 
+import io.netty.util.internal.MathUtil;
+import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
@@ -52,7 +54,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         //Max sections: ~500k
         //Max geometry: 1 gb
-        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, (1L<<32)-1024);
+        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/);
         Logger.info("Using renderer: " + this.sectionRenderer.getClass().getSimpleName());
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
@@ -84,18 +86,15 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
     }
 
-    private int q = -60;
+    public void addTopLevelNode(long pos) {
+        this.nodeManager.insertTopLevelNode(pos);
+    }
+
+    public void removeTopLevelNode(long pos) {
+        this.nodeManager.removeTopLevelNode(pos);
+    }
+
     public void setup(Camera camera) {
-        final int W = 32;
-        final int H = 2;
-        boolean SIDED = false;
-        for (int i = 0; i<64 && q<((W*2+1)*(W*2+1)*H)&&q++>=0;i++) {
-            this.nodeManager.insertTopLevelNode(WorldEngine.getWorldSectionId(4, (q%(W*2+1))-(SIDED?0:W), ((q/(W*2+1))/(W*2+1))-1, ((q/(W*2+1))%(W*2+1))-(SIDED?0:W)));
-        }
-        if (q==((W*2+1)*(W*2+1)*H)) {
-            q++;
-            Logger.info("Finished loading render distance");
-        }
         this.modelService.tick();
     }
 
@@ -174,6 +173,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.nodeCleaner.free();
         //Release all the unprocessed built geometry
         this.geometryUpdateQueue.clear(BuiltSection::free);
+        this.sectionUpdateQueue.clear(WorldSection::release);//Release anything thats in the queue
     }
 
     public Viewport<?> getViewport() {

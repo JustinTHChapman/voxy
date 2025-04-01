@@ -9,7 +9,7 @@ import java.util.function.LongConsumer;
 import static me.cortex.voxy.common.world.WorldEngine.UPDATE_TYPE_BLOCK_BIT;
 
 public class SectionUpdateRouter implements ISectionWatcher {
-    private static final int SLICES = 1<<3;
+    private static final int SLICES = 1<<8;
     public interface IChildUpdate {void accept(WorldSection section);}
 
     private final Long2ByteOpenHashMap[] slices = new Long2ByteOpenHashMap[SLICES];

@@ -101,7 +101,7 @@ public abstract class ScanMesher2D {
         //TODO: replace with much better method, TODO: check this is right!!
         this.putNext(0);
         if (1<count) {
-            this.emitRanged(((1 << (count - 1)) - 1) << (this.currentIndex & 31));
+            this.emitRanged(((1 << (Math.min(count, 32) - 1)) - 1) << (this.currentIndex & 31));
             this.currentIndex += count - 1;
         }
         /*

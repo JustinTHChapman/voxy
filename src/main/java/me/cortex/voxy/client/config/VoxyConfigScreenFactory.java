@@ -46,13 +46,7 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
             }
             //Shutdown world
             if (world != null && ON_SAVE_RELOAD_ALL) {
-                //This is a hack inserted for the client world thing
-                //TODO: FIXME: MAKE BETTER
-                var engine = world.getWorldEngine();
-                if (engine != null) {
-                    VoxyCommon.getInstance().stopWorld(engine);
-                }
-                world.setWorldEngine(null);
+                world.shutdownEngine();
             }
             //Shutdown instance
             if (ON_SAVE_RELOAD_ALL) {
@@ -110,6 +104,20 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setTooltip(Text.translatable("voxy.config.general.subDivisionSize.tooltip"))
                 .setSaveConsumer(val -> config.subDivisionSize = val)
                 .setDefaultValue((int) DEFAULT.subDivisionSize)
+                .build());
+
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.renderDistance"), config.sectionRenderDistance, 2, 64)
+                .setTooltip(Text.translatable("voxy.config.general.renderDistance.tooltip"))
+                .setSaveConsumer(val -> {
+                    if (config.sectionRenderDistance != val) {
+                        config.sectionRenderDistance = val;
+                        var wrenderer = ((IGetVoxyRenderSystem) (MinecraftClient.getInstance().worldRenderer));
+                        if (wrenderer != null && wrenderer.getVoxyRenderSystem() != null) {
+                            wrenderer.getVoxyRenderSystem().setRenderDistance(val);
+                        }
+                    }
+                })
+                .setDefaultValue(DEFAULT.sectionRenderDistance)
                 .build());
 
         //category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.lruCacheSize"), config.secondaryLruCacheSize, 16, 1<<13)

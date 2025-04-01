@@ -54,7 +54,7 @@ public final class WorldSection {
     volatile int nonEmptyBlockCount = 0;
     volatile byte nonEmptyChildren;
 
-    private final ActiveSectionTracker tracker;
+    final ActiveSectionTracker tracker;
     public final AtomicBoolean inSaveQueue = new AtomicBoolean();
 
     //When the first bit is set it means its loaded

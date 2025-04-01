@@ -8,12 +8,14 @@ import me.cortex.voxy.common.config.storage.StorageConfig;
 import me.cortex.voxy.common.util.ThreadLocalMemoryBuffer;
 import me.cortex.voxy.common.world.SaveLoadSystem;
 import me.cortex.voxy.common.world.SaveLoadSystem2;
+import me.cortex.voxy.common.world.SaveLoadSystem3;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongConsumer;
 
 public class SectionSerializationStorage extends SectionStorage {
     private final StorageBackend backend;
@@ -26,7 +28,7 @@ public class SectionSerializationStorage extends SectionStorage {
     public int loadSection(WorldSection into) {
         var data = this.backend.getSectionData(into.key, MEMORY_CACHE.get().createUntrackedUnfreeableReference());
         if (data != null) {
-            if (!SaveLoadSystem.deserialize(into, data)) {
+            if (!SaveLoadSystem3.deserialize(into, data)) {
                 this.backend.deleteSectionData(into.key);
                 //TODO: regenerate the section from children
                 Arrays.fill(into._unsafeGetRawDataArray(), Mapper.AIR);
@@ -46,7 +48,7 @@ public class SectionSerializationStorage extends SectionStorage {
 
     @Override
     public void saveSection(WorldSection section) {
-        var saveData = SaveLoadSystem.serialize(section);
+        var saveData = SaveLoadSystem3.serialize(section);
         this.backend.setSectionData(section.key, saveData);
         saveData.free();
     }
@@ -69,6 +71,11 @@ public class SectionSerializationStorage extends SectionStorage {
     @Override
     public void close() {
         this.backend.close();
+    }
+
+    @Override
+    public void iterateStoredSectionPositions(LongConsumer consumer) {
+        this.backend.iterateStoredSectionPositions(consumer);
     }
 
     public static class Config extends SectionStorageConfig {
