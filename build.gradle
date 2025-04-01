@@ -82,7 +82,7 @@ dependencies {
     //modRuntimeOnly "maven.modrinth:nvidium:0.2.6-beta"
     modCompileOnly "maven.modrinth:nvidium:0.2.8-beta"
 
-    modImplementation("maven.modrinth:cloth-config:17.0.144+fabric")
+    modImplementation("maven.modrinth:cloth-config:18.0.145+fabric")
 
     modImplementation("maven.modrinth:modmenu:14.0.0-rc.2")
 
@@ -94,7 +94,7 @@ dependencies {
 
 
     modCompileOnly("maven.modrinth:chunky:1.4.27-fabric")
-    modRuntimeOnly("maven.modrinth:chunky:1.4.27-fabric")
+    //modRuntimeOnly("maven.modrinth:chunky:1.4.27-fabric")
 
     modRuntimeOnly("maven.modrinth:spark:1.10.121-fabric")
     modRuntimeOnly("maven.modrinth:fabric-permissions-api:0.3.3")

@@ -154,6 +154,7 @@ public class PostProcessing {
         mat.get(data);
         glUniformMatrix4fv(4, false, data);//invMVP
 
+        glActiveTexture(GL_TEXTURE0);
         glBindImageTexture(0, this.colourSSAO.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
         glActiveTexture(GL_TEXTURE1);
         GL11C.glBindTexture(GL_TEXTURE_2D, this.depthStencil.id);

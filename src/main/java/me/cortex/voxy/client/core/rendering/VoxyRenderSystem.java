@@ -1,12 +1,16 @@
 package me.cortex.voxy.client.core.rendering;
 
+import com.mojang.blaze3d.opengl.GlConst;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.ColourDepthTextureData;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelTextureBakery;
+import me.cortex.voxy.client.core.model.bakery.ModelTextureBakery2;
 import me.cortex.voxy.client.core.rendering.building.RenderDataFactory45;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
@@ -20,10 +24,15 @@ import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.irisshaders.iris.targets.RenderTarget;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.GlBackend;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
+import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
@@ -34,8 +43,9 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.lwjgl.opengl.GL11C.glFinish;
+import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
+import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
 
 public class VoxyRenderSystem {
     private final RenderService renderer;
@@ -94,7 +104,7 @@ public class VoxyRenderSystem {
         ).mulLocal(makeProjectionMatrix(16, 16*3000));
     }
 
-    //private static final ModelTextureBakery mtb = new ModelTextureBakery(16, 16);
+    //private static final ModelTextureBakery2 mtb = new ModelTextureBakery2(16, 16);
     //private static final RawDownloadStream downstream = new RawDownloadStream(1<<20);
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
         /*
@@ -121,7 +131,7 @@ public class VoxyRenderSystem {
         mtb.renderFacesToStream(Blocks.GRASS_BLOCK.getDefaultState(), 123456, false, downstream.getBufferId(), allocation);
         downstream.submit();
         downstream.tick();
-         */
+        */
 
         //if (true) return;
 
@@ -164,7 +174,12 @@ public class VoxyRenderSystem {
                 .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
         viewport.frameId++;
 
-        int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
+
+
+        int oldFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
+
+        var target = DefaultTerrainRenderPasses.CUTOUT.getTarget();
+        int boundFB = ((net.minecraft.client.texture.GlTexture) target.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getFramebufferManager(), target.getDepthAttachment());
         if (boundFB == 0) {
             throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
         }
@@ -172,7 +187,7 @@ public class VoxyRenderSystem {
         //int boundDepthBuffer = glGetNamedFramebufferAttachmentParameteri(boundFB, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
 
         //TODO:FIXME!!! ??
-        this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);
+        this.postProcessing.setup(target.textureWidth, target.textureHeight, boundFB);
 
         this.renderer.renderFarAwayOpaque(viewport);
 
@@ -184,6 +199,7 @@ public class VoxyRenderSystem {
 
 
         this.postProcessing.renderPost(projection, RenderSystem.getProjectionMatrix(), boundFB);
+        glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
     }
 
     public void addDebugInfo(List<String> debug) {

@@ -123,7 +123,7 @@ public class BakedBlockEntityModel {
                     }
                 }
                 layer.putInto(bb);
-                BudgetBufferRenderer.draw(bb.end());
+                //BudgetBufferRenderer.draw(bb.end());
             }
         }
     }

@@ -26,3 +26,6 @@ accessible field net/minecraft/world/chunk/PalettedContainer$Data storage Lnet/m
 accessible field net/minecraft/world/chunk/PalettedContainer$Data palette Lnet/minecraft/world/chunk/Palette;
 
 accessible field net/minecraft/client/gl/GlGpuBuffer id I
+
+accessible field net/minecraft/client/gl/GlResourceManager currentProgram Lnet/minecraft/client/gl/ShaderProgram;
+accessible field net/minecraft/client/gl/GlResourceManager currentPipeline Lcom/mojang/blaze3d/pipeline/RenderPipeline;
