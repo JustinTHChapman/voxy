@@ -14,6 +14,7 @@ public class WorldUpdater {
         if (!into.isLive) throw new IllegalStateException("World is not live");
         boolean shouldCheckEmptiness = false;
         WorldSection previousSection = null;
+        final var vdat = section.section;
 
         for (int lvl = 0; lvl < MAX_LOD_LAYER+1; lvl++) {
             var worldSection = into.acquire(lvl, section.x >> (lvl + 1), section.y >> (lvl + 1), section.z >> (lvl + 1));
@@ -45,9 +46,9 @@ public class WorldUpdater {
                 var secD = worldSection.data;
                 for (int i = 0; i <= 0xFFF >> (lvl * 3); i++) {
                     int secIdx = Integer.expand(i, secMsk)+baseSec;
-                    long newId = section.section[baseVIdx+i];
+                    long newId = vdat[baseVIdx+i];
                     long oldId = secD[secIdx]; secD[secIdx] = newId;
-                    nonAirCountDelta += Mapper.isAir(oldId) == Mapper.isAir(newId) ? 0 : (Mapper.isAir(newId) ? -1 : 1);
+                    nonAirCountDelta += (Mapper.isAir(newId)?1:0)-(Mapper.isAir(oldId)?1:0);
                     didStateChange |= newId != oldId;
                 }
             }
@@ -86,5 +87,17 @@ public class WorldUpdater {
         if (previousSection != null) {
             previousSection.release();
         }
+    }
+
+    public static void main(String[] args) {
+        int MSK = 0b110110010100;
+        int iMSK = ~MSK;
+        int iMSK1 = iMSK+1;
+        int i = 0;
+        do  {
+            System.err.println(Integer.toBinaryString(i));
+            if (i==MSK) break;
+            i = (i+iMSK1)&MSK;
+        } while (true);
     }
 }

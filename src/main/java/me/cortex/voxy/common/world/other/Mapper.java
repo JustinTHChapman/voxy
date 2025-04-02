@@ -74,6 +74,10 @@ public class Mapper {
         return (id&(~(0xFFL<<56)))|(Integer.toUnsignedLong(light&0xFF)<<56);
     }
 
+    public static long airWithLight(int light) {
+        return Integer.toUnsignedLong(light&0xFF)<<56;
+    }
+
     public void setStateCallback(Consumer<StateEntry> stateCallback) {
         this.newStateCallback = stateCallback;
     }

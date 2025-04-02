@@ -154,28 +154,24 @@ public class WorldConversionFactory {
             long sample = 0;
             int c = 0;
             int dec = 0;
-            for (int y = 0; y < 16; y++) {
-                for (int z = 0; z < 16; z++) {
-                    for (int x = 0; x < 16; x++) {
-                        if (dec-- == 0) {
-                            sample = bDat[c++];
-                            dec = iterPerLong;
-                        }
-                        int bId;
-                        if (bps == null) {
-                            bId = pc[(int) (sample & MSK)];
-                        } else {
-                            bId = stateMapper.getIdForBlockState(bps.get((int) (sample&MSK)));
-                        }
-                        sample >>>= eBits;
+            for (int i = 0; i < 0xFFF; i++) {
+                if (dec-- == 0) {
+                    sample = bDat[c++];
+                    dec = iterPerLong;
+                }
+                int bId;
+                if (bps == null) {
+                    bId = pc[(int) (sample & MSK)];
+                } else {
+                    bId = stateMapper.getIdForBlockState(bps.get((int) (sample&MSK)));
+                }
+                sample >>>= eBits;
 
-                        byte light = lightSupplier.supply(x, y, z);
-                        if (!(bId == 0 && (light == 0))) {
-                            data[G(x, y, z)] = Mapper.composeMappingId(light, bId, biomes[((y & 0b1100) << 2) | (z & 0b1100) | (x >> 2)]);
-                        } else {
-                            data[G(x, y, z)] = Mapper.AIR;
-                        }
-                    }
+                byte light = lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF);
+                if (!(bId == 0 && (light == 0))) {
+                    data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
+                } else {
+                    data[i] = Mapper.AIR;
                 }
             }
         } else {
@@ -183,21 +179,31 @@ public class WorldConversionFactory {
                 throw new IllegalStateException();
             }
             int bId = pc[0];
-            for (int y = 0; y < 16; y++) {
-                for (int z = 0; z < 16; z++) {
-                    for (int x = 0; x < 16; x++) {
-                        byte light = lightSupplier.supply(x, y, z);
-                        if (!(bId == 0 && (light == 0))) {
-                            data[G(x, y, z)] = Mapper.composeMappingId(light, bId, biomes[((y & 0b1100) << 2) | (z & 0b1100) | (x >> 2)]);
-                        } else {
-                            data[G(x, y, z)] = Mapper.AIR;
-                        }
+            if (bId == 0) {//Its air
+                for (int i = 0; i < 0xFFF; i++) {
+                    data[i] = Mapper.airWithLight(lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF));
+                }
+            } else {
+                for (int i = 0; i < 0xFFF; i++) {
+                    byte light = lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF);
+                    if (light != 0) {
+                        data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
+                    } else {
+                        data[i] = Mapper.AIR;
                     }
                 }
             }
         }
         return section;
     }
+
+
+
+
+
+
+
+
 
     private static int G(int x, int y, int z) {
         return ((y<<8)|(z<<4)|x);

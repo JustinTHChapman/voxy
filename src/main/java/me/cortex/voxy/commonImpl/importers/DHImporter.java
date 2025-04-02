@@ -291,10 +291,12 @@ public class DHImporter implements IDataImporter {
                     //    int a = 0;
                     //}
                     //Insert all entries into data cache
-                    for (int y = startY; y < endY; y++) {
-                        int idx = Integer.expand(y, 0b11111111_00_1111_0000_0000) | bPos;
-                        storage[idx] = mEntry;
-
+                    startY = Integer.expand(startY, 0b11111111_00_1111_0000_0000);
+                    endY = Integer.expand(endY, 0b11111111_00_1111_0000_0000);
+                    final int Msk = 0b11111111_00_1111_0000_0000;
+                    final int iMsk1 = (~Msk)+1;
+                    for (int y = startY; y != endY; y = (y+iMsk1)&Msk) {
+                        storage[y+bPos] = mEntry;
                         //touched[(idx >>> 12)>>6] |= 1L<<(idx&0x3f);
                     }
                 }
