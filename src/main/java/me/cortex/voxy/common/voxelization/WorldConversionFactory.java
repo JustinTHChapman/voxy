@@ -154,7 +154,7 @@ public class WorldConversionFactory {
             long sample = 0;
             int c = 0;
             int dec = 0;
-            for (int i = 0; i < 0xFFF; i++) {
+            for (int i = 0; i <= 0xFFF; i++) {
                 if (dec-- == 0) {
                     sample = bDat[c++];
                     dec = iterPerLong;
@@ -180,17 +180,13 @@ public class WorldConversionFactory {
             }
             int bId = pc[0];
             if (bId == 0) {//Its air
-                for (int i = 0; i < 0xFFF; i++) {
+                for (int i = 0; i <= 0xFFF; i++) {
                     data[i] = Mapper.airWithLight(lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF));
                 }
             } else {
-                for (int i = 0; i < 0xFFF; i++) {
+                for (int i = 0; i <= 0xFFF; i++) {
                     byte light = lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF);
-                    if (light != 0) {
-                        data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
-                    } else {
-                        data[i] = Mapper.AIR;
-                    }
+                    data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
                 }
             }
         }

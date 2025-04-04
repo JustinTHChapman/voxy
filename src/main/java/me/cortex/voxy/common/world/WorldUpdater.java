@@ -39,16 +39,23 @@ public class WorldUpdater {
 
 
             {//Do a bunch of funny math
+                var secD = worldSection.data;
+
                 int baseVIdx = VoxelizedSection.getBaseIndexForLevel(lvl);
                 int baseSec = bx | (bz << 5) | (by << 10);
+
                 int secMsk = 0xF >> lvl;
                 secMsk |= (secMsk << 5) | (secMsk << 10);
-                var secD = worldSection.data;
-                for (int i = 0; i <= 0xFFF >> (lvl * 3); i++) {
-                    int secIdx = Integer.expand(i, secMsk)+baseSec;
-                    long newId = vdat[baseVIdx+i];
-                    long oldId = secD[secIdx]; secD[secIdx] = newId;
-                    nonAirCountDelta += (Mapper.isAir(newId)?1:0)-(Mapper.isAir(oldId)?1:0);
+                int iSecMsk1 =(~secMsk)+1;
+
+                int secIdx = 0;
+                for (int i = baseVIdx; i <= (0xFFF >> (lvl * 3)) + baseVIdx; i++) {
+                    int cSecIdx = secIdx+baseSec;
+                    secIdx = (secIdx + iSecMsk1)&secMsk;
+
+                    long newId = vdat[i];
+                    long oldId = secD[cSecIdx]; secD[cSecIdx] = newId;
+                    nonAirCountDelta += (Mapper.isAir(newId)?0:1)-(Mapper.isAir(oldId)?0:1);//its 0:1 cause its nonAir
                     didStateChange |= newId != oldId;
                 }
             }
