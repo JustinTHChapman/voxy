@@ -43,9 +43,9 @@ public class RenderDataFactory45 {
     //TODO: emit directly to memory buffer instead of long arrays
 
     //Each axis gets a max quad count of 2^16 (65536 quads) since that is the max the basic geometry manager can handle
-    private final MemoryBuffer directionalQuadBuffer = new MemoryBuffer(6*(8*(1<<16)));
-    private final long directionalQuadBufferPtr = this.directionalQuadBuffer.address;
-    private final int[] directionalQuadCounters = new int[6];//Maybe change to short? (or long /w raw pointers)
+    private final MemoryBuffer quadBuffer = new MemoryBuffer(8*(8*(1<<16)));//6 faces + dual direction + translucents
+    private final long quadBufferPtr = this.quadBuffer.address;
+    private final int[] quadCounters = new int[8];
 
 
     private int minX;
@@ -67,8 +67,6 @@ public class RenderDataFactory45 {
         //Note x, z are in top right
         @Override
         protected void emitQuad(int x, int z, int length, int width, long data) {
-            RenderDataFactory45.this.quadCount++;
-
             if (VERIFY_MESHING) {
                 if (length<1||length>16) {
                     throw new IllegalStateException("length out of bounds: " + length);
@@ -85,8 +83,10 @@ public class RenderDataFactory45 {
                 if (x-(length-1)<0 || z-(width-1)<0) {
                     throw new IllegalStateException("dim out of bounds: " + (x-(length-1))+", " + (z-(width-1)));
                 }
-
             }
+
+            RenderDataFactory45.this.quadCount++;
+
             x -= length-1;
             z -= width-1;
 
@@ -103,35 +103,44 @@ public class RenderDataFactory45 {
 
             //Lower 26 bits can be auxiliary data since that is where quad position information goes;
             int auxData = (int) (data&((1<<26)-1));
-            int faceSide = auxData&1;
-            data &= ~(data&((1<<26)-1));
+            data &= ~((1<<26)-1);
 
-            final int axis = this.axis;
-            int face = (axis<<1)|faceSide;
-            int encodedPosition = face;
-
-            //Shift up if is negative axis
-            int auxPos = this.auxiliaryPosition;
-            auxPos += this.doAuxiliaryFaceOffset?(1-faceSide):0;//Shift
+            int axisSide = auxData&1;
+            int type = (auxData>>1)&3;//Translucent, double side, directional
 
             if (VERIFY_MESHING) {
-                if (auxPos > 31) {
-                    throw new IllegalStateException("OOB face: " + auxPos + ", " + faceSide);
+                if (type == 3) {
+                    throw new IllegalStateException();
                 }
             }
 
-            encodedPosition |= ((width - 1) << 7) | ((length - 1) << 3);
+            //Shift up if is negative axis
+            int auxPos = this.auxiliaryPosition;
+            auxPos += 1-(this.doAuxiliaryFaceOffset?axisSide:1);//Shift
 
+            if (VERIFY_MESHING) {
+                if (auxPos > 31) {
+                    throw new IllegalStateException("OOB face: " + auxPos + ", " + axisSide);
+                }
+            }
+
+            final int axis = this.axis;
+            int face = (axis<<1)|axisSide;
+
+            int encodedPosition = face;
+            encodedPosition |= ((width - 1) << 7) | ((length - 1) << 3);
             encodedPosition |= x << (axis==2?16:21);
             encodedPosition |= z << (axis==1?16:11);
-            encodedPosition |= auxPos << (axis==0?16:(axis==1?11:21));
+            int shiftAmount = axis==0?16:(axis==1?11:21);
+            //shiftAmount += ;
+            encodedPosition |= auxPos << (shiftAmount);
 
             long quad = data | Integer.toUnsignedLong(encodedPosition);
 
 
-
-            MemoryUtil.memPutLong(RenderDataFactory45.this.directionalQuadBufferPtr + (RenderDataFactory45.this.directionalQuadCounters[face]++)*8L + face*8L*(1<<16), quad);
-
+            int bufferIdx = type+(type==2?face:0);//Translucent, double side, directional
+            long bufferOffset = (RenderDataFactory45.this.quadCounters[bufferIdx]++)*8L + bufferIdx*8L*(1<<16);
+            MemoryUtil.memPutLong(RenderDataFactory45.this.quadBufferPtr + bufferOffset, quad);
 
 
             //Update AABB bounds
@@ -175,7 +184,23 @@ public class RenderDataFactory45 {
         this.modelMan = modelManager;
     }
 
-
+    private static long packPartialQuadData(int modelId, long state, long metaData) {
+        //This uses hardcoded data to shuffle things
+        long lightAndBiome =  (state&((0x1FFL<<47)|(0xFFL<<56)))>>1;
+        lightAndBiome &= ModelQueries.isBiomeColoured(metaData)?-1:~(0x1FFL<<47);
+        lightAndBiome &= ModelQueries.isFullyOpaque(metaData)?~(0xFFL<<56):-1;//If its fully opaque it always uses neighbor light?
+        int type = 0;
+        {
+            boolean a = ModelQueries.isTranslucent(metaData);
+            boolean b = ModelQueries.isDoubleSided(metaData);
+            type = a|b?0:2;
+            type |= b?1:0;
+        }
+        long quadData = lightAndBiome;
+        quadData |= Integer.toUnsignedLong(modelId)<<26;
+        quadData |= type << 1;
+        return quadData;
+    }
 
     private int prepareSectionData() {
         final var sectionData = this.sectionData;
@@ -189,7 +214,7 @@ public class RenderDataFactory45 {
             int modelId = this.modelMan.getModelId(Mapper.getBlockId(block));
             long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
 
-            sectionData[i * 2] = modelId | ((long) (Mapper.getLightId(block)) << 16) | (ModelQueries.isBiomeColoured(modelMetadata)?(((long) (Mapper.getBiomeId(block))) << 24):0);
+            sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
             sectionData[i * 2 + 1] = modelMetadata;
 
             boolean isFullyOpaque = ModelQueries.isFullyOpaque(modelMetadata);
@@ -306,7 +331,6 @@ public class RenderDataFactory45 {
                 this.blockMesher.skip(cSkip);
                 cSkip = 0;
 
-                //TODO: For boarder sections, should NOT EMIT neighbors faces
                 int faceForwardMsk = msk & current;
                 int cIdx = -1;
                 while (msk != 0) {
@@ -331,9 +355,8 @@ public class RenderDataFactory45 {
 
                         //Example thing thats just wrong but as example
                         this.blockMesher.putNext(((long) facingForward) |//Facing
-                                ((selfModel & 0xFFFF) << 26) | //ModelId
-                                (((nextModel>>16)&0xFF) << 55) |//Lighting
-                                ((selfModel&(0x1FFL<<24))<<(46-24))//biomeId
+                                selfModel |
+                                (nextModel&(0xFFL<<56))//Apply lighting
                         );
                     }
                 }
@@ -391,9 +414,8 @@ public class RenderDataFactory45 {
 
                         //Example thing thats just wrong but as example
                         this.blockMesher.putNext((side == 0 ? 0L : 1L) |
-                                ((A & 0xFFFFL) << 26) |
-                                (((long)Mapper.getLightId(neighborId)) << 55) |
-                                ((A&(0x1FFL<<24))<<(46-24))
+                                A |
+                                ((neighborId&(0xFFL<<56))>>1)
                         );
                     }
                 }
@@ -442,25 +464,24 @@ public class RenderDataFactory45 {
                     {
                         int idx = index + (pidx * 32);
 
-                        //TODO: swap this out for something not getting the next entry
-                        long A = this.sectionData[idx * 2];
                         long B = this.sectionData[idx * 2+1];
+
                         if (ModelQueries.isTranslucent(B)) {
                             this.blockMesher.putNext(0);
                             this.seondaryblockMesher.putNext(0);
                             continue;
                         }
 
+                        long A = this.sectionData[idx * 2];
+
                         //Example thing thats just wrong but as example
                         this.blockMesher.putNext((long) (false ? 0L : 1L) |
-                                ((A & 0xFFFFL) << 26) |
-                                (((0xFFL) & 0xFF) << 55) |
-                                ((A&(0x1FFL<<24))<<(46-24))
+                                A |
+                                (((0xFFL) & 0xFF) << 55)
                         );
                         this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
-                                ((A & 0xFFFFL) << 26) |
-                                (((0xFFL) & 0xFF) << 55) |
-                                ((A&(0x1FFL<<24))<<(46-24))
+                                A |
+                                (((0xFFL) & 0xFF) << 55)
                         );
                     }
                 }
@@ -584,9 +605,8 @@ public class RenderDataFactory45 {
 
                         //Example thing thats just wrong but as example
                         mesher.putNext(((long) facingForward) |//Facing
-                                ((selfModel & 0xFFFF) << 26) | //ModelId
-                                (((nextModel>>16)&0xFF) << 55) |//Lighting
-                                ((selfModel&(0x1FFL<<24))<<(46-24))//biomeId
+                                selfModel |
+                                (nextModel&(0xFFL<<55))
                         );
                     }
                 }
@@ -644,7 +664,10 @@ public class RenderDataFactory45 {
                     if (oki) {
                         ma.skip(skipA); skipA = 0;
                         long A = this.sectionData[(i<<5) * 2];
-                        ma.putNext(0L | ((A&0xFFFF)<<26) | (((long)Mapper.getLightId(neighborId))<<55)|((A&(0x1FFL<<24))<<(46-24)));
+                        ma.putNext(0L |
+                                A |
+                                ((neighborId&(0xFFL<<56))>>1)
+                        );
                     } else {skipA++;}
                 } else {skipA++;}
 
@@ -660,7 +683,10 @@ public class RenderDataFactory45 {
                     if (oki) {
                         mb.skip(skipB); skipB = 0;
                         long A = this.sectionData[(i*32+31) * 2];
-                        mb.putNext(1L | ((A&0xFFFF)<<26) | (((long)Mapper.getLightId(neighborId))<<55)|((A&(0x1FFL<<24))<<(46-24)));
+                        mb.putNext(1L |
+                                A |
+                                ((neighborId&(0xFFL<<56))>>1)
+                        );
                     } else {skipB++;}
                 } else {skipB++;}
             }
@@ -687,16 +713,6 @@ public class RenderDataFactory45 {
             mesher.finish();
         }
     }
-
-    /*
-    private static long createQuad() {
-        ((long)clientModelId) | (((long) Mapper.getLightId(ModelQueries.faceUsesSelfLighting(metadata, face)?self:facingState))<<16) | ((((long) Mapper.getBiomeId(self))<<24) * (ModelQueries.isBiomeColoured(metadata)?1:0)) | otherFlags
-
-
-            long data = Integer.toUnsignedLong(array[i*3+1]);
-            data |= ((long) array[i*3+2])<<32;
-            long encodedQuad = Integer.toUnsignedLong(QuadEncoder.encodePosition(face, otherAxis, quad)) | ((data&0xFFFF)<<26) | (((data>>16)&0xFF)<<55) | (((data>>24)&0x1FF)<<46);
-    }*/
 
     //section is already acquired and gets released by the parent
     public BuiltSection generateMesh(WorldSection section) {
@@ -729,7 +745,7 @@ public class RenderDataFactory45 {
         this.maxY = Integer.MIN_VALUE;
         this.maxZ = Integer.MIN_VALUE;
 
-        Arrays.fill(this.directionalQuadCounters, (short) 0);
+        Arrays.fill(this.quadCounters, (short) 0);
 
         //Prepare everything
         int neighborMsk = this.prepareSectionData();
@@ -742,27 +758,23 @@ public class RenderDataFactory45 {
         //TODO:NOTE! when doing face culling of translucent blocks,
         // if the connecting type of the translucent block is the same AND the face is full, discard it
         // this stops e.g. multiple layers of glass (and ocean) from having 3000 layers of quads etc
-
         if (this.quadCount == 0) {
             return BuiltSection.emptyWithChildren(section.key, section.getNonEmptyChildren());
         }
 
-        //TODO: FIXME AND OPTIMIZE, get rid of the stupid quad collector bullshit
+        if (this.minX<0 || this.minY<0 || this.minZ<0 || 32<this.maxX || 32<this.maxY || 32<this.maxZ) {
+            throw new IllegalStateException();
+        }
 
         int[] offsets = new int[8];
         var buff = new MemoryBuffer(this.quadCount * 8L);
         long ptr = buff.address;
         int coff = 0;
-
-        for (int face = 0; face < 6; face++) {
-            offsets[face + 2] = coff;
-            int size = this.directionalQuadCounters[face];
-            UnsafeUtil.memcpy(this.directionalQuadBufferPtr + (face*(8*(1<<16))), ptr + coff*8L, (size* 8L));
+        for (int buffer = 0; buffer < 8; buffer++) {// translucent, double sided quads, 6 faces
+            offsets[buffer] = coff;
+            int size = this.quadCounters[buffer];
+            UnsafeUtil.memcpy(this.quadBufferPtr + (buffer*(8*(1<<16))), ptr + coff*8L, (size* 8L));
             coff += size;
-        }
-
-        if (this.minX<0 || this.minY<0 || this.minZ<0 || 32<this.maxX || 32<this.maxY || 32<this.maxZ) {
-            throw new IllegalStateException();
         }
 
         int aabb = 0;
@@ -774,64 +786,11 @@ public class RenderDataFactory45 {
         aabb |= (this.maxZ-this.minZ-1)<<25;
 
         return new BuiltSection(section.key, section.getNonEmptyChildren(), aabb, buff, offsets);
-
-        /*
-            buff = new MemoryBuffer(bufferSize * 8L);
-            long ptr = buff.address;
-            int coff = 0;
-
-            //Ordering is: translucent, double sided quads, directional quads
-            offsets[0] = coff;
-            int size = this.translucentQuadCollector.size();
-            LongArrayList arrayList = this.translucentQuadCollector;
-            for (int i = 0; i < size; i++) {
-                long data = arrayList.getLong(i);
-                MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
-            }
-
-            offsets[1] = coff;
-            size = this.doubleSidedQuadCollector.size();
-            arrayList = this.doubleSidedQuadCollector;
-            for (int i = 0; i < size; i++) {
-                long data = arrayList.getLong(i);
-                MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
-            }
-
-            for (int face = 0; face < 6; face++) {
-                offsets[face + 2] = coff;
-                final LongArrayList faceArray = this.directionalQuadCollectors[face];
-                size = faceArray.size();
-                for (int i = 0; i < size; i++) {
-                    long data = faceArray.getLong(i);
-                    MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
-                }
-            }
-
-        int aabb = 0;
-        aabb |= this.minX;
-        aabb |= this.minY<<5;
-        aabb |= this.minZ<<10;
-        aabb |= (this.maxX-this.minX)<<15;
-        aabb |= (this.maxY-this.minY)<<20;
-        aabb |= (this.maxZ-this.minZ)<<25;
-
-        return new BuiltSection(section.key, section.getNonEmptyChildren(), aabb, buff, offsets);
-         */
     }
 
     public void free() {
-        this.directionalQuadBuffer.free();
+        this.quadBuffer.free();
     }
-
-
-
-
-
-
-
-
-
-
 
 
 

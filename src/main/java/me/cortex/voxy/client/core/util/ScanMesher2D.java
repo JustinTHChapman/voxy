@@ -95,19 +95,24 @@ public abstract class ScanMesher2D {
         }
     }
 
-    //Note it is illegal for count to cause `this.currentIndex&31` to wrap and continue
     public final void skip(int count) {
+        /*
         if (count == 0) return;
-        //TODO: replace with much better method, TODO: check this is right!!
+        if (this.currentData != 0) {
+            this.putNext(0); count--;
+        }
+        if (count != 0) {
+            this.emitRanged(((1 << Math.min(count, 31)) - 1) << (this.currentIndex & 31));
+        }
+        this.currentIndex += count;
+         */
+        if (count == 0) return;
         this.putNext(0);
         if (1<count) {
-            this.emitRanged(((1 << (Math.min(count, 32) - 1)) - 1) << (this.currentIndex & 31));
+            this.emitRanged(((1 << (Math.min(count, 32)-1)) - 1) << (this.currentIndex & 31));
             this.currentIndex += count - 1;
         }
-        /*
-        for (int i = 0; i < count; i++) {
-            this.putNext(0);
-        }*/
+
     }
 
     public final void reset() {

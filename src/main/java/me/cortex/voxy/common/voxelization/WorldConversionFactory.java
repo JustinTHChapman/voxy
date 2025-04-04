@@ -222,16 +222,18 @@ public class WorldConversionFactory {
 
         //Mip L1
         int i = 0;
-        for (int y = 0; y < 16; y+=2) {
-            for (int z = 0; z < 16; z += 2) {
-                for (int x = 0; x < 16; x += 2) {
-                    data[16*16*16 + i++] =
-                            Mipper.mip(
-                                    data[G(x, y, z)],       data[G(x+1, y, z)],       data[G(x, y, z+1)],      data[G(x+1, y, z+1)],
-                                    data[G(x, y+1, z)],   data[G(x+1, y+1, z)],  data[G(x, y+1, z+1)], data[G(x+1, y+1, z+1)],
-                                    mapper);
-                }
-            }
+        int MSK = 0b1110_1110_1110;
+        int iMSK1 = (~MSK)+1;
+        int q = 0;
+        while (true) {
+            data[16*16*16 + i++] = Mipper.mip(
+                    data[q|G(0,0,0)], data[q|G(1,0,0)], data[q|G(0,0,1)], data[q|G(1,0,1)],
+                    data[q|G(0,1,0)], data[q|G(1,1,0)], data[q|G(0,1,1)], data[q|G(1,1,1)],
+                    mapper
+            );
+            if (q == MSK)
+                break;
+            q = (q+iMSK1)&MSK;
         }
 
         //Mip L2
