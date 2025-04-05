@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering;
 
 import io.netty.util.internal.MathUtil;
+import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
@@ -23,6 +24,7 @@ import net.minecraft.client.render.Camera;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.lwjgl.opengl.GL42.*;
 
@@ -157,6 +159,20 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.renderGen.addDebugData(debug);
         this.sectionRenderer.addDebug(debug);
         this.nodeManager.addDebug(debug);
+
+        if (RenderStatistics.enabled) {
+            debug.add("HTC: [" + Arrays.stream(flipCopy(RenderStatistics.hierarchicalTraversalCounts)).mapToObj(Integer::toString).collect(Collectors.joining(", "))+"]");
+            debug.add("HRS: [" + Arrays.stream(flipCopy(RenderStatistics.hierarchicalRenderSections)).mapToObj(Integer::toString).collect(Collectors.joining(", "))+"]");
+        }
+    }
+
+    private static int[] flipCopy(int[] array) {
+        int[] ret = new int[array.length];
+        int i = ret.length;
+        for (int j : array) {
+            ret[--i] = j;
+        }
+        return ret;
     }
 
     public void shutdown() {

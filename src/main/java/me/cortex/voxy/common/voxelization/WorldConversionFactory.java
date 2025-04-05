@@ -168,11 +168,8 @@ public class WorldConversionFactory {
                 sample >>>= eBits;
 
                 byte light = lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF);
-                if (!(bId == 0 && (light == 0))) {
-                    data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
-                } else {
-                    data[i] = Mapper.AIR;
-                }
+
+                data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
             }
         } else {
             if (!(blockContainer.data.storage instanceof EmptyPaletteStorage)) {

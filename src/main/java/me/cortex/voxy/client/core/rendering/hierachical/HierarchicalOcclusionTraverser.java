@@ -1,7 +1,9 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
+import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.PrintfDebugUtil;
@@ -38,15 +40,15 @@ public class HierarchicalOcclusionTraverser {
     private final GlBuffer nodeBuffer;
     private final GlBuffer uniformBuffer = new GlBuffer(1024).zero();
     private final GlBuffer renderList = new GlBuffer(100_000 * 4 + 4).zero();//100k sections max to render, TODO: Maybe move to render service or somewhere else
-
+    private final GlBuffer statisticsBuffer = new GlBuffer(1024).zero();
 
 
     private final GlBuffer queueMetaBuffer = new GlBuffer(4*4*5).zero();
     private final GlBuffer scratchQueueA = new GlBuffer(100_000*4).zero();
     private final GlBuffer scratchQueueB = new GlBuffer(100_000*4).zero();
 
-    private static final int LOCAL_WORK_SIZE_BITS = 5;
     private static final int MAX_ITERATIONS = 5;
+    private static final int LOCAL_WORK_SIZE_BITS = 5;
 
     private static int BINDING_COUNTER = 1;
     private static final int SCENE_UNIFORM_BINDING = BINDING_COUNTER++;
@@ -58,11 +60,12 @@ public class HierarchicalOcclusionTraverser {
     private static final int NODE_QUEUE_SOURCE_BINDING = BINDING_COUNTER++;
     private static final int NODE_QUEUE_SINK_BINDING = BINDING_COUNTER++;
     private static final int RENDER_TRACKER_BINDING = BINDING_COUNTER++;
+    private static final int STATISTICS_BUFFER_BINDING = BINDING_COUNTER++;
 
     private final HiZBuffer hiZBuffer = new HiZBuffer();
     private final int hizSampler = glGenSamplers();
 
-    private final Shader traversal = Shader.make(PRINTF_processor)
+    private final AutoBindingShader traversal = Shader.makeAuto(PRINTF_processor)
             .defineIf("DEBUG", HIERARCHICAL_SHADER_DEBUG)
             .define("MAX_ITERATIONS", MAX_ITERATIONS)
             .define("LOCAL_SIZE_BITS", LOCAL_WORK_SIZE_BITS)
@@ -82,6 +85,9 @@ public class HierarchicalOcclusionTraverser {
 
             .define("RENDER_TRACKER_BINDING", RENDER_TRACKER_BINDING)
 
+            .defineIf("HAS_STATISTICS", RenderStatistics.enabled)
+            .defineIf("STATISTICS_BUFFER_BINDING", RenderStatistics.enabled, STATISTICS_BUFFER_BINDING)
+
             .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/traversal_dev.comp")
             .compile();
 
@@ -99,6 +105,15 @@ public class HierarchicalOcclusionTraverser {
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
+
+        this.traversal
+                .ubo("SCENE_UNIFORM_BINDING", this.uniformBuffer)
+                .ssbo("REQUEST_QUEUE_BINDING", this.requestBuffer)
+                .ssbo("RENDER_QUEUE_BINDING", this.renderList)
+                .ssbo("NODE_DATA_BINDING", this.nodeBuffer)
+                .ssbo("NODE_QUEUE_META_BINDING", this.queueMetaBuffer)
+                .ssbo("RENDER_TRACKER_BINDING", this.nodeCleaner.visibilityBuffer)
+                .ssboIf("STATISTICS_BUFFER_BINDING", this.statisticsBuffer);
     }
 
     private void uploadUniform(Viewport<?> viewport) {
@@ -127,28 +142,11 @@ public class HierarchicalOcclusionTraverser {
         //Screen space size for descending
         MemoryUtil.memPutFloat(ptr, (float) (screenspaceAreaDecreasingSize) /(viewport.width*viewport.height)); ptr += 4;
 
-
         //VisibilityId
         MemoryUtil.memPutInt(ptr, this.nodeCleaner.visibilityId); ptr += 4;
-
-        /*
-        //Very funny and cool thing that is possible
-        if (MinecraftClient.getInstance().getCurrentFps() < 30) {
-            VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + 5, 256);
-        }
-
-        if (60 < MinecraftClient.getInstance().getCurrentFps()) {
-            VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - 1, 32);
-        }*/
     }
 
     private void bindings() {
-        glBindBufferBase(GL_UNIFORM_BUFFER, SCENE_UNIFORM_BINDING, this.uniformBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, REQUEST_QUEUE_BINDING, this.requestBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_QUEUE_BINDING, this.renderList.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, NODE_DATA_BINDING, this.nodeBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, NODE_QUEUE_META_BINDING, this.queueMetaBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_TRACKER_BINDING, this.nodeCleaner.visibilityBuffer.id);
         glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.queueMetaBuffer.id);
 
         //Bind the hiz buffer
@@ -167,12 +165,25 @@ public class HierarchicalOcclusionTraverser {
         this.bindings();
         PrintfDebugUtil.bind();
 
+        if (RenderStatistics.enabled) {
+            this.statisticsBuffer.zero();
+        }
 
         this.traverseInternal(this.nodeManager.getTopLevelNodeIds().size());
 
-
         this.downloadResetRequestQueue();
 
+        if (RenderStatistics.enabled) {
+            DownloadStream.INSTANCE.download(this.statisticsBuffer, down->{
+                for (int i = 0; i < 5; i++) {
+                    RenderStatistics.hierarchicalTraversalCounts[i] = MemoryUtil.memGetInt(down.address+i*4L);
+                }
+
+                for (int i = 0; i < 5; i++) {
+                    RenderStatistics.hierarchicalRenderSections[i] = MemoryUtil.memGetInt(down.address+5*4L+i*4L);
+                }
+            });
+        }
 
         //Bind the hiz buffer
         glBindSampler(0, 0);
@@ -299,6 +310,7 @@ public class HierarchicalOcclusionTraverser {
         this.hiZBuffer.free();
         this.nodeBuffer.free();
         this.uniformBuffer.free();
+        this.statisticsBuffer.free();
         this.renderList.free();
         this.queueMetaBuffer.free();
         this.scratchQueueA.free();

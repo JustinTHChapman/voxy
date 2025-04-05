@@ -432,12 +432,13 @@ public class RenderDataFactory45 {
         this.seondaryblockMesher.doAuxiliaryFaceOffset = false;
         this.blockMesher.axis = axis;
         this.seondaryblockMesher.axis = axis;
-        for (int layer = 0; layer < 32; layer++) {//(should be 1->31, then have outer face mesher)
+        for (int layer = 1; layer < 31; layer++) {//(should be 1->31, then have outer face mesher)
             this.blockMesher.auxiliaryPosition = layer;
             this.seondaryblockMesher.auxiliaryPosition = layer;
             int cSkip = 0;
             for (int other = 0; other < 32; other++) {//TODO: need to do the faces that border sections
                 int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
+                int skipAmount = axis==0?32*32:32;
 
                 int msk = this.nonOpaqueMasks[pidx];
 
@@ -465,24 +466,57 @@ public class RenderDataFactory45 {
                         int idx = index + (pidx * 32);
 
                         long B = this.sectionData[idx * 2+1];
-
+                        //This is just some garbage hack test thing
                         if (ModelQueries.isTranslucent(B)) {
-                            this.blockMesher.putNext(0);
+                            if (axis != 0) {
+                                this.blockMesher.putNext(0);
+                                this.seondaryblockMesher.putNext(0);
+                                continue;
+                            }
+
+                            //Example thing thats just wrong but as example
+                            long A = this.sectionData[idx * 2];
+
+                            long MSK = 0xFFFFL<<26;
+
+                            long O = this.sectionData[(idx+skipAmount)*2];
+                            if ((O&MSK) != (A&MSK)) {
+                                this.blockMesher.putNext((long) (false ? 0L : 1L) |
+                                        A |
+                                        (((0xFFL) & 0xFF) << 55)
+                                );
+                            } else {
+                                this.blockMesher.putNext(0);
+                            }
+
                             this.seondaryblockMesher.putNext(0);
+                            /*
+                            O = this.sectionData[(idx-skipAmount)*2];
+                            if ((O&MSK) != (A&MSK)) {
+                                this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
+                                        A |
+                                        (((0xFFL) & 0xFF) << 55)
+                                );
+                            }*/
                             continue;
+                        } else {
+                            //this.blockMesher.putNext(0);
+                            //this.seondaryblockMesher.putNext(0);
+                            //continue;
+
+
+                            long A = this.sectionData[idx * 2];
+
+                            //Example thing thats just wrong but as example
+                            this.blockMesher.putNext((long) (false ? 0L : 1L) |
+                                    A |
+                                    (((0xFFL) & 0xFF) << 55)
+                            );
+                            this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
+                                    A |
+                                    (((0xFFL) & 0xFF) << 55)
+                            );
                         }
-
-                        long A = this.sectionData[idx * 2];
-
-                        //Example thing thats just wrong but as example
-                        this.blockMesher.putNext((long) (false ? 0L : 1L) |
-                                A |
-                                (((0xFFL) & 0xFF) << 55)
-                        );
-                        this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
-                                A |
-                                (((0xFFL) & 0xFF) << 55)
-                        );
                     }
                 }
                 this.blockMesher.endRow();

@@ -36,6 +36,13 @@ layout(binding = RENDER_TRACKER_BINDING, std430) restrict writeonly buffer rende
     uint[] lastRenderFrame;
 };
 
+#ifdef HAS_STATISTICS
+layout(binding = STATISTICS_BUFFER_BINDING, std430) restrict buffer statisticsBuffer {
+    uint traversalCounts[5];
+    uint renderCounts[5];
+};
+#endif
+
 void addRequest(inout UnpackedNode node) {
     //printf("Put node decend request");
     if (!hasRequested(node)) {
@@ -72,12 +79,20 @@ void enqueueSelfForRender(in UnpackedNode node) {
             #ifdef IS_DEBUG
             debugRenderNodeQueue[atomicAdd(debugRenderNodeQueueIndex, 1)] = node.nodeId;
             #endif
+
+            #ifdef HAS_STATISTICS
+            atomicAdd(renderCounts[node.lodLevel], 1);
+            #endif
         }
     }
 }
 
 
 void traverse(in UnpackedNode node) {
+    #ifdef HAS_STATISTICS
+    atomicAdd(traversalCounts[node.lodLevel], 1);
+    #endif
+
     //Compute screenspace
     setupScreenspace(node);
     //debugDumpNode(node);

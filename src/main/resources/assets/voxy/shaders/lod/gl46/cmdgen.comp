@@ -60,8 +60,8 @@ void main() {
 
     //Note! its not with respect to the sectionId
     //
-    //Check the occlusion data from last frame
-    bool shouldRender = visibilityData[gl_GlobalInvocationID.x] == frameId - 1;
+    //Check the occlusion data from this frame occlusion
+    bool shouldRender = visibilityData[gl_GlobalInvocationID.x] == frameId;
 
     //Clear the occlusion data (not strictly? needed? i think???)
     //visibilityData[gl_GlobalInvocationID.x] = 0;
@@ -100,8 +100,8 @@ void main() {
         //Translucency
         count = meta.cntA&0xFFFF;
         if (count != 0) {
-            //uint translucentCommandPtr = atomicAdd(translucentDrawCount, 1) + 400000;//FIXME: dont hardcode this offset
-            //writeCmd(translucentCommandPtr, drawId, ptr, count);
+            uint translucentCommandPtr = atomicAdd(translucentDrawCount, 1) + TRANSLUCENT_OFFSET;//FIXME: dont hardcode this offset
+            writeCmd(translucentCommandPtr, drawId, ptr, count);
         }
         ptr += count;
 

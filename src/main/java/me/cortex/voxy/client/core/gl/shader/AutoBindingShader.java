@@ -39,6 +39,13 @@ public class AutoBindingShader extends Shader {
         return GlDebug.name(name, this);
     }
 
+    public AutoBindingShader ssboIf(String define, GlBuffer buffer) {
+        if (this.defines.containsKey(define)) {
+            return this.ssbo(define, buffer);
+        }
+        return this;
+    }
+
     public AutoBindingShader ssbo(int index, GlBuffer binding) {
         return this.ssbo(index, binding, 0);
     }
@@ -50,6 +57,11 @@ public class AutoBindingShader extends Shader {
     public AutoBindingShader ssbo(int index, GlBuffer buffer, long offset) {
         this.bindings.add(new BufferBinding(GL_SHADER_STORAGE_BUFFER, index, buffer, offset, -1));
         return this;
+    }
+
+
+    public AutoBindingShader ubo(String define, GlBuffer buffer) {
+        return this.ubo(Integer.parseInt(this.defines.get(define)), buffer);
     }
 
     public AutoBindingShader ubo(int index, GlBuffer buffer) {

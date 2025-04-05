@@ -33,6 +33,7 @@ import static org.lwjgl.opengl.GL45.glCopyNamedBufferSubData;
 
 //Uses MDIC to render the sections
 public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryManager> {
+    private static final int TRANSLUCENT_OFFSET = 400_000;//in draw calls
     private final Shader terrainShader = Shader.make()
             .defineIf("DEBUG_RENDER", false)
             .add(ShaderType.VERTEX, "voxy:lod/gl46/quads2.vert")
@@ -40,6 +41,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             .compile();
 
     private final Shader commandGenShader = Shader.make()
+            .define("TRANSLUCENT_OFFSET", TRANSLUCENT_OFFSET)
             .add(ShaderType.COMPUTE, "voxy:lod/gl46/cmdgen.comp")
             .compile();
 
@@ -56,7 +58,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     //TODO: needs to be in the viewport, since it contains the compute indirect call/values
     private final GlBuffer drawCountCallBuffer = new GlBuffer(1024).zero();
-    private final GlBuffer drawCallBuffer  = new GlBuffer(5*4*400000).zero();//400k draw calls
+    private final GlBuffer drawCallBuffer  = new GlBuffer(5*4*(400_000+100_000)).zero();//400k draw calls
     private final GlBuffer positionScratchBuffer  = new GlBuffer(8*400000).zero();//400k positions
 
     public MDICSectionRenderer(ModelStore modelStore, int maxSectionCount, long geometryCapacity) {
@@ -127,31 +129,13 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         this.uploadUniformBuffer(viewport);
 
-        //TODO Move this to after culling has occured instead of here, since here the geometry might have changed and
-        // can cause explosions, while if do after culling, its after geometry changes
-        // well the thing is here it technicnally should be before geometry changes anyway tho??
-        // so here should actually be fine aswell???
-        // but doing it before enables computing temporal draw commands aswell to fix temporal coherance
-        // yea thats true, should move it probably
-        {
-            this.commandGenShader.bind();
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.drawCountCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBufferId());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.positionScratchBuffer.id);
-            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountCallBuffer.id);
-            glDispatchComputeIndirect(0);
-            glMemoryBarrier(GL_COMMAND_BARRIER_BIT);
-        }
-
         this.renderTerrain();
     }
 
     @Override
     public void buildDrawCallsAndRenderTemporal(MDICViewport viewport, GlBuffer sectionRenderList) {
+        if (this.geometryManager.getSectionCount() == 0) return;
+        this.uploadUniformBuffer(viewport);
         //Can do a sneeky trick, since the sectionRenderList is a list to things to render, it invokes the culler
         // which only marks visible sections
 
@@ -190,10 +174,43 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glDisable(GL_DEPTH_TEST);
         }
 
+
+        {
+            this.commandGenShader.bind();
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCallBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.drawCountCallBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBufferId());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.positionScratchBuffer.id);
+            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountCallBuffer.id);
+            glDispatchComputeIndirect(0);
+            glMemoryBarrier(GL_COMMAND_BARRIER_BIT);
+        }
     }
 
     @Override
     public void renderTranslucent(MDICViewport viewport) {
+        glEnable(GL_BLEND);
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+        glDisable(GL_CULL_FACE);
+        glEnable(GL_DEPTH_TEST);
+        this.terrainShader.bind();
+        glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
+        this.bindRenderingBuffers();
+
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), 100_000), 0);
+
+        glEnable(GL_CULL_FACE);
+        glBindVertexArray(0);
+        glBindSampler(0, 0);
+        glBindTextureUnit(0, 0);
+        glBindSampler(1, 0);
+        glBindTextureUnit(1, 0);
+
+        glDisable(GL_BLEND);
 
     }
 
