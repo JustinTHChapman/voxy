@@ -198,6 +198,15 @@ public final class NodeStore {
         return ((this.localNodeData[id2idx(nodeId)+1]>>63)&1)!=0;
     }
 
+    //TODO: Implement this in node manager
+    public void setAllChildrenAreLeaf(int nodeId, boolean state) {
+        this.localNodeData[id2idx(nodeId)+2] &= ~(1L<<16);
+        this.localNodeData[id2idx(nodeId)+2] |= state?1L<<16:0;
+    }
+    public boolean getAllChildrenAreLeaf(int nodeId) {
+        return ((this.localNodeData[id2idx(nodeId)+2]>>16)&1)!=0;
+    }
+
     public void markNodeGeometryInFlight(int nodeId) {
         this.localNodeData[id2idx(nodeId)+1] |= 1L<<59;
     }

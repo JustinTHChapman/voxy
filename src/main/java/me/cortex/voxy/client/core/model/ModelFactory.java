@@ -325,7 +325,7 @@ public class ModelFactory {
         metadata |= hasBiomeColourResolver?1:0;
         metadata |= blockRenderLayer == RenderLayer.getTranslucent()?2:0;
         metadata |= needsDoubleSidedQuads?4:0;
-        metadata |= (!blockState.getFluidState().isEmpty())?8:0;//Has a fluid state accosiacted with it
+        metadata |= ((!isFluid) && !blockState.getFluidState().isEmpty())?8:0;//Has a fluid state accosiacted with it and is not itself a fluid
         metadata |= isFluid?16:0;//Is a fluid
 
         metadata |= cullsSame?32:0;

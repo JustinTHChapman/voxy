@@ -38,6 +38,7 @@ public class RenderDataFactory45 {
 
     private final int[] opaqueMasks = new int[32*32];
     private final int[] nonOpaqueMasks = new int[32*32];
+    private final int[] fluidMasks = new int[32*32];//Used to separately mesh fluids, allowing for fluid + blockstate
 
 
     //TODO: emit directly to memory buffer instead of long arrays
@@ -206,29 +207,38 @@ public class RenderDataFactory45 {
         final var sectionData = this.sectionData;
         int opaque = 0;
         int notEmpty = 0;
+        int pureFluid = 0;
+        int partialFluid = 0;
 
         int neighborAcquireMsk = 0;//-+x, -+y, -+Z
         for (int i = 0; i < 32*32*32;) {
             long block = sectionData[i + 32 * 32 * 32];//Get the block mapping
+            if (Mapper.isAir(block)) {//If it is air, just emit lighting
+                sectionData[i * 2] = (block&(0xFFL<<56))>>1;
+                sectionData[i * 2 + 1] = 0;
+            } else {
+                int modelId = this.modelMan.getModelId(Mapper.getBlockId(block));
+                long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
 
-            int modelId = this.modelMan.getModelId(Mapper.getBlockId(block));
-            long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
+                sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
+                sectionData[i * 2 + 1] = modelMetadata;
 
-            sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
-            sectionData[i * 2 + 1] = modelMetadata;
-
-            boolean isFullyOpaque = ModelQueries.isFullyOpaque(modelMetadata);
-            opaque |= (isFullyOpaque ? 1:0) << (i & 31);
-            notEmpty |= (modelId!=0 ? 1:0) << (i & 31);
+                int msk = 1 << (i & 31);
+                opaque |= ModelQueries.isFullyOpaque(modelMetadata) ? msk : 0;
+                notEmpty |= modelId != 0 ? msk : 0;
+                pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
+                partialFluid |= ModelQueries.containsFluid(modelMetadata) ? msk : 0;
+            }
 
             //TODO: here also do bitmask of what neighboring sections are needed to compute (may be getting rid of this in future)
 
             //Do increment here
             i++;
 
-            if ((i & 31) == 0) {
+            if ((i & 31) == 0 && notEmpty != 0) {
                 this.opaqueMasks[(i >> 5) - 1] = opaque;
-                this.nonOpaqueMasks[(i >> 5) - 1] = notEmpty^opaque;
+                this.nonOpaqueMasks[(i >> 5) - 1] = (notEmpty^opaque)&~pureFluid;
+                this.fluidMasks[(i >> 5) - 1] = pureFluid|partialFluid;
 
                 int neighborMsk = 0;
                 //-+x
@@ -236,16 +246,18 @@ public class RenderDataFactory45 {
                 neighborMsk |= (notEmpty>>>30)&0b10;//+x
 
                 //notEmpty = (notEmpty != 0)?1:0;
-                neighborMsk |= notEmpty!=0&&((i-1)>>10)==0?0b100:0;//-y
-                neighborMsk |= notEmpty!=0&&((i-1)>>10)==31?0b1000:0;//+y
-                neighborMsk |= notEmpty!=0&&(((i-1)>>5)&0x1F)==0?0b10000:0;//-z
-                neighborMsk |= notEmpty!=0&&(((i-1)>>5)&0x1F)==31?0b100000:0;//+z
+                neighborMsk |= (((i - 1) >> 10) == 0) ? 0b100 : 0;//-y
+                neighborMsk |= (((i - 1) >> 10) == 31) ? 0b1000 : 0;//+y
+                neighborMsk |= ((((i - 1) >> 5) & 0x1F) == 0) ? 0b10000 : 0;//-z
+                neighborMsk |= ((((i - 1) >> 5) & 0x1F) == 31) ? 0b100000 : 0;//+z
 
                 neighborAcquireMsk |= neighborMsk;
 
 
                 opaque = 0;
                 notEmpty = 0;
+                pureFluid = 0;
+                partialFluid = 0;
             }
         }
         return neighborAcquireMsk;
@@ -353,7 +365,7 @@ public class RenderDataFactory45 {
                         long selfModel = facingForward == 1 ? A : B;
                         long nextModel = facingForward == 1 ? B : A;
 
-                        //Example thing thats just wrong but as example
+
                         this.blockMesher.putNext(((long) facingForward) |//Facing
                                 selfModel |
                                 (nextModel&(0xFFL<<56))//Apply lighting
@@ -406,13 +418,17 @@ public class RenderDataFactory45 {
                                 this.blockMesher.skip(1);
                                 continue;
                             }
+
+                            if (ModelQueries.faceOccludes(meta, (axis<<1)|(1-side))) {
+                                this.blockMesher.skip(1);
+                                continue;
+                            }
                         }
 
 
                         //TODO: swap this out for something not getting the next entry
                         long A = this.sectionData[idx * 2];
 
-                        //Example thing thats just wrong but as example
                         this.blockMesher.putNext((side == 0 ? 0L : 1L) |
                                 A |
                                 ((neighborId&(0xFFL<<56))>>1)
@@ -422,6 +438,155 @@ public class RenderDataFactory45 {
                 this.blockMesher.endRow();
             }
 
+            this.blockMesher.finish();
+        }
+        this.blockMesher.doAuxiliaryFaceOffset = true;
+    }
+
+    private void generateYZFluidInnerGeometry(int axis) {
+        for (int layer = 0; layer < 31; layer++) {
+            this.blockMesher.auxiliaryPosition = layer;
+            int cSkip = 0;
+            for (int other = 0; other < 32; other++) {
+                int pidx = axis==0 ?(layer*32+other):(other*32+layer);
+                int skipAmount = axis==0?32:1;
+
+                //TODO: this needs to take into account opaqueMasks to not mesh any faces with it set
+                int current = this.fluidMasks[pidx];
+                int next = this.fluidMasks[pidx + skipAmount];
+
+                int msk = (current | this.opaqueMasks[pidx]) ^ (next | this.opaqueMasks[pidx + skipAmount]);
+                msk &= current|next;
+                if (msk == 0) {
+                    cSkip += 32;
+                    continue;
+                }
+
+                this.blockMesher.skip(cSkip);
+                cSkip = 0;
+
+                int faceForwardMsk = msk & current;
+                int cIdx = -1;
+                while (msk != 0) {
+                    int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
+                    int delta = index - cIdx - 1;
+                    cIdx = index; //index--;
+                    if (delta != 0) this.blockMesher.skip(delta);
+                    msk &= ~Integer.lowestOneBit(msk);
+
+                    int facingForward = ((faceForwardMsk >> index) & 1);
+
+                    {
+                        int idx = index + (pidx*32);
+
+                        int a = idx*2;
+                        int b = (idx + skipAmount * 32) * 2;
+
+                        //Flip data with respect to facing direction
+                        int ai = facingForward == 1 ? a : b;
+                        int bi = facingForward == 1 ? b : a;
+
+                        long A = this.sectionData[ai];
+                        long Am = this.sectionData[ai+1];
+                        //If it isnt a fluid but contains one,
+                        if (ModelQueries.containsFluid(Am)) {
+                            int modelId = (int) ((A>>26)&0xFFFF);
+                            A &= ~(0xFFFFL<<26);
+                            int fluidId = this.modelMan.getFluidClientStateId(modelId);
+                            A |= Integer.toUnsignedLong(fluidId)<<26;
+                            Am = this.modelMan.getModelMetadataFromClientId(fluidId);
+                        }
+
+                        long lighter = A;
+                        //if (!ModelQueries.faceUsesSelfLighting(Am, facingForward|(axis*2))) {//TODO: check this is right
+                        //    lighter = this.sectionData[bi];
+                        //}
+
+                        this.blockMesher.putNext(((long) facingForward) |//Facing
+                                A |
+                                (lighter&(0xFFL<<56))//Apply lighting
+                        );
+                    }
+                }
+
+                this.blockMesher.endRow();
+            }
+            this.blockMesher.finish();
+        }
+    }
+
+    private void generateYZFluidOuterGeometry(int axis) {
+        this.blockMesher.doAuxiliaryFaceOffset = false;
+        //Hacky generate section side faces (without check neighbor section)
+        for (int side = 0; side < 2; side++) {//-, +
+            int layer = side == 0 ? 0 : 31;
+            this.blockMesher.auxiliaryPosition = layer;
+            int cSkips = 0;
+            for (int other = 0; other < 32; other++) {
+                int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
+                int msk = this.fluidMasks[pidx];
+                if (msk == 0) {
+                    cSkips += 32;
+                    continue;
+                }
+
+                this.blockMesher.skip(cSkips);
+                cSkips = 0;
+
+                int cIdx = -1;
+                while (msk != 0) {
+                    int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
+                    int delta = index - cIdx - 1;
+                    cIdx = index; //index--;
+                    if (delta != 0) this.blockMesher.skip(delta);
+                    msk &= ~Integer.lowestOneBit(msk);
+
+                    {
+                        int idx = index + (pidx * 32);
+
+
+                        int neighborIdx = ((axis+1)*32*32 * 2)+(side)*32*32;
+                        long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
+
+                        long A = this.sectionData[idx * 2];
+                        long B = this.sectionData[idx * 2 + 1];
+
+                        if (ModelQueries.containsFluid(B)) {
+                            int modelId = (int) ((A>>26)&0xFFFF);
+                            A &= ~(0xFFFFL<<26);
+                            int fluidId = this.modelMan.getFluidClientStateId(modelId);
+                            A |= Integer.toUnsignedLong(fluidId)<<26;
+                            B = this.modelMan.getModelMetadataFromClientId(fluidId);
+                        }
+
+                        //Check and test if can cull W.R.T neighbor
+                        if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                            int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                            long meta = this.modelMan.getModelMetadataFromClientId(modelId);
+                            if (ModelQueries.containsFluid(meta)) {
+                                modelId = this.modelMan.getFluidClientStateId(modelId);
+                            }
+                            if (ModelQueries.cullsSame(B)) {
+                                if (modelId == ((A>>26)&0xFFFF)) {
+                                    this.blockMesher.skip(1);
+                                    continue;
+                                }
+                            }
+
+                            if (ModelQueries.faceOccludes(meta, (axis<<1)|(1-side))) {
+                                this.blockMesher.skip(1);
+                                continue;
+                            }
+                        }
+
+                        this.blockMesher.putNext((side == 0 ? 0L : 1L) |
+                                A |
+                                ((neighborId&(0xFFL<<56))>>1)
+                        );
+                    }
+                }
+                this.blockMesher.endRow();
+            }
             this.blockMesher.finish();
         }
         this.blockMesher.doAuxiliaryFaceOffset = true;
@@ -465,58 +630,19 @@ public class RenderDataFactory45 {
                     {
                         int idx = index + (pidx * 32);
 
+                        long A = this.sectionData[idx * 2];
                         long B = this.sectionData[idx * 2+1];
-                        //This is just some garbage hack test thing
-                        if (ModelQueries.isTranslucent(B)) {
-                            if (axis != 0) {
-                                this.blockMesher.putNext(0);
-                                this.seondaryblockMesher.putNext(0);
-                                continue;
-                            }
+                        //TODO: filtering
 
-                            //Example thing thats just wrong but as example
-                            long A = this.sectionData[idx * 2];
-
-                            long MSK = 0xFFFFL<<26;
-
-                            long O = this.sectionData[(idx+skipAmount)*2];
-                            if ((O&MSK) != (A&MSK)) {
-                                this.blockMesher.putNext((long) (false ? 0L : 1L) |
-                                        A |
-                                        (((0xFFL) & 0xFF) << 55)
-                                );
-                            } else {
-                                this.blockMesher.putNext(0);
-                            }
-
-                            this.seondaryblockMesher.putNext(0);
-                            /*
-                            O = this.sectionData[(idx-skipAmount)*2];
-                            if ((O&MSK) != (A&MSK)) {
-                                this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
-                                        A |
-                                        (((0xFFL) & 0xFF) << 55)
-                                );
-                            }*/
-                            continue;
-                        } else {
-                            //this.blockMesher.putNext(0);
-                            //this.seondaryblockMesher.putNext(0);
-                            //continue;
-
-
-                            long A = this.sectionData[idx * 2];
-
-                            //Example thing thats just wrong but as example
-                            this.blockMesher.putNext((long) (false ? 0L : 1L) |
-                                    A |
-                                    (((0xFFL) & 0xFF) << 55)
-                            );
-                            this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
-                                    A |
-                                    (((0xFFL) & 0xFF) << 55)
-                            );
-                        }
+                        //Example thing thats just wrong but as example
+                        this.blockMesher.putNext((long) (false ? 0L : 1L) |
+                                A |
+                                (((0xFFL) & 0xFF) << 55)
+                        );
+                        this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
+                                A |
+                                (((0xFFL) & 0xFF) << 55)
+                        );
                     }
                 }
                 this.blockMesher.endRow();
@@ -533,6 +659,9 @@ public class RenderDataFactory45 {
 
             this.generateYZOpaqueInnerGeometry(axis);
             this.generateYZOpaqueOuterGeometry(axis);
+
+            this.generateYZFluidInnerGeometry(axis);
+            this.generateYZFluidOuterGeometry(axis);
 
             //this.generateYZNonOpaqueInnerGeometry(axis);
         }
@@ -779,7 +908,10 @@ public class RenderDataFactory45 {
         this.maxY = Integer.MIN_VALUE;
         this.maxZ = Integer.MIN_VALUE;
 
-        Arrays.fill(this.quadCounters, (short) 0);
+        Arrays.fill(this.quadCounters,0);
+        Arrays.fill(this.opaqueMasks, 0);
+        Arrays.fill(this.nonOpaqueMasks, 0);
+        Arrays.fill(this.fluidMasks, 0);
 
         //Prepare everything
         int neighborMsk = this.prepareSectionData();
