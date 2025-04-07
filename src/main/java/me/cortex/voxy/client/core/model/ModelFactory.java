@@ -311,8 +311,8 @@ public class ModelFactory {
 
             if (allFalse == allTrue) {//If only some sides where self culled then abort
                 cullsSame = false;
-                if (LOGGED_SELF_CULLING_WARNING.add(blockState))
-                    Logger.info("Warning! blockstate: " + blockState + " only culled against its self some of the time");
+                //if (LOGGED_SELF_CULLING_WARNING.add(blockState))
+                //    Logger.info("Warning! blockstate: " + blockState + " only culled against its self some of the time");
             }
 
             if (allTrue) {

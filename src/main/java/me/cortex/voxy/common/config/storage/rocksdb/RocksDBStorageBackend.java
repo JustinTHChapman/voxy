@@ -61,6 +61,8 @@ public class RocksDBStorageBackend extends StorageBackend {
         );
 
         final DBOptions options = new DBOptions()
+                .setAvoidUnnecessaryBlockingIO(true)
+                .setIncreaseParallelism(2)
                 .setCreateIfMissing(true)
                 .setCreateMissingColumnFamilies(true)
                 .setMaxTotalWalSize(1024*1024*512);//512 mb max WAL size
