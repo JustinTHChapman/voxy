@@ -137,8 +137,8 @@ public class VoxyConfigScreenPages implements ModMenuApi {
                 ).add(OptionImpl.createBuilder(int.class, storage)
                         .setName(Text.translatable("voxy.config.general.subDivisionSize"))
                         .setTooltip(Text.translatable("voxy.config.general.subDivisionSize.tooltip"))
-                        .setControl(opt->new SliderControl(opt, 28, 256, 1, v->Text.literal(Integer.toString(v))))
-                        .setBinding((s, v)->s.subDivisionSize = v, s -> (int) s.subDivisionSize)
+                        .setControl(opt->new SliderControl(opt, 0, SUBDIV_IN_MAX, 1, v->Text.literal(Integer.toString(Math.round(ln2subDiv(v))))))
+                        .setBinding((s, v) -> s.subDivisionSize = ln2subDiv(v), s -> subDiv2ln(s.subDivisionSize))
                         .setImpact(OptionImpact.HIGH)
                         .build()
                 ).add(OptionImpl.createBuilder(int.class, storage)
@@ -161,4 +161,23 @@ public class VoxyConfigScreenPages implements ModMenuApi {
         );
         return new OptionPage(Text.translatable("voxy.config.title"), ImmutableList.copyOf(groups));
     }
+
+    private static final int SUBDIV_IN_MAX = 100;
+    private static final double SUBDIV_MIN = 28;
+    private static final double SUBDIV_MAX = 256;
+    private static final double SUBDIV_CONST = Math.log(SUBDIV_MAX/SUBDIV_MIN)/Math.log(2);
+
+
+    //In range is 0->200
+    //Out range is 28->256
+    private static float ln2subDiv(int in) {
+        return (float) (SUBDIV_MIN*Math.pow(2, SUBDIV_CONST*((double)in/SUBDIV_IN_MAX)));
+    }
+
+    //In range is ... any?
+    //Out range is 0->200
+    private static int subDiv2ln(float in) {
+        return (int) (((Math.log(((double)in)/SUBDIV_MIN)/Math.log(2))/SUBDIV_CONST)*SUBDIV_IN_MAX);
+    }
+
 }
