@@ -189,7 +189,7 @@ public class RenderDataFactory45 {
         //This uses hardcoded data to shuffle things
         long lightAndBiome =  (state&((0x1FFL<<47)|(0xFFL<<56)))>>1;
         lightAndBiome &= ModelQueries.isBiomeColoured(metaData)?-1:~(0x1FFL<<47);
-        lightAndBiome &= ModelQueries.isFullyOpaque(metaData)?~(0xFFL<<56):-1;//If its fully opaque it always uses neighbor light?
+        lightAndBiome &= ModelQueries.isFullyOpaque(metaData)?~(0xFFL<<55):-1;//If its fully opaque it always uses neighbor light?
         int type = 0;
         {
             boolean a = ModelQueries.isTranslucent(metaData);
@@ -368,7 +368,7 @@ public class RenderDataFactory45 {
 
                         this.blockMesher.putNext(((long) facingForward) |//Facing
                                 selfModel |
-                                (nextModel&(0xFFL<<56))//Apply lighting
+                                (nextModel&(0xFFL<<55))//Apply lighting
                         );
                     }
                 }
@@ -419,14 +419,17 @@ public class RenderDataFactory45 {
                                 continue;
                             }
 
-                            if (ModelQueries.faceOccludes(meta, (axis<<1)|(1-side))) {
-                                this.blockMesher.skip(1);
-                                continue;
+                            //This very funnily causes issues when not combined with meshing non full opaque geometry
+                            //TODO:FIXME, when non opaque geometry is added
+                            if (false) {
+                                if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
+                                    this.blockMesher.skip(1);
+                                    continue;
+                                }
                             }
                         }
 
 
-                        //TODO: swap this out for something not getting the next entry
                         long A = this.sectionData[idx * 2];
 
                         this.blockMesher.putNext((side == 0 ? 0L : 1L) |
@@ -504,7 +507,7 @@ public class RenderDataFactory45 {
 
                         this.blockMesher.putNext(((long) facingForward) |//Facing
                                 A |
-                                (lighter&(0xFFL<<56))//Apply lighting
+                                (lighter&(0xFFL<<55))//Apply lighting
                         );
                     }
                 }
