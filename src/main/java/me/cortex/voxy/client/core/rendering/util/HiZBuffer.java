@@ -76,7 +76,7 @@ public class HiZBuffer {
         glBindVertexArray(RenderService.STATIC_VAO);
         int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         this.hiz.bind();
-        this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, 0).verify();
+        this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, 0);//.verify();
         glBindFramebuffer(GL_FRAMEBUFFER, this.fb.id);
 
         glDepthFunc(GL_ALWAYS);
