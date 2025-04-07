@@ -34,6 +34,7 @@ import static org.lwjgl.opengl.ARBShaderImageLoadStore.glMemoryBarrier;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL20C.glUniformMatrix4fv;
 import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.opengl.GL45.glBlitNamedFramebuffer;
 
 //Builds a texture for each face of a model
 public class ModelTextureBakery {
@@ -106,10 +107,11 @@ public class ModelTextureBakery {
         //TODO: figure out why calling this makes minecraft render black
         //renderLayer.startDrawing();
 
+
+        glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
         glClearColor(0,0,0,0);
         glClearDepth(1);
         glClearStencil(0);
-        glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         glEnable(GL_STENCIL_TEST);
@@ -137,6 +139,9 @@ public class ModelTextureBakery {
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         glStencilMask(0xFF);
 
+        int[] viewdat = new int[4];
+        glGetIntegerv(GL_VIEWPORT, viewdat);
+
         var tex = MinecraftClient.getInstance().getTextureManager().getTexture(Identifier.of("minecraft", "textures/atlas/blocks.png")).getGlTexture();
         for (int i = 0; i < FACE_VIEWS.size(); i++) {
             glViewport((i%3)*this.width, (i/3)*this.height, this.width, this.height);
@@ -148,6 +153,9 @@ public class ModelTextureBakery {
             this.rasterView(state, model, transform, randomValue, i, renderFluid, tex);
         }
 
+        glViewport(viewdat[0], viewdat[1], viewdat[2], viewdat[3]);
+
+
 
         //renderLayer.endDrawing();
 
@@ -156,6 +164,21 @@ public class ModelTextureBakery {
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
         this.capture.emitToStream(streamBuffer, streamBaseOffset);
+
+        //var target = DefaultTerrainRenderPasses.CUTOUT.getTarget();
+        //int boundFB = ((net.minecraft.client.texture.GlTexture) target.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getFramebufferManager(), target.getDepthAttachment());
+        //glBlitNamedFramebuffer(this.capture.framebuffer.id, boundFB, 0,0,16*3, 16*2, 0,0, 16*3*4,16*2*4, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+
+        //SOMEBODY PLEASE FUCKING EXPLAIN TO ME WHY MUST CLEAR THE FRAMEBUFFER HERE WHEN IT IS LITERALLY CLEARED AT THE START OF THE FRAME
+        // WITHOUT THIS, WATER DOESNT RENDER
+        //TODO: FIXME, WHAT THE ACTUAL FUCK
+        glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
+        glClearDepth(1);
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     private final BufferAllocator allocator = new BufferAllocator(786432);

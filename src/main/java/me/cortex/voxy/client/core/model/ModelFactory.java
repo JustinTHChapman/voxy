@@ -132,6 +132,7 @@ public class ModelFactory {
         Arrays.fill(this.fluidStateLUT, -1);
 
         this.modelTexture2id.defaultReturnValue(-1);
+        this.addEntry(0);//Add air as the first entry
     }
 
 
