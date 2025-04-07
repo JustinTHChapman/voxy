@@ -195,4 +195,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     public Viewport<?> getViewport() {
         return this.viewportSelector.getViewport();
     }
+
+    public int getMeshQueueCount() {
+        return this.renderGen.getTaskCount();
+    }
 }

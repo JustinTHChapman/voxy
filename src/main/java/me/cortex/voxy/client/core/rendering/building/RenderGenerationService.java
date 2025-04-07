@@ -213,4 +213,8 @@ public class RenderGenerationService {
     public void addDebugData(List<String> debug) {
         debug.add("RSSQ: " + this.taskQueue.size());//render section service queue
     }
+
+    public int getTaskCount() {
+        return this.taskQueue.size();
+    }
 }

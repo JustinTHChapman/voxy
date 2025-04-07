@@ -137,13 +137,16 @@ public class VoxyRenderSystem {
         }
 
         if (false) {
+            //only increase quality while there are very few mesh queues, this stops,
+            // e.g. while flying and is rendering alot of low quality chunks
+            boolean canDecreaseSize = this.renderer.getMeshQueueCount() < 5000;
             float CHANGE_PER_SECOND = 30;
             //Auto fps targeting
             if (MinecraftClient.getInstance().getCurrentFps() < 45) {
                 VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 256);
             }
 
-            if (55 < MinecraftClient.getInstance().getCurrentFps()) {
+            if (55 < MinecraftClient.getInstance().getCurrentFps() && canDecreaseSize) {
                 VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 30);
             }
         }

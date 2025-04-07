@@ -6,6 +6,7 @@ import me.cortex.voxy.common.util.VolatileHolder;
 import me.cortex.voxy.common.world.other.Mapper;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -58,6 +59,7 @@ public class ActiveSectionTracker {
 
         lock.lock();
         {
+            VarHandle.fullFence();
             holder = cache.get(key);
             if (holder == null) {
                 holder = new VolatileHolder<>();
@@ -70,6 +72,7 @@ public class ActiveSectionTracker {
                 lock.unlock();
                 return section;
             }
+            VarHandle.fullFence();
         }
         lock.unlock();
 
@@ -136,6 +139,7 @@ public class ActiveSectionTracker {
         final var lock = this.locks[index];
         lock.lock();
         {
+            VarHandle.fullFence();
             if (section.trySetFreed()) {
                 var cached = cache.remove(section.key);
                 var obj = cached.obj;
@@ -144,6 +148,7 @@ public class ActiveSectionTracker {
                 }
                 sec = section;
             }
+            VarHandle.fullFence();
         }
         lock.unlock();
 
