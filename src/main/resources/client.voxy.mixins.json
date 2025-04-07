@@ -11,7 +11,8 @@
     "minecraft.MixinWindow",
     "minecraft.MixinWorldRenderer",
     "sodium.MixinDefaultChunkRenderer",
-    "sodium.MixinRenderSectionManager"
+    "sodium.MixinRenderSectionManager",
+    "sodium.MixinSodiumOptionsGUI"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -4,6 +4,7 @@ import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import me.cortex.voxy.common.Logger;
+import net.caffeinemc.mods.sodium.client.gui.options.storage.OptionStorage;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.FileReader;
@@ -12,12 +13,13 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-public class VoxyConfig {
+public class VoxyConfig implements OptionStorage<VoxyConfig> {
     private static final Gson GSON = new GsonBuilder()
             .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
             .setPrettyPrinting()
             .excludeFieldsWithModifiers(Modifier.PRIVATE)
             .create();
+
     public static VoxyConfig CONFIG = loadOrCreate();
 
     public boolean enabled = true;
@@ -26,13 +28,14 @@ public class VoxyConfig {
     public int sectionRenderDistance = 16;
     public int serviceThreads = Math.max(Runtime.getRuntime().availableProcessors()/2, 1);
     public float subDivisionSize = 128;
-    public int secondaryLruCacheSize = 1024;
 
     public static VoxyConfig loadOrCreate() {
         var path = getConfigPath();
         if (Files.exists(path)) {
             try (FileReader reader = new FileReader(path.toFile())) {
-                return GSON.fromJson(reader, VoxyConfig.class);
+                var conf = GSON.fromJson(reader, VoxyConfig.class);
+                conf.save();
+                return conf;
             } catch (IOException e) {
                 Logger.error("Could not parse config",e);
             }
@@ -41,6 +44,7 @@ public class VoxyConfig {
         config.save();
         return config;
     }
+
     public void save() {
         try {
             Files.writeString(getConfigPath(), GSON.toJson(this));
@@ -53,5 +57,10 @@ public class VoxyConfig {
         return FabricLoader.getInstance()
                 .getConfigDir()
                 .resolve("voxy-config.json");
+    }
+
+    @Override
+    public VoxyConfig getData() {
+        return this;
     }
 }

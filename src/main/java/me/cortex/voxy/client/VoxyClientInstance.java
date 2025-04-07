@@ -13,6 +13,8 @@ import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class VoxyClientInstance extends VoxyInstance {
+    public static boolean isInGame = false;
+
     private static final ContextSelectionSystem SELECTOR = new ContextSelectionSystem();
 
     public VoxyClientInstance() {

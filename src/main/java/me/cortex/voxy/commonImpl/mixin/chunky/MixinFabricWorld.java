@@ -19,18 +19,22 @@ public class MixinFabricWorld {
     @WrapOperation(method = "getChunkAtAsync", at = @At(value = "INVOKE", target = "Lorg/popcraft/chunky/mixin/ServerChunkCacheMixin;invokeGetChunkFutureMainThread(IILnet/minecraft/world/chunk/ChunkStatus;Z)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<OptionalChunk<Chunk>> captureGeneratedChunk(ServerChunkCacheMixin instance, int i, int j, ChunkStatus chunkStatus, boolean b, Operation<CompletableFuture<OptionalChunk<Chunk>>> original) {
         var future = original.call(instance, i, j, chunkStatus, b);
-        return future.thenApplyAsync(res->{
-            res.ifPresent(chunk -> {
-                var voxyInstance = VoxyCommon.getInstance();
-                if (voxyInstance != null) {
-                    try {
-                        voxyInstance.getIngestService().enqueueIngest((WorldChunk) chunk, true);
-                    } catch (Exception e) {
+        if (true) {//TODO: ADD SERVER CONFIG THING
+            return future;
+        } else {
+            return future.thenApplyAsync(res -> {
+                res.ifPresent(chunk -> {
+                    var voxyInstance = VoxyCommon.getInstance();
+                    if (voxyInstance != null) {
+                        try {
+                            voxyInstance.getIngestService().enqueueIngest((WorldChunk) chunk, true);
+                        } catch (Exception e) {
 
+                        }
                     }
-                }
+                });
+                return res;
             });
-            return res;
-        });
+        }
     }
 }

@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
 import me.cortex.voxy.client.LoadException;
+import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.client.MinecraftClient;
@@ -21,6 +22,7 @@ import java.util.function.Consumer;
 public class MixinClientLoginNetworkHandler {
     @Inject(method = "<init>", at = @At(value = "TAIL"))
     private void voxy$init(ClientConnection connection, MinecraftClient client, ServerInfo serverInfo, Screen parentScreen, boolean newWorld, Duration worldLoadTime, Consumer statusConsumer, CookieStorage cookieStorage, CallbackInfo ci) {
+        VoxyClientInstance.isInGame = true;
         if (VoxyConfig.CONFIG.enabled) {
             VoxyCommon.createInstance();
         }

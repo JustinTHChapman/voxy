@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
+import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.client.MinecraftClient;
@@ -13,14 +14,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(MinecraftClient.class)
 public class MixinMinecraftClient {
-    @Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/resource/PeriodicNotificationManager;<init>(Lnet/minecraft/util/Identifier;Lit/unimi/dsi/fastutil/objects/Object2BooleanFunction;)V", shift = At.Shift.AFTER))
-    private void injectRenderDoc(RunArgs args, CallbackInfo ci) {
-        //System.load("C:\\Program Files\\RenderDoc\\renderdoc.dll");
-    }
-
     @Inject(method = "disconnect(Lnet/minecraft/client/gui/screen/Screen;Z)V", at = @At("TAIL"))
     private void voxy$injectWorldClose(CallbackInfo ci) {
         VoxyCommon.shutdownInstance();
+        VoxyClientInstance.isInGame = false;
     }
 
     /*
