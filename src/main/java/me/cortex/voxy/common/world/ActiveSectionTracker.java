@@ -20,8 +20,8 @@ public class ActiveSectionTracker {
     private final ReentrantLock[] locks;
     private final SectionLoader loader;
 
-    private final int maxLRUSectionPerSlice;
-    private final Long2ObjectLinkedOpenHashMap<WorldSection>[] lruSecondaryCache;//TODO: THIS NEEDS TO BECOME A GLOBAL STATIC CACHE
+    private final int lruSize;
+    private final Long2ObjectLinkedOpenHashMap<WorldSection> lruSecondaryCache;//TODO: THIS NEEDS TO BECOME A GLOBAL STATIC CACHE
     @Nullable
     public final WorldEngine engine;
 
@@ -35,12 +35,11 @@ public class ActiveSectionTracker {
 
         this.loader = loader;
         this.loadedSectionCache = new Long2ObjectOpenHashMap[1<<numSlicesBits];
-        this.lruSecondaryCache = new Long2ObjectLinkedOpenHashMap[1<<numSlicesBits];
+        this.lruSecondaryCache = new Long2ObjectLinkedOpenHashMap<>(cacheSize);
         this.locks = new ReentrantLock[1<<numSlicesBits];
-        this.maxLRUSectionPerSlice = (cacheSize+(1<<numSlicesBits)-1)/(1<<numSlicesBits);
+        this.lruSize = cacheSize;
         for (int i = 0; i < this.loadedSectionCache.length; i++) {
             this.loadedSectionCache[i] = new Long2ObjectOpenHashMap<>(1024);
-            this.lruSecondaryCache[i] = new Long2ObjectLinkedOpenHashMap<>(this.maxLRUSectionPerSlice);
             this.locks[i] = new ReentrantLock();
         }
     }
@@ -71,11 +70,14 @@ public class ActiveSectionTracker {
                 lock.unlock();
                 return section;
             }
-            if (isLoader) {
-                section = this.lruSecondaryCache[index].remove(key);
-            }
         }
         lock.unlock();
+
+        if (isLoader) {
+            synchronized (this.lruSecondaryCache) {
+                section = this.lruSecondaryCache.remove(key);
+            }
+        }
 
         //If this thread was the one to create the reference then its the thread to load the section
         if (isLoader) {
@@ -130,8 +132,7 @@ public class ActiveSectionTracker {
     void tryUnload(WorldSection section) {
         int index = this.getCacheArrayIndex(section.key);
         final var cache = this.loadedSectionCache[index];
-        WorldSection prev = null;
-        WorldSection lruEntry = null;
+        WorldSection sec = null;
         final var lock = this.locks[index];
         lock.lock();
         {
@@ -141,23 +142,23 @@ public class ActiveSectionTracker {
                 if (obj != section) {
                     throw new IllegalStateException("Removed section not the same as the referenced section in the cache: cached: " + obj + " got: " + section + " A: " + WorldSection.ATOMIC_STATE_HANDLE.get(obj) + " B: " +WorldSection.ATOMIC_STATE_HANDLE.get(section));
                 }
-
-                //Add section to secondary cache while primary is locked
-                var lruCache = this.lruSecondaryCache[index];
-                prev = lruCache.put(section.key, section);
-                //If cache is bigger than its ment to be, remove the least recently used and free it
-                if (this.maxLRUSectionPerSlice < lruCache.size()) {
-                    lruEntry = lruCache.removeFirst();
-                }
+                sec = section;
             }
         }
         lock.unlock();
 
-        if (prev != null) {
-            prev._releaseArray();
-        }
-        if (lruEntry != null) {
-            lruEntry._releaseArray();
+        if (sec != null) {
+            WorldSection a;
+            synchronized (this.lruSecondaryCache) {
+                a = this.lruSecondaryCache.put(section.key, section);
+                //If cache is bigger than its ment to be, remove the least recently used and free it
+                if (a == null && this.lruSize < this.lruSecondaryCache.size()) {
+                    a = this.lruSecondaryCache.removeFirst();
+                }
+            }
+            if (a != null) {
+                a._releaseArray();
+            }
         }
     }
 
@@ -180,11 +181,7 @@ public class ActiveSectionTracker {
     }
 
     public int getSecondaryCacheSize() {
-        int res = 0;
-        for (var cache : this.lruSecondaryCache) {
-            res += cache.size();
-        }
-        return res;
+        return this.lruSecondaryCache.size();
     }
 
     public static void main(String[] args) {
