@@ -20,7 +20,6 @@ layout(binding = HIZ_BINDING) uniform sampler2DShadow hizDepthSampler;
 vec3 minBB;
 vec3 maxBB;
 vec2 size;
-float zThing;
 
 uint BASE_IDX = gl_LocalInvocationID.x*8;
 shared vec2[LOCAL_SIZE*8] screenPoints;
@@ -47,7 +46,6 @@ void setupScreenspace(in UnpackedNode node) {
 
     minBB = base.xyz/base.w;
     maxBB = minBB;
-    zThing = -999999999999.0f;
 
     screenPoints[BASE_IDX+0] = minBB.xy*0.5f+0.5f;
     for (int i = 1; i < 8; i++) {
@@ -55,7 +53,6 @@ void setupScreenspace(in UnpackedNode node) {
         vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*(32<<node.lodLevel),1));//Size of section is 32x32x32 (need to change it to a bounding box in the future)
         pPoint += base;
         vec3 point = pPoint.xyz/pPoint.w;
-        zThing = max(point.z, zThing);
         //TODO: CLIP TO VIEWPORT
         minBB = min(minBB, point);
         maxBB = max(maxBB, point);
@@ -80,7 +77,7 @@ void setupScreenspace(in UnpackedNode node) {
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
-    return any(lessThanEqual(maxBB, vec3(0.0f))) || any(lessThanEqual(vec3(1.0f), minBB)) || zThing < 0;//
+    return any(lessThanEqual(maxBB, vec3(0.0f))) || any(lessThanEqual(vec3(1.0f), minBB)) || maxBB.z < 0.5f || maxBB.z > 1;// maxBB.z > 1 is actually wrong
 
     //|| any(lessThanEqual(minBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), maxBB));
 }
