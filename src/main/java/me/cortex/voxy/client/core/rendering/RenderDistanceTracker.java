@@ -27,6 +27,9 @@ public class RenderDistanceTracker {
     }
 
     public void setRenderDistance(int renderDistance) {
+        if (renderDistance == this.renderDistance) {
+            return;
+        }
         this.renderDistance = renderDistance;
         this.tracker.unload();//Mark all as unload
         this.tracker = new RingTracker(this.tracker, renderDistance, ((int)this.posX)>>9, ((int)this.posZ)>>9, true);//Steal from previous tracker
