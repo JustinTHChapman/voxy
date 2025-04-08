@@ -27,10 +27,9 @@ public class RenderDistanceTracker {
     }
 
     public void setRenderDistance(int renderDistance) {
-        this.tracker.unload();
-        this.tracker.process(Integer.MAX_VALUE, this::add, this::rem);
         this.renderDistance = renderDistance;
-        this.tracker = new RingTracker(renderDistance, ((int)this.posX)>>9, ((int)this.posZ)>>9, true);
+        this.tracker.unload();//Mark all as unload
+        this.tracker = new RingTracker(this.tracker, renderDistance, ((int)this.posX)>>9, ((int)this.posZ)>>9, true);//Steal from previous tracker
     }
 
     public void setCenterAndProcess(double x, double z) {

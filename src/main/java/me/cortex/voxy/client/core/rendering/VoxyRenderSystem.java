@@ -55,7 +55,7 @@ public class VoxyRenderSystem {
         this.renderer = new RenderService(world, threadPool);
         this.postProcessing = new PostProcessing();
 
-        this.renderDistanceTracker = new RenderDistanceTracker(10,
+        this.renderDistanceTracker = new RenderDistanceTracker(20,
                 MinecraftClient.getInstance().world.getBottomSectionCoord()>>5,
                 (MinecraftClient.getInstance().world.getTopSectionCoord()-1)>>5,
                 this.renderer::addTopLevelNode,

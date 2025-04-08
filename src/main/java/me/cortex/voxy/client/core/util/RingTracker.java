@@ -16,10 +16,18 @@ public class RingTracker {
     private int centerZ;
 
     public RingTracker(int radius, int centerX, int centerZ, boolean fill) {
+        this(null, radius, centerX, centerZ, fill);
+    }
+
+    public RingTracker(RingTracker stealFrom, int radius, int centerX, int centerZ, boolean fill) {
         this.centerX = centerX;
         this.centerZ = centerZ;
         this.radius = radius;
         this.boundDist = generateBoundingHalfCircleDistance(radius);
+        if (stealFrom != null) {
+            this.operations.putAll(stealFrom.operations);
+            stealFrom.operations.clear();
+        }
         if (fill) {
             this.fillRing(true);
         }
