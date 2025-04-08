@@ -157,7 +157,7 @@ void main() {
 
     //Work size batching
     for (uint i = 0; i < OPS_PER_THREAD; i++) {
-        barrier();
+        barrier();//Probably unneeded, was just to keep warp coheriancy
         uint id = gl_LocalInvocationID.x+(i*WORK_SIZE);
         uint sid = initalSort[id];
         if ((sid&(1u<<31)) != 0) {

@@ -202,7 +202,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
         this.bindRenderingBuffers();
 
-        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), 100_000), 0);
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, Math.min(this.geometryManager.getSectionCount(), 100_000), 0);
 
         glEnable(GL_CULL_FACE);
         glBindVertexArray(0);
