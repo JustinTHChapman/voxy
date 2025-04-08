@@ -35,6 +35,7 @@ public class NodeCleaner {
 
 
     private static final int SORTING_WORKER_SIZE = 64;
+    private static final int WORK_PER_THREAD = 8;
     private static final int OUTPUT_COUNT = 256;
 
 
@@ -43,6 +44,7 @@ public class NodeCleaner {
 
     private final AutoBindingShader sorter = Shader.makeAuto(PrintfDebugUtil.PRINTF_processor)
             .define("WORK_SIZE", SORTING_WORKER_SIZE)
+            .define("ELEMS_PER_THREAD", WORK_PER_THREAD)
             .define("OUTPUT_SIZE", OUTPUT_COUNT)
             .define("VISIBILITY_BUFFER_BINDING", 1)
             .define("OUTPUT_BUFFER_BINDING", 2)
@@ -134,7 +136,7 @@ public class NodeCleaner {
 
                 //TODO: choose whether this is in nodeSpace or section/geometryId space
                 //
-                glDispatchCompute((this.nodeManager.getCurrentMaxNodeId() + SORTING_WORKER_SIZE - 1) / SORTING_WORKER_SIZE, 1, 1);
+                glDispatchCompute((this.nodeManager.getCurrentMaxNodeId() + (SORTING_WORKER_SIZE+WORK_PER_THREAD) - 1) / (SORTING_WORKER_SIZE+WORK_PER_THREAD), 1, 1);
                 glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
                 this.resultTransformer.bind();
