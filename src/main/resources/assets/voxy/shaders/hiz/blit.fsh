@@ -11,8 +11,8 @@ void main() {
     //TODO, do it so that for the first 2,3 levels if 1 (or maybe even 2 (on the first layer)) pixels are air, just ignore that
     // this is to stop issues with 1 pixel gaps
     bvec4 cv = lessThanEqual(vec4(0.99999999), depths);
-    if (any(cv) && !all(cv)) {
-        depths = mix(vec4(1.0f), depths, cv);
-    }
+    //if (any(cv) && !all(cv)) {
+    //    depths = mix(vec4(1.0f), depths, cv);
+    //}
     gl_FragDepth = max(max(depths.x, depths.y), max(depths.z, depths.w)); // Write conservative depth.
 }
