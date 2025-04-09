@@ -203,6 +203,9 @@ public class PrintfInjector implements IShaderProcessor {
             ptr += 4;
             cnt++;
             String fmt = this.idToPrintfStringMap.get(id);
+            if (fmt == null) {
+                throw new IllegalStateException("Unknown id: "+ id);
+            }
             types.clear();
             parsePrintfTypes(fmt, types);
             Object[] args = new Object[types.size()];

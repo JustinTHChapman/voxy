@@ -285,7 +285,7 @@ public class TestNodeManager {
 
         Logger.SHUTUP = true;
 
-        if (false) {
+        if (true) {
             for (int q = 0; q < ITER_COUNT; q++) {
                 //Logger.info("Iteration "+ q);
                 if (runTest(INNER_ITER_COUNT, q, seenTraces, GEO_REM)) {

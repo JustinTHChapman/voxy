@@ -150,8 +150,8 @@ public class HierarchicalOcclusionTraverser {
         glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.queueMetaBuffer.id);
 
         //Bind the hiz buffer
-        glBindSampler(0, this.hizSampler);
         glBindTextureUnit(0, this.hiZBuffer.getHizTextureId());
+        glBindSampler(0, this.hizSampler);
     }
 
     public void doTraversal(Viewport<?> viewport, int depthBuffer) {

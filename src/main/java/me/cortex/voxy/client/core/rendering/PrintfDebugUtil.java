@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering;
 import me.cortex.voxy.client.core.gl.shader.IShaderProcessor;
 import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.common.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,9 +19,9 @@ public final class PrintfDebugUtil {
 
     static {
         if (ENABLE_PRINTF_DEBUGGING) {
-            PRINTF_object = new PrintfInjector(50000, 10, line -> {
+            PRINTF_object = new PrintfInjector(50000, 20, line -> {
                 if (line.startsWith("LOG")) {
-                    System.err.println(line);
+                    Logger.info(line);
                 }
                 printfQueue.add(line);
             }, printfQueue::clear);

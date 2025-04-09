@@ -51,7 +51,6 @@ public class RocksDBStorageBackend extends StorageBackend {
          */
 
         final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
-                .optimizeUniversalStyleCompaction()
                 .optimizeForPointLookup(128);
 
         final List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(

@@ -206,7 +206,7 @@ public class ModelFactory {
             throw new IllegalStateException("Block id already added: " + blockId + " for state: " + blockState);
         }
 
-        if (!this.blockStatesInFlight.remove(blockId)) {
+        if (!this.blockStatesInFlight.contains(blockId)) {
             throw new IllegalStateException("processing a texture bake result but the block state was not in flight!!");
         }
 
@@ -449,6 +449,10 @@ public class ModelFactory {
 
         //Set the mapping at the very end
         this.idMappings[blockId] = modelId;
+
+        if (!this.blockStatesInFlight.remove(blockId)) {
+            throw new IllegalStateException("processing a texture bake result but the block state was not in flight!!");
+        }
 
         //Upload/commit stream
         //TODO maybe dont do it for every uploaded block?? try to batch it

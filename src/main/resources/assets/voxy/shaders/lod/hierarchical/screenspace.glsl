@@ -24,12 +24,13 @@ vec2 size;
 uint BASE_IDX = gl_LocalInvocationID.x*8;
 shared vec2[LOCAL_SIZE*8] screenPoints;
 
+UnpackedNode node22;
 //Sets up screenspace with the given node id, returns true on success false on failure/should not continue
 //Accesses data that is setup in the main traversal and is just shared to here
 void setupScreenspace(in UnpackedNode node) {
     //TODO: Need to do aabb size for the nodes, it must be an overesimate of all the children
 
-
+    node22 = node;
     /*
     Transform transform = transforms[getTransformIndex(node)];
 
@@ -59,12 +60,6 @@ void setupScreenspace(in UnpackedNode node) {
         screenPoints[BASE_IDX+i] = point.xy*0.5f+0.5f;
     }
 
-    //TODO: MORE ACCURATLY DETERMIN SCREENSPACE AREA, this can be done by computing and adding
-    //  the projected surface area of each face/quad which winding order faces the camera
-    //  (this is just the dot product of 2 projected vectors)
-
-    //can do a funny by not doing the perspective divide except on the output of the area
-
     //printf("Screenspace MIN: %f, %f, %f  MAX: %f, %f, %f", minBB.x,minBB.y,minBB.z, maxBB.x,maxBB.y,maxBB.z);
 
     //Convert to screenspace
@@ -77,7 +72,7 @@ void setupScreenspace(in UnpackedNode node) {
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
-    return any(lessThanEqual(maxBB, vec3(0.0f))) || any(lessThanEqual(vec3(1.0f), minBB)) || maxBB.z < 0.5f;// maxBB.z > 1 is actually wrong
+    return any(lessThanEqual(maxBB, vec3(0.0f))) || any(lessThanEqual(vec3(1.0f), minBB));// maxBB.z > 1 is actually wrong
 
     //|| any(lessThanEqual(minBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), maxBB));
 }
@@ -87,20 +82,18 @@ bool isCulledByHiz() {
     //    return false;//Just cull it for now cause other culling isnt working, TODO: FIXME
     //}
 
-
     vec2 ssize = size * vec2(screenW, screenH);
     float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
-    miplevel = clamp(miplevel, 1, 20);
+    miplevel = clamp(miplevel, 0, 20);
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
     //TODO: maybe get rid of clamp
     //Todo: replace with some rasterization, e.g. especially for request back to cpu
-    midpoint = clamp(midpoint, vec2(0), vec2(1));
-    bool culled = textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) < 0.0001f;
-
-    if (culled) {
-        printf("HiZ sample point culled: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
+    vec2 midpoint2 = clamp(midpoint, vec2(0), vec2(1));
+    bool culled = textureLod(hizDepthSampler, vec3(midpoint2, minBB.z), miplevel) < 0.0001f;
+    //printf("HiZ sample point: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
+    if (culled && node22.lodLevel != 4) {
+        printf("HiZ sample point: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
     }
-
     return culled;
 }
 

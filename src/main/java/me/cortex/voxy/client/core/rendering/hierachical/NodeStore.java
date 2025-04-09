@@ -203,6 +203,7 @@ public final class NodeStore {
         this.localNodeData[id2idx(nodeId)+2] &= ~(1L<<16);
         this.localNodeData[id2idx(nodeId)+2] |= state?1L<<16:0;
     }
+
     public boolean getAllChildrenAreLeaf(int nodeId) {
         return ((this.localNodeData[id2idx(nodeId)+2]>>16)&1)!=0;
     }

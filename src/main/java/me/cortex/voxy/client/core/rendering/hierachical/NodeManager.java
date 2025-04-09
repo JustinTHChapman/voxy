@@ -470,6 +470,7 @@ public class NodeManager {
                     //TODO: make new SENTINAL value for this!!! NodeStore.NODE_ID_MSK-1
                     // check in shader aswell!!!
 
+                    this.nodeData.setAllChildrenAreLeaf(nodeId, false);//Children dont exist, therefor set them to false
                     this.nodeData.setChildPtr(nodeId, SENTINEL_EMPTY_CHILD_PTR);
                     this.nodeData.setChildPtrCount(nodeId, 8);
                     for (int i = 0; i < 8; i++) {
@@ -587,7 +588,7 @@ public class NodeManager {
 
             this.nodeData.setChildPtr(nodeId, -1);
             int old = this.activeSectionMap.put(pos, NODE_TYPE_LEAF|nodeId);
-
+            this.nodeData.setAllChildrenAreLeaf(nodeId, false);//Node is leaf so is not all child leaf
             this.invalidateNode(nodeId);
         }
     }
@@ -873,16 +874,14 @@ public class NodeManager {
             this.nodeData.unmarkRequestInFlight(parentNodeId);
 
             //Change it from a leaf to an inner node
-            {
-                int pid = this.activeSectionMap.remove(request.getPosition());
-                if (pid == -1 || (pid & NODE_TYPE_MSK) != NODE_TYPE_LEAF) {
-                    throw new IllegalStateException("Unexpected node mapping: " + pid);
-                }
+            //Set the type from leaf to inner node
+            if ((this.activeSectionMap.put(request.getPosition(), NODE_TYPE_INNER|parentNodeId)&NODE_TYPE_MSK)!=NODE_TYPE_LEAF) {
+                throw new IllegalStateException();
             }
-            //_this is why it hasnt been working, grrr, wasnt doing this_
-            this.activeSectionMap.put(request.getPosition(), NODE_TYPE_INNER|parentNodeId);//Set the type from leaf to inner node
-
             this.invalidateNode(parentNodeId);
+            this.nodeData.setAllChildrenAreLeaf(parentNodeId, true);
+
+            //TODO: Need to set AllChildrenAreLeaf of the parent of the parent to false
         } else if (parentNodeType==NODE_TYPE_INNER) {
             //For this, only need to add the nodes to the existing child set thing (shuffle around whatever) dont ever have to remove nodes
 
@@ -1238,11 +1237,15 @@ public class NodeManager {
             this.recurseRemoveChildNodes(pPos);//TODO: make this download/fetch the data instead of just deleting it
             //this.clearId(pId);
 
+            //Make node a leaf
             int old = this.activeSectionMap.put(pPos, NODE_TYPE_LEAF|pId);
             if (old == -1)
                 throw new IllegalStateException();
             if ((old&NODE_TYPE_MSK)!=NODE_TYPE_INNER || (old&NODE_ID_MSK)!=pId)
                 throw new IllegalStateException();
+
+            //Mark all children as not leaf (as this is a leaf node)
+            this.nodeData.setAllChildrenAreLeaf(pId, false);
         }
     }
 
@@ -1271,87 +1274,6 @@ public class NodeManager {
             }
         }
     }
-    /*
-    public void removeNodeGeometryOld(long pos) {
-        int nodeId = this.activeSectionMap.get(pos);
-        if (nodeId == -1) {
-            Logger.error("Got geometry removal for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, ignoring!");
-            return;
-        }
-        int nodeType = nodeId&NODE_TYPE_MSK;
-        nodeId &= NODE_ID_MSK;
-        if (nodeType == NODE_TYPE_REQUEST) {
-            Logger.error("Tried removing geometry for pos: " + WorldEngine.pprintPos(pos) + " but its type was a request, ignoring!");
-            return;
-        }
-
-        //Reset/clear the id
-        this.clearId(nodeId);
-
-        if (nodeType == NODE_TYPE_LEAF) {
-            //If it is a leaf node, check that the parent has geometry, if it doesnt, request geometry for that parent
-            // if it DOES tho, remove all the children and make the parent a leaf node
-            // by requesting the geometry of the parent, it means that the system will automatically handle itself
-            // (if only a bit slow as needs to go roundabout in the pipeline)
-            // but what it means is the parent then gets geometry, and the child still has the clear request from this
-            // which means magically everything might maybe should work tm?
-            //Logger.warn("Tried removing geometry for leaf node: " + WorldEngine.pprintPos(pos) + " but this is not yet supported, ignoring!");
-
-            if (WorldEngine.getLevel(pos) == MAX_LOD_LAYERS-1) {
-                //Cannot remove top level nodes
-
-                //Logger.info("Tried cleaning top level node " + WorldEngine.pprintPos(pos));
-
-                this.removeGeometryInternal(pos, nodeId);
-                return;
-            }
-
-            long pPos = makeParentPos(pos);
-            int pId = this.activeSectionMap.get(pPos);
-            if (pId == -1) throw new IllegalStateException("Parent node must exist");
-            if ((pId&NODE_TYPE_MSK)!=NODE_TYPE_INNER) throw new IllegalStateException("Parent node must be an inner node");
-            pId &= NODE_ID_MSK;
-
-            if (this.nodeData.getNodeGeometry(pId) == NULL_GEOMETRY_ID) {
-                //If the parent has null geometry we must first fill it before we can remove it
-
-                //Logger.error("TODO: THIS");
-
-                this.processRequest(pPos);//Assume we can do this, TODO: maybe dont?
-            } else {
-                //Else make the parent node a leaf node and remove all the children
-
-                //THIS IS MOST IMPORTANT
-                //Logger.error("TODO: THIS 2");
-
-                //TODO: cancel any requests with the parent node
-                // update the parent nodes child existance with respect to the request if it had
-                // recurseRemoveNode(); on all the children (which will include us)
-                // update the type of the parent node
-                Logger.error("TODO: FINISH THIS");
-            }
-            //this.removeGeometryInternal(pos, nodeId);
-            return;
-        }
-        this.removeGeometryInternal(pos, nodeId);
-    }
-
-    private void removeGeometryInternal(long pos, int nodeId) {
-        int geometryId = this.nodeData.getNodeGeometry(nodeId);
-        if (geometryId != NULL_GEOMETRY_ID && geometryId != EMPTY_GEOMETRY_ID) {
-            //Unwatch geometry updates
-            if (this.watcher.unwatch(pos, WorldEngine.UPDATE_TYPE_BLOCK_BIT)) {
-                throw new IllegalStateException("Unwatching position for geometry removal at: " + WorldEngine.pprintPos(pos) + " resulted in full removal");
-            }
-            //Remove geometry and set to null
-            //TODO: download and remove instead of just removing, and store in ram cache for later!!
-            this.geometryManager.removeSection(geometryId);
-            this.nodeData.setNodeGeometry(nodeId, NULL_GEOMETRY_ID);
-            //this.cleaner
-        }
-        this.invalidateNode(nodeId);
-    }
-     */
 
     //==================================================================================================================
     public boolean writeChanges(GlBuffer nodeBuffer) {
@@ -1547,6 +1469,7 @@ public class NodeManager {
                 }
                 //TODO: check SENTINEL_EMPTY_CHILD_PTR
                 if (childPtr != SENTINEL_EMPTY_CHILD_PTR) {
+                    boolean allChildrenLeaf = true;
                     for (int i = 0; i < childCount; i++) {
                         if (!this.nodeData.nodeExists(i + childPtr))//All children must exist
                             throw new IllegalStateException();
@@ -1554,10 +1477,25 @@ public class NodeManager {
                         if (makeParentPos(cPos) != pos)//Parent of child must be this position
                             throw new IllegalStateException();
                         cActiveExistence |= 1 << getChildIdx(cPos);
+
+                        int cNode = this.activeSectionMap.get(cPos);
+                        if (cNode == -1) {
+                            throw new IllegalStateException();
+                        }
+                        if ((cNode&NODE_TYPE_MSK) != NODE_TYPE_LEAF) {
+                            allChildrenLeaf = false;
+                        }
                         //Recurse into child
                         this.verifyNode(cPos, seenPositions, seenNodes);
                     }
+
+                    if (this.nodeData.getAllChildrenAreLeaf(node) != allChildrenLeaf) {
+                        throw new IllegalStateException();
+                    }
                 } else {
+                    if (this.nodeData.getAllChildrenAreLeaf(node)) {
+                        throw new IllegalStateException();
+                    }
                     //TODO: verify SENTINEL_EMPTY_CHILD_PTR is valid
                     childCount = 0;
                 }
@@ -1573,9 +1511,14 @@ public class NodeManager {
                     throw new IllegalStateException();
                 }
             } else if (type == NODE_TYPE_LEAF) {
+                if (this.nodeData.getAllChildrenAreLeaf(node)) {
+                    throw new IllegalStateException();
+                }
+
                 if (this.nodeData.getChildPtr(node) != -1) {//Leafs cannot have child ptrs
                     throw new IllegalStateException();
                 }
+
                 if (this.nodeData.getNodeGeometry(node) == NULL_GEOMETRY_ID) {//Leafs cannot have null geometry
                     throw new IllegalStateException();
                 }
