@@ -133,6 +133,7 @@ public class VoxyConfigScreenPages implements ModMenuApi {
                                 }
                             }
                         }, s -> s.enableRendering)
+                        .setImpact(OptionImpact.HIGH)
                         .build()
                 ).add(OptionImpl.createBuilder(int.class, storage)
                         .setName(Text.translatable("voxy.config.general.subDivisionSize"))
@@ -156,6 +157,12 @@ public class VoxyConfigScreenPages implements ModMenuApi {
                             }
                         }, s -> s.sectionRenderDistance)
                         .setImpact(OptionImpact.LOW)
+                        .build()
+                ).add(OptionImpl.createBuilder(boolean.class, storage)
+                        .setName(Text.translatable("voxy.config.general.vanilla_fog"))
+                        .setTooltip(Text.translatable("voxy.config.general.vanilla_fog.tooltip"))
+                        .setControl(TickBoxControl::new)
+                        .setBinding((s, v)-> s.renderVanillaFog = v, s -> s.renderVanillaFog)
                         .build()
                 ).build()
         );
