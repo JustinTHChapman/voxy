@@ -49,13 +49,13 @@ public class HiZBuffer {
 
         //GL_DEPTH_COMPONENT32F //Cant use this as it does not match the depth format of the provided depth buffer
         this.texture = new GlTexture().store(this.type, this.levels, width, height).name("HiZ");
-        glTextureParameteri(this.texture.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTextureParameteri(this.texture.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_COMPARE_MODE, GL_NONE);
         glTextureParameteri(this.texture.id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTextureParameteri(this.texture.id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        glSamplerParameteri(this.sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glSamplerParameteri(this.sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
         glSamplerParameteri(this.sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glSamplerParameteri(this.sampler, GL_TEXTURE_COMPARE_MODE, GL_NONE);
         glSamplerParameteri(this.sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -95,17 +95,18 @@ public class HiZBuffer {
         glUniform1i(0, 0);
         int cw = this.width;
         int ch = this.height;
+        glViewport(0, 0, cw, ch);
         for (int i = 0; i < this.levels-1; i++) {
             glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, i);
             glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, i);
             this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, i+1);
-            cw /= 2; ch /= 2; glViewport(0, 0, cw, ch);
+            cw = Math.max(cw/2, 2); ch = Math.max(ch/2, 2); glViewport(0, 0, cw, ch);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
             glTextureBarrier();
             glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
         }
         glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, 0);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, this.levels-1);//TODO: CHECK IF ITS -1 or -0
+        glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, 1000);//TODO: CHECK IF ITS -1 or -0
 
         glDepthFunc(GL_LEQUAL);
         glDisable(GL_DEPTH_TEST);
