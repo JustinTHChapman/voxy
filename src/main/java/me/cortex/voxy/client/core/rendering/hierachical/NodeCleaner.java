@@ -129,10 +129,8 @@ public class NodeCleaner {
                 glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
                 this.outputBuffer.fill(this.nodeManager.maxNodeCount - 2);//TODO: maybe dont set to zero??
 
-
                 this.sorter.bind();
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, nodeDataBuffer.id);
-
 
                 //TODO: choose whether this is in nodeSpace or section/geometryId space
                 //
@@ -147,10 +145,9 @@ public class NodeCleaner {
                 glUniform1ui(0, this.visibilityId);
 
                 glDispatchCompute(1, 1, 1);
-                //glFinish();
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
                 DownloadStream.INSTANCE.download(this.outputBuffer, 4 * OUTPUT_COUNT, 8 * OUTPUT_COUNT, this::onDownload);
-                //glFinish();
             }
         }
     }

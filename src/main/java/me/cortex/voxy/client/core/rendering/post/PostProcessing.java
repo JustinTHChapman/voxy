@@ -180,11 +180,11 @@ public class PostProcessing {
         glUniformMatrix4fv(3, false, data);//tooProjection
 
 
-        glActiveTexture(GL_TEXTURE1);
-        GL11C.glBindTexture(GL_TEXTURE_2D, this.depthStencil.id);
-        glTexParameteri (GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, this.didSSAO?this.colourSSAO.id:this.colour.id);
+        glBindTextureUnit(0, this.didSSAO?this.colourSSAO.id:this.colour.id);
+
+        glBindTextureUnit(1, this.depthStencil.id);
+        //glTextureParameteri(this.depthStencil.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+
         glEnable(GL_DEPTH_TEST);
         glDepthMask(true);
         this.blitTexture.blit();

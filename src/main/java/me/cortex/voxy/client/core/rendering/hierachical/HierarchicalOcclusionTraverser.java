@@ -96,7 +96,7 @@ public class HierarchicalOcclusionTraverser {
         this.nodeCleaner = nodeCleaner;
         this.nodeManager = nodeManager;
         this.requestBuffer = new GlBuffer(REQUEST_QUEUE_SIZE*8L+8).zero();
-        this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).zero();
+        this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).fill(-1);
 
 
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
