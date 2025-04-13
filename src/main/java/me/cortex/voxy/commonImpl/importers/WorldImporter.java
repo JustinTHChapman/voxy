@@ -61,7 +61,7 @@ public class WorldImporter implements IDataImporter {
 
     public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, BooleanSupplier runChecker) {
         this.world = worldEngine;
-        this.threadPool = servicePool.createServiceNoCleanup("World importer", 1, ()->()->this.jobQueue.poll().run(), runChecker);
+        this.threadPool = servicePool.createServiceNoCleanup("World importer", 3, ()->()->this.jobQueue.poll().run(), runChecker);
 
         var biomeRegistry = mcWorld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
         var defaultBiome = biomeRegistry.getOrThrow(BiomeKeys.PLAINS);
@@ -191,6 +191,9 @@ public class WorldImporter implements IDataImporter {
                 regions.add(entry);
             }
             this.importRegionsAsync(regions.toArray(ZipArchiveEntry[]::new), (entry)->{
+                if (entry.getSize() == 0) {
+                    return;
+                }
                 var buf = new MemoryBuffer(entry.getSize());
                 try (var channel = Channels.newChannel(file.getInputStream(entry))) {
                     if (channel.read(buf.asByteBuffer()) != buf.size) {
@@ -274,6 +277,9 @@ public class WorldImporter implements IDataImporter {
         int rz = Integer.parseInt(sections[2]);
 
         try (var fileStream = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
+            if (fileStream.size() == 0) {
+                return;
+            }
             var fileData = new MemoryBuffer(fileStream.size());
             if (fileStream.read(fileData.asByteBuffer(), 0) < 8192) {
                 fileData.free();
@@ -301,39 +307,45 @@ public class WorldImporter implements IDataImporter {
             int sectorStart = sectorMeta>>>8;
             int sectorCount = sectorMeta&((1<<8)-1);
 
-            //TODO: create memory copy for each section
-            if (regionFile.size < (sectorCount+sectorStart)*4096L) {
-                Logger.warn("Cannot access chunk sector as it goes out of bounds. start: " + sectorStart + " count: " + sectorCount + " fileSize: " + regionFile.size);
+            if (sectorCount == 0) {
                 continue;
             }
-            var data = new MemoryBuffer(sectorCount*4096).cpyFrom(regionFile.address+sectorStart*4096L);
 
-            boolean addedToQueue = false;
+            //TODO: create memory copy for each section
+            if (regionFile.size < ((sectorCount-1) + sectorStart) * 4096L) {
+                System.err.println("Cannot access chunk sector as it goes out of bounds. start bytes: " + (sectorStart*4096) + " sector count: " + sectorCount + " fileSize: " + regionFile.size);
+                continue;
+            }
+
             {
-                int m = Integer.reverseBytes(MemoryUtil.memGetInt(data.address));
-                byte b = MemoryUtil.memGetByte(data.address+4L);
+                long base = regionFile.address + sectorStart * 4096L;
+                int chunkLen = sectorCount * 4096;
+                int m = Integer.reverseBytes(MemoryUtil.memGetInt(base));
+                byte b = MemoryUtil.memGetByte(base + 4L);
                 if (m == 0) {
                     Logger.error("Chunk is allocated, but stream is missing");
                 } else {
                     int n = m - 1;
-                    if ((b & 128) != 0) {
+                    if (regionFile.size < (n + sectorStart*4096L)) {
+                        System.err.println("Chunk stream to small");
+                    } else if ((b & 128) != 0) {
                         if (n != 0) {
                             Logger.error("Chunk has both internal and external streams");
                         }
                         Logger.error("Chunk has external stream which is not supported");
-                    } else if (n > data.size-5) {
-                        Logger.error("Chunk stream is truncated: expected "+n+" but read " + (data.size-5));
+                    } else if (n > chunkLen-5) {
+                        Logger.error("Chunk stream is truncated: expected "+n+" but read " + (chunkLen-5));
                     } else if (n < 0) {
                         Logger.error("Declared size of chunk is negative");
                     } else {
-                        addedToQueue = true;
+                        var data = new MemoryBuffer(n).cpyFrom(base + 5);
                         this.jobQueue.add(()-> {
                             if (!this.isRunning) {
                                 return;
                             }
                             try {
                                 try (var decompressedData = this.decompress(b, new InputStream() {
-                                    private long offset = 5;//For the initial 5 offset
+                                    private long offset = 0;
                                     @Override
                                     public int read() {
                                         return MemoryUtil.memGetByte(data.address + (this.offset++)) & 0xFF;
@@ -372,9 +384,6 @@ public class WorldImporter implements IDataImporter {
                         this.threadPool.execute();
                     }
                 }
-            }
-            if (!addedToQueue) {
-                data.free();
             }
         }
     }
