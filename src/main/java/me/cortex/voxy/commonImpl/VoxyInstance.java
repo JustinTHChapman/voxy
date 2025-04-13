@@ -67,6 +67,7 @@ public class VoxyInstance {
         if (!this.activeWorlds.isEmpty()) {
             throw new IllegalStateException("Not all worlds shutdown");
         }
+        Logger.info("Instance shutdown");
     }
 
     public ServiceThreadPool getThreadPool() {
@@ -99,7 +100,7 @@ public class VoxyInstance {
     }
 
     protected WorldEngine createWorld(SectionStorage storage) {
-        var world = new WorldEngine(storage, 2048, this);
+        var world = new WorldEngine(storage, this);
         world.setSaveCallback(this.savingService::enqueueSave);
         this.activeWorlds.add(world);
         return world;

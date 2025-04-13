@@ -41,17 +41,17 @@ public class WorldEngine {
 
     public final @Nullable VoxyInstance instanceIn;
 
-    public WorldEngine(SectionStorage storage, int cacheCount) {
-        this(storage, cacheCount, null);
+    public WorldEngine(SectionStorage storage) {
+        this(storage, null);
     }
 
-    public WorldEngine(SectionStorage storage, int cacheCount, @Nullable VoxyInstance instance) {
+    public WorldEngine(SectionStorage storage, @Nullable VoxyInstance instance) {
         this.instanceIn = instance;
 
         this.storage = storage;
         this.mapper = new Mapper(this.storage);
         //5 cache size bits means that the section tracker has 32 separate maps that it uses
-        this.sectionTracker = new ActiveSectionTracker(10, storage::loadSection, cacheCount, this);
+        this.sectionTracker = new ActiveSectionTracker(10, storage::loadSection, 2048, this);
     }
 
     public WorldSection acquireIfExists(int lvl, int x, int y, int z) {
