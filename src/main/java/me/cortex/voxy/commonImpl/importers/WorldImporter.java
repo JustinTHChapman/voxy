@@ -344,28 +344,7 @@ public class WorldImporter implements IDataImporter {
                                 return;
                             }
                             try {
-                                try (var decompressedData = this.decompress(b, new InputStream() {
-                                    private long offset = 0;
-                                    @Override
-                                    public int read() {
-                                        return MemoryUtil.memGetByte(data.address + (this.offset++)) & 0xFF;
-                                    }
-
-                                    @Override
-                                    public int read(byte[] b, int off, int len) {
-                                        len = Math.min(len, this.available());
-                                        if (len == 0) {
-                                            return -1;
-                                        }
-                                        UnsafeUtil.memcpy(data.address+this.offset, len, b, off); this.offset+=len;
-                                        return len;
-                                    }
-
-                                    @Override
-                                    public int available() {
-                                        return (int) (data.size-this.offset);
-                                    }
-                                })) {
+                                try (var decompressedData = this.decompress(b, data)) {
                                     if (decompressedData == null) {
                                         Logger.error("Error decompressing chunk data");
                                     } else {
@@ -388,13 +367,38 @@ public class WorldImporter implements IDataImporter {
         }
     }
 
-    private DataInputStream decompress(byte flags, InputStream stream) throws IOException {
+    private static InputStream createInputStream(MemoryBuffer data) {
+        return new InputStream() {
+            private long offset = 0;
+            @Override
+            public int read() {
+                return MemoryUtil.memGetByte(data.address + (this.offset++)) & 0xFF;
+            }
+
+            @Override
+            public int read(byte[] b, int off, int len) {
+                len = Math.min(len, this.available());
+                if (len == 0) {
+                    return -1;
+                }
+                UnsafeUtil.memcpy(data.address+this.offset, len, b, off); this.offset+=len;
+                return len;
+            }
+
+            @Override
+            public int available() {
+                return (int) (data.size-this.offset);
+            }
+        };
+    }
+
+    private DataInputStream decompress(byte flags, MemoryBuffer stream) throws IOException {
         ChunkCompressionFormat chunkStreamVersion = ChunkCompressionFormat.get(flags);
         if (chunkStreamVersion == null) {
             Logger.error("Chunk has invalid chunk stream version");
             return null;
         } else {
-            return new DataInputStream(chunkStreamVersion.wrap(stream));
+            return new DataInputStream(chunkStreamVersion.wrap(createInputStream(stream)));
         }
     }
 
