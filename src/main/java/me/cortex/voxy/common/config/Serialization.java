@@ -107,7 +107,10 @@ public class Serialization {
             if (clzName.contains("mixin")) {
                 continue;//Dont want to load mixins
             }
-            if (clzName.contains("VoxyConfigScreenFactory")) {
+            if (clzName.contains("ModMenuIntegration")) {
+                continue;//Dont want to modmenu incase it doesnt exist
+            }
+            if (clzName.contains("VoxyConfigScreenPages")) {
                 continue;//Dont want to modmenu incase it doesnt exist
             }
             if (clzName.endsWith("VoxyConfig")) {
