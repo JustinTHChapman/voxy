@@ -21,7 +21,7 @@
       "me.cortex.voxy.client.VoxyClient"
     ],
     "modmenu": [
-      "me.cortex.voxy.client.config.VoxyConfigScreenPages"
+      "me.cortex.voxy.client.config.ModMenuIntegration"
     ],
     "main": [
       "me.cortex.voxy.commonImpl.VoxyCommon"

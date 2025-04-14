@@ -21,27 +21,10 @@ import net.minecraft.text.Text;
 import java.util.ArrayList;
 import java.util.List;
 
-public class VoxyConfigScreenPages implements ModMenuApi {
-    public static OptionPage voxyOptionPage = null;
+public abstract class VoxyConfigScreenPages {
+    private VoxyConfigScreenPages(){}
 
-    @Override
-    public ConfigScreenFactory<?> getModConfigScreenFactory() {
-        return parent -> {
-            var screen = (SodiumOptionsGUI)SodiumOptionsGUI.createScreen(parent);
-            //Sorry jelly and douira, please dont hurt me
-            try {
-                //We cant use .setPage() as that invokes rebuildGui, however the screen hasnt been initalized yet
-                // causing things to crash
-                var field = SodiumOptionsGUI.class.getDeclaredField("currentPage");
-                field.setAccessible(true);
-                field.set(screen, voxyOptionPage);
-                field.setAccessible(false);
-            } catch (Exception e) {
-                Logger.error("Failed to set the current page to voxy", e);
-            }
-            return screen;
-        };
-    }
+    public static OptionPage voxyOptionPage = null;
 
     public static OptionPage page() {
         List<OptionGroup> groups = new ArrayList<>();
