@@ -82,7 +82,8 @@ dependencies {
     //modRuntimeOnly "maven.modrinth:nvidium:0.2.6-beta"
     modCompileOnly "maven.modrinth:nvidium:0.2.8-beta"
 
-    modImplementation("maven.modrinth:modmenu:14.0.0-rc.2")
+    modCompileOnly("maven.modrinth:modmenu:14.0.0-rc.2")
+    modRuntimeOnly("maven.modrinth:modmenu:14.0.0-rc.2")
 
     modCompileOnly("maven.modrinth:iris:1.8.5+1.21.4-fabric")
 
