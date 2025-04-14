@@ -123,6 +123,7 @@ java {
         toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
     }
     archivesBaseName = project.archives_base_name
+
     // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
     // if it is present.
     // If you remove this line, sources will not be generated.
@@ -175,6 +176,14 @@ if (!processIncludeJars.outputDirectory.asFileTree.filter {
     }
 }
 
+remapJar {
+    delete getDestinationDirectory().get()
+
+    def hash = gitCommitHash();
+    if (!hash.equals("<UnknownCommit>")) {
+        archiveClassifier.set(hash);
+    }
+}
 
 project.ext.lwjglVersion = "3.3.3"
 project.ext.lwjglNatives = "natives-windows"
