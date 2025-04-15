@@ -426,7 +426,8 @@ public class NodeManager {
 
                         //Remove child from being watched and activeSections
                         long cPos = makeChildPos(pos, i);
-                        if (this.activeSectionMap.remove(cPos) == -1) {//TODO: verify the removed section is a request type of child and the request id matches this
+                        int cnid = this.activeSectionMap.remove(cPos);
+                        if (cnid == -1 || (cnid&NODE_TYPE_MSK) != NODE_TYPE_REQUEST) {//TODO: verify the removed section is a request type of child and the request id matches this
                             throw new IllegalStateException("Child pos was in a request but not in active section map");
                         }
                         if (!this.watcher.unwatch(cPos, WorldEngine.UPDATE_FLAGS)) {
@@ -487,6 +488,7 @@ public class NodeManager {
                     int prevChildId = oldPtr - 1;
                     int newChildId = newPtr - 1;
 
+                    boolean allChildNodesLeaf = true;
                     //Need to compact the old into the new
                     for (int i = 0; i < 8; i++) {
                         if ((oldExistence & (1 << i)) == 0) continue;
@@ -515,6 +517,7 @@ public class NodeManager {
                             if ((prevNodeId & NODE_ID_MSK) != prevChildId) {
                                 throw new IllegalStateException("State inconsistency");
                             }
+                            allChildNodesLeaf &= (prevNodeId & NODE_TYPE_MSK) == NODE_TYPE_LEAF;
                             this.activeSectionMap.put(cPos, (prevNodeId & NODE_TYPE_MSK) | newChildId);
 
                             //Release the old entry
@@ -524,6 +527,7 @@ public class NodeManager {
                             this.invalidateNode(newChildId);
                         }
                     }
+                    this.nodeData.setAllChildrenAreLeaf(nodeId, allChildNodesLeaf);
 
                     //Put the new childPtr into the map
                     this.nodeData.setChildPtr(nodeId, newPtr);
@@ -747,6 +751,8 @@ public class NodeManager {
                     throw new IllegalStateException("Pos was not being watched");
                 }
             } else {
+                //All children removed, clear marker
+                this.nodeData.setAllChildrenAreLeaf(nodeId, false);
                 //TODO: probably need this.clearId(nodeId);
                 this.invalidateNode(nodeId);
             }
@@ -882,6 +888,15 @@ public class NodeManager {
             this.nodeData.setAllChildrenAreLeaf(parentNodeId, true);
 
             //TODO: Need to set AllChildrenAreLeaf of the parent of the parent to false
+            //Update the parentParent that all the children are leaf
+            if (!this.topLevelNodes.contains(request.getPosition())) {
+                int ppnId = this.activeSectionMap.get(makeParentPos(request.getPosition()));
+                if ((ppnId&NODE_TYPE_MSK) != NODE_TYPE_INNER) {
+                    throw new IllegalStateException();
+                }
+                //Since this node isnt a leaf node anymore
+                this.nodeData.setAllChildrenAreLeaf(ppnId&NODE_ID_MSK, false);
+            }
         } else if (parentNodeType==NODE_TYPE_INNER) {
             //For this, only need to add the nodes to the existing child set thing (shuffle around whatever) dont ever have to remove nodes
 
@@ -925,11 +940,13 @@ public class NodeManager {
             // FOR OLD ALLOCATIONS, NEED TO UPDATE POINTERS
             int childId = newChildPtr-1;
             int prevChildId = oldChildPtr-1;
+
             for (int i = 0; i < 8; i++) {
                 if ((newMsk&(1<<i))==0) continue;
                 childId++;
 
                 if ((reqMsk&(1<<i))!=0) {
+
                     //Its an entry from the request
                     long childPos = makeChildPos(request.getPosition(), i);
 
@@ -985,6 +1002,11 @@ public class NodeManager {
             //Free the old child data
             if (oldChildPtr != SENTINEL_EMPTY_CHILD_PTR) {
                 this.nodeData.free(oldChildPtr, oldChildCnt);
+            }
+
+            //If the old ptr was sentinal null, this node is now pure leaf children
+            if (oldChildPtr == SENTINEL_EMPTY_CHILD_PTR) {
+                this.nodeData.setAllChildrenAreLeaf(parentNodeId, true);
             }
 
             //Free request
@@ -1403,8 +1425,18 @@ public class NodeManager {
                 if (!this.topLevelNodes.contains(pos)) {
                     throw new IllegalStateException();
                 }
+                int id = node&NODE_ID_MSK;
+                var req = this.singleRequests.get(id);
+                if (req.getPosition() != pos) {
+                    throw new IllegalStateException();
+                }
                 //TODO
             } else {
+                int id = node&NODE_ID_MSK;
+                var req = this.childRequests.get(id);
+                if (req.getPosition() != makeParentPos(pos)) {
+                    throw new IllegalStateException();
+                }
                 //TODO
             }
         } else {
@@ -1412,6 +1444,10 @@ public class NodeManager {
             if (!this.nodeData.nodeExists(node)) {
                 throw new IllegalStateException();
             }
+
+            //if (type != this.nodeData.getNodeType(node))
+            //    throw new IllegalStateException();
+
             if (this.nodeData.nodePosition(node) != pos) {
                 throw new IllegalStateException();
             }
@@ -1469,7 +1505,7 @@ public class NodeManager {
                 }
                 //TODO: check SENTINEL_EMPTY_CHILD_PTR
                 if (childPtr != SENTINEL_EMPTY_CHILD_PTR) {
-                    boolean allChildrenLeaf = true;
+                    boolean allChildrenLeaf = true;//childCount != 0;
                     for (int i = 0; i < childCount; i++) {
                         if (!this.nodeData.nodeExists(i + childPtr))//All children must exist
                             throw new IllegalStateException();

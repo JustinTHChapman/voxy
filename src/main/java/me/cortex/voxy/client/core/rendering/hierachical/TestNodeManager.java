@@ -268,7 +268,7 @@ public class TestNodeManager {
         private final long pos;
         private final Node[] children = new Node[8];
         private byte childExistenceMask;
-        private boolean hasMesh;
+        private int meshId;
         private Node(long pos) {
             this.pos = pos;
         }
@@ -285,7 +285,7 @@ public class TestNodeManager {
 
         Logger.SHUTUP = true;
 
-        if (true) {
+        if (false) {
             for (int q = 0; q < ITER_COUNT; q++) {
                 //Logger.info("Iteration "+ q);
                 if (runTest(INNER_ITER_COUNT, q, seenTraces, GEO_REM)) {

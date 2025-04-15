@@ -275,8 +275,14 @@ public final class NodeStore {
         int w = 0;
 
         short flags = 0;
-        flags |= (short) (this.isNodeRequestInFlight(nodeId)?1:0);
-        flags |= (short) ((this.getChildPtrCount(nodeId)-1)<<2);
+        flags |= (short) (this.isNodeRequestInFlight(nodeId)?1:0);//1 bit
+        flags |= (short) ((this.getChildPtrCount(nodeId)-1)<<2);//3 bit
+
+        boolean isEligibleForCleaning = false;
+        isEligibleForCleaning |= this.getAllChildrenAreLeaf(nodeId);
+        //isEligibleForCleaning |= this.getNodeType()
+
+        flags |= (short) (isEligibleForCleaning?1<<4:0);//1 bit
 
         {
             int geometry = this.getNodeGeometry(nodeId);

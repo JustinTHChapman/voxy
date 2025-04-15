@@ -49,6 +49,7 @@ public class WorldUpdater {
                 int iSecMsk1 =(~secMsk)+1;
 
                 int secIdx = 0;
+                //TODO: manually unroll and do e.g. 4 iterations per loop
                 for (int i = baseVIdx; i <= (0xFFF >> (lvl * 3)) + baseVIdx; i++) {
                     int cSecIdx = secIdx+baseSec;
                     secIdx = (secIdx + iSecMsk1)&secMsk;
