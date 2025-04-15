@@ -489,6 +489,8 @@ public class RenderDataFactory45 {
                         int ai = facingForward == 1 ? a : b;
                         int bi = facingForward == 1 ? b : a;
 
+                        //TODO: check if must cull against next entries face
+
                         long A = this.sectionData[ai];
                         long Am = this.sectionData[ai+1];
                         //If it isnt a fluid but contains one,
@@ -693,6 +695,7 @@ public class RenderDataFactory45 {
             for (int z = 0; z < 32; z++) {
                 int lMsk = this.opaqueMasks[y*32+z];
                 msk = (lMsk^(lMsk>>>1));
+                //TODO: fixme? doesnt this generate extra geometry??
                 msk &= -1>>>1;//Remove top bit as we dont actually know/have the data for that slice
 
                 //Always increment cause can do funny trick (i.e. -1 on skip amount)
@@ -826,6 +829,10 @@ public class RenderDataFactory45 {
                         if (ModelQueries.isFullyOpaque(meta)) {
                             oki = false;
                         }
+                        //TODO: check neibor face
+                        //else if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
+                        //    oki = false;
+                        //}
                     }
                     if (oki) {
                         ma.skip(skipA); skipA = 0;
@@ -845,6 +852,10 @@ public class RenderDataFactory45 {
                         if (ModelQueries.isFullyOpaque(meta)) {
                             oki = false;
                         }
+                        //TODO: check neibor face
+                        //else if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
+                        //    oki = false;
+                        //}
                     }
                     if (oki) {
                         mb.skip(skipB); skipB = 0;
@@ -866,6 +877,243 @@ public class RenderDataFactory45 {
         mb.doAuxiliaryFaceOffset = true;
     }
 
+    private void generateXInnerFluidGeometry() {
+        for (int y = 0; y < 32; y++) {
+            long sumA = 0;
+            long sumB = 0;
+            long sumC = 0;
+            int partialHasCount = -1;
+            int msk = 0;
+            for (int z = 0; z < 32; z++) {
+                int oMsk = this.opaqueMasks[y*32+z];
+                int fMsk = this.fluidMasks[y*32+z];
+                int lMsk = oMsk|fMsk;
+                msk = (lMsk^(lMsk>>>1));
+                //TODO: fixme? doesnt this generate extra geometry??
+                msk &= -1>>>1;//Remove top bit as we dont actually know/have the data for that slice
+
+                //Dont generate geometry for opaque faces
+                msk &= fMsk|(fMsk>>1);
+
+                //Always increment cause can do funny trick (i.e. -1 on skip amount)
+                sumA += X_I_MSK;
+                sumB += X_I_MSK;
+                sumC += X_I_MSK;
+
+                partialHasCount &= ~msk;
+
+                if (z == 30 && partialHasCount != 0) {//Hackfix for incremental count overflow issue
+                    int cmsk = partialHasCount;
+                    while (cmsk!=0) {
+                        int index = Integer.numberOfTrailingZeros(cmsk);
+                        cmsk &= ~Integer.lowestOneBit(cmsk);
+                        //TODO: fixme! check this is correct or if should be 30
+                        this.xAxisMeshers[index].skip(31);
+                    }
+                    //Clear the sum
+                    sumA &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount), X_I_MSK)*0x1F);
+                    sumB &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>11, X_I_MSK)*0x1F);
+                    sumC &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>22, X_I_MSK)*0x1F);
+                }
+
+                if (msk == 0) {
+                    continue;
+                }
+
+                int faceForwardMsk = msk&lMsk;
+                int iter = msk;
+                while (iter!=0) {
+                    int index = Integer.numberOfTrailingZeros(iter);
+                    iter &= ~Integer.lowestOneBit(iter);
+
+                    var mesher = this.xAxisMeshers[index];
+
+                    int skipCount;//Compute the skip count
+                    {//TODO: Branch-less
+                        //Compute skip and clear
+                        if (index<11) {
+                            skipCount = (int) (sumA>>(index*5));
+                            sumA &= ~(0x1FL<<(index*5));
+                        } else if (index<22) {
+                            skipCount = (int) (sumB>>((index-11)*5));
+                            sumB &= ~(0x1FL<<((index-11)*5));
+                        } else {
+                            skipCount = (int) (sumC>>((index-22)*5));
+                            sumC &= ~(0x1FL<<((index-22)*5));
+                        }
+                        skipCount &= 0x1F;
+                        skipCount--;
+                    }
+
+                    if (skipCount != 0) {
+                        mesher.skip(skipCount);
+                    }
+
+                    int facingForward = ((faceForwardMsk>>index)&1);
+                    {
+                        int idx = index + (z * 32) + (y * 32 * 32);
+
+                        //The facingForward thing is to get next entry automajicly
+                        int ai = (idx+(1-facingForward))*2;
+                        int bi = (idx+facingForward)*2;
+
+
+                        long A = this.sectionData[ai];
+                        long Am = this.sectionData[ai+1];
+
+                        //TODO: check if must cull against next entries face
+                        if (ModelQueries.containsFluid(Am)) {
+                            int modelId = (int) ((A>>26)&0xFFFF);
+                            A &= ~(0xFFFFL<<26);
+                            int fluidId = this.modelMan.getFluidClientStateId(modelId);
+                            A |= Integer.toUnsignedLong(fluidId)<<26;
+                            Am = this.modelMan.getModelMetadataFromClientId(fluidId);
+                        }
+
+                        long lighter = A;
+                        //if (!ModelQueries.faceUsesSelfLighting(Am, facingForward|(axis*2))) {//TODO: check this is right
+                        //    lighter = this.sectionData[bi];
+                        //}
+
+                        //Example thing thats just wrong but as example
+                        mesher.putNext(((long) facingForward) |//Facing
+                                A |
+                                (lighter&(0xFFL<<55))//Lighting
+                        );
+                    }
+                }
+            }
+
+            //Need to skip the remaining entries in the skip array
+            {
+                msk = ~msk;//Invert the mask as we only need to set stuff that isnt 0
+                while (msk!=0) {
+                    int index = Integer.numberOfTrailingZeros(msk);
+                    msk &= ~Integer.lowestOneBit(msk);
+                    int skipCount;
+                    if (index < 11) {
+                        skipCount = (int) (sumA>>(index*5));
+                    } else if (index<22) {
+                        skipCount = (int) (sumB>>((index-11)*5));
+                    } else {
+                        skipCount = (int) (sumC>>((index-22)*5));
+                    }
+                    skipCount &= 0x1F;
+
+                    if (skipCount != 0) {
+                        this.xAxisMeshers[index].skip(skipCount);
+                    }
+                }
+            }
+        }
+    }
+
+    private void generateXOuterFluidGeometry() {
+        //Generate the side faces, hackily, using 0 and 31 mesher
+
+        var ma = this.xAxisMeshers[0];
+        var mb = this.xAxisMeshers[31];
+        ma.finish();
+        mb.finish();
+        ma.doAuxiliaryFaceOffset = false;
+        mb.doAuxiliaryFaceOffset = false;
+
+        for (int y = 0; y < 32; y++) {
+            int skipA = 0;
+            int skipB = 0;
+            for (int z = 0; z < 32; z++) {
+                int i = y*32+z;
+                int msk = this.fluidMasks[i];
+                if ((msk & 1) != 0) {//-x
+                    long neighborId = this.neighboringFaces[i];
+                    boolean oki = true;
+                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                        long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
+                        if (ModelQueries.isFullyOpaque(meta)) {
+                            oki = false;
+                        }
+                        //TODO: check neibor face
+                        //else if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
+                        //    oki = false;
+                        //}
+                    }
+                    if (oki) {
+                        ma.skip(skipA); skipA = 0;
+                        int sidx = (i<<5) * 2;
+                        long A = this.sectionData[sidx];
+                        long Am = this.sectionData[sidx + 1];
+
+                        //TODO: check if must cull against next entries face
+                        if (ModelQueries.containsFluid(Am)) {
+                            int modelId = (int) ((A>>26)&0xFFFF);
+                            A &= ~(0xFFFFL<<26);
+                            int fluidId = this.modelMan.getFluidClientStateId(modelId);
+                            A |= Integer.toUnsignedLong(fluidId)<<26;
+                            Am = this.modelMan.getModelMetadataFromClientId(fluidId);
+                        }
+
+                        long lightData = ((neighborId&(0xFFL<<56))>>1);//A;
+                        //if (!ModelQueries.faceUsesSelfLighting(Am, facingForward|(axis*2))) {//TODO: check this is right
+                        //    lighter = this.sectionData[bi];
+                        //}
+
+                        ma.putNext(0L |
+                                A |
+                                lightData
+                        );
+                    } else {skipA++;}
+                } else {skipA++;}
+
+                if ((msk & (1<<31)) != 0) {//+x
+                    long neighborId = this.neighboringFaces[i+32*32];
+                    boolean oki = true;
+                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                        long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
+                        if (ModelQueries.isFullyOpaque(meta)) {
+                            oki = false;
+                        }
+                        //TODO: check neibor face
+                        //else if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
+                        //    oki = false;
+                        //}
+                    }
+                    if (oki) {
+                        mb.skip(skipB); skipB = 0;
+                        int sidx = (i*32+31) * 2;
+
+                        long A = this.sectionData[sidx];
+                        long Am = this.sectionData[sidx + 1];
+
+                        //TODO: check if must cull against next entries face
+                        if (ModelQueries.containsFluid(Am)) {
+                            int modelId = (int) ((A>>26)&0xFFFF);
+                            A &= ~(0xFFFFL<<26);
+                            int fluidId = this.modelMan.getFluidClientStateId(modelId);
+                            A |= Integer.toUnsignedLong(fluidId)<<26;
+                            Am = this.modelMan.getModelMetadataFromClientId(fluidId);
+                        }
+
+                        long lightData = ((neighborId&(0xFFL<<56))>>1);//A;
+                        //if (!ModelQueries.faceUsesSelfLighting(Am, facingForward|(axis*2))) {//TODO: check this is right
+                        //    lighter = this.sectionData[bi];
+                        //}
+
+                        mb.putNext(1L |
+                                A |
+                                lightData
+                        );
+                    } else {skipB++;}
+                } else {skipB++;}
+            }
+            ma.skip(skipA);
+            mb.skip(skipB);
+        }
+
+        ma.finish();
+        mb.finish();
+        ma.doAuxiliaryFaceOffset = true;
+        mb.doAuxiliaryFaceOffset = true;
+    }
 
     private void generateXNonOpaqueInnerGeometry() {
 
@@ -874,6 +1122,13 @@ public class RenderDataFactory45 {
     private void generateXFaces() {
         this.generateXOpaqueInnerGeometry();
         this.generateXOuterOpaqueGeometry();
+
+        for (var mesher : this.xAxisMeshers) {
+            mesher.finish();
+        }
+
+        this.generateXInnerFluidGeometry();
+        this.generateXOuterFluidGeometry();
 
         for (var mesher : this.xAxisMeshers) {
             mesher.finish();
