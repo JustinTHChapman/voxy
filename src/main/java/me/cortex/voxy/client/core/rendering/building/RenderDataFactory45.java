@@ -1027,30 +1027,48 @@ public class RenderDataFactory45 {
                 if ((msk & 1) != 0) {//-x
                     long neighborId = this.neighboringFaces[i];
                     boolean oki = true;
+
+                    int sidx = (i<<5) * 2;
+                    long A = this.sectionData[sidx];
+                    long Am = this.sectionData[sidx + 1];
+
+                    if (ModelQueries.containsFluid(Am)) {
+                        int modelId = (int) ((A>>26)&0xFFFF);
+                        A &= ~(0xFFFFL<<26);
+                        int fluidId = this.modelMan.getFluidClientStateId(modelId);
+                        A |= Integer.toUnsignedLong(fluidId)<<26;
+                        Am = this.modelMan.getModelMetadataFromClientId(fluidId);
+                    }
+
+
                     if (Mapper.getBlockId(neighborId) != 0) {//Not air
-                        long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
+
+                        int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                        long meta = this.modelMan.getModelMetadataFromClientId(modelId);
                         if (ModelQueries.isFullyOpaque(meta)) {
                             oki = false;
                         }
+
+                        /*
                         //TODO: check neibor face
-                        //else if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
-                        //    oki = false;
-                        //}
+                        if (ModelQueries.faceOccludes(meta, (axis<<1)|(1-side))) {
+                            oki = false;
+                        }
+                        */
+
+                        if (ModelQueries.containsFluid(meta)) {
+                            modelId = this.modelMan.getFluidClientStateId(modelId);
+                        }
+
+                        if (ModelQueries.cullsSame(Am)) {
+                            if (modelId == ((A>>26)&0xFFFF)) {
+                                oki = false;
+                            }
+                        }
                     }
+
                     if (oki) {
                         ma.skip(skipA); skipA = 0;
-                        int sidx = (i<<5) * 2;
-                        long A = this.sectionData[sidx];
-                        long Am = this.sectionData[sidx + 1];
-
-                        //TODO: check if must cull against next entries face
-                        if (ModelQueries.containsFluid(Am)) {
-                            int modelId = (int) ((A>>26)&0xFFFF);
-                            A &= ~(0xFFFFL<<26);
-                            int fluidId = this.modelMan.getFluidClientStateId(modelId);
-                            A |= Integer.toUnsignedLong(fluidId)<<26;
-                            Am = this.modelMan.getModelMetadataFromClientId(fluidId);
-                        }
 
                         long lightData = ((neighborId&(0xFFL<<56))>>1);//A;
                         //if (!ModelQueries.faceUsesSelfLighting(Am, facingForward|(axis*2))) {//TODO: check this is right
@@ -1067,31 +1085,50 @@ public class RenderDataFactory45 {
                 if ((msk & (1<<31)) != 0) {//+x
                     long neighborId = this.neighboringFaces[i+32*32];
                     boolean oki = true;
+
+
+                    int sidx = (i*32+31) * 2;
+                    long A = this.sectionData[sidx];
+                    long Am = this.sectionData[sidx + 1];
+
+                    //TODO: check if must cull against next entries face
+                    if (ModelQueries.containsFluid(Am)) {
+                        int modelId = (int) ((A>>26)&0xFFFF);
+                        A &= ~(0xFFFFL<<26);
+                        int fluidId = this.modelMan.getFluidClientStateId(modelId);
+                        A |= Integer.toUnsignedLong(fluidId)<<26;
+                        Am = this.modelMan.getModelMetadataFromClientId(fluidId);
+                    }
+
+
+
                     if (Mapper.getBlockId(neighborId) != 0) {//Not air
-                        long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
+                        int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                        long meta = this.modelMan.getModelMetadataFromClientId(modelId);
                         if (ModelQueries.isFullyOpaque(meta)) {
                             oki = false;
                         }
+
+                        /*
                         //TODO: check neibor face
-                        //else if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
-                        //    oki = false;
-                        //}
+                        if (ModelQueries.faceOccludes(meta, (axis<<1)|(1-side))) {
+                            oki = false;
+                        }
+                        */
+
+                        if (ModelQueries.containsFluid(meta)) {
+                            modelId = this.modelMan.getFluidClientStateId(modelId);
+                        }
+
+                        if (ModelQueries.cullsSame(Am)) {
+                            if (modelId == ((A>>26)&0xFFFF)) {
+                                oki = false;
+                            }
+                        }
                     }
+
                     if (oki) {
                         mb.skip(skipB); skipB = 0;
-                        int sidx = (i*32+31) * 2;
-
-                        long A = this.sectionData[sidx];
-                        long Am = this.sectionData[sidx + 1];
-
-                        //TODO: check if must cull against next entries face
-                        if (ModelQueries.containsFluid(Am)) {
-                            int modelId = (int) ((A>>26)&0xFFFF);
-                            A &= ~(0xFFFFL<<26);
-                            int fluidId = this.modelMan.getFluidClientStateId(modelId);
-                            A |= Integer.toUnsignedLong(fluidId)<<26;
-                            Am = this.modelMan.getModelMetadataFromClientId(fluidId);
-                        }
 
                         long lightData = ((neighborId&(0xFFL<<56))>>1);//A;
                         //if (!ModelQueries.faceUsesSelfLighting(Am, facingForward|(axis*2))) {//TODO: check this is right
