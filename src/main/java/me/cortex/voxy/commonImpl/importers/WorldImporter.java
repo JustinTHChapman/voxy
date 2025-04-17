@@ -205,9 +205,13 @@ public class WorldImporter implements IDataImporter {
                 var parts = entry.getName().split("/");
                 var name = parts[parts.length-1];
                 var sections = name.split("\\.");
-                this.importRegion(buf, Integer.parseInt(sections[1]), Integer.parseInt(sections[2]));
-                buf.free();
 
+                try {
+                    this.importRegion(buf, Integer.parseInt(sections[1]), Integer.parseInt(sections[2]));
+                } catch (NumberFormatException e) {
+                    Logger.error("Invalid format for region position, x: \""+sections[1]+"\" z: \"" + sections[2] + "\" skipping region");
+                }
+                buf.free();
             });
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -273,9 +277,15 @@ public class WorldImporter implements IDataImporter {
             Logger.error("Unknown file: " + name);
             throw new IllegalStateException();
         }
-        int rx = Integer.parseInt(sections[1]);
-        int rz = Integer.parseInt(sections[2]);
-
+        int rx = 0;
+        int rz = 0;
+        try {
+            rx = Integer.parseInt(sections[1]);
+            rz = Integer.parseInt(sections[2]);
+        } catch (NumberFormatException e) {
+            Logger.error("Invalid format for region position, x: \""+sections[1]+"\" z: \"" + sections[2] + "\" skipping region");
+            return;
+        }
         try (var fileStream = FileChannel.open(file.toPath(), StandardOpenOption.READ)) {
             if (fileStream.size() == 0) {
                 return;
