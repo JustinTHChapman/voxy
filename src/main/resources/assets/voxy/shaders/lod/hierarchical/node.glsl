@@ -66,9 +66,9 @@ bool childListIsEmpty(in UnpackedNode node) {
     return node.childPtr == EMPTY_QUEUE_ID;
 }
 
-bool isEmpty(in UnpackedNode node) {
-    return (node.flags&2u) != 0;
-}
+//bool isEmpty(in UnpackedNode node) {
+//    return (node.flags&2u) != 0;
+//}
 
 bool hasRequested(in UnpackedNode node) {
     return (node.flags&1u) != 0u;

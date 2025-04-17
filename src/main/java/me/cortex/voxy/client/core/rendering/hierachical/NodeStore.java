@@ -282,7 +282,7 @@ public final class NodeStore {
         isEligibleForCleaning |= this.getAllChildrenAreLeaf(nodeId);
         //isEligibleForCleaning |= this.getNodeType()
 
-        flags |= (short) (isEligibleForCleaning?1<<4:0);//1 bit
+        flags |= (short) (isEligibleForCleaning?1<<5:0);//1 bit
 
         {
             int geometry = this.getNodeGeometry(nodeId);
