@@ -376,13 +376,20 @@ public class DHImporter implements IDataImporter {
     private static VarHandle create(Class<?> viewArrayClass) {
         return MethodHandles.byteArrayViewVarHandle(viewArrayClass, ByteOrder.BIG_ENDIAN);
     }
+
+    public static final boolean HasRequiredLibraries;
+
     private static final VarHandle LONG = create(long[].class);
     static {
+        boolean hasJDBC = false;
         try {
             Class.forName("org.sqlite.JDBC");
+            hasJDBC = true;
         } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
+            //throw new RuntimeException(e);
+            Logger.error("Unable to load sqlite JDBC, DHImporting wont be available", e);
         }
+        HasRequiredLibraries = hasJDBC;
     }
 
 }

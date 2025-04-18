@@ -25,32 +25,37 @@ import java.util.concurrent.CompletableFuture;
 public class VoxyCommands {
 
     public static LiteralArgumentBuilder<FabricClientCommandSource> register() {
+        var imports = ClientCommandManager.literal("import")
+                .then(ClientCommandManager.literal("world")
+                        .then(ClientCommandManager.argument("world_name", StringArgumentType.string())
+                                .suggests(VoxyCommands::importWorldSuggester)
+                                .executes(VoxyCommands::importWorld)))
+                .then(ClientCommandManager.literal("bobby")
+                        .then(ClientCommandManager.argument("world_name", StringArgumentType.string())
+                                .suggests(VoxyCommands::importBobbySuggester)
+                                .executes(VoxyCommands::importBobby)))
+                .then(ClientCommandManager.literal("raw")
+                        .then(ClientCommandManager.argument("path", StringArgumentType.string())
+                                .executes(VoxyCommands::importRaw)))
+                .then(ClientCommandManager.literal("zip")
+                        .then(ClientCommandManager.argument("zipPath", StringArgumentType.string())
+                                .executes(VoxyCommands::importZip)
+                                .then(ClientCommandManager.argument("innerPath", StringArgumentType.string())
+                                        .executes(VoxyCommands::importZip))))
+                .then(ClientCommandManager.literal("cancel")
+                        .executes(VoxyCommands::cancelImport));
+
+        if (DHImporter.HasRequiredLibraries) {
+            imports = imports
+                    .then(ClientCommandManager.literal("distant_horizons")
+                    .then(ClientCommandManager.argument("sqlDbPath", StringArgumentType.string())
+                            .executes(VoxyCommands::importDistantHorizons)));
+        }
+
         return ClientCommandManager.literal("voxy").requires((ctx)-> VoxyCommon.getInstance() != null)
                 .then(ClientCommandManager.literal("reload")
                         .executes(VoxyCommands::reloadInstance))
-                .then(ClientCommandManager.literal("import")
-                        .then(ClientCommandManager.literal("world")
-                                .then(ClientCommandManager.argument("world_name", StringArgumentType.string())
-                                        .suggests(VoxyCommands::importWorldSuggester)
-                                        .executes(VoxyCommands::importWorld)))
-                        .then(ClientCommandManager.literal("bobby")
-                                .then(ClientCommandManager.argument("world_name", StringArgumentType.string())
-                                        .suggests(VoxyCommands::importBobbySuggester)
-                                        .executes(VoxyCommands::importBobby)))
-                        .then(ClientCommandManager.literal("raw")
-                                .then(ClientCommandManager.argument("path", StringArgumentType.string())
-                                        .executes(VoxyCommands::importRaw)))
-                        .then(ClientCommandManager.literal("zip")
-                                .then(ClientCommandManager.argument("zipPath", StringArgumentType.string())
-                                        .executes(VoxyCommands::importZip)
-                                        .then(ClientCommandManager.argument("innerPath", StringArgumentType.string())
-                                                .executes(VoxyCommands::importZip))))
-                        .then(ClientCommandManager.literal("distant_horizons")
-                                .then(ClientCommandManager.argument("sqlDbPath", StringArgumentType.string())
-                                        .executes(VoxyCommands::importDistantHorizons)))
-                        .then(ClientCommandManager.literal("cancel")
-                                .executes(VoxyCommands::cancelImport))
-        );
+                .then(imports);
     }
 
     private static int reloadInstance(CommandContext<FabricClientCommandSource> ctx) {
