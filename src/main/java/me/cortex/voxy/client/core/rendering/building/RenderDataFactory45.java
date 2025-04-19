@@ -11,6 +11,7 @@ import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import net.minecraft.block.Blocks;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.Arrays;
@@ -185,21 +186,27 @@ public class RenderDataFactory45 {
         this.modelMan = modelManager;
     }
 
-    private static long packPartialQuadData(int modelId, long state, long metaData) {
-        //This uses hardcoded data to shuffle things
-        long lightAndBiome =  (state&((0x1FFL<<47)|(0xFFL<<56)))>>1;
-        lightAndBiome &= ModelQueries.isBiomeColoured(metaData)?-1:~(0x1FFL<<47);
-        lightAndBiome &= ModelQueries.isFullyOpaque(metaData)?~(0xFFL<<55):-1;//If its fully opaque it always uses neighbor light?
+    private static long getQuadTyping(long metadata) {//2 bits
         int type = 0;
         {
-            boolean a = ModelQueries.isTranslucent(metaData);
-            boolean b = ModelQueries.isDoubleSided(metaData);
-            type = a|b?0:2;
-            type |= b?1:0;
+            boolean a = ModelQueries.isTranslucent(metadata);
+            boolean b = ModelQueries.isDoubleSided(metadata);
+            //Pre shift by 1
+            type = a|b?0:4;
+            type |= b?2:0;
         }
+        return type;
+    }
+
+    private static long packPartialQuadData(int modelId, long state, long metadata) {
+        //This uses hardcoded data to shuffle things
+        long lightAndBiome =  (state&((0x1FFL<<47)|(0xFFL<<56)))>>1;
+        lightAndBiome &= ModelQueries.isBiomeColoured(metadata)?-1:~(0x1FFL<<47);
+        lightAndBiome &= ModelQueries.isFullyOpaque(metadata)?~(0xFFL<<55):-1;//If its fully opaque it always uses neighbor light?
+
         long quadData = lightAndBiome;
         quadData |= Integer.toUnsignedLong(modelId)<<26;
-        quadData |= type << 1;
+        quadData |= getQuadTyping(metadata);//Returns the typing already shifted by 1
         return quadData;
     }
 
@@ -500,6 +507,9 @@ public class RenderDataFactory45 {
                             int fluidId = this.modelMan.getFluidClientStateId(modelId);
                             A |= Integer.toUnsignedLong(fluidId)<<26;
                             Am = this.modelMan.getModelMetadataFromClientId(fluidId);
+
+                            //Update quad typing info
+                            A &= ~0b110L; A |= getQuadTyping(Am);
                         }
 
                         long lighter = A;
@@ -562,6 +572,9 @@ public class RenderDataFactory45 {
                             int fluidId = this.modelMan.getFluidClientStateId(modelId);
                             A |= Integer.toUnsignedLong(fluidId)<<26;
                             B = this.modelMan.getModelMetadataFromClientId(fluidId);
+
+                            //We need to update the typing info for A
+                            A &= ~0b110L; A |= getQuadTyping(B);
                         }
 
                         //Check and test if can cull W.R.T neighbor
@@ -968,6 +981,9 @@ public class RenderDataFactory45 {
                             int fluidId = this.modelMan.getFluidClientStateId(modelId);
                             A |= Integer.toUnsignedLong(fluidId)<<26;
                             Am = this.modelMan.getModelMetadataFromClientId(fluidId);
+
+                            //Update quad typing info to be the fluid type
+                            A &= ~0b110L; A |= getQuadTyping(Am);
                         }
 
                         long lighter = A;
@@ -1038,6 +1054,9 @@ public class RenderDataFactory45 {
                         int fluidId = this.modelMan.getFluidClientStateId(modelId);
                         A |= Integer.toUnsignedLong(fluidId)<<26;
                         Am = this.modelMan.getModelMetadataFromClientId(fluidId);
+
+                        //Update quad typing info to be the fluid type
+                        A &= ~0b110L; A |= getQuadTyping(Am);
                     }
 
 
