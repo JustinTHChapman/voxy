@@ -10,6 +10,7 @@ import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.other.Mapper;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.FluidBlock;
 import net.minecraft.block.entity.BlockEntity;
@@ -249,9 +250,6 @@ public class ModelFactory {
             this.fluidStateLUT[modelId] = clientFluidStateId;
         }
 
-        var colourProvider = MinecraftClient.getInstance().getBlockColors().providers.get(Registries.BLOCK.getRawId(blockState.getBlock()));
-
-
         RenderLayer blockRenderLayer = null;
         if (blockState.getBlock() instanceof FluidBlock) {
             blockRenderLayer = RenderLayers.getFluidLayer(blockState.getFluidState());
@@ -269,6 +267,7 @@ public class ModelFactory {
             checkMode = TextureUtils.WRITE_CHECK_ALPHA;
         }
 
+        var colourProvider = getColourProvider(blockState.getBlock());
 
 
         long uploadPtr = UploadStream.INSTANCE.upload(this.storage.modelBuffer, (long) modelId * MODEL_SIZE, MODEL_SIZE);;
@@ -276,9 +275,15 @@ public class ModelFactory {
 
         //TODO: implement;
         // TODO: if it has a constant colour instead... idk why (apparently for things like spruce leaves)?? but premultiply the texture data by the constant colour
-        boolean hasBiomeColourResolver = false;
+        boolean isBiomeColourDependent = false;
         if (colourProvider != null) {
-            hasBiomeColourResolver = isBiomeDependentColour(colourProvider, blockState);
+            isBiomeColourDependent = isBiomeDependentColour(colourProvider, blockState);
+        }
+        //If it contains fluid but isnt a fluid
+        if ((!isFluid) && (!blockState.getFluidState().isEmpty()) && clientFluidStateId != -1) {
+
+            //Or it with the fluid state biome dependency
+            isBiomeColourDependent |= ModelQueries.isBiomeColoured(this.getModelMetadataFromClientId(clientFluidStateId));
         }
 
 
@@ -323,7 +328,7 @@ public class ModelFactory {
 
         //Each face gets 1 byte, with the top 2 bytes being for whatever
         long metadata = 0;
-        metadata |= hasBiomeColourResolver?1:0;
+        metadata |= isBiomeColourDependent?1:0;
         metadata |= blockRenderLayer == RenderLayer.getTranslucent()?2:0;
         metadata |= needsDoubleSidedQuads?4:0;
         metadata |= ((!isFluid) && !blockState.getFluidState().isEmpty())?8:0;//Has a fluid state accosiacted with it and is not itself a fluid
@@ -412,7 +417,7 @@ public class ModelFactory {
         // todo: put in like the render layer type ig? along with colour resolver info
         int modelFlags = 0;
         modelFlags |= colourProvider != null?1:0;
-        modelFlags |= hasBiomeColourResolver?2:0;//Basicly whether to use the next int as a colour or as a base index/id into a colour buffer for biome dependent colours
+        modelFlags |= isBiomeColourDependent?2:0;//Basicly whether to use the next int as a colour or as a base index/id into a colour buffer for biome dependent colours
         modelFlags |= blockRenderLayer == RenderLayer.getTranslucent()?4:0;//Is translucent
         modelFlags |= blockRenderLayer == RenderLayer.getCutout()?0:8;//Use mipmaps
 
@@ -422,7 +427,7 @@ public class ModelFactory {
         //Temporary override to always be non biome specific
         if (colourProvider == null) {
             MemoryUtil.memPutInt(uploadPtr + 4, -1);//Set the default to nothing so that its faster on the gpu
-        } else if (!hasBiomeColourResolver) {
+        } else if (!isBiomeColourDependent) {
             MemoryUtil.memPutInt(uploadPtr + 4, captureColourConstant(colourProvider, blockState, DEFAULT_BIOME)|0xFF000000);
         } else if (!this.biomes.isEmpty()) {
             //Populate the list of biomes for the model state
@@ -491,6 +496,9 @@ public class ModelFactory {
         }
     }
 
+    private static BlockColorProvider getColourProvider(Block block) {
+        return MinecraftClient.getInstance().getBlockColors().providers.get(Registries.BLOCK.getRawId(block));
+    }
 
     //TODO: add a method to detect biome dependent colours (can do by detecting if getColor is ever called)
     // if it is, need to add it to a list and mark it as biome colour dependent or something then the shader
