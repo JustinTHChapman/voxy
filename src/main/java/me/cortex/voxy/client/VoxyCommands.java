@@ -45,7 +45,14 @@ public class VoxyCommands {
                 .then(ClientCommandManager.literal("cancel")
                         .executes(VoxyCommands::cancelImport));
 
-        if (DHImporter.HasRequiredLibraries) {
+        boolean hasXZStream = true;
+        try {
+            Class.forName("org.tukaani.xz.XZInputStream");
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            hasXZStream = false;
+        }
+
+        if (DHImporter.HasRequiredLibraries && hasXZStream) {
             imports = imports
                     .then(ClientCommandManager.literal("distant_horizons")
                     .then(ClientCommandManager.argument("sqlDbPath", StringArgumentType.string())
