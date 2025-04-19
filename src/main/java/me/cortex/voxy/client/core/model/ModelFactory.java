@@ -235,6 +235,10 @@ public class ModelFactory {
             if (possibleDuplicate != -1) {//Duplicate found
                 this.idMappings[blockId] = possibleDuplicate;
                 modelId = possibleDuplicate;
+                //Remove from flight
+                if (!this.blockStatesInFlight.remove(blockId)) {
+                    throw new IllegalStateException();
+                }
                 return;
             } else {//Not a duplicate so create a new entry
                 modelId = this.modelTexture2id.size();
