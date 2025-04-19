@@ -801,7 +801,9 @@ public class NodeManager {
 
         //Assume that this is always a top node
         // FIXME: DONT DO THIS
-        this.topLevelNodeIds.add(id);
+        if (!this.topLevelNodeIds.add(id)) {
+            throw new IllegalStateException();
+        }
         this.clearAllocId(id);
     }
 
@@ -1042,6 +1044,12 @@ public class NodeManager {
             throw new IllegalStateException("Unknown node type: " + nodeType);
         }
 
+
+        if (WorldEngine.getLevel(pos) == 0) {
+            Logger.error("Requests cannot exist for bottom level nodes. at: " + WorldEngine.pprintPos(pos) + ". Ignoring request");
+            return;
+        }
+
         //TODO: ADJUST AND FIX THIS TO MAKE IT REMOVE THE LAST THING IN QUEUE OR SOMETHING
         //if (this.activeNodeRequestCount > 100 && WorldEngine.getLevel(pos) < 2) {
             //Logger.info("Many active requests, declining request at " + WorldEngine.pprintPos(pos));
@@ -1070,6 +1078,7 @@ public class NodeManager {
         // in this case we should not mark the node as inflight as it casuse very bad things to happen
         // we should only mark inflight when there is actually a request
         if (nodeType == NODE_TYPE_LEAF) {
+
             if (this.nodeData.getNodeGeometry(nodeId) == NULL_GEOMETRY_ID) {
                 //Weird case that not sure how possible
                 Logger.warn("Got request for leaf that doesnt have geometry, this should not be possible at pos " + WorldEngine.pprintPos(pos));
@@ -1631,6 +1640,27 @@ public class NodeManager {
             if (!seenNodes.containsAll(nodes)) {
                 throw new IllegalStateException();
             }
+        }
+
+        IntSet tln = new IntOpenHashSet(this.topLevelNodeIds.size());
+        for (long p : this.topLevelNodes) {
+            int n = this.activeSectionMap.get(p);
+            if (n == -1) {
+                throw new IllegalStateException();
+            }
+            if ((n&NODE_TYPE_MSK)!=NODE_TYPE_REQUEST) {
+                if (!tln.add(n&NODE_ID_MSK)) {
+                    throw new IllegalStateException();
+                }
+            }
+        }
+
+        if (!this.topLevelNodeIds.containsAll(tln)) {
+            throw new IllegalStateException();
+        }
+
+        if (!tln.containsAll(this.topLevelNodeIds)) {
+            throw new IllegalStateException();
         }
     }
 }

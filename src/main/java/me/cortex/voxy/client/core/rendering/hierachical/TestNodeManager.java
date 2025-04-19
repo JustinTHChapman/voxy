@@ -312,21 +312,43 @@ public class TestNodeManager {
     }
 
     private static boolean runTest(int ITERS, int testIdx, Set<List<StackTraceElement>> traces, boolean geoRemoval) {
-        long POS_A = WorldEngine.getWorldSectionId(4, 0, 0, 0);
-
         Random r = new Random(testIdx * 1234L);
         try {
             var test = new TestBase();
             LongList tops = new LongArrayList();
+
+            int R = 1;
+            if (r.nextBoolean()) {
+                R++;
+                if (r.nextBoolean()) {
+                    R++;
+                    if (r.nextBoolean()) {
+                        R++;
+                    }
+                }
+            }
+
             //Fuzzy bruteforce everything
-            test.putTopPos(POS_A);
-            tops.add(POS_A);
+            for (int x = -R; x<=R; x++) {
+                for (int z = -R; z<=R; z++) {
+                    tops.add(WorldEngine.getWorldSectionId(4, x, 0, z));
+                    tops.add(WorldEngine.getWorldSectionId(4, x, 1, z));
+                }
+            }
+
+            for (long p : tops) {
+                test.putTopPos(p);
+                test.meshUpdate(p, -1, 18);
+                fillInALl(test, p, a->-1);
+                test.printNodeChanges();
+                test.verifyIntegrity();
+            }
             for (int i = 0; i < ITERS; i++) {
                 long pos = rPos(r, tops);
                 int op = r.nextInt(5);
                 int extra = r.nextInt(256);
                 boolean hasGeometry = r.nextBoolean();
-                boolean addRemTLN = r.nextInt(512) == 0;
+                boolean addRemTLN = r.nextInt(64) == 0;
                 boolean extraBool = r.nextBoolean();
                 if (op == 0 && addRemTLN) {
                     pos = WorldEngine.getWorldSectionId(4, r.nextInt(5)-2, r.nextInt(5)-2, r.nextInt(5)-2);
