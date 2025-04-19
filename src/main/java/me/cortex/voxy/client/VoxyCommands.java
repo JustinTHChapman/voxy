@@ -52,7 +52,7 @@ public class VoxyCommands {
             hasXZStream = false;
         }
 
-        if (DHImporter.HasRequiredLibraries && hasXZStream) {
+        if (hasXZStream && DHImporter.HasRequiredLibraries) {
             imports = imports
                     .then(ClientCommandManager.literal("distant_horizons")
                     .then(ClientCommandManager.argument("sqlDbPath", StringArgumentType.string())
