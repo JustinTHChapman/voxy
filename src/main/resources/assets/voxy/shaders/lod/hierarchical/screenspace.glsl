@@ -56,8 +56,8 @@ void setupScreenspace(in UnpackedNode node) {
     //vec3 minPos = minSize + basePos;
     //vec3 maxPos = maxSize + basePos;
 
-    minBB = vec3(9999f);
-    maxBB = vec3(-9999f);
+    minBB = vec3(9999.0f);
+    maxBB = vec3(-9999.0f);
     insideFrustum = false;
 
     for (int i = 0; i < 8; i++) {
