@@ -20,9 +20,22 @@ layout(binding = HIZ_BINDING) uniform sampler2DShadow hizDepthSampler;
 vec3 minBB;
 vec3 maxBB;
 vec2 size;
+bool insideFrustum;
 
 uint BASE_IDX = gl_LocalInvocationID.x*8;
 shared vec2[LOCAL_SIZE*8] screenPoints;
+
+bool within(vec2 a, vec2 b, vec2 c) {
+    return all(lessThan(a,b)) && all(lessThan(b, c));
+}
+
+bool within(vec3 a, vec3 b, vec3 c) {
+    return all(lessThan(a,b)) && all(lessThan(b, c));
+}
+
+bool within(float a, float b, float c) {
+    return a<b && b<c;
+}
 
 UnpackedNode node22;
 //Sets up screenspace with the given node id, returns true on success false on failure/should not continue
@@ -38,25 +51,33 @@ void setupScreenspace(in UnpackedNode node) {
                     + (transform.worldPos.xyz-camChunkPos))-camSubChunk);
                     */
 
-    vec4 base = VP*vec4(vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos, 1);
-
     //TODO: AABB SIZES not just a max cube
 
     //vec3 minPos = minSize + basePos;
     //vec3 maxPos = maxSize + basePos;
 
-    minBB = base.xyz/base.w;
-    maxBB = minBB;
+    minBB = vec3(9999f);
+    maxBB = vec3(-9999f);
+    insideFrustum = false;
 
-    screenPoints[BASE_IDX+0] = minBB.xy*0.5f+0.5f;
-    for (int i = 1; i < 8; i++) {
+    for (int i = 0; i < 8; i++) {
+        vec3 ppoint = vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*(32<<node.lodLevel);
+
+        ppoint += vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos;
+
+
+
         //NOTE!: cant this be precomputed and put in an array?? in the scene uniform??
-        vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*(32<<node.lodLevel),1));//Size of section is 32x32x32 (need to change it to a bounding box in the future)
-        pPoint += base;
+        vec4 pPoint = VP*vec4(ppoint, 1);//Size of section is 32x32x32 (need to change it to a bounding box in the future)
+
+        bool pointInside = within(vec3(-pPoint.w,-pPoint.w,0.0f), pPoint.xyz, vec3(pPoint.w));
+        insideFrustum = insideFrustum || pointInside;
+
         vec3 point = pPoint.xyz/pPoint.w;
         //TODO: CLIP TO VIEWPORT
         minBB = min(minBB, point);
         maxBB = max(maxBB, point);
+
         screenPoints[BASE_IDX+i] = point.xy*0.5f+0.5f;
     }
 
@@ -72,7 +93,7 @@ void setupScreenspace(in UnpackedNode node) {
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
-    return any(lessThanEqual(maxBB, vec3(0.0f))) || any(lessThanEqual(vec3(1.0f), minBB)) || maxBB.z < 0.5;// maxBB.z > 1 is actually wrong
+    return !insideFrustum;// maxW < 16 is a trick where 16 is the near plane
 
     //|| any(lessThanEqual(minBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), maxBB));
 }
