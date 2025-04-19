@@ -386,7 +386,7 @@ public class DHImporter implements IDataImporter {
             Class.forName("org.sqlite.JDBC");
             Class.forName("org.tukaani.xz.XZInputStream");
             hasJDBC = true;
-        } catch (ClassNotFoundException e) {
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
             //throw new RuntimeException(e);
             Logger.error("Unable to load sqlite JDBC or lzma decompressor, DHImporting wont be available", e);
         }
