@@ -274,7 +274,7 @@ public class ModelFactory {
         var colourProvider = getColourProvider(blockState.getBlock());
 
 
-        long uploadPtr = UploadStream.INSTANCE.upload(this.storage.modelBuffer, (long) modelId * MODEL_SIZE, MODEL_SIZE);;
+        long uploadPtr = UploadStream.INSTANCE.upload(this.storage.modelBuffer, (long) modelId * MODEL_SIZE, MODEL_SIZE);
 
 
         //TODO: implement;

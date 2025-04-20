@@ -17,14 +17,6 @@ layout(binding = HIZ_BINDING) uniform sampler2DShadow hizDepthSampler;
 //TODO: maybe do spher bounds aswell? cause they have different accuracies but are both over estimates (liberals (non conservative xD))
 // so can do &&
 
-vec3 minBB;
-vec3 maxBB;
-vec2 size;
-bool insideFrustum;
-
-uint BASE_IDX = gl_LocalInvocationID.x*8;
-shared vec2[LOCAL_SIZE*8] screenPoints;
-
 bool within(vec2 a, vec2 b, vec2 c) {
     return all(lessThan(a,b)) && all(lessThan(b, c));
 }
@@ -36,6 +28,21 @@ bool within(vec3 a, vec3 b, vec3 c) {
 bool within(float a, float b, float c) {
     return a<b && b<c;
 }
+
+float crossMag(vec2 a, vec2 b) {
+    return abs(a.x*b.y-b.x*a.y);
+}
+
+bool checkPointInView(vec4 point) {
+    return within(vec3(-point.w,-point.w,0.0f), point.xyz, vec3(point.w));
+}
+
+vec3 minBB;
+vec3 maxBB;
+vec2 size;
+bool insideFrustum;
+
+float screenSize;
 
 UnpackedNode node22;
 //Sets up screenspace with the given node id, returns true on success false on failure/should not continue
@@ -56,39 +63,65 @@ void setupScreenspace(in UnpackedNode node) {
     //vec3 minPos = minSize + basePos;
     //vec3 maxPos = maxSize + basePos;
 
-    minBB = vec3(9999.0f);
-    maxBB = vec3(-9999.0f);
-    insideFrustum = false;
+    vec3 basePos = vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos;
 
-    for (int i = 0; i < 8; i++) {
-        vec3 ppoint = vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*(32<<node.lodLevel);
+    vec4 P000 = VP * vec4(basePos, 1);
+    mat3x4 Axis = mat3x4(VP) * float(32<<node.lodLevel);
 
-        ppoint += vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos;
+    vec4 P100 = Axis[0] + P000;
+    vec4 P001 = Axis[2] + P000;
+    vec4 P101 = Axis[2] + P100;
+    vec4 P010 = Axis[1] + P000;
+    vec4 P110 = Axis[1] + P100;
+    vec4 P011 = Axis[1] + P001;
+    vec4 P111 = Axis[1] + P101;
 
+    insideFrustum = checkPointInView(P000) || checkPointInView(P100) || checkPointInView(P001) || checkPointInView(P101) ||
+                    checkPointInView(P010) || checkPointInView(P110) || checkPointInView(P011) || checkPointInView(P111);
 
-
-        //NOTE!: cant this be precomputed and put in an array?? in the scene uniform??
-        vec4 pPoint = VP*vec4(ppoint, 1);//Size of section is 32x32x32 (need to change it to a bounding box in the future)
-
-        bool pointInside = within(vec3(-pPoint.w,-pPoint.w,0.0f), pPoint.xyz, vec3(pPoint.w));
-        insideFrustum = insideFrustum || pointInside;
-
-        vec3 point = pPoint.xyz/pPoint.w;
-        //TODO: CLIP TO VIEWPORT
-        minBB = min(minBB, point);
-        maxBB = max(maxBB, point);
-
-        screenPoints[BASE_IDX+i] = point.xy*0.5f+0.5f;
+    //Fast exit
+    if (!insideFrustum) {
+        return;
     }
 
-    //printf("Screenspace MIN: %f, %f, %f  MAX: %f, %f, %f", minBB.x,minBB.y,minBB.z, maxBB.x,maxBB.y,maxBB.z);
+    //Perspective divide + convert to screenspace (i.e. range 0->1 if within viewport)
+    vec3 p000 = (P000.xyz/P000.w) * 0.5f + 0.5f;
+    vec3 p100 = (P100.xyz/P100.w) * 0.5f + 0.5f;
+    vec3 p001 = (P001.xyz/P001.w) * 0.5f + 0.5f;
+    vec3 p101 = (P101.xyz/P101.w) * 0.5f + 0.5f;
+    vec3 p010 = (P010.xyz/P010.w) * 0.5f + 0.5f;
+    vec3 p110 = (P110.xyz/P110.w) * 0.5f + 0.5f;
+    vec3 p011 = (P011.xyz/P011.w) * 0.5f + 0.5f;
+    vec3 p111 = (P111.xyz/P111.w) * 0.5f + 0.5f;
 
-    //Convert to screenspace
-    maxBB = maxBB*0.5f+0.5f;
-    minBB = minBB*0.5f+0.5f;
+
+    {//Compute exact screenspace size
+        float ssize = 0;
+        {//Faces from 0,0,0
+
+            vec2 A = p100.xy-p000.xy;
+            vec2 B = p010.xy-p000.xy;
+            vec2 C = p001.xy-p000.xy;
+            ssize += crossMag(A,B);
+            ssize += crossMag(A,C);
+            ssize += crossMag(C,B);
+        }
+        {//Faces from 1,1,1
+            vec2 A = p011.xy-p111.xy;
+            vec2 B = p101.xy-p111.xy;
+            vec2 C = p110.xy-p111.xy;
+            ssize += crossMag(A,B);
+            ssize += crossMag(A,C);
+            ssize += crossMag(C,B);
+        }
+        ssize *= 0.5f;//Half the size since we did both back and front area
+        screenSize = ssize;
+    }
+
+    minBB = min(min(min(p000, p100), min(p001, p101)), min(min(p010, p110), min(p011, p111)));
+    maxBB = max(max(max(p000, p100), max(p001, p101)), max(max(p010, p110), max(p011, p111)));
 
     size = clamp(maxBB.xy - minBB.xy, vec2(0), vec2(1));
-
 }
 
 //Checks if the node is implicitly culled (outside frustum)
@@ -104,47 +137,26 @@ bool isCulledByHiz() {
     //}
 
     vec2 ssize = size * vec2(screenW, screenH);
-    float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
+    float miplevel = log2(max(max(ssize.x, ssize.y),1));
+    miplevel = ceil(miplevel);
+
     //miplevel = clamp(miplevel, 0, 20);
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
     //TODO: maybe get rid of clamp
     //Todo: replace with some rasterization, e.g. especially for request back to cpu
-    vec2 midpoint2 = clamp(midpoint, vec2(0), vec2(1));
-    bool culled = textureLod(hizDepthSampler, vec3(midpoint2, minBB.z), miplevel) < 0.0001f;
+    //vec2 midpoint2 = clamp(midpoint, vec2(0), vec2(1));
+    vec2 midpoint2 = midpoint;
+    bool culled = textureLod(hizDepthSampler, vec3(midpoint2, minBB.z*2.0f-1.0f), miplevel) < 0.0001f;//*0.5f+0.5f
     //printf("HiZ sample point: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
-    //if (culled && node22.lodLevel != 4) {
-    //    printf("HiZ sample point: (%f,%f)@%f against %f, value %f", midpoint.x, midpoint.y, miplevel, minBB.z, textureLod(hizDepthSampler, vec3(0.0f,0.0f, 0.000001f), 20));
+    //if ((culled) && node22.lodLevel == 0) {
+    //    printf("HiZ sample point: (%f,%f)@%f against %f, value %f", midpoint.x, midpoint.y, miplevel, minBB.z, textureLod(hizDepthSampler, vec3(0.5f,0.5f, 0.000000001f), 9.0f));
     //}
     return culled;
 }
 
 
-float crossMag(vec2 a, vec2 b) {
-    return abs(a.x*b.y-b.x*a.y);
-}
 
 //Returns if we should decend into its children or not
 bool shouldDecend() {
-    float size = 0;
-    {//Faces from 0,0,0
-        vec2 base = screenPoints[BASE_IDX+0];
-        vec2 A = screenPoints[BASE_IDX+1]-base;
-        vec2 B = screenPoints[BASE_IDX+2]-base;
-        vec2 C = screenPoints[BASE_IDX+4]-base;
-        size += crossMag(A,B);
-        size += crossMag(A,C);
-        size += crossMag(C,B);
-    }
-    {//Faces from 1,1,1
-        vec2 base = screenPoints[BASE_IDX+7];
-        vec2 A = screenPoints[BASE_IDX+3]-base;
-        vec2 B = screenPoints[BASE_IDX+5]-base;
-        vec2 C = screenPoints[BASE_IDX+6]-base;
-        size += crossMag(A,B);
-        size += crossMag(A,C);
-        size += crossMag(C,B);
-    }
-    size *= 0.5f;//Half the size since we did both back and front area
-
-    return size > minSSS;
+    return screenSize > minSSS;
 }
