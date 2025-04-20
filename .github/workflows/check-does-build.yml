@@ -1,6 +1,6 @@
-name: build-commit
+name: check-does-build
 
-on: [ push ]
+on: [ push, pull_request ]
 jobs:
   build:
     runs-on: ubuntu-latest
