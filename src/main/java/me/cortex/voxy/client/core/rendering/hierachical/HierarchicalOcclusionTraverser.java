@@ -12,9 +12,13 @@ import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import net.minecraft.util.math.MathHelper;
+import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
+
+import java.lang.reflect.Field;
 
 import static me.cortex.voxy.client.core.rendering.PrintfDebugUtil.PRINTF_processor;
 import static org.lwjgl.opengl.GL11.*;
@@ -116,6 +120,14 @@ public class HierarchicalOcclusionTraverser {
                 .ssboIf("STATISTICS_BUFFER_BINDING", this.statisticsBuffer);
     }
 
+
+    private static void setFrustum(Viewport<?> viewport, long ptr) {
+        for (int i = 0; i < 6; i++) {
+            var plane = viewport.frustumPlanes[i];
+            plane.getToAddress(ptr); ptr += 4*4;
+        }
+    }
+
     private void uploadUniform(Viewport<?> viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 1024);
         int sx = MathHelper.floor(viewport.cameraX)>>5;
@@ -134,6 +146,8 @@ public class HierarchicalOcclusionTraverser {
         innerTranslation.getToAddress(ptr); ptr += 4*3;
 
         MemoryUtil.memPutFloat(ptr, viewport.height); ptr += 4;
+
+        setFrustum(viewport, ptr); ptr += 4*4*6;
 
         MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;
 

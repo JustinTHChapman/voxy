@@ -5,12 +5,15 @@
 #define LOCAL_SIZE (1<<LOCAL_SIZE_BITS)
 layout(local_size_x=LOCAL_SIZE) in;//, local_size_y=1
 
+#import <voxy:lod/frustum.glsl>
+
 layout(binding = SCENE_UNIFORM_BINDING, std140) uniform SceneUniform {
     mat4 VP;
     ivec3 camSecPos;
     float screenW;
     vec3 camSubSecPos;
     float screenH;
+    Frustum frustum;
     uint renderQueueMaxSize;
     float minSSS;
     uint frameId;

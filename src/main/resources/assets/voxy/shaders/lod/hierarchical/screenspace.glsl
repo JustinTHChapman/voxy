@@ -58,12 +58,15 @@ void setupScreenspace(in UnpackedNode node) {
                     + (transform.worldPos.xyz-camChunkPos))-camSubChunk);
                     */
 
-    //TODO: AABB SIZES not just a max cube
-
-    //vec3 minPos = minSize + basePos;
-    //vec3 maxPos = maxSize + basePos;
 
     vec3 basePos = vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos;
+
+    insideFrustum = !outsideFrustum(frustum, basePos, float(32<<node.lodLevel));
+
+    //Fast exit
+    if (!insideFrustum) {
+        return;
+    }
 
     vec4 P000 = VP * vec4(basePos, 1);
     mat3x4 Axis = mat3x4(VP) * float(32<<node.lodLevel);
@@ -76,13 +79,6 @@ void setupScreenspace(in UnpackedNode node) {
     vec4 P011 = Axis[1] + P001;
     vec4 P111 = Axis[1] + P101;
 
-    insideFrustum = checkPointInView(P000) || checkPointInView(P100) || checkPointInView(P001) || checkPointInView(P101) ||
-                    checkPointInView(P010) || checkPointInView(P110) || checkPointInView(P011) || checkPointInView(P111);
-
-    //Fast exit
-    if (!insideFrustum) {
-        return;
-    }
 
     //Perspective divide + convert to screenspace (i.e. range 0->1 if within viewport)
     vec3 p000 = (P000.xyz/P000.w) * 0.5f + 0.5f;

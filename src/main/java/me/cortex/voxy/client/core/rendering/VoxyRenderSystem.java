@@ -170,7 +170,8 @@ public class VoxyRenderSystem {
                 .setProjection(projection)
                 .setModelView(matrices.peek().getPositionMatrix())
                 .setCamera(cameraX, cameraY, cameraZ)
-                .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
+                .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight)
+                .updateFrustum();
         viewport.frameId++;
 
 
