@@ -50,7 +50,7 @@ public class UploadStream {
                 //Note! we dont commit here, we only try to flush existing memory copies, we dont commit
                 // since commit is an explicit op saying we are done any to push upload everything
                 //We dont commit since we dont want to invalidate existing upload pointers
-                Logger.warn("Upload stream full, preemptively committing, this could cause bad things to happen");
+                Logger.error("Upload stream full, preemptively committing, this could cause bad things to happen");
                 int attempts = 10;
                 while (--attempts != 0 && this.caddr == SIZE_LIMIT) {
                     glFinish();
@@ -124,6 +124,6 @@ public class UploadStream {
 
     //A upload instance instead of passing one around by reference
     // MUST ONLY BE USED ON THE RENDER THREAD
-    public static final UploadStream INSTANCE = new UploadStream(1<<25);//32 mb upload buffer
+    public static final UploadStream INSTANCE = new UploadStream(1<<26);//64 mb upload buffer
 
 }

@@ -69,6 +69,10 @@ public class HierarchicalBitSet {
     }
 
     private void set(int idx) {
+        //if (this.isSet(idx)) {
+        //    throw new IllegalStateException();
+        //}
+
         this.endId += idx==(this.endId+1)?1:0;
         long dp = this.D[idx>>6] |= 1L<<(idx&0x3f);
         if (dp==-1) {
