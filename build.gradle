@@ -138,19 +138,19 @@ jar {
 
 
 
-tasks.register('excludeUnused', Zip) {
-    //outputs.upToDateWhen { false }
+tasks.register('makeExcludedRocksDB', Zip) {
     archiveExtension.set("jar")
     entryCompression(ZipEntryCompression.STORED)
     destinationDirectory.set temporaryDir
-    archiveFileName.set processIncludeJars.outputDirectory.asFileTree.filter {
+
+    dependsOn configurations.includeInternal
+
+    def files = configurations.includeInternal.incoming.getArtifacts().getArtifactFiles().filter {
         it.name.startsWith('rocksdb')
-    }.first().name
-    processIncludeJars.outputDirectory.asFileTree.each {
-        if (it.name.startsWith('rocksdb')) {
-            from zipTree(it)
-        }
     }
+    from {->zipTree(files.first())}
+    archiveFileName.set(providers.provider{files.first().name})
+
     exclude {
         def file = it.name
         if (file.endsWith(".jnilib")) {
@@ -161,19 +161,12 @@ tasks.register('excludeUnused', Zip) {
         }
         return ["osx", "linux32", "s390x", "riscv64", "ppc64le", "aarch64"].any(file::contains)
     }
-    dependsOn processIncludeJars
 }
 
-if (!processIncludeJars.outputDirectory.asFileTree.filter {
-    it.name.startsWith('rocksdb')
-}.isEmpty()) {
-    println "Compressing rocksdb"
-    remapJar {
-        nestedJars = nestedJars.filter {
-            !it.name.startsWith('rocksdb')
-        }
-        nestedJars.from excludeUnused
-    }
+processIncludeJars {
+    dependsOn makeExcludedRocksDB
+    jars = jars.filter {!it.name.startsWith('rocksdb')}
+    jars.from(makeExcludedRocksDB)
 }
 
 remapJar {
