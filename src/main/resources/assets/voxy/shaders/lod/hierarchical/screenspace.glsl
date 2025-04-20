@@ -142,6 +142,7 @@ bool isCulledByHiz() {
     //Todo: replace with some rasterization, e.g. especially for request back to cpu
     //vec2 midpoint2 = clamp(midpoint, vec2(0), vec2(1));
     vec2 midpoint2 = midpoint;
+    //the *2.0f-1.0f converts from the 0->1 range to -1->1 range that depth is in
     bool culled = textureLod(hizDepthSampler, vec3(midpoint2, minBB.z*2.0f-1.0f), miplevel) < 0.0001f;//*0.5f+0.5f
     //printf("HiZ sample point: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
     //if ((culled) && node22.lodLevel == 0) {
