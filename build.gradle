@@ -149,6 +149,7 @@ tasks.register('makeExcludedRocksDB', Zip) {
     def files = configurations.includeInternal.incoming.getArtifacts().getArtifactFiles().filter {
         it.name.startsWith('rocksdb')
     }
+    
     from {->zipTree(files.first())}
     archiveFileName.set(providers.provider{files.first().name})
 
