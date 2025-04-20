@@ -6,6 +6,10 @@ plugins {
 version = project.mod_version
 group = project.maven_group
 
+base {
+    archivesName = project.archives_base_name
+}
+
 repositories {
     exclusiveContent {
         forRepository {
@@ -33,7 +37,7 @@ def gitCommitHash = { ->
         if (result.getResult().get().getExitValue() != 0) {
             return "<UnknownCommit>";
         } else {
-            return result.standardOutput.asText.get();
+            return result.standardOutput.asText.get().strip();
         }
     } catch (Exception e) {
         e.printStackTrace()
@@ -45,10 +49,11 @@ def buildtime = {System.currentTimeSeconds()}
 processResources {
     def time = buildtime()
     def hash = gitCommitHash()
-    inputs.properties("version": project.version, "commit": hash, "buildtime": time)
+    def version = project.version
 
+    inputs.properties("version": version, "commit": hash, "buildtime": time)
     filesMatching("fabric.mod.json") {
-        expand "version": project.version, "commit": hash, "buildtime": time
+        expand "version": version, "commit": hash, "buildtime": time
     }
 }
 
