@@ -100,7 +100,7 @@ public class HiZBuffer {
             glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, i);
             glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, i);
             this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, i+1);
-            cw = Math.max(cw/2, 2); ch = Math.max(ch/2, 2); glViewport(0, 0, cw, ch);
+            cw = Math.max(cw/2, 1); ch = Math.max(ch/2, 1); glViewport(0, 0, cw, ch);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
             glTextureBarrier();
             glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
