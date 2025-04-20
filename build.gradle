@@ -165,6 +165,8 @@ tasks.register('makeExcludedRocksDB', Zip) {
 }
 
 processIncludeJars {
+    outputs.cacheIf {true}
+
     dependsOn makeExcludedRocksDB
     jars = jars.filter {!it.name.startsWith('rocksdb')}
     jars.from(makeExcludedRocksDB)
