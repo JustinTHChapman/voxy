@@ -128,22 +128,25 @@ bool outsideFrustum() {
 }
 
 bool isCulledByHiz() {
-    //if (minBB.z < 0) {//Minpoint is behind the camera, its always going to pass
-    //    return false;//Just cull it for now cause other culling isnt working, TODO: FIXME
-    //}
+    if (any(lessThan(minBB.xy, vec2(0)) && lessThan(vec2(1), maxBB.xy))) {
+        return false;
+    }
 
     vec2 ssize = size * vec2(screenW, screenH);
     float miplevel = log2(max(max(ssize.x, ssize.y),1));
-    miplevel = ceil(miplevel);
 
+    miplevel = ceil(miplevel);
     //miplevel = clamp(miplevel, 0, 20);
+
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
-    //TODO: maybe get rid of clamp
-    //Todo: replace with some rasterization, e.g. especially for request back to cpu
-    //vec2 midpoint2 = clamp(midpoint, vec2(0), vec2(1));
-    vec2 midpoint2 = midpoint;
-    //the *2.0f-1.0f converts from the 0->1 range to -1->1 range that depth is in
-    bool culled = textureLod(hizDepthSampler, vec3(midpoint2, minBB.z*2.0f-1.0f), miplevel) < 0.0001f;//*0.5f+0.5f
+    //midpoint = clamp(midpoint, vec2(0), vec2(1));
+
+    float testAgainst = minBB.z;
+    //the *2.0f-1.0f converts from the 0->1 range to -1->1 range that depth is in (not having this causes tighter bounds, but causes culling issues in caves)
+    testAgainst = testAgainst*2.0f-1.0f;
+
+    bool culled = textureLod(hizDepthSampler, vec3(midpoint, testAgainst), miplevel) < 0.0001f;
+
     //printf("HiZ sample point: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
     //if ((culled) && node22.lodLevel == 0) {
     //    printf("HiZ sample point: (%f,%f)@%f against %f, value %f", midpoint.x, midpoint.y, miplevel, minBB.z, textureLod(hizDepthSampler, vec3(0.5f,0.5f, 0.000000001f), 9.0f));

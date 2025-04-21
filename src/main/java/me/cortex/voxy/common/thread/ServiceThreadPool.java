@@ -3,6 +3,9 @@ package me.cortex.voxy.common.thread;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
 
+import java.lang.invoke.VarHandle;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +17,12 @@ import java.util.function.Supplier;
 //TODO: could also probably replace all of this with just VirtualThreads and a Executors.newThreadPerTaskExecutor with a fixed thread pool
 // it is probably better anyway
 public class ServiceThreadPool {
+    /*
+    private static final ThreadMXBean THREAD_BEAN = ManagementFactory.getThreadMXBean();
+    static {
+        THREAD_BEAN.setThreadCpuTimeEnabled(true);
+    }*/
+
     private volatile boolean running = true;
     private Thread[] workers = new Thread[0];
     private final Semaphore jobCounter = new Semaphore(0);
@@ -189,6 +198,7 @@ public class ServiceThreadPool {
                     //Didnt consume the job, find a new job
                     continue;
                 }
+
                 //Consumed a job from the service, decrease weight by the amount
                 if (this.totalJobWeight.addAndGet(-service.weightPerJob)<0) {
                     throw new IllegalStateException("Total job weight is negative");
