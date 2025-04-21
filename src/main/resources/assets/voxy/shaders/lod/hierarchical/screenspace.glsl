@@ -128,12 +128,12 @@ bool outsideFrustum() {
 }
 
 bool isCulledByHiz() {
-    if (any(lessThan(minBB.xy, vec2(0)) && lessThan(vec2(1), maxBB.xy))) {
-        return false;
-    }
-
     vec2 ssize = size * vec2(screenW, screenH);
     float miplevel = log2(max(max(ssize.x, ssize.y),1));
+
+    if (miplevel > 9.5f) {
+        return false;
+    }
 
     miplevel = ceil(miplevel);
     //miplevel = clamp(miplevel, 0, 20);
