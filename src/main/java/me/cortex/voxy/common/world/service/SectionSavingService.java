@@ -50,6 +50,18 @@ public class SectionSavingService {
         if (!section.inSaveQueue.getAndSet(true)) {
             //Acquire the section for use
             section.acquire();
+
+            //Hard limit the save count to prevent OOM
+            if (this.getTaskCount() > 5_000) {
+                while (this.getTaskCount() > 5_000) {
+                    try {
+                        Thread.sleep(10);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }
+
             this.saveQueue.add(new SaveEntry(in, section));
             this.threads.execute();
         }
