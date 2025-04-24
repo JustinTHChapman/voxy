@@ -37,12 +37,12 @@ bool checkPointInView(vec4 point) {
     return within(vec3(-point.w,-point.w,0.0f), point.xyz, vec3(point.w));
 }
 
-vec3 minBB;
-vec3 maxBB;
-vec2 size;
-bool insideFrustum;
+vec3 minBB = vec3(0.0f);
+vec3 maxBB = vec3(0.0f);
+vec2 size = vec2(0.0f);
+bool insideFrustum = false;
 
-float screenSize;
+float screenSize = 0.0f;
 
 UnpackedNode node22;
 //Sets up screenspace with the given node id, returns true on success false on failure/should not continue

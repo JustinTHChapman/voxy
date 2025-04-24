@@ -54,9 +54,11 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.world = world;
         this.modelService = new ModelBakerySubsystem(world.getMapper());
 
-        //Max sections: ~500k
         //Max geometry: 1 gb
-        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/);
+        long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
+        //  geometryCapacity = 1<<24;
+        //Max sections: ~500k
+        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, geometryCapacity);
         Logger.info("Using renderer: " + this.sectionRenderer.getClass().getSimpleName());
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
@@ -157,12 +159,14 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     public void addDebugData(List<String> debug) {
         this.modelService.addDebugData(debug);
         this.renderGen.addDebugData(debug);
-        this.sectionRenderer.addDebug(debug);
+        this.sectionRenderer.addDebug(debug);   
         this.nodeManager.addDebug(debug);
 
         if (RenderStatistics.enabled) {
             debug.add("HTC: [" + Arrays.stream(flipCopy(RenderStatistics.hierarchicalTraversalCounts)).mapToObj(Integer::toString).collect(Collectors.joining(", "))+"]");
             debug.add("HRS: [" + Arrays.stream(flipCopy(RenderStatistics.hierarchicalRenderSections)).mapToObj(Integer::toString).collect(Collectors.joining(", "))+"]");
+            debug.add("VS: [" + Arrays.stream(flipCopy(RenderStatistics.visibleSections)).mapToObj(Integer::toString).collect(Collectors.joining(", "))+"]");
+            debug.add("QC: [" + Arrays.stream(flipCopy(RenderStatistics.quadCount)).mapToObj(Integer::toString).collect(Collectors.joining(", "))+"]");
         }
     }
 

@@ -20,5 +20,8 @@
   "voxy.config.general.renderDistance.tooltip": "Render distance of voxy in chunks",
 
   "voxy.config.general.vanilla_fog": "Enable vanilla fog",
-  "voxy.config.general.vanilla_fog.tooltip": "Enables or disables vanilla fog effect"
+  "voxy.config.general.vanilla_fog.tooltip": "Enables or disables vanilla fog effect",
+
+  "voxy.config.general.render_statistics": "Enable render statistics",
+  "voxy.config.general.render_statistics.tooltip": "Enable render statistics in F3 menu, useful for debugging"
 }

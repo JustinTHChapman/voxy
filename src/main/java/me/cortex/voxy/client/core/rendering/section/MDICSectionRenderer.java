@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering.section;
 
 
+import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
@@ -8,6 +9,7 @@ import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.LightMapHelper;
 import me.cortex.voxy.client.core.rendering.RenderService;
 import me.cortex.voxy.client.core.rendering.SharedIndexBuffer;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.util.math.MathHelper;
@@ -34,6 +36,7 @@ import static org.lwjgl.opengl.GL45.glCopyNamedBufferSubData;
 //Uses MDIC to render the sections
 public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryManager> {
     private static final int TRANSLUCENT_OFFSET = 400_000;//in draw calls
+    private static final int STATISTICS_BUFFER_BINDING = 7;
     private final Shader terrainShader = Shader.make()
             .defineIf("DEBUG_RENDER", false)
             .add(ShaderType.VERTEX, "voxy:lod/gl46/quads2.vert")
@@ -42,6 +45,10 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     private final Shader commandGenShader = Shader.make()
             .define("TRANSLUCENT_OFFSET", TRANSLUCENT_OFFSET)
+
+            .defineIf("HAS_STATISTICS", RenderStatistics.enabled)
+            .defineIf("STATISTICS_BUFFER_BINDING", RenderStatistics.enabled, STATISTICS_BUFFER_BINDING)
+
             .add(ShaderType.COMPUTE, "voxy:lod/gl46/cmdgen.comp")
             .compile();
 
@@ -60,6 +67,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private final GlBuffer drawCountCallBuffer = new GlBuffer(1024).zero();
     private final GlBuffer drawCallBuffer  = new GlBuffer(5*4*(400_000+100_000)).zero();//400k draw calls
     private final GlBuffer positionScratchBuffer  = new GlBuffer(8*400000).zero();//400k positions
+
+    //Statistics
+    private final GlBuffer statisticsBuffer = new GlBuffer(1024).zero();
 
     public MDICSectionRenderer(ModelStore modelStore, int maxSectionCount, long geometryCapacity) {
         super(modelStore, new BasicSectionGeometryManager(maxSectionCount, geometryCapacity));
@@ -184,9 +194,26 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.positionScratchBuffer.id);
+
+            if (RenderStatistics.enabled) {
+                this.statisticsBuffer.zero();
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, STATISTICS_BUFFER_BINDING, this.statisticsBuffer.id);
+            }
+
             glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountCallBuffer.id);
             glDispatchComputeIndirect(0);
-            glMemoryBarrier(GL_COMMAND_BARRIER_BIT);
+            glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
+            if (RenderStatistics.enabled) {
+                DownloadStream.INSTANCE.download(this.statisticsBuffer, down->{
+                    for (int i = 0; i < 5; i++) {
+                        RenderStatistics.visibleSections[i] = MemoryUtil.memGetInt(down.address+i*4L);
+                    }
+
+                    for (int i = 0; i < 5; i++) {
+                        RenderStatistics.quadCount[i] = MemoryUtil.memGetInt(down.address+5*4L+i*4L);
+                    }
+                });
+            }
         }
     }
 
@@ -237,5 +264,6 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.drawCallBuffer.free();
         this.drawCountCallBuffer.free();
         this.positionScratchBuffer.free();
+        this.statisticsBuffer.free();
     }
 }

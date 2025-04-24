@@ -115,7 +115,7 @@ public class ModelTextureBakery {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         glEnable(GL_STENCIL_TEST);
-        glDepthRange(0, 1);
+        //glDepthRange(0, 1);
         glDepthMask(true);
         glEnable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);

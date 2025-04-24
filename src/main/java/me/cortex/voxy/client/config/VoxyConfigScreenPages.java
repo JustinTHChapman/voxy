@@ -3,16 +3,14 @@ package me.cortex.voxy.client.config;
 import com.google.common.collect.ImmutableList;
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
+import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.commonImpl.IVoxyWorld;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.client.gui.SodiumOptionsGUI;
-import net.caffeinemc.mods.sodium.client.gui.options.OptionGroup;
-import net.caffeinemc.mods.sodium.client.gui.options.OptionImpact;
-import net.caffeinemc.mods.sodium.client.gui.options.OptionImpl;
-import net.caffeinemc.mods.sodium.client.gui.options.OptionPage;
+import net.caffeinemc.mods.sodium.client.gui.options.*;
 import net.caffeinemc.mods.sodium.client.gui.options.control.SliderControl;
 import net.caffeinemc.mods.sodium.client.gui.options.control.TickBoxControl;
 import net.minecraft.client.MinecraftClient;
@@ -146,6 +144,13 @@ public abstract class VoxyConfigScreenPages {
                         .setTooltip(Text.translatable("voxy.config.general.vanilla_fog.tooltip"))
                         .setControl(TickBoxControl::new)
                         .setBinding((s, v)-> s.renderVanillaFog = v, s -> s.renderVanillaFog)
+                        .build()
+                ).add(OptionImpl.createBuilder(boolean.class, storage)
+                        .setName(Text.translatable("voxy.config.general.render_statistics"))
+                        .setTooltip(Text.translatable("voxy.config.general.render_statistics.tooltip"))
+                        .setControl(TickBoxControl::new)
+                        .setBinding((s, v)-> RenderStatistics.enabled = v, s -> RenderStatistics.enabled)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 ).build()
         );

@@ -20,6 +20,12 @@ layout(local_size_x = 128) in;
 // adds support for uint8_t which can use for compact visibility buffer
 
 
+#ifdef HAS_STATISTICS
+layout(binding = STATISTICS_BUFFER_BINDING, std430) restrict buffer statisticsBuffer {
+    uint visibleSectionCounts[5];
+    uint quadCounts[5];
+};
+#endif
 
 /*
     uint  count;
@@ -28,11 +34,6 @@ layout(local_size_x = 128) in;
     int  baseVertex;
     uint  baseInstance;
     */
-
-uint encodeLocalLodPos(uint detail, ivec3 pos) {
-    uvec3 detla = (pos - (baseSectionPos >> detail))&((1<<9)-1);
-    return (detail<<27)|(detla.x<<18)|(detla.y<<9)|(detla.z);
-}
 
 
 //Note: if i want reverse indexing i need to use the index buffer offset to offset
@@ -69,12 +70,13 @@ void main() {
     //TODO: need to make it check that only if it was also in the frustum last frame does it apply the visibilityData check!
     // this fixes temporal coherance
 
-    //This prevents overflow of the relative position encoder
-    if (shouldRender) {
 
-    }
 
     if (shouldRender) {
+        #ifdef HAS_STATISTICS
+        atomicAdd(visibleSectionCounts[detail], 1);
+        #endif
+
         uint ptr = extractQuadStart(meta);
         ivec3 relative = ipos-(baseSectionPos>>detail);
         uint drawId = gl_GlobalInvocationID.x;
@@ -95,6 +97,9 @@ void main() {
 
         uint cmdPtr = atomicAdd(opaqueDrawCount, bitCount(msk));
 
+        #ifdef HAS_STATISTICS
+        uint totalQuads = 0;
+        #endif
 
         uint count = 0;
         //Translucency
@@ -102,6 +107,9 @@ void main() {
         if (count != 0) {
             uint translucentCommandPtr = atomicAdd(translucentDrawCount, 1) + TRANSLUCENT_OFFSET;//FIXME: dont hardcode this offset
             writeCmd(translucentCommandPtr, drawId, ptr, count);
+            #ifdef HAS_STATISTICS
+            totalQuads += count;
+            #endif
         }
         ptr += count;
 
@@ -109,6 +117,9 @@ void main() {
         count = (meta.cntA>>16)&0xFFFF;
         if (count != 0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            #ifdef HAS_STATISTICS
+            totalQuads += count;
+            #endif
         }
         ptr += count;
 
@@ -116,6 +127,9 @@ void main() {
         count = (meta.cntB)&0xFFFF;
         if (((msk&(1u<<0))!=0)) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            #ifdef HAS_STATISTICS
+            totalQuads += count;
+            #endif
         }
         ptr += count;
 
@@ -123,6 +137,9 @@ void main() {
         count = (meta.cntB>>16)&0xFFFF;
         if ((msk&(1u<<1))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            #ifdef HAS_STATISTICS
+            totalQuads += count;
+            #endif
         }
         ptr += count;
 
@@ -130,6 +147,9 @@ void main() {
         count = (meta.cntC)&0xFFFF;
         if ((msk&(1u<<2))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            #ifdef HAS_STATISTICS
+            totalQuads += count;
+            #endif
         }
         ptr += count;
 
@@ -137,6 +157,9 @@ void main() {
         count = (meta.cntC>>16)&0xFFFF;
         if ((msk&(1u<<3))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            #ifdef HAS_STATISTICS
+            totalQuads += count;
+            #endif
         }
         ptr += count;
 
@@ -144,6 +167,9 @@ void main() {
         count = (meta.cntD)&0xFFFF;
         if ((msk&(1u<<4))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            #ifdef HAS_STATISTICS
+            totalQuads += count;
+            #endif
         }
         ptr += count;
 
@@ -151,7 +177,14 @@ void main() {
         count = (meta.cntD>>16)&0xFFFF;
         if ((msk&(1u<<5))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            #ifdef HAS_STATISTICS
+            totalQuads += count;
+            #endif
         }
         ptr += count;
+
+        #ifdef HAS_STATISTICS
+        atomicAdd(quadCounts[detail], totalQuads);
+        #endif
     }
 }
