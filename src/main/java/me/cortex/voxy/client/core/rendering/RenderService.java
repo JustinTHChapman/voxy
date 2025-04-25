@@ -75,7 +75,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.geometryUpdateQueue = new MessageQueue<>(this.nodeManager::processGeometryResult);
 
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
-        this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool, this.geometryUpdateQueue::push, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
+        this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool,
+                this.geometryUpdateQueue::push, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets,
+                ()->this.geometryUpdateQueue.count()<2000);
 
         router.setCallbacks(this.renderGen::enqueueTask, section -> {
             section.acquire();
@@ -129,8 +131,11 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
             DownloadStream.INSTANCE.tick();
 
 
-            this.sectionUpdateQueue.consume();
-            this.geometryUpdateQueue.consume();
+            this.sectionUpdateQueue.consume(128);
+
+            //Cap the number of consumed sections per frame to 40 + 2% of the queue size, cap of 200
+            int geoUpdateCap = Math.max(100, Math.min((int)(0.02*this.geometryUpdateQueue.count()), 200));
+            this.geometryUpdateQueue.consume(geoUpdateCap);
             if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
                 UploadStream.INSTANCE.commit();
             }
@@ -185,12 +190,16 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.world.getMapper().setBiomeCallback(null);
         this.world.getMapper().setStateCallback(null);
 
+        //Release all the unprocessed built geometry
+        this.geometryUpdateQueue.clear(BuiltSection::free);
+
         this.modelService.shutdown();
         this.renderGen.shutdown();
         this.viewportSelector.free();
         this.sectionRenderer.free();
         this.traversal.free();
         this.nodeCleaner.free();
+
         //Release all the unprocessed built geometry
         this.geometryUpdateQueue.clear(BuiltSection::free);
         this.sectionUpdateQueue.clear(WorldSection::release);//Release anything thats in the queue

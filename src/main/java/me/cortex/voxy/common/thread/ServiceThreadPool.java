@@ -127,9 +127,9 @@ public class ServiceThreadPool {
         this.jobCounter.release(1);
     }
 
-    void steal(ServiceSlice service) {
-        this.totalJobWeight.addAndGet(-service.weightPerJob);
-        this.jobCounter.acquireUninterruptibly(1);
+    void steal(ServiceSlice service, int count) {
+        this.totalJobWeight.addAndGet(-(service.weightPerJob*(long)count));
+        this.jobCounter.acquireUninterruptibly(count);
     }
 
     private void worker(int threadId) {
@@ -141,9 +141,17 @@ public class ServiceThreadPool {
                 break;
             }
 
-            int attempts = 50;
+            final int ATTEMPT_COUNT = 50;
+            int attempts = ATTEMPT_COUNT;
             outer:
             while (true) {
+                if (attempts < ATTEMPT_COUNT-2) {
+                    try {
+                        Thread.sleep(20);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
                 var ref = this.serviceSlices;
                 if (ref.length == 0) {
                     Logger.error("Service worker tried to run but had 0 slices");
@@ -152,7 +160,7 @@ public class ServiceThreadPool {
                 if (attempts-- == 0) {
                     Logger.warn("Unable to execute service after many attempts, releasing");
                     try {
-                        Thread.sleep(10);
+                        Thread.sleep(100);
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }
@@ -169,13 +177,20 @@ public class ServiceThreadPool {
                     break;
                 }
 
-                ServiceSlice service = ref[(int) (clamped % ref.length)];
+                ServiceSlice service = ref[0];
+                for (int i = 0; i < ref.length; i++) {
+                    service = ref[(int) ((clamped+i) % ref.length)];
+                    if (service.workConditionMet()) {
+                        break;
+                    }
+                }
+
                 //1 in 64 chance just to pick a service that has a task, in a cycling manor, this is to keep at least one service from overloading all services constantly
                 if (((seed>>10)&63) == 0) {
                     for (int i = 0; i < ref.length; i++) {
                         int idx = (i+revolvingSelector)%ref.length;
                         var slice = ref[idx];
-                        if (slice.hasJobs()) {
+                        if (slice.hasJobs() && slice.workConditionMet()) {
                             service = slice;
                             revolvingSelector = (idx+1)%ref.length;
                             break;
@@ -186,7 +201,7 @@ public class ServiceThreadPool {
                     long chosenNumber = clamped % weight;
                     for (var slice : ref) {
                         chosenNumber -= ((long) slice.weightPerJob) * slice.jobCount.availablePermits();
-                        if (chosenNumber <= 0) {
+                        if (chosenNumber <= 0 && slice.workConditionMet()) {
                             service = slice;
                             break;
                         }

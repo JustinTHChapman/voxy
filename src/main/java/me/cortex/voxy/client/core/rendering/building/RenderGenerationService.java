@@ -14,6 +14,7 @@ import me.cortex.voxy.common.thread.ServiceSlice;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -39,6 +40,10 @@ public class RenderGenerationService {
 
 
     public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, Consumer<BuiltSection> consumer, boolean emitMeshlets) {
+        this(world, modelBakery, serviceThreadPool, consumer, emitMeshlets, ()->true);
+    }
+
+    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, Consumer<BuiltSection> consumer, boolean emitMeshlets, BooleanSupplier taskLimiter) {
         this.emitMeshlets = emitMeshlets;
         this.world = world;
         this.modelBakery = modelBakery;
@@ -50,7 +55,7 @@ public class RenderGenerationService {
             return new Pair<>(() -> {
                 this.processJob(factory);
             }, factory::free);
-        });
+        }, taskLimiter);
     }
 
     //NOTE: the biomes are always fully populated/kept up to date
@@ -166,6 +171,10 @@ public class RenderGenerationService {
                 this.threads.execute();
                 return new BuildTask(key);
             });
+            //Prioritize lower detail builds
+            if (WorldEngine.getLevel(pos) > 2) {
+                this.taskQueue.getAndMoveToFirst(pos);
+            }
         }
     }
 
@@ -189,11 +198,16 @@ public class RenderGenerationService {
 
     public void shutdown() {
         //Steal and free as much work as possible
-        while (this.threads.steal()) {
+        while (this.threads.hasJobs()) {
+            int i = this.threads.drain();
+            if (i == 0) break;
+
             synchronized (this.taskQueue) {
-                var task = this.taskQueue.removeFirst();
-                if (task.section != null) {
-                    task.section.release();
+                for (int j = 0; j < i; j++) {
+                    var task = this.taskQueue.removeFirst();
+                    if (task.section != null) {
+                        task.section.release();
+                    }
                 }
             }
         }

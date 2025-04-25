@@ -139,6 +139,10 @@ public class ServiceSlice extends TrackedObject {
         return this.jobCount.availablePermits() != 0;
     }
 
+    boolean workConditionMet() {
+        return this.condition.getAsBoolean();
+    }
+
     public void blockTillEmpty() {
         while (this.activeCount.get() != 0 && this.alive) {
             while (this.jobCount2.get() != 0 && this.alive) {
@@ -161,8 +165,21 @@ public class ServiceSlice extends TrackedObject {
         if (this.jobCount2.decrementAndGet() < 0) {
             throw new IllegalStateException("Job count negative!!!");
         }
-        this.threadPool.steal(this);
+        this.threadPool.steal(this, 1);
         return true;
+    }
+
+    public int drain() {
+        int count = this.jobCount.drainPermits();
+        if (count == 0) {
+            return 0;
+        }
+
+        if (this.jobCount2.addAndGet(-count) < 0) {
+            throw new IllegalStateException("Job count negative!!!");
+        }
+        this.threadPool.steal(this, count);
+        return count;
     }
 
     public boolean isAlive() {
