@@ -134,7 +134,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
             this.sectionUpdateQueue.consume(128);
 
             //Cap the number of consumed sections per frame to 40 + 2% of the queue size, cap of 200
-            int geoUpdateCap = Math.max(100, Math.min((int)(0.02*this.geometryUpdateQueue.count()), 200));
+            int geoUpdateCap = Math.max(100, Math.min((int)(0.15*this.geometryUpdateQueue.count()), 260));
             this.geometryUpdateQueue.consume(geoUpdateCap);
             if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
                 UploadStream.INSTANCE.commit();

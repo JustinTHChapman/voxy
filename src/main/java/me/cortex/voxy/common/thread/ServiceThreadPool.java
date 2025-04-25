@@ -17,11 +17,11 @@ import java.util.function.Supplier;
 //TODO: could also probably replace all of this with just VirtualThreads and a Executors.newThreadPerTaskExecutor with a fixed thread pool
 // it is probably better anyway
 public class ServiceThreadPool {
-    /*
+
     private static final ThreadMXBean THREAD_BEAN = ManagementFactory.getThreadMXBean();
     static {
         THREAD_BEAN.setThreadCpuTimeEnabled(true);
-    }*/
+    }
 
     private volatile boolean running = true;
     private Thread[] workers = new Thread[0];
@@ -135,6 +135,9 @@ public class ServiceThreadPool {
     private void worker(int threadId) {
         long seed = 1234342;
         int revolvingSelector = 0;
+
+        double rollRuntimeRatio = 0;
+        double rollCpuTimeDelta = 0;
         while (true) {
             this.jobCounter.acquireUninterruptibly();
             if (!this.running) {
@@ -207,12 +210,40 @@ public class ServiceThreadPool {
                         }
                     }
                 }
+                /*
+                VarHandle.fullFence();
+                long realTimeStart = System.nanoTime();
+                long cpuTimeStart = THREAD_BEAN.getCurrentThreadCpuTime();
+                VarHandle.fullFence();
+                 */
 
                 //Run the job
                 if (!service.doRun(threadId)) {
                     //Didnt consume the job, find a new job
                     continue;
                 }
+                /*
+                VarHandle.fullFence();
+                long cpuTimeEnd = THREAD_BEAN.getCurrentThreadCpuTime();
+                long realTimeEnd = System.nanoTime();
+                VarHandle.fullFence();
+
+                long realTimeDelta = realTimeEnd - realTimeStart;
+                long cpuTimeDelta = cpuTimeEnd - cpuTimeStart;
+
+                //Realtime should always be bigger or equal to cpu time
+                double runtimeRatio = ((double)cpuTimeDelta)/((double)realTimeDelta);
+                rollRuntimeRatio = (rollRuntimeRatio*0.95)+runtimeRatio*0.05;
+                rollCpuTimeDelta = (rollCpuTimeDelta*0.95)+cpuTimeDelta*0.05;
+                //Attempt to self balance cpu load
+                VarHandle.fullFence();
+                try {
+                    if (rollRuntimeRatio > 0.8) {
+                        Thread.sleep(Math.max((long) ((rollRuntimeRatio - 0.5) * (rollCpuTimeDelta / (1000 * 1000))), 1));
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }*/
 
                 //Consumed a job from the service, decrease weight by the amount
                 if (this.totalJobWeight.addAndGet(-service.weightPerJob)<0) {
