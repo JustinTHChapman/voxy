@@ -59,9 +59,9 @@ public class ModelFactory {
 
     //TODO: replace the fluid BlockState with a client model id integer of the fluidState, requires looking up
     // the fluid state in the mipper
-    private record ModelEntry(List<ColourDepthTextureData> textures, int fluidBlockStateId) {
-        private ModelEntry(ColourDepthTextureData[] textures, int fluidBlockStateId) {
-            this(Stream.of(textures).map(ColourDepthTextureData::clone).toList(), fluidBlockStateId);
+    private record ModelEntry(ColourDepthTextureData down, ColourDepthTextureData up, ColourDepthTextureData north, ColourDepthTextureData south, ColourDepthTextureData west, ColourDepthTextureData east, int fluidBlockStateId) {
+        public ModelEntry(ColourDepthTextureData[] textures, int fluidBlockStateId) {
+            this(textures[0], textures[1], textures[2], textures[3], textures[4], textures[5], fluidBlockStateId);
         }
     }
 
