@@ -11,6 +11,7 @@ import me.cortex.voxy.client.core.rendering.RenderService;
 import me.cortex.voxy.client.core.rendering.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.Logger;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
@@ -36,6 +37,7 @@ import static org.lwjgl.opengl.GL45.glCopyNamedBufferSubData;
 //Uses MDIC to render the sections
 public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryManager> {
     private static final int TRANSLUCENT_OFFSET = 400_000;//in draw calls
+    private static final int TEMPORAL_OFFSET = 500_000;//in draw calls
     private static final int STATISTICS_BUFFER_BINDING = 7;
     private final Shader terrainShader = Shader.make()
             .defineIf("DEBUG_RENDER", false)
@@ -45,6 +47,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     private final Shader commandGenShader = Shader.make()
             .define("TRANSLUCENT_OFFSET", TRANSLUCENT_OFFSET)
+            .define("TEMPORAL_OFFSET", TEMPORAL_OFFSET)
 
             .defineIf("HAS_STATISTICS", RenderStatistics.enabled)
             .defineIf("STATISTICS_BUFFER_BINDING", RenderStatistics.enabled, STATISTICS_BUFFER_BINDING)
@@ -65,14 +68,17 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     //TODO: needs to be in the viewport, since it contains the compute indirect call/values
     private final GlBuffer drawCountCallBuffer = new GlBuffer(1024).zero();
-    private final GlBuffer drawCallBuffer  = new GlBuffer(5*4*(400_000+100_000)).zero();//400k draw calls
+    private final GlBuffer drawCallBuffer  = new GlBuffer(5*4*(400_000+100_000+100_000)).zero();//400k draw calls
     private final GlBuffer positionScratchBuffer  = new GlBuffer(8*400000).zero();//400k positions
 
     //Statistics
     private final GlBuffer statisticsBuffer = new GlBuffer(1024).zero();
 
+    private final int maxSectionCount;
+
     public MDICSectionRenderer(ModelStore modelStore, int maxSectionCount, long geometryCapacity) {
         super(modelStore, new BasicSectionGeometryManager(maxSectionCount, geometryCapacity));
+        this.maxSectionCount = maxSectionCount;
     }
 
 
@@ -90,7 +96,11 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         MemoryUtil.memPutInt(ptr, sx); ptr += 4;
         MemoryUtil.memPutInt(ptr, sy); ptr += 4;
         MemoryUtil.memPutInt(ptr, sz); ptr += 4;
-        MemoryUtil.memPutInt(ptr, viewport.frameId); ptr += 4;
+        if (viewport.frameId<0) {
+            Logger.error("Frame ID negative, this will cause things to break, wrapping around");
+            viewport.frameId &= 0x7fffffff;
+        }
+        MemoryUtil.memPutInt(ptr, viewport.frameId&0x7fffffff); ptr += 4;
         innerTranslation.getToAddress(ptr); ptr += 4*3;
 
         UploadStream.INSTANCE.commit();
@@ -116,7 +126,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     }
 
-    private void renderTerrain() {
+    private void renderTerrain(long indirectOffset, long drawCountOffset, int maxDrawCount) {
         //RenderLayer.getCutoutMipped().startDrawing();
 
         glDisable(GL_CULL_FACE);
@@ -125,7 +135,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
         this.bindRenderingBuffers();
 
-        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 4*3, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), 400_000), 0);
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCountOffset, maxDrawCount, 0);
 
         glEnable(GL_CULL_FACE);
         glBindVertexArray(0);
@@ -143,7 +153,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         this.uploadUniformBuffer(viewport);
 
-        this.renderTerrain();
+        this.renderTerrain(0, 4*3, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), 400_000));
     }
 
     @Override
@@ -244,6 +254,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                 });
             }
         }
+
+        //Render temporal
+        this.renderTerrain(TEMPORAL_OFFSET*5*4, 4*5, Math.min(this.geometryManager.getSectionCount(), 100_000));
     }
 
     @Override
@@ -254,7 +267,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     @Override
     public MDICViewport createViewport() {
-        return new MDICViewport();
+        return new MDICViewport(this.maxSectionCount);
     }
 
     @Override

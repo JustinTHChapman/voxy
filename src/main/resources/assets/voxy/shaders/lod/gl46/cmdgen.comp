@@ -59,20 +59,16 @@ void main() {
     vec3 cornerPos = vec3(((ipos<<detail)-baseSectionPos)<<5)-cameraSubPos;
 
 
-    //Note! its not with respect to the sectionId
-    //
-    //Check the occlusion data from this frame occlusion
-    bool shouldRender = visibilityData[gl_GlobalInvocationID.x] == frameId;
+    uint dat = visibilityData[sectionId];
 
-    //Clear the occlusion data (not strictly? needed? i think???)
-    //visibilityData[gl_GlobalInvocationID.x] = 0;
-
-    //TODO: need to make it check that only if it was also in the frustum last frame does it apply the visibilityData check!
-    // this fixes temporal coherance
+    //if the section was visible this frame
+    bool shouldRender = (dat&0x7fffffffu) == frameId;
+    bool renderTemporally = (dat&0x80000000u)==0;// means, if it was not visible last frame
 
 
 
     if (shouldRender) {
+
         #ifdef HAS_STATISTICS
         atomicAdd(visibleSectionCounts[detail], 1);
         #endif
@@ -95,8 +91,15 @@ void main() {
         msk |= uint(((meta.cntA>>16)&0xFFFF)!=0)<<6;
 
 
-        uint cmdPtr = atomicAdd(opaqueDrawCount, bitCount(msk));
+        uint cmdCnt = bitCount(msk);
+        uint cmdPtr = atomicAdd(opaqueDrawCount, cmdCnt);
 
+        uint tCmdPtr = 0;
+        if (renderTemporally) {
+            tCmdPtr = atomicAdd(temporalOpaqueDrawCount, cmdCnt) + TEMPORAL_OFFSET;
+        }
+
+        //TODO: make totalQuads also have temporal amount
         #ifdef HAS_STATISTICS
         uint totalQuads = 0;
         #endif
@@ -117,6 +120,9 @@ void main() {
         count = (meta.cntA>>16)&0xFFFF;
         if (count != 0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            if (renderTemporally) {
+                writeCmd(tCmdPtr++, drawId, ptr, count);
+            }
             #ifdef HAS_STATISTICS
             totalQuads += count;
             #endif
@@ -127,6 +133,9 @@ void main() {
         count = (meta.cntB)&0xFFFF;
         if (((msk&(1u<<0))!=0)) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            if (renderTemporally) {
+                writeCmd(tCmdPtr++, drawId, ptr, count);
+            }
             #ifdef HAS_STATISTICS
             totalQuads += count;
             #endif
@@ -137,6 +146,9 @@ void main() {
         count = (meta.cntB>>16)&0xFFFF;
         if ((msk&(1u<<1))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            if (renderTemporally) {
+                writeCmd(tCmdPtr++, drawId, ptr, count);
+            }
             #ifdef HAS_STATISTICS
             totalQuads += count;
             #endif
@@ -147,6 +159,9 @@ void main() {
         count = (meta.cntC)&0xFFFF;
         if ((msk&(1u<<2))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            if (renderTemporally) {
+                writeCmd(tCmdPtr++, drawId, ptr, count);
+            }
             #ifdef HAS_STATISTICS
             totalQuads += count;
             #endif
@@ -157,6 +172,9 @@ void main() {
         count = (meta.cntC>>16)&0xFFFF;
         if ((msk&(1u<<3))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            if (renderTemporally) {
+                writeCmd(tCmdPtr++, drawId, ptr, count);
+            }
             #ifdef HAS_STATISTICS
             totalQuads += count;
             #endif
@@ -167,6 +185,9 @@ void main() {
         count = (meta.cntD)&0xFFFF;
         if ((msk&(1u<<4))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            if (renderTemporally) {
+                writeCmd(tCmdPtr++, drawId, ptr, count);
+            }
             #ifdef HAS_STATISTICS
             totalQuads += count;
             #endif
@@ -177,6 +198,9 @@ void main() {
         count = (meta.cntD>>16)&0xFFFF;
         if ((msk&(1u<<5))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
+            if (renderTemporally) {
+                writeCmd(tCmdPtr++, drawId, ptr, count);
+            }
             #ifdef HAS_STATISTICS
             totalQuads += count;
             #endif

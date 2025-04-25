@@ -1,6 +1,6 @@
 #version 460 core
 #extension GL_ARB_gpu_shader_int64 : enable
-#define VISIBILITY_ACCESS writeonly
+#define VISIBILITY_ACCESS readonly
 
 #define SECTION_METADATA_BUFFER_BINDING 1
 #define VISIBILITY_BUFFER_BINDING 2
@@ -29,7 +29,10 @@ void main() {
 
     gl_Position = MVP * vec4(vec3(pos),1);
 
-    //Write to this id
-    id = gl_InstanceID;//Note!! we write to the instance id _not_ the section id
-    value = frameId;
+    //Write to the section id, to track temporal over time (litterally just need a single bit, 1 fking bit, but no)
+    id = sid;
+
+    uint previous = visibilityData[sid]&0x7fffffffu;
+    bool wasVisibleLastFrame = previous==(frameId-1);
+    value = (frameId&0x7fffffffu)|(uint(wasVisibleLastFrame)<<31);//Encode if it was visible last frame
 }
