@@ -14,6 +14,7 @@ void main() {
 
     opaqueDrawCount = 0;
     translucentDrawCount = 0;
+    temporalOpaqueDrawCount = 0;
 
     cullDrawIndirectCommand.count = 6*2*3;
     cullDrawIndirectCommand.instanceCount = sectionCount;

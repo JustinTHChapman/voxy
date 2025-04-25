@@ -27,7 +27,7 @@ public class VoxyConfig implements OptionStorage<VoxyConfig> {
     public boolean ingestEnabled = true;
     public int sectionRenderDistance = 16;
     public int serviceThreads = Math.max(Runtime.getRuntime().availableProcessors()/2, 1);
-    public float subDivisionSize = 128;
+    public float subDivisionSize = 64;
     public boolean renderVanillaFog = false;
     public boolean renderStatistics = false;
 

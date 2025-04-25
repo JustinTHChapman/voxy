@@ -63,8 +63,8 @@ layout(binding = DRAW_COUNT_BUFFER_BINDING, std430) restrict buffer DrawCommandC
 
     uint opaqueDrawCount;
     uint translucentDrawCount;
+    uint temporalOpaqueDrawCount;
 
-    uint pad_A;
     DrawCommand cullDrawIndirectCommand;
 };
 #endif

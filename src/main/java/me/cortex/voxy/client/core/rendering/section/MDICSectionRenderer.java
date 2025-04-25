@@ -112,6 +112,10 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     }
 
 
+    private void renderTemporalTerrain() {
+
+    }
+
     private void renderTerrain() {
         //RenderLayer.getCutoutMipped().startDrawing();
 
@@ -140,6 +144,30 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.uploadUniformBuffer(viewport);
 
         this.renderTerrain();
+    }
+
+    @Override
+    public void renderTranslucent(MDICViewport viewport) {
+        if (this.geometryManager.getSectionCount() == 0) return;
+        glEnable(GL_BLEND);
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+        glDisable(GL_CULL_FACE);
+        glEnable(GL_DEPTH_TEST);
+        this.terrainShader.bind();
+        glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
+        this.bindRenderingBuffers();
+
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, Math.min(this.geometryManager.getSectionCount(), 100_000), 0);
+
+        glEnable(GL_CULL_FACE);
+        glBindVertexArray(0);
+        glBindSampler(0, 0);
+        glBindTextureUnit(0, 0);
+        glBindSampler(1, 0);
+        glBindTextureUnit(1, 0);
+
+        glDisable(GL_BLEND);
     }
 
     @Override
@@ -203,6 +231,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountCallBuffer.id);
             glDispatchComputeIndirect(0);
             glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
+
             if (RenderStatistics.enabled) {
                 DownloadStream.INSTANCE.download(this.statisticsBuffer, down->{
                     for (int i = 0; i < 5; i++) {
@@ -215,31 +244,6 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                 });
             }
         }
-    }
-
-    @Override
-    public void renderTranslucent(MDICViewport viewport) {
-        if (this.geometryManager.getSectionCount() == 0) return;
-        glEnable(GL_BLEND);
-        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-        glDisable(GL_CULL_FACE);
-        glEnable(GL_DEPTH_TEST);
-        this.terrainShader.bind();
-        glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
-        this.bindRenderingBuffers();
-
-        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, Math.min(this.geometryManager.getSectionCount(), 100_000), 0);
-
-        glEnable(GL_CULL_FACE);
-        glBindVertexArray(0);
-        glBindSampler(0, 0);
-        glBindTextureUnit(0, 0);
-        glBindSampler(1, 0);
-        glBindTextureUnit(1, 0);
-
-        glDisable(GL_BLEND);
-
     }
 
     @Override
