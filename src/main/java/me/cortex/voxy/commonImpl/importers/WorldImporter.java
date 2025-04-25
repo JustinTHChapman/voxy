@@ -351,6 +351,7 @@ public class WorldImporter implements IDataImporter {
                         var data = new MemoryBuffer(n).cpyFrom(base + 5);
                         this.jobQueue.add(()-> {
                             if (!this.isRunning) {
+                                data.free();
                                 return;
                             }
                             try {
