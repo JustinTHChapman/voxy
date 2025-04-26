@@ -7,4 +7,7 @@ out vec4 colour;
 
 void main() {
     colour = texture(tex, texCoord)*(metadata&1);
+    if (colour.a <0.0001f) {
+        discard;
+    }
 }

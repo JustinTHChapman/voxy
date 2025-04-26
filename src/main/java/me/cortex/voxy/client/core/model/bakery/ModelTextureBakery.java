@@ -130,7 +130,10 @@ public class ModelTextureBakery {
             glBlendFuncSeparate(GL_ONE_MINUS_DST_ALPHA, GL_DST_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         } else {
             glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+            glDisable(GL_BLEND);
         }
+        boolean hasDiscard = renderLayer == RenderLayer.getCutout() ||
+                             renderLayer == RenderLayer.getCutoutMipped();
 
 
         //glBlendFunc(GL_ONE, GL_ONE);
@@ -150,7 +153,7 @@ public class ModelTextureBakery {
             if (entityModel!=null&&!renderFluid) {
                 entityModel.renderOut(transform, tex);
             }
-            this.rasterView(state, model, transform, randomValue, i, renderFluid, tex);
+            this.rasterView(state, model, transform, randomValue, i, renderFluid, tex, hasDiscard);
         }
 
         glViewport(viewdat[0], viewdat[1], viewdat[2], viewdat[3]);
@@ -173,20 +176,25 @@ public class ModelTextureBakery {
         //SOMEBODY PLEASE FUCKING EXPLAIN TO ME WHY MUST CLEAR THE FRAMEBUFFER HERE WHEN IT IS LITERALLY CLEARED AT THE START OF THE FRAME
         // WITHOUT THIS, WATER DOESNT RENDER
         //TODO: FIXME, WHAT THE ACTUAL FUCK
-        glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
-        glClearDepth(1);
-        glClear(GL_DEPTH_BUFFER_BIT);
+        //glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
+        //glClearDepth(1);
+        //glClear(GL_DEPTH_BUFFER_BIT);
 
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     private final BufferAllocator allocator = new BufferAllocator(786432);
-    private void rasterView(BlockState state, BlockStateModel model, Matrix4f transform, long randomValue, int face, boolean renderFluid, GpuTexture texture) {
+    private void rasterView(BlockState state, BlockStateModel model, Matrix4f transform, long randomValue, int face, boolean renderFluid, GpuTexture texture, boolean hasDiscard) {
         var bb = new BufferBuilder(this.allocator, VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR) {
             @Override
             public void vertex(float x, float y, float z, int color, float u, float v, int overlay, int light, float normalX, float normalY, float normalZ) {
-                super.vertex(x, y, z, ColorHelper.getArgb(0,0,1), u, v, overlay, light, normalX, normalY, normalZ);
+                int colour = color;
+                colour |= hasDiscard?2:0;
+                if (renderFluid) {
+                    colour = ColorHelper.getArgb(0,0,1);
+                }
+                super.vertex(x, y, z, colour, u, v, overlay, light, normalX, normalY, normalZ);
             }
 
             @Override
