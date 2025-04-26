@@ -23,6 +23,9 @@ public class MessageQueue <T> {
     }
 
     public int consume(int max) {
+        if (this.count.get() == 0) {
+            return 0;
+        }
         int i = 0;
         while (i < max) {
             var entry = this.queue.poll();
@@ -30,6 +33,24 @@ public class MessageQueue <T> {
             i++;
             this.consumer.accept(entry);
         }
+        if (i != 0) {
+            this.count.addAndGet(-i);
+        }
+        return i;
+    }
+
+    public int consumeMillis(int millis) {
+        if (this.count.get() == 0) {
+            return 0;
+        }
+        int i = 0;
+        long nano = System.nanoTime();
+        do {
+            var entry = this.queue.poll();
+            if (entry == null) break;
+            i++;
+            this.consumer.accept(entry);
+        } while ((System.nanoTime()-nano) < millis*1000_000L);
         if (i != 0) {
             this.count.addAndGet(-i);
         }

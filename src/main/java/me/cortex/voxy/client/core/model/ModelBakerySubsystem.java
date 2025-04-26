@@ -46,7 +46,7 @@ public class ModelBakerySubsystem {
 
 
         //There should be a method to access the frame time IIRC, if the user framecap is unlimited lock it to like 60 fps for computation
-        int BUDGET = 10;//TODO: make this computed based on the remaining free time in a frame (and like div by 2 to reduce overhead) (with a min of 1)
+        int BUDGET = 16;//TODO: make this computed based on the remaining free time in a frame (and like div by 2 to reduce overhead) (with a min of 1)
         if (!this.blockIdQueue.isEmpty()) {
             int[] est = new int[Math.min(this.blockIdQueue.size(), BUDGET)];
             int i = 0;
