@@ -363,7 +363,7 @@ public class RenderDataFactory45 {
 
                     {
                         int idx = index + (pidx*32);
-                        int shift = skipAmount * 32;
+                        int shift = skipAmount * 32 * 2;
 
                         //Flip data with respect to facing direction
                         int iA = idx * 2 + (facingForward == 1 ? 0 : shift);
