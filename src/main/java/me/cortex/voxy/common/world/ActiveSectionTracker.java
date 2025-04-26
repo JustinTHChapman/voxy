@@ -143,6 +143,9 @@ public class ActiveSectionTracker {
             if (section.trySetFreed()) {
                 var cached = cache.remove(section.key);
                 var obj = cached.obj;
+                if (obj == null) {
+                    throw new IllegalStateException("This should be impossible");
+                }
                 if (obj != section) {
                     throw new IllegalStateException("Removed section not the same as the referenced section in the cache: cached: " + obj + " got: " + section + " A: " + WorldSection.ATOMIC_STATE_HANDLE.get(obj) + " B: " +WorldSection.ATOMIC_STATE_HANDLE.get(section));
                 }
