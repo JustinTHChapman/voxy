@@ -363,15 +363,14 @@ public class RenderDataFactory45 {
 
                     {
                         int idx = index + (pidx*32);
-
-                        //TODO: swap this out for something not getting the next entry
-                        long A = this.sectionData[idx * 2];
-                        long B = this.sectionData[(idx + skipAmount * 32) * 2];
+                        int shift = skipAmount * 32;
 
                         //Flip data with respect to facing direction
-                        long selfModel = facingForward == 1 ? A : B;
-                        long nextModel = facingForward == 1 ? B : A;
+                        int iA = idx * 2 + (facingForward == 1 ? 0 : shift);
+                        int iB = idx * 2 + (facingForward == 1 ? shift : 0);
 
+                        long selfModel = this.sectionData[iA];
+                        long nextModel = this.sectionData[iB];
 
                         this.blockMesher.putNext(((long) facingForward) |//Facing
                                 selfModel |

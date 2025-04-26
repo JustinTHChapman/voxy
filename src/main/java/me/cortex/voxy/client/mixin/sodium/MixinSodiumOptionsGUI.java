@@ -15,7 +15,7 @@ import java.util.List;
 
 @Mixin(SodiumOptionsGUI.class)
 public class MixinSodiumOptionsGUI {
-    @Shadow @Final private List<OptionPage> pages;
+    @Shadow(remap = false) @Final private List<OptionPage> pages;
 
     @Inject(method = "<init>", at = @At("TAIL"))
     private void voxy$addConfigPage(Screen prevScreen, CallbackInfo ci) {
