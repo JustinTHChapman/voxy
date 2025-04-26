@@ -361,6 +361,7 @@ public class ModelFactory {
             boolean faceCoversFullBlock = faceSize[0] == 0 && faceSize[2] == 0 &&
                     faceSize[1] == (MODEL_TEXTURE_SIZE-1) && faceSize[3] == (MODEL_TEXTURE_SIZE-1);
 
+
             metadata |= faceCoversFullBlock?2:0;
 
             //TODO: add alot of config options for the following
@@ -413,6 +414,7 @@ public class ModelFactory {
 
             MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
         }
+
         metadata |= fullyOpaque?(1L<<(48+6)):0;
         this.metadataCache[modelId] = metadata;
 
@@ -423,7 +425,7 @@ public class ModelFactory {
         modelFlags |= colourProvider != null?1:0;
         modelFlags |= isBiomeColourDependent?2:0;//Basicly whether to use the next int as a colour or as a base index/id into a colour buffer for biome dependent colours
         modelFlags |= blockRenderLayer == RenderLayer.getTranslucent()?4:0;//Is translucent
-        modelFlags |= blockRenderLayer == RenderLayer.getCutout()?0:8;//Use mipmaps
+        modelFlags |= blockRenderLayer == RenderLayer.getCutout()?0:8;//Dont use mipmaps (AND ALSO FKING SPECIFIES IF IT HAS AO, WHY??? GREAT QUESTION, TODO FIXE THIS)
 
         //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
         MemoryUtil.memPutInt(uploadPtr, modelFlags);
@@ -498,6 +500,8 @@ public class ModelFactory {
                 MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(colourProvider, entry.getRight(), biomeE)|0xFF000000); clrUploadPtr += 4;
             }
         }
+
+        UploadStream.INSTANCE.commit();
     }
 
     private static BlockColorProvider getColourProvider(Block block) {
