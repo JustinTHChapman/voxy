@@ -24,4 +24,4 @@ jobs:
           cache-read-only: true
 
       - name: Gradle build
-        run: ./gradlew build
+        run: ./gradlew build --no-daemon
