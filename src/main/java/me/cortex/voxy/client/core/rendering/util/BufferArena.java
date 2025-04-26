@@ -18,6 +18,9 @@ public class BufferArena {
     private final AllocationArena allocationMap = new AllocationArena();
     private long used;
 
+    //TODO: cache the GlBuffer accross open and closing of the renderer
+    // until the instance is closed, this helps the driver as allocating a huge block of memory is expensive
+    // so reusing it is ideal
     public BufferArena(long capacity, int elementSize) {
         if (capacity%elementSize != 0) {
             throw new IllegalArgumentException("Capacity not a multiple of element size");
