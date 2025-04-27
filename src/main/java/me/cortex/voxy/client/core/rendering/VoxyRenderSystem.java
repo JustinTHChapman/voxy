@@ -31,6 +31,7 @@ import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.system.MemoryUtil;
 
+import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -45,6 +46,7 @@ public class VoxyRenderSystem {
     private final PostProcessing postProcessing;
     private final WorldEngine worldIn;
     private final RenderDistanceTracker renderDistanceTracker;
+    private long runTimeNano = 0;
 
     public VoxyRenderSystem(WorldEngine world, ServiceThreadPool threadPool) {
         //Trigger the shared index buffer loading
@@ -98,11 +100,18 @@ public class VoxyRenderSystem {
             downstream.submit();
             downstream.tick();
         }*/
+        VarHandle.fullFence();
+        long start = System.nanoTime();
+        VarHandle.fullFence();
 
         this.renderDistanceTracker.setCenterAndProcess(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
 
-        this.renderer.setup(camera);
+        this.renderer.tickModelService();
         PrintfDebugUtil.tick();
+
+        VarHandle.fullFence();
+        this.runTimeNano = System.nanoTime() - start;
+        VarHandle.fullFence();
     }
 
     private static Matrix4f makeProjectionMatrix(float near, float far) {
@@ -128,9 +137,9 @@ public class VoxyRenderSystem {
     }
 
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
-
-        //if (true) return;
-
+        VarHandle.fullFence();
+        long startTime = System.nanoTime();
+        VarHandle.fullFence();
 
         if (IrisUtil.irisShadowActive()) {
             return;
@@ -200,11 +209,20 @@ public class VoxyRenderSystem {
 
         this.postProcessing.renderPost(projection, RenderSystem.getProjectionMatrix(), boundFB);
         glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
+
+        VarHandle.fullFence();
+        this.runTimeNano += System.nanoTime() - startTime;
+        VarHandle.fullFence();
     }
 
+    private double role = 0;
     public void addDebugInfo(List<String> debug) {
         debug.add("GlBuffer, Count/Size (mb): " + GlBuffer.getCount() + "/" + (GlBuffer.getTotalSize()/1_000_000));
         this.renderer.addDebugData(debug);
+        double aa = (((double)(this.runTimeNano/1000))/1000);
+
+        this.role = Math.max(Math.ceil((this.role * 0.99 + (aa*0.01))*1000)/1000, aa);
+        debug.add("Voxy frame runtime (millis): " + this.role);
         PrintfDebugUtil.addToOut(debug);
     }
 

@@ -25,7 +25,7 @@ public class VoxelIngestService {
     private final ConcurrentLinkedDeque<IngestSection> ingestQueue = new ConcurrentLinkedDeque<>();
 
     public VoxelIngestService(ServiceThreadPool pool) {
-        this.threads = pool.createServiceNoCleanup("Ingest service", 1000, ()-> this::processJob);
+        this.threads = pool.createServiceNoCleanup("Ingest service", 5000, ()-> this::processJob);
     }
 
     private void processJob() {

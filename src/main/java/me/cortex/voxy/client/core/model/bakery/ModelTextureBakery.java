@@ -176,9 +176,9 @@ public class ModelTextureBakery {
         //SOMEBODY PLEASE FUCKING EXPLAIN TO ME WHY MUST CLEAR THE FRAMEBUFFER HERE WHEN IT IS LITERALLY CLEARED AT THE START OF THE FRAME
         // WITHOUT THIS, WATER DOESNT RENDER
         //TODO: FIXME, WHAT THE ACTUAL FUCK
-        //glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
-        //glClearDepth(1);
-        //glClear(GL_DEPTH_BUFFER_BIT);
+        glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
+        glClearDepth(1);
+        glClear(GL_DEPTH_BUFFER_BIT);
 
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);

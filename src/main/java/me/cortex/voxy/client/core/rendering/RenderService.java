@@ -100,7 +100,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.nodeManager.removeTopLevelNode(pos);
     }
 
-    public void setup(Camera camera) {
+    public void tickModelService() {
         this.modelService.tick();
     }
 
@@ -135,7 +135,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
             //Cap the number of consumed sections per frame to 40 + 2% of the queue size, cap of 200
             //int geoUpdateCap = 20;//Math.max(100, Math.min((int)(0.15*this.geometryUpdateQueue.count()), 260));
-            this.geometryUpdateQueue.consumeMillis(2);
+            this.geometryUpdateQueue.consumeMillis(1);
             if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
                 UploadStream.INSTANCE.commit();
             }
