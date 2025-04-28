@@ -220,8 +220,6 @@ public class VoxyRenderSystem {
             TimingStatistics.update();
             debug.add("Voxy frame runtime (millis): " + TimingStatistics.setup.pVal() + ", " + TimingStatistics.dynamic.pVal() + ", " + TimingStatistics.main.pVal()+ ", " + TimingStatistics.all.pVal());
         }
-        int val = RenderGenerationService.FC.getAndSet(0);
-        debug.add("FC: " + val);
         PrintfDebugUtil.addToOut(debug);
     }
 
