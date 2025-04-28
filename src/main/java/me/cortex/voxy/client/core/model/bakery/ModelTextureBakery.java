@@ -95,6 +95,8 @@ public class ModelTextureBakery {
         });
 
 
+        int originalFramebuffer = glGetInteger(GL_FRAMEBUFFER_BINDING);
+
 
         RenderLayer renderLayer = null;
         if (!renderFluid) {
@@ -181,7 +183,7 @@ public class ModelTextureBakery {
         glClear(GL_DEPTH_BUFFER_BIT);
 
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glBindFramebuffer(GL_FRAMEBUFFER, originalFramebuffer);
     }
 
     private final BufferAllocator allocator = new BufferAllocator(786432);

@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering;
 
 import io.netty.util.internal.MathUtil;
 import me.cortex.voxy.client.RenderStatistics;
+import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
@@ -22,6 +23,7 @@ import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldSection;
 import net.minecraft.client.render.Camera;
 
+import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -127,9 +129,12 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         // this is because e.g. shadows, cause this pipeline to be invoked multiple times
         // which may cause the geometry to become outdated resulting in corruption rendering in renderOpaque
         //TODO: Need to find a proper way to fix this (if there even is one)
-        if (true /* firstInvocationThisFrame */) {
-            DownloadStream.INSTANCE.tick();
+        {
+            TimingStatistics.main.stop();
+            TimingStatistics.dynamic.start();
 
+            //Tick download stream
+            DownloadStream.INSTANCE.tick();
 
             this.sectionUpdateQueue.consume(128);
 
@@ -143,8 +148,13 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
             //this needs to go after, due to geometry updates committed by the nodeManager
             this.sectionRenderer.getGeometryManager().tick();
+
+            //Tick upload stream
+            UploadStream.INSTANCE.tick();
+
+            TimingStatistics.dynamic.stop();
+            TimingStatistics.main.start();
         }
-        UploadStream.INSTANCE.tick();
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_PIXEL_BUFFER_BARRIER_BIT);
 

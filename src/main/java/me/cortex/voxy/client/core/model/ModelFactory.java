@@ -139,16 +139,16 @@ public class ModelFactory {
 
 
 
-    public void addEntry(int blockId) {
+    public boolean addEntry(int blockId) {
         if (this.idMappings[blockId] != -1) {
-            return;
+            return false;
         }
         //We are (probably) going to be baking the block id
         // check that it is currently not inflight, if it is, return as its already being baked
         // else add it to the flight as it is going to be baked
         if (!this.blockStatesInFlight.add(blockId)) {
             //Block baking is already in-flight
-            return;
+            return false;
         }
 
         var blockState = this.mapper.getBlockStateFromBlockId(blockId);
@@ -192,6 +192,7 @@ public class ModelFactory {
             processTextureBakeResult(blockId, blockState, textureData);
         });
         this.bakery.renderFacesToStream(blockState, 123456, isFluid, this.downstream.getBufferId(), allocation);
+        return true;
     }
 
     //TODO: what i need to do is seperate out fluid states from blockStates

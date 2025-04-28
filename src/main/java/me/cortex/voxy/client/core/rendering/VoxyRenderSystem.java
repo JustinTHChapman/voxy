@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering;
 
 import com.mojang.blaze3d.opengl.GlConst;
 import com.mojang.blaze3d.systems.RenderSystem;
+import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
@@ -46,7 +47,6 @@ public class VoxyRenderSystem {
     private final PostProcessing postProcessing;
     private final WorldEngine worldIn;
     private final RenderDistanceTracker renderDistanceTracker;
-    private long runTimeNano = 0;
 
     public VoxyRenderSystem(WorldEngine world, ServiceThreadPool threadPool) {
         //Trigger the shared index buffer loading
@@ -70,9 +70,12 @@ public class VoxyRenderSystem {
         this.renderDistanceTracker.setRenderDistance(renderDistance);
     }
 
+
     //private static final ModelTextureBakery mtb = new ModelTextureBakery(16, 16);
     //private static final RawDownloadStream downstream = new RawDownloadStream(1<<20);
     public void renderSetup(Frustum frustum, Camera camera) {
+        TimingStatistics.resetSamplers();
+
         /*
         if (false) {
             int allocation = downstream.download(2 * 4 * 6 * 16 * 16, ptr -> {
@@ -100,18 +103,15 @@ public class VoxyRenderSystem {
             downstream.submit();
             downstream.tick();
         }*/
-        VarHandle.fullFence();
-        long start = System.nanoTime();
-        VarHandle.fullFence();
 
+        TimingStatistics.setup.start();
         this.renderDistanceTracker.setCenterAndProcess(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
 
+        //Done here as is allows less gl state resetup
         this.renderer.tickModelService();
-        PrintfDebugUtil.tick();
 
-        VarHandle.fullFence();
-        this.runTimeNano = System.nanoTime() - start;
-        VarHandle.fullFence();
+        PrintfDebugUtil.tick();
+        TimingStatistics.setup.stop();
     }
 
     private static Matrix4f makeProjectionMatrix(float near, float far) {
@@ -137,13 +137,10 @@ public class VoxyRenderSystem {
     }
 
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
-        VarHandle.fullFence();
-        long startTime = System.nanoTime();
-        VarHandle.fullFence();
-
         if (IrisUtil.irisShadowActive()) {
             return;
         }
+        TimingStatistics.main.start();
 
         if (false) {
             //only increase quality while there are very few mesh queues, this stops,
@@ -209,20 +206,17 @@ public class VoxyRenderSystem {
 
         this.postProcessing.renderPost(projection, RenderSystem.getProjectionMatrix(), boundFB);
         glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
+        TimingStatistics.main.stop();
 
-        VarHandle.fullFence();
-        this.runTimeNano += System.nanoTime() - startTime;
-        VarHandle.fullFence();
     }
 
-    private double role = 0;
     public void addDebugInfo(List<String> debug) {
         debug.add("GlBuffer, Count/Size (mb): " + GlBuffer.getCount() + "/" + (GlBuffer.getTotalSize()/1_000_000));
         this.renderer.addDebugData(debug);
-        double aa = (((double)(this.runTimeNano/1000))/1000);
-
-        this.role = Math.max(Math.ceil((this.role * 0.99 + (aa*0.01))*1000)/1000, aa);
-        debug.add("Voxy frame runtime (millis): " + this.role);
+        {
+            TimingStatistics.update();
+            debug.add("Voxy frame runtime (millis): " + TimingStatistics.setup.pVal() + ", " + TimingStatistics.dynamic.pVal() + ", " + TimingStatistics.main.pVal());
+        }
         PrintfDebugUtil.addToOut(debug);
     }
 

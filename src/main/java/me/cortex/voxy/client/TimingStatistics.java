@@ -1,0 +1,81 @@
+package me.cortex.voxy.client;
+
+import java.lang.invoke.VarHandle;
+import java.util.ArrayList;
+
+public class TimingStatistics {
+    public static double ROLLING_WEIGHT = 0.95;
+    private static final ArrayList<TimeSampler> allSamplers = new ArrayList<>();
+    public static final class TimeSampler {
+        private boolean running;
+        private long timestamp;
+        private long runtime;
+
+        private double rolling;
+
+        public TimeSampler() {
+            TimingStatistics.allSamplers.add(this);
+        }
+
+        private void reset() {
+            if (this.running) {
+                throw new IllegalStateException();
+            }
+            this.runtime = 0;
+        }
+
+        public void start() {
+            if (this.running) {
+                throw new IllegalStateException();
+            }
+            this.running = true;
+            VarHandle.fullFence();
+            this.timestamp = System.nanoTime();
+            VarHandle.fullFence();
+        }
+
+        public void stop() {
+            if (!this.running) {
+                throw new IllegalStateException();
+            }
+            this.running = false;
+            VarHandle.fullFence();
+            this.runtime += System.nanoTime() - this.timestamp;
+            VarHandle.fullFence();
+        }
+
+        public void subtract(TimeSampler sampler) {
+            this.runtime -= sampler.runtime;
+        }
+
+        private void update() {
+            double time = ((double) (this.runtime / 1000)) / 1000;
+            this.rolling = Math.max(this.rolling * ROLLING_WEIGHT + time * (1-ROLLING_WEIGHT), time);
+        }
+
+        public double getRolling() {
+            return this.rolling;
+        }
+
+        public String pVal() {
+            return String.format("%6.3f", this.rolling);
+        }
+    }
+
+    public static void resetSamplers() {
+        TimingStatistics.allSamplers.forEach(TimeSampler::reset);
+    }
+
+    private static void updateSamplers() {
+        TimingStatistics.allSamplers.forEach(TimeSampler::update);
+    }
+
+    public static TimeSampler setup = new TimeSampler();
+    public static TimeSampler main = new TimeSampler();
+    public static TimeSampler dynamic = new TimeSampler();
+
+    public static void update() {
+        updateSamplers();
+    }
+
+}

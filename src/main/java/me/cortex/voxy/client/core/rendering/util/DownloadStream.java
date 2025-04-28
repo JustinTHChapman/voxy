@@ -105,6 +105,9 @@ public class DownloadStream {
 
 
     public void commit() {
+        if (this.downloadList.isEmpty()) {
+            return;
+        }
         glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
         //Copies all the data from target buffers into the download stream
         for (var entry : this.downloadList) {

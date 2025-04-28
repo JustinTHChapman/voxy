@@ -68,7 +68,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     //TODO: needs to be in the viewport, since it contains the compute indirect call/values
     private final GlBuffer drawCountCallBuffer = new GlBuffer(1024).zero();
-    private final GlBuffer drawCallBuffer  = new GlBuffer(5*4*(400_000+100_000+100_000)).zero();//400k draw calls
+    private final GlBuffer drawCallBuffer = new GlBuffer(5*4*(400_000+100_000+100_000)).zero();//400k draw calls
     private final GlBuffer positionScratchBuffer  = new GlBuffer(8*400000).zero();//400k positions
 
     //Statistics
@@ -118,12 +118,6 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawCallBuffer.id);
         glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.drawCountCallBuffer.id);
-
-    }
-
-
-    private void renderTemporalTerrain() {
-
     }
 
     private void renderTerrain(long indirectOffset, long drawCountOffset, int maxDrawCount) {

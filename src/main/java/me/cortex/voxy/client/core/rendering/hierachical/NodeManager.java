@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
+import it.unimi.dsi.fastutil.ints.IntConsumer;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -90,6 +91,9 @@ public class NodeManager {
     private final LongOpenHashSet topLevelNodes = new LongOpenHashSet();
     private int activeNodeRequestCount;
 
+    private IntConsumer topLevelNodeIdAddedCallback;
+    private IntConsumer topLevelNodeIdRemovedCallback;
+
     public interface ICleaner {
         void alloc(int id);
         void move(int from, int to);
@@ -100,6 +104,11 @@ public class NodeManager {
     private void clearAllocId(int id) { if (this.cleanerInterface != null) this.cleanerInterface.alloc(id); }
     private void clearMoveId(int from, int to) { if (this.cleanerInterface != null) this.cleanerInterface.move(from, to); }
     private void clearFreeId(int id) { if (this.cleanerInterface != null) this.cleanerInterface.free(id); }
+
+    public void setTLNCallbacks(IntConsumer onAdd, IntConsumer onRemove) {
+        this.topLevelNodeIdAddedCallback = onAdd;
+        this.topLevelNodeIdRemovedCallback = onRemove;
+    }
 
     public NodeManager(int maxNodeCount, AbstractSectionGeometryManager geometryManager, ISectionWatcher watcher) {
         if (!MathUtil.isPowerOfTwo(maxNodeCount)) {
@@ -144,8 +153,9 @@ public class NodeManager {
             if (!this.topLevelNodeIds.remove(id)) {
                 throw new IllegalStateException("Node id was not in top level node ids: " + nodeId + " pos: " + WorldEngine.pprintPos(pos));
             }
+            if (this.topLevelNodeIdRemovedCallback != null)
+                this.topLevelNodeIdRemovedCallback.accept(id);
         }
-
         //Remove the entire thing
         this.recurseRemoveNode(pos);
     }
@@ -805,6 +815,8 @@ public class NodeManager {
             throw new IllegalStateException();
         }
         this.clearAllocId(id);
+        if (this.topLevelNodeIdAddedCallback != null)
+            this.topLevelNodeIdAddedCallback.accept(id);
     }
 
     private void finishRequest(int requestId, NodeChildRequest request) {
