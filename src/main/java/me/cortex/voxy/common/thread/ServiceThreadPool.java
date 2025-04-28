@@ -32,7 +32,7 @@ public class ServiceThreadPool {
     private final ThreadGroup threadGroup;
 
     public ServiceThreadPool(int threadCount) {
-        this(threadCount, 3);//Maybe change to 3
+        this(threadCount, 1);//Maybe change to 3
     }
 
     public ServiceThreadPool(int threadCount, int priority) {
