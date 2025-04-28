@@ -104,6 +104,7 @@ public class VoxyRenderSystem {
             downstream.tick();
         }*/
 
+        TimingStatistics.all.start();
         TimingStatistics.setup.start();
         this.renderDistanceTracker.setCenterAndProcess(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
 
@@ -112,6 +113,7 @@ public class VoxyRenderSystem {
 
         PrintfDebugUtil.tick();
         TimingStatistics.setup.stop();
+        TimingStatistics.all.stop();
     }
 
     private static Matrix4f makeProjectionMatrix(float near, float far) {
@@ -140,6 +142,7 @@ public class VoxyRenderSystem {
         if (IrisUtil.irisShadowActive()) {
             return;
         }
+        TimingStatistics.all.start();
         TimingStatistics.main.start();
 
         if (false) {
@@ -207,7 +210,7 @@ public class VoxyRenderSystem {
         this.postProcessing.renderPost(projection, RenderSystem.getProjectionMatrix(), boundFB);
         glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
         TimingStatistics.main.stop();
-
+        TimingStatistics.all.stop();
     }
 
     public void addDebugInfo(List<String> debug) {
@@ -215,8 +218,10 @@ public class VoxyRenderSystem {
         this.renderer.addDebugData(debug);
         {
             TimingStatistics.update();
-            debug.add("Voxy frame runtime (millis): " + TimingStatistics.setup.pVal() + ", " + TimingStatistics.dynamic.pVal() + ", " + TimingStatistics.main.pVal());
+            debug.add("Voxy frame runtime (millis): " + TimingStatistics.setup.pVal() + ", " + TimingStatistics.dynamic.pVal() + ", " + TimingStatistics.main.pVal()+ ", " + TimingStatistics.all.pVal());
         }
+        int val = RenderGenerationService.FC.getAndSet(0);
+        debug.add("FC: " + val);
         PrintfDebugUtil.addToOut(debug);
     }
 

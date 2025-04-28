@@ -115,15 +115,16 @@ public class ModelFactory {
 
     private final Mapper mapper;
     private final ModelStore storage;
-    private final RawDownloadStream downstream;
+    private final RawDownloadStream downstream = new RawDownloadStream(8*1024*1024);//8mb downstream
+
+    public final Deque<Runnable> resultJobs = new ArrayDeque<>();
 
 
     //TODO: NOTE!!! is it worth even uploading as a 16x16 texture, since automatic lod selection... doing 8x8 textures might be perfectly ok!!!
     // this _quarters_ the memory requirements for the texture atlas!!! WHICH IS HUGE saving
-    public ModelFactory(Mapper mapper, ModelStore storage, RawDownloadStream downstream) {
+    public ModelFactory(Mapper mapper, ModelStore storage) {
         this.mapper = mapper;
         this.storage = storage;
-        this.downstream = downstream;
         this.bakery = new ModelTextureBakery(MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
 
         this.metadataCache = new long[1<<16];
@@ -137,7 +138,9 @@ public class ModelFactory {
     }
 
 
-
+    public void tick() {
+        this.downstream.tick();
+    }
 
     public boolean addEntry(int blockId) {
         if (this.idMappings[blockId] != -1) {
@@ -172,7 +175,7 @@ public class ModelFactory {
         }
 
         int TOTAL_FACES_TEXTURE_SIZE = MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*2*4*6;// since both depth and colour are packed together, 6 faces, 4 bytes per pixel
-        int allocation = this.downstream.download(TOTAL_FACES_TEXTURE_SIZE, ptr->{
+        int allocation = this.downstream.download(TOTAL_FACES_TEXTURE_SIZE, ptr -> {
             ColourDepthTextureData[] textureData = new ColourDepthTextureData[6];
             final int FACE_SIZE = MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE;
             for (int face = 0; face < 6; face++) {
@@ -189,17 +192,13 @@ public class ModelFactory {
 
                 textureData[face] = new ColourDepthTextureData(colour, depth, MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
             }
-            processTextureBakeResult(blockId, blockState, textureData);
+            this.resultJobs.add(()->processTextureBakeResult(blockId, blockState, textureData));
         });
         this.bakery.renderFacesToStream(blockState, 123456, isFluid, this.downstream.getBufferId(), allocation);
         return true;
     }
 
-    //TODO: what i need to do is seperate out fluid states from blockStates
 
-
-    //TODO: so need a few things, per face sizes and offsets, the sizes should be computed from the pixels and find the minimum bounding pixel
-    // while the depth is computed from the depth buffer data
 
     //This is
     private void processTextureBakeResult(int blockId, BlockState blockState, ColourDepthTextureData[] textureData) {
@@ -634,7 +633,7 @@ public class ModelFactory {
     public int getModelId(int blockId) {
         int map = this.idMappings[blockId];
         if (map == -1) {
-            throw new IdNotYetComputedException(blockId);
+            throw new IdNotYetComputedException(blockId, true);
         }
         return map;
     }
@@ -646,7 +645,7 @@ public class ModelFactory {
     public int getFluidClientStateId(int clientBlockStateId) {
         int map = this.fluidStateLUT[clientBlockStateId];
         if (map == -1) {
-            throw new IdNotYetComputedException(clientBlockStateId);
+            throw new IdNotYetComputedException(clientBlockStateId, false);
         }
         return map;
     }
@@ -691,6 +690,7 @@ public class ModelFactory {
     }
 
     public void free() {
+        this.downstream.free();
         this.bakery.free();
     }
 

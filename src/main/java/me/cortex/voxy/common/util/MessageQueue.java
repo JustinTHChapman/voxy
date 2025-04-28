@@ -1,5 +1,6 @@
 package me.cortex.voxy.common.util;
 
+import java.lang.invoke.VarHandle;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -39,18 +40,20 @@ public class MessageQueue <T> {
         return i;
     }
 
-    public int consumeMillis(int millis) {
+    public int consumeNano(long budget) {
         if (this.count.get() == 0) {
             return 0;
         }
         int i = 0;
+        VarHandle.fullFence();
         long nano = System.nanoTime();
+        VarHandle.fullFence();
         do {
             var entry = this.queue.poll();
             if (entry == null) break;
             i++;
             this.consumer.accept(entry);
-        } while ((System.nanoTime()-nano) < millis*1000_000L);
+        } while ((System.nanoTime()-nano) < budget);
         if (i != 0) {
             this.count.addAndGet(-i);
         }

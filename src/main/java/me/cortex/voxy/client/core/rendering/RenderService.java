@@ -79,7 +79,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
         this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool,
                 this.geometryUpdateQueue::push, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets,
-                ()->this.geometryUpdateQueue.count()<2000);
+                ()->this.geometryUpdateQueue.count()<1000 && this.modelService.getProcessingCount()< 750);
 
         router.setCallbacks(this.renderGen::enqueueTask, section -> {
             section.acquire();
@@ -132,25 +132,35 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         {
             TimingStatistics.main.stop();
             TimingStatistics.dynamic.start();
+            long start = System.nanoTime();
+            VarHandle.fullFence();
 
             //Tick download stream
             DownloadStream.INSTANCE.tick();
 
+            //Tick upload stream (this is ok to do here as upload ticking is just memory management)
+            UploadStream.INSTANCE.tick();
+
             this.sectionUpdateQueue.consume(128);
 
-            //Cap the number of consumed sections per frame to 40 + 2% of the queue size, cap of 200
-            //int geoUpdateCap = 20;//Math.max(100, Math.min((int)(0.15*this.geometryUpdateQueue.count()), 260));
-            this.geometryUpdateQueue.consumeMillis(1);
+            VarHandle.fullFence();
+            long updateBudget = Math.max(1_000_000-(System.nanoTime()-start), 0);
+            VarHandle.fullFence();
+
+            if (updateBudget > 50_000) {
+                //Cap the number of consumed sections per frame to 40 + 2% of the queue size, cap of 200
+                //int geoUpdateCap = 20;//Math.max(100, Math.min((int)(0.15*this.geometryUpdateQueue.count()), 260));
+                this.geometryUpdateQueue.consumeNano(updateBudget);
+            }
+
+            this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
+
             if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
                 UploadStream.INSTANCE.commit();
             }
-            this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
 
             //this needs to go after, due to geometry updates committed by the nodeManager
             this.sectionRenderer.getGeometryManager().tick();
-
-            //Tick upload stream
-            UploadStream.INSTANCE.tick();
 
             TimingStatistics.dynamic.stop();
             TimingStatistics.main.start();

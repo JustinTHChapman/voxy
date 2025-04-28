@@ -14,6 +14,7 @@ import me.cortex.voxy.common.thread.ServiceSlice;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -23,7 +24,8 @@ public class RenderGenerationService {
     private static final class BuildTask {
         WorldSection section;
         final long position;
-        boolean hasDoneModelRequest;
+        boolean hasDoneModelRequestInner;
+        boolean hasDoneModelRequestOuter;
         private BuildTask(long position) {
             this.position = position;
         }
@@ -52,8 +54,9 @@ public class RenderGenerationService {
         this.threads = serviceThreadPool.createService("Section mesh generation service", 100, ()->{
             //Thread local instance of the factory
             var factory = new RenderDataFactory45(this.world, this.modelBakery.factory, this.emitMeshlets);
+            IntOpenHashSet seenMissed = new IntOpenHashSet(128);
             return new Pair<>(() -> {
-                this.processJob(factory);
+                this.processJob(factory, seenMissed);
             }, factory::free);
         }, taskLimiter);
     }
@@ -61,14 +64,28 @@ public class RenderGenerationService {
     //NOTE: the biomes are always fully populated/kept up to date
 
     //Asks the Model system to bake all blocks that currently dont have a model
-    private void computeAndRequestRequiredModels(WorldSection section, int extraId) {
-        var raw = section.copyData();//TODO: replace with copyDataTo and use a "thread local"/context array to reduce allocation rates
-        IntOpenHashSet seen = new IntOpenHashSet(128);
-        seen.add(extraId);
-        for (long state : raw) {
+    private void computeAndRequestRequiredModels(IntOpenHashSet seenMissedIds, int bitMsk, long[] auxData) {
+        final var factory = this.modelBakery.factory;
+        for (int i = 0; i < 6; i++) {
+            if ((bitMsk&(1<<i))==0) continue;
+            for (int j = 0; j < 32*32; j++) {
+                int block = Mapper.getBlockId(auxData[j+(i*32*32)]);
+                if (block != 0 && !factory.hasModelForBlockId(block)) {
+                    if (seenMissedIds.add(block)) {
+                        this.modelBakery.requestBlockBake(block);
+                    }
+                }
+            }
+        }
+    }
+
+    private void computeAndRequestRequiredModels(IntOpenHashSet seenMissedIds, WorldSection section) {
+        //Know this is... very much not safe, however it reduces allocation rates and other garbage, am sure its "fine"
+        final var factory = this.modelBakery.factory;
+        for (long state : section._unsafeGetRawDataArray()) {
             int block = Mapper.getBlockId(state);
-            if (!this.modelBakery.factory.hasModelForBlockId(block)) {
-                if (seen.add(block)) {
+            if (block != 0 && !factory.hasModelForBlockId(block)) {
+                if (seenMissedIds.add(block)) {
                     this.modelBakery.requestBlockBake(block);
                 }
             }
@@ -79,8 +96,14 @@ public class RenderGenerationService {
         return this.world.acquireIfExists(pos);
     }
 
+    private static boolean putTaskFirst(long pos) {
+        //Level 3 or 4
+        return WorldEngine.getLevel(pos) > 2;
+    }
+
+    public static final AtomicInteger FC = new AtomicInteger(0);
     //TODO: add a generated render data cache
-    private void processJob(RenderDataFactory45 factory) {
+    private void processJob(RenderDataFactory45 factory, IntOpenHashSet seenMissedIds) {
         BuildTask task;
         synchronized (this.taskQueue) {
             task = this.taskQueue.removeFirst();
@@ -105,20 +128,33 @@ public class RenderGenerationService {
         try {
             mesh = factory.generateMesh(section);
         } catch (IdNotYetComputedException e) {
-            //TODO: maybe move this to _after_ task as been readded to queue??
-
-            if (!this.modelBakery.factory.hasModelForBlockId(e.id)) {
-                this.modelBakery.requestBlockBake(e.id);
+            if (e.isIdBlockId) {
+                //TODO: maybe move this to _after_ task as been readded to queue??
+                if (!this.modelBakery.factory.hasModelForBlockId(e.id)) {
+                    if (seenMissedIds.add(e.id)) {
+                        this.modelBakery.requestBlockBake(e.id);
+                    }
+                }
             }
-            if (task.hasDoneModelRequest) {
+
+            if (task.hasDoneModelRequestInner && task.hasDoneModelRequestOuter) {
+                FC.addAndGet(1);
                 try {
                     Thread.sleep(1);
                 } catch (InterruptedException ex) {
                     throw new RuntimeException(ex);
                 }
-            } else {
+            }
+
+            if (!task.hasDoneModelRequestInner) {
                 //The reason for the extra id parameter is that we explicitly add/check against the exception id due to e.g. requesting accross a chunk boarder wont be captured in the request
-                this.computeAndRequestRequiredModels(section, e.id);
+                if (e.auxData == null)//the null check this is because for it to be, the inner must already be computed
+                    this.computeAndRequestRequiredModels(seenMissedIds, section);
+                task.hasDoneModelRequestInner = true;
+            }
+            if ((!task.hasDoneModelRequestOuter) && e.auxData != null) {
+                this.computeAndRequestRequiredModels(seenMissedIds, e.auxBitMsk, e.auxData);
+                task.hasDoneModelRequestOuter = true;
             }
 
 
@@ -130,12 +166,14 @@ public class RenderGenerationService {
                 BuildTask queuedTask;
                 synchronized (this.taskQueue) {
                     queuedTask = this.taskQueue.putIfAbsent(section.key, task);
-                }
-                if (queuedTask == null) {
-                    queuedTask = task;
-                }
+                    if (queuedTask == null) {
+                        queuedTask = task;
+                    }
 
-                queuedTask.hasDoneModelRequest = true;//Mark (or remark) the section as having chunks requested
+                    if (queuedTask.hasDoneModelRequestInner && queuedTask.hasDoneModelRequestOuter && putTaskFirst(section.key)) {//Force higher priority
+                        this.taskQueue.getAndMoveToFirst(section.key);
+                    }
+                }
 
                 if (queuedTask == task) {//use the == not .equal to see if we need to release a permit
                     if (this.threads.isAlive()) {//Only execute if were not dead
@@ -145,8 +183,12 @@ public class RenderGenerationService {
                     //If we did put it in the queue, dont release the section
                     shouldFreeSection = false;
                 } else {
-                    //This should no longer be a worry with LRU section cache
-                    //Logger.info("Funkyness happened and multiple tasks for same section where in queue");
+                    //Mark (or remark) the section as having models requested
+                    if (task.hasDoneModelRequestInner)
+                        queuedTask.hasDoneModelRequestInner = true;
+
+                    if (task.hasDoneModelRequestOuter)
+                        queuedTask.hasDoneModelRequestOuter = true;
 
                     //Things went bad, set section to null and ensure section is freed
                     task.section = null;
@@ -172,7 +214,7 @@ public class RenderGenerationService {
                 return new BuildTask(key);
             });
             //Prioritize lower detail builds
-            if (WorldEngine.getLevel(pos) > 2) {
+            if (putTaskFirst(pos)) {
                 this.taskQueue.getAndMoveToFirst(pos);
             }
         }

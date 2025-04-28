@@ -4,7 +4,7 @@ import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 
 public class TimingStatistics {
-    public static double ROLLING_WEIGHT = 0.95;
+    public static double ROLLING_WEIGHT = 0.975;
     private static final ArrayList<TimeSampler> allSamplers = new ArrayList<>();
     public static final class TimeSampler {
         private boolean running;
@@ -70,9 +70,11 @@ public class TimingStatistics {
         TimingStatistics.allSamplers.forEach(TimeSampler::update);
     }
 
+    public static TimeSampler all = new TimeSampler();
     public static TimeSampler setup = new TimeSampler();
     public static TimeSampler main = new TimeSampler();
     public static TimeSampler dynamic = new TimeSampler();
+
 
     public static void update() {
         updateSamplers();

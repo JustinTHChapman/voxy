@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering.building;
 
 import me.cortex.voxy.client.core.gl.Capabilities;
+import me.cortex.voxy.client.core.model.IdNotYetComputedException;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.client.core.model.ModelQueries;
 import me.cortex.voxy.client.core.util.Mesher2D;
@@ -1230,9 +1231,14 @@ public class RenderDataFactory45 {
         int neighborMsk = this.prepareSectionData();
         this.acquireNeighborData(section, neighborMsk);
 
-        this.generateYZFaces();
-        this.generateXFaces();
-
+        try {
+            this.generateYZFaces();
+            this.generateXFaces();
+        } catch (IdNotYetComputedException e) {
+            e.auxBitMsk = neighborMsk;
+            e.auxData = this.neighboringFaces;
+            throw e;
+        }
 
         //TODO:NOTE! when doing face culling of translucent blocks,
         // if the connecting type of the translucent block is the same AND the face is full, discard it

@@ -58,6 +58,8 @@ public class RawDownloadStream {
     }
 
     public void tick() {
+        this.submit();
+
         while (!this.frames.isEmpty()) {
             //If the first element is not signaled, none of the others will be signaled so break
             if (!this.frames.peek().fence.signaled()) {

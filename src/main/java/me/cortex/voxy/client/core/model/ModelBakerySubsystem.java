@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.model;
 
 
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
+import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
@@ -25,15 +26,13 @@ public class ModelBakerySubsystem {
     //Redo to just make it request the block faces with the async texture download stream which
     // basicly solves all the render stutter due to the baking
 
-
-    private final RawDownloadStream textureDownStream = new RawDownloadStream(8*1024*1024);//8mb downstream
     private final ModelStore storage = new ModelStore();
     public final ModelFactory factory;
-    private final IntLinkedOpenHashSet blockIdQueue = new IntLinkedOpenHashSet();
+    private final ConcurrentLinkedDeque<Integer> blockIdQueue = new ConcurrentLinkedDeque<>();//TODO: replace with custom DS
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeQueue = new ConcurrentLinkedDeque<>();
 
     public ModelBakerySubsystem(Mapper mapper) {
-        this.factory = new ModelFactory(mapper, this.storage, this.textureDownStream);
+        this.factory = new ModelFactory(mapper, this.storage);
     }
 
     public void tick() {
@@ -45,6 +44,7 @@ public class ModelBakerySubsystem {
         }
 
 
+        /*
         //There should be a method to access the frame time IIRC, if the user framecap is unlimited lock it to like 60 fps for computation
         int BUDGET = 16;//TODO: make this computed based on the remaining free time in a frame (and like div by 2 to reduce overhead) (with a min of 1)
         if (!this.blockIdQueue.isEmpty()) {
@@ -64,27 +64,39 @@ public class ModelBakerySubsystem {
             for (int j = 0; j < i; j++) {
                 this.factory.addEntry(est[j]);
             }
+        }*/
+        long totalBudget = 2_000_000;
+        //TimingStatistics.modelProcess.start();
+        long start = System.nanoTime();
+        VarHandle.fullFence();
+        {
+            long budget = Math.min(totalBudget-200_000, totalBudget-(this.factory.resultJobs.size()*20_000L))-200_000;
+            if (budget > 50_000) {
+                Integer i = this.blockIdQueue.poll();
+                while (i != null && (System.nanoTime() - start < budget)) {
+                    this.factory.addEntry(i);
+                    i = this.blockIdQueue.poll();
+                }
+            }
         }
 
-        //Submit is effectively free if nothing is submitted
-        this.textureDownStream.submit();
+        this.factory.tick();
 
-        //Tick the download stream
-        this.textureDownStream.tick();
+        while (!this.factory.resultJobs.isEmpty()) {
+            this.factory.resultJobs.poll().run();
+            if (totalBudget<(System.nanoTime()-start))
+                break;
+        }
+        //TimingStatistics.modelProcess.stop();
     }
 
     public void shutdown() {
         this.factory.free();
         this.storage.free();
-        this.textureDownStream.free();
     }
 
     public void requestBlockBake(int blockId) {
-        synchronized (this.blockIdQueue) {
-            if (this.blockIdQueue.add(blockId)) {
-                VarHandle.fullFence();//Ensure memory coherancy
-            }
-        }
+        this.blockIdQueue.add(blockId);
     }
 
     public void addBiome(Mapper.BiomeEntry biomeEntry) {
@@ -92,7 +104,7 @@ public class ModelBakerySubsystem {
     }
 
     public void addDebugData(List<String> debug) {
-        debug.add("MQ/IF/MC: " + this.blockIdQueue.size() + "/" + this.factory.getInflightCount() + "/" + this.factory.getBakedCount());//Model bake queue/in flight/model baked count
+        debug.add(String.format("MQ/IF/MC: %04d, %03d, %04d", this.blockIdQueue.size(), this.factory.getInflightCount(),  this.factory.getBakedCount()));//Model bake queue/in flight/model baked count
     }
 
     public ModelStore getStore() {
@@ -101,5 +113,9 @@ public class ModelBakerySubsystem {
 
     public boolean areQueuesEmpty() {
         return this.blockIdQueue.isEmpty() && this.factory.getInflightCount() == 0 && this.biomeQueue.isEmpty();
+    }
+
+    public int getProcessingCount() {
+        return this.blockIdQueue.size() + this.factory.getInflightCount();
     }
 }
