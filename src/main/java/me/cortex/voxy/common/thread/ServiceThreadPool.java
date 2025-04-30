@@ -129,7 +129,9 @@ public class ServiceThreadPool {
 
     void steal(ServiceSlice service, int count) {
         this.totalJobWeight.addAndGet(-(service.weightPerJob*(long)count));
-        this.jobCounter.acquireUninterruptibly(count);
+        for (int i = 0; i < count; i++) {
+            this.jobCounter.acquireUninterruptibly();
+        }
     }
 
     private void worker(int threadId) {
