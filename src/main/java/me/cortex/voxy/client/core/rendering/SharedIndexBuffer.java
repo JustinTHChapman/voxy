@@ -9,6 +9,7 @@ import org.lwjgl.system.MemoryUtil;
 
 //Has a base index buffer of 16380 quads, and also a 1 cube byte index buffer at the end
 public class SharedIndexBuffer {
+    public static final int CUBE_INDEX_OFFSET = (1<<16)*6*2;
     public static final SharedIndexBuffer INSTANCE = new SharedIndexBuffer();
     public static final SharedIndexBuffer INSTANCE_BYTE = new SharedIndexBuffer(true);
 

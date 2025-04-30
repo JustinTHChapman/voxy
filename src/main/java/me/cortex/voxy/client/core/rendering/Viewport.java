@@ -1,8 +1,7 @@
 package me.cortex.voxy.client.core.rendering;
 
-import org.joml.FrustumIntersection;
-import org.joml.Matrix4f;
-import org.joml.Vector4f;
+import net.minecraft.util.math.MathHelper;
+import org.joml.*;
 
 import java.lang.reflect.Field;
 
@@ -27,6 +26,10 @@ public abstract class Viewport <A extends Viewport<A>> {
     public double cameraX;
     public double cameraY;
     public double cameraZ;
+
+    public final Matrix4f MVP = new Matrix4f();
+    public final Vector3i section = new Vector3i();
+    public final Vector3f innerTranslation = new Vector3f();
 
     protected Viewport() {
         Vector4f[] planes = null;
@@ -67,8 +70,24 @@ public abstract class Viewport <A extends Viewport<A>> {
         return (A) this;
     }
 
-    public A updateFrustum() {
-        this.frustum.set(new Matrix4f(this.projection).mul(this.modelView), false);
+    public A update() {
+        //MVP
+        this.projection.mul(this.modelView, this.MVP);
+
+        //Update the frustum
+        this.frustum.set(this.MVP, false);
+
+        //Translation vectors
+        int sx = MathHelper.floor(this.cameraX)>>5;
+        int sy = MathHelper.floor(this.cameraY)>>5;
+        int sz = MathHelper.floor(this.cameraZ)>>5;
+        this.section.set(sx, sy, sz);
+
+        this.innerTranslation.set(
+                (float) (this.cameraX-(sx<<5)),
+                (float) (this.cameraY-(sy<<5)),
+                (float) (this.cameraZ-(sz<<5)));
+
         return (A) this;
     }
 }

@@ -84,24 +84,19 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     private void uploadUniformBuffer(MDICViewport viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniform, 0, 1024);
-
-        int sx = MathHelper.floor(viewport.cameraX)>>5;
-        int sy = MathHelper.floor(viewport.cameraY)>>5;
-        int sz = MathHelper.floor(viewport.cameraZ)>>5;
         
-        var mat = new Matrix4f(viewport.projection).mul(viewport.modelView);
-        var innerTranslation = new Vector3f((float) (viewport.cameraX-(sx<<5)), (float) (viewport.cameraY-(sy<<5)), (float) (viewport.cameraZ-(sz<<5)));
-        mat.translate(-innerTranslation.x, -innerTranslation.y, -innerTranslation.z);
+        var mat = new Matrix4f(viewport.MVP);
+        mat.translate(-viewport.innerTranslation.x, -viewport.innerTranslation.y, -viewport.innerTranslation.z);
         mat.getToAddress(ptr); ptr += 4*4*4;
-        MemoryUtil.memPutInt(ptr, sx); ptr += 4;
-        MemoryUtil.memPutInt(ptr, sy); ptr += 4;
-        MemoryUtil.memPutInt(ptr, sz); ptr += 4;
+
+        viewport.section.getToAddress(ptr); ptr += 4*3;
+
         if (viewport.frameId<0) {
             Logger.error("Frame ID negative, this will cause things to break, wrapping around");
             viewport.frameId &= 0x7fffffff;
         }
         MemoryUtil.memPutInt(ptr, viewport.frameId&0x7fffffff); ptr += 4;
-        innerTranslation.getToAddress(ptr); ptr += 4*3;
+        viewport.innerTranslation.getToAddress(ptr); ptr += 4*3;
 
         UploadStream.INSTANCE.commit();
     }

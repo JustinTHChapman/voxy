@@ -16,6 +16,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinRenderSectionManager {
     @Shadow @Final private ClientWorld level;
 
+    @Inject(method = "onChunkAdded", at = @At("HEAD"))
+    private void voxy$trackChunkAdd(int x, int z, CallbackInfo ci) {
+
+    }
+
+    @Inject(method = "onChunkRemoved", at = @At("HEAD"))
+    private void voxy$trackChunkRemove(int x, int z, CallbackInfo ci) {
+
+    }
+
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
     private void injectIngest(int x, int z, CallbackInfo ci) {
         //TODO: Am not quite sure if this is right
