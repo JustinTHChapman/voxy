@@ -2,6 +2,7 @@ package me.cortex.voxy.client.mixin.sodium;
 
 import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
 import net.minecraft.client.world.ClientWorld;
@@ -18,12 +19,22 @@ public class MixinRenderSectionManager {
 
     @Inject(method = "onChunkAdded", at = @At("HEAD"))
     private void voxy$trackChunkAdd(int x, int z, CallbackInfo ci) {
+        if (this.level.worldRenderer != null) {
+            var system = ((IGetVoxyRenderSystem)(this.level.worldRenderer)).getVoxyRenderSystem();
+            if (system != null) {
 
+            }
+        }
     }
 
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
     private void voxy$trackChunkRemove(int x, int z, CallbackInfo ci) {
+        if (this.level.worldRenderer != null) {
+            var system = ((IGetVoxyRenderSystem)(this.level.worldRenderer)).getVoxyRenderSystem();
+            if (system != null) {
 
+            }
+        }
     }
 
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))

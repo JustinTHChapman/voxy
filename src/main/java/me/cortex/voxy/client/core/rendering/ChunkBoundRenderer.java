@@ -3,19 +3,30 @@ package me.cortex.voxy.client.core.rendering;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.GlFramebuffer;
+import me.cortex.voxy.client.core.gl.GlTexture;
+import me.cortex.voxy.client.core.gl.shader.Shader;
+import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import net.minecraft.util.math.MathHelper;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import org.joml.Vector3i;
 import org.lwjgl.system.MemoryUtil;
 
+import static me.cortex.voxy.client.core.rendering.PrintfDebugUtil.PRINTF_processor;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
 import static org.lwjgl.opengl.GL30.glBindBufferBase;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL30C.*;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
 import static org.lwjgl.opengl.GL31.glDrawElementsInstanced;
 import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
+import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfv;
 
 //This is a render subsystem, its very simple in what it does
 // it renders an AABB around loaded chunks, thats it
@@ -25,12 +36,24 @@ public class ChunkBoundRenderer {
     private final GlBuffer uniformBuffer = new GlBuffer(128);
     private final Long2IntOpenHashMap chunk2idx = new Long2IntOpenHashMap(MAX_CHUNK_COUNT);
     private final long[] idx2chunk = new long[MAX_CHUNK_COUNT];
+    private final Shader rasterShader = Shader.makeAuto()
+            .add(ShaderType.VERTEX, "voxy:chunkoutline/outline.vsh")
+            .add(ShaderType.FRAGMENT, "voxy:chunkoutline/outline.fsh")
+            .compile()
+            .ssbo(0, this.uniformBuffer)
+            .ssbo(1, this.chunkPosBuffer);
+
+    private GlTexture depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, 128, 128);
+    private final GlFramebuffer frameBuffer = new GlFramebuffer().bind(GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
 
     public ChunkBoundRenderer() {
         this.chunk2idx.defaultReturnValue(-1);
     }
 
     public void addChunk(long pos) {
+        if (this.chunk2idx.size() >= MAX_CHUNK_COUNT) {
+            throw new IllegalStateException("At capacity");
+        }
         if (this.chunk2idx.containsKey(pos)) {
             throw new IllegalArgumentException("Chunk already in map");
         }
@@ -75,22 +98,62 @@ public class ChunkBoundRenderer {
 
     //Bind and render, changing as little gl state as possible so that the caller may configure how it wants to render
     public void render(Viewport<?> viewport) {
+        if (this.depthBuffer.getWidth() != viewport.width || this.depthBuffer.getHeight() != viewport.height) {
+            this.depthBuffer.free();
+            this.depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, viewport.width, viewport.height);
+            this.frameBuffer.bind(GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
+        }
+
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 128);
-        viewport.MVP.getToAddress(ptr); ptr += 4*4*4;
-        viewport.section.getToAddress(ptr); ptr += 4*4;
-        viewport.innerTranslation.getToAddress(ptr); ptr += 4*4;
+        long matPtr = ptr; ptr += 4*4*4;
+        {//This is recomputed to be in chunk section space not worldsection
+            int sx = MathHelper.floor(viewport.cameraX) >> 4;
+            int sy = MathHelper.floor(viewport.cameraY) >> 4;
+            int sz = MathHelper.floor(viewport.cameraZ) >> 4;
+            new Vector3i(sx, sy, sz).getToAddress(ptr); ptr += 4*4;
+
+            viewport.MVP.translate(
+                    -(float) (viewport.cameraX - (sx << 4)),
+                    -(float) (viewport.cameraY - (sy << 4)),
+                    -(float) (viewport.cameraZ - (sz << 4)),
+                    new Matrix4f()).getToAddress(matPtr);
+        }
         UploadStream.INSTANCE.commit();
 
+
         //TODO: NOTE: need to reverse the winding order since we want the back faces of the AABB, not the front
-        //this.cullShader.bind();
+        {
+            glFrontFace(GL_CW);//Reverse winding order
+
+            //"reverse depth buffer" it goes from 0->1 where 1 is far away
+            glClearNamedFramebufferfv(this.frameBuffer.id, GL_DEPTH, 0, new float[]{0});
+            glEnable(GL_CULL_FACE);
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(GL_GREATER);
+        }
+
         glBindVertexArray(RenderService.STATIC_VAO);
-        glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.chunkPosBuffer.id);
+        glBindFramebuffer(GL_FRAMEBUFFER, this.frameBuffer.id);
+        this.rasterShader.bind();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
         glDrawElementsInstanced(GL_TRIANGLES, 6*2*3, GL_UNSIGNED_BYTE, SharedIndexBuffer.CUBE_INDEX_OFFSET, this.chunk2idx.size());
+
+        {
+            glFrontFace(GL_CCW);//Restore winding order
+
+            glDepthFunc(GL_LEQUAL);
+
+            //TODO: check this is correct
+            glEnable(GL_CULL_FACE);
+            glDisable(GL_DEPTH_TEST);
+        }
     }
 
     public void free() {
+        this.depthBuffer.free();
+        this.frameBuffer.free();
+
+        this.rasterShader.free();
         this.uniformBuffer.free();
         this.chunkPosBuffer.free();
     }

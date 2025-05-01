@@ -111,6 +111,7 @@ public class ModelTextureBakery {
 
 
         glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
+        //TODO: make use glClearNamedFramebuffer* to reduce/remove state change
         glClearColor(0,0,0,0);
         glClearDepth(1);
         glClearStencil(0);

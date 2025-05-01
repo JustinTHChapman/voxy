@@ -12,6 +12,9 @@ public class GlTexture extends TrackedObject {
     public final int id;
     private final int type;
     private int format;
+    private int width;
+    private int height;
+    private int layers;
     public GlTexture() {
         this(GL_TEXTURE_2D);
     }
@@ -34,6 +37,9 @@ public class GlTexture extends TrackedObject {
         this.format = format;
         if (this.type == GL_TEXTURE_2D) {
             glTextureStorage2D(this.id, levels, format, width, height);
+            this.width = width;
+            this.height = height;
+            this.layers = layers;
         } else {
             throw new IllegalStateException("Unknown texture type");
         }
@@ -54,5 +60,17 @@ public class GlTexture extends TrackedObject {
 
     public GlTexture name(String name) {
         return GlDebug.name(name, this);
+    }
+
+    public int getWidth() {
+        return this.width;
+    }
+
+    public int getHeight() {
+        return this.height;
+    }
+
+    public int getLayers() {
+        return this.layers;
     }
 }
