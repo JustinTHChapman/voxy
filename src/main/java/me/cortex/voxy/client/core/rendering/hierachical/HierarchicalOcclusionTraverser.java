@@ -12,6 +12,7 @@ import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.world.WorldEngine;
 import org.lwjgl.system.MemoryUtil;
 
 import static me.cortex.voxy.client.core.rendering.util.PrintfDebugUtil.PRINTF_processor;
@@ -30,6 +31,10 @@ public class HierarchicalOcclusionTraverser {
 
     public static final int REQUEST_QUEUE_SIZE = 50;
 
+
+    private static final int MAX_ITERATIONS = WorldEngine.MAX_LOD_LAYER+1;
+    private static final int LOCAL_WORK_SIZE_BITS = 5;
+
     private final NodeManager nodeManager;
     private final NodeCleaner nodeCleaner;
 
@@ -45,12 +50,9 @@ public class HierarchicalOcclusionTraverser {
     private final Int2IntOpenHashMap topNode2idxMapping = new Int2IntOpenHashMap();//Used to store mapping from TLN to array index
     private final int[] idx2topNodeMapping = new int[100_000];//Used to map idx to TLN id
     private final GlBuffer topNodeIds = new GlBuffer(100_000*4).zero();
-    private final GlBuffer queueMetaBuffer = new GlBuffer(4*4*5).zero();
+    private final GlBuffer queueMetaBuffer = new GlBuffer(4*4*MAX_ITERATIONS).zero();
     private final GlBuffer scratchQueueA = new GlBuffer(100_000*4).zero();
     private final GlBuffer scratchQueueB = new GlBuffer(100_000*4).zero();
-
-    private static final int MAX_ITERATIONS = 5;
-    private static final int LOCAL_WORK_SIZE_BITS = 5;
 
     private static int BINDING_COUNTER = 1;
     private static final int SCENE_UNIFORM_BINDING = BINDING_COUNTER++;
@@ -220,12 +222,12 @@ public class HierarchicalOcclusionTraverser {
 
         if (RenderStatistics.enabled) {
             DownloadStream.INSTANCE.download(this.statisticsBuffer, down->{
-                for (int i = 0; i < 5; i++) {
+                for (int i = 0; i < MAX_ITERATIONS; i++) {
                     RenderStatistics.hierarchicalTraversalCounts[i] = MemoryUtil.memGetInt(down.address+i*4L);
                 }
 
-                for (int i = 0; i < 5; i++) {
-                    RenderStatistics.hierarchicalRenderSections[i] = MemoryUtil.memGetInt(down.address+5*4L+i*4L);
+                for (int i = 0; i < MAX_ITERATIONS; i++) {
+                    RenderStatistics.hierarchicalRenderSections[i] = MemoryUtil.memGetInt(down.address+MAX_ITERATIONS*4L+i*4L);
                 }
             });
         }
@@ -258,12 +260,12 @@ public class HierarchicalOcclusionTraverser {
         glClearNamedBufferSubData(this.queueMetaBuffer.id, GL_RGBA32UI, 0, 16, GL_RGBA, GL_UNSIGNED_INT, new int[]{firstDispatchSize,1,1,initialQueueSize});
          */
         {//TODO:FIXME: THIS IS BULLSHIT BY INTEL need to fix the clearing
-            long ptr = UploadStream.INSTANCE.upload(this.queueMetaBuffer, 0, 16*5);
+            long ptr = UploadStream.INSTANCE.upload(this.queueMetaBuffer, 0, 16*MAX_ITERATIONS);
             MemoryUtil.memPutInt(ptr +  0, firstDispatchSize);
             MemoryUtil.memPutInt(ptr +  4, 1);
             MemoryUtil.memPutInt(ptr +  8, 1);
             MemoryUtil.memPutInt(ptr + 12, this.topNodeCount);
-            for (int i = 1; i < 5; i++) {
+            for (int i = 1; i < MAX_ITERATIONS; i++) {
                 MemoryUtil.memPutInt(ptr + (i*16)+ 0, 0);
                 MemoryUtil.memPutInt(ptr + (i*16)+ 4, 1);
                 MemoryUtil.memPutInt(ptr + (i*16)+ 8, 1);

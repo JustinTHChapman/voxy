@@ -12,6 +12,7 @@ import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.world.WorldEngine;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
@@ -230,12 +231,13 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
             if (RenderStatistics.enabled) {
                 DownloadStream.INSTANCE.download(this.statisticsBuffer, down->{
-                    for (int i = 0; i < 5; i++) {
+                    final int LAYERS = WorldEngine.MAX_LOD_LAYER+1;
+                    for (int i = 0; i < LAYERS; i++) {
                         RenderStatistics.visibleSections[i] = MemoryUtil.memGetInt(down.address+i*4L);
                     }
 
-                    for (int i = 0; i < 5; i++) {
-                        RenderStatistics.quadCount[i] = MemoryUtil.memGetInt(down.address+5*4L+i*4L);
+                    for (int i = 0; i < LAYERS; i++) {
+                        RenderStatistics.quadCount[i] = MemoryUtil.memGetInt(down.address+LAYERS*4L+i*4L);
                     }
                 });
             }

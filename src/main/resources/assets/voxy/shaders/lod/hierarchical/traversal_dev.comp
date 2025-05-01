@@ -41,8 +41,8 @@ layout(binding = RENDER_TRACKER_BINDING, std430) restrict writeonly buffer rende
 
 #ifdef HAS_STATISTICS
 layout(binding = STATISTICS_BUFFER_BINDING, std430) restrict buffer statisticsBuffer {
-    uint traversalCounts[5];
-    uint renderCounts[5];
+    uint traversalCounts[MAX_ITERATIONS];
+    uint renderCounts[MAX_ITERATIONS];
 };
 #endif
 
