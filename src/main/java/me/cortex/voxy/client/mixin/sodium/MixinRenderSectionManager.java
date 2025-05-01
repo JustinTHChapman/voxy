@@ -1,12 +1,18 @@
 package me.cortex.voxy.client.mixin.sodium;
 
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
+import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
+import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.math.ChunkPos;
 import org.spongepowered.asm.mixin.Final;
@@ -14,6 +20,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = RenderSectionManager.class, remap = false)
@@ -30,6 +37,7 @@ public class MixinRenderSectionManager {
         }
     }
 
+    /*
     @Inject(method = "onChunkAdded", at = @At("HEAD"))
     private void voxy$trackChunkAdd(int x, int z, CallbackInfo ci) {
         if (this.level.worldRenderer != null) {
@@ -38,7 +46,7 @@ public class MixinRenderSectionManager {
                 system.chunkBoundRenderer.addChunk(ChunkPos.toLong(x, z));
             }
         }
-    }
+    }*/
 
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
     private void voxy$trackChunkRemove(int x, int z, CallbackInfo ci) {
@@ -66,6 +74,21 @@ public class MixinRenderSectionManager {
         }
     }
 
+    @Redirect(method = "updateSectionInfo", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSection;setInfo(Lnet/caffeinemc/mods/sodium/client/render/chunk/data/BuiltSectionInfo;)Z"))
+    private boolean voxy$updateOnUpload(RenderSection instance, BuiltSectionInfo info) {
+        boolean retVal = instance.setInfo(info);
+        if (!retVal) {
+            return false;
+        }
+        if (info == null || info == BuiltSectionInfo.EMPTY) {
+            return true;
+        }
+        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.worldRenderer)).getVoxyRenderSystem();
+        if (system != null) {
+            system.chunkBoundRenderer.addChunk(ChunkPos.toLong(instance.getChunkX(), instance.getChunkZ()));
+        }
+        return true;
+    }
 
     @ModifyReturnValue(method = "getSearchDistance", at = @At("RETURN"))
     private float voxy$increaseSearchDistanceFix(float searchDistance) {

@@ -1,5 +1,8 @@
 package me.cortex.voxy.client.core.rendering;
 
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2LongLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
@@ -43,6 +46,8 @@ public class ChunkBoundRenderer {
     private GlTexture depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, 128, 128);
     private final GlFramebuffer frameBuffer = new GlFramebuffer().bind(GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
 
+    private final Int2LongOpenHashMap updates = new Int2LongOpenHashMap();
+
     public ChunkBoundRenderer() {
         this.chunk2idx.defaultReturnValue(-1);
     }
@@ -52,24 +57,20 @@ public class ChunkBoundRenderer {
             throw new IllegalStateException("At capacity");
         }
         if (this.chunk2idx.containsKey(pos)) {
-            Logger.warn("Chunk already in map: " + new ChunkPos(pos));
+            //Logger.warn("Chunk already in map: " + new ChunkPos(pos));
             return;
         }
         int idx = this.chunk2idx.size();
         this.chunk2idx.put(pos, idx);
         this.idx2chunk[idx] = pos;
 
-        long ptr = UploadStream.INSTANCE.upload(this.chunkPosBuffer, 8L*idx, 8);
-        //Need to do it in 2 parts because ivec2 is 2 parts
-        MemoryUtil.memPutInt(ptr, (int)(pos&0xFFFFFFFFL)); ptr += 4;
-        MemoryUtil.memPutInt(ptr, (int)((pos>>>32)&0xFFFFFFFFL));
-        UploadStream.INSTANCE.commit();
+        this.updates.put(idx, pos);
     }
 
     public void removeChunk(long pos) {
         int idx = this.chunk2idx.remove(pos);
         if (idx == -1) {
-            Logger.warn("Chunk not in map: " + new ChunkPos(pos));
+            //Logger.warn("Chunk not in map: " + new ChunkPos(pos));
             return;
         }
         if (idx == this.chunk2idx.size()) {
@@ -88,11 +89,7 @@ public class ChunkBoundRenderer {
         this.idx2chunk[idx] = ePos;
 
         //Put the end pos into the new idx
-        long ptr = UploadStream.INSTANCE.upload(this.chunkPosBuffer, 8L*idx, 8);
-        //Need to do it in 2 parts because ivec2 is 2 parts
-        MemoryUtil.memPutInt(ptr, (int)(ePos&0xFFFFFFFFL)); ptr += 4;
-        MemoryUtil.memPutInt(ptr, (int)((ePos>>>32)&0xFFFFFFFFL));
-        UploadStream.INSTANCE.commit();
+        this.updates.put(idx, ePos);
     }
 
     //Bind and render, changing as little gl state as possible so that the caller may configure how it wants to render
@@ -150,6 +147,23 @@ public class ChunkBoundRenderer {
             //TODO: check this is correct
             glEnable(GL_CULL_FACE);
             glEnable(GL_DEPTH_TEST);
+        }
+
+        //Only apply after
+        if (!this.updates.isEmpty()) {
+            var iter = this.updates.int2LongEntrySet().fastIterator();
+            while (iter.hasNext()) {
+                var entry = iter.next();
+                int idx = entry.getIntKey();
+                long pos = entry.getLongValue();
+
+                long ptr2 = UploadStream.INSTANCE.upload(this.chunkPosBuffer, 8L*idx, 8);
+                //Need to do it in 2 parts because ivec2 is 2 parts
+                MemoryUtil.memPutInt(ptr2, (int)(pos&0xFFFFFFFFL)); ptr2 += 4;
+                MemoryUtil.memPutInt(ptr2, (int)((pos>>>32)&0xFFFFFFFFL));
+                UploadStream.INSTANCE.commit();
+            }
+            this.updates.clear();
         }
     }
 
