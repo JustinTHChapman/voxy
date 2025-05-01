@@ -2,11 +2,13 @@ package me.cortex.voxy.client;
 
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.IVoxyWorld;
 import me.cortex.voxy.commonImpl.ImportManager;
 import me.cortex.voxy.commonImpl.VoxyInstance;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 
 import java.util.Random;
@@ -98,5 +100,37 @@ public class VoxyClientInstance extends VoxyInstance {
         long delta = System.currentTimeMillis() - start;
         ser.shutdown();
         System.out.println("Total "+delta+"ms " + ((double)delta/c) + "ms average total, avg wrt threads: " + (((double)delta/c)*engine.instanceIn.getThreadPool().getThreadCount()) + "ms");
+    }
+
+
+    private void verifyTopNodeChildren(int X, int Y, int Z) {
+        var world = this.getOrMakeRenderWorld(MinecraftClient.getInstance().world);
+        for (int lvl = 0; lvl < 5; lvl++) {
+            for (int y = (Y<<5)>>lvl; y < ((Y+1)<<5)>>lvl; y++) {
+                for (int x = (X<<5)>>lvl; x < ((X+1)<<5)>>lvl; x++) {
+                    for (int z = (Z<<5)>>lvl; z < ((Z+1)<<5)>>lvl; z++) {
+                        if (lvl == 0) {
+                            var own = world.acquire(lvl, x, y, z);
+                            if ((own.getNonEmptyChildren() != 0) ^ (own.getNonEmptyBlockCount() != 0)) {
+                                Logger.error("Lvl 0 node not marked correctly " + WorldEngine.pprintPos(own.key));
+                            }
+                            own.release();
+                        } else {
+                            byte msk = 0;
+                            for (int child = 0; child < 8; child++) {
+                                var section = world.acquire(lvl-1, (child&1)+(x<<1), ((child>>2)&1)+(y<<1), ((child>>1)&1)+(z<<1));
+                                msk |= (byte) (section.getNonEmptyBlockCount()!=0?(1<<child):0);
+                                section.release();
+                            }
+                            var own = world.acquire(lvl, x, y, z);
+                            if (own.getNonEmptyChildren() != msk) {
+                                Logger.error("Section empty child mask not correct " + WorldEngine.pprintPos(own.key) + " got: " + String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(own.getNonEmptyChildren()))).replace(' ', '0') + " expected: " + String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(msk))).replace(' ', '0'));
+                            }
+                            own.release();
+                        }
+                    }
+                }
+            }
+        }
     }
 }

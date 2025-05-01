@@ -1,5 +1,6 @@
 package me.cortex.voxy.commonImpl;
 
+import me.cortex.voxy.client.taskbar.Taskbar;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.importers.IDataImporter;
@@ -14,6 +15,12 @@ import java.util.function.IntConsumer;
 import java.util.function.Supplier;
 
 public class ImportManager {
+    //TODO:
+    //Taskbar.INSTANCE.setProgress(0,10000);
+    //Taskbar.INSTANCE.setIsProgression();
+    //Taskbar.INSTANCE.setProgress(a, Math.max(1, b));
+    //Taskbar.INSTANCE.setIsNone();
+
     private final Map<WorldEngine, ImportTask> activeImporters = new HashMap<>();
 
     protected class ImportTask {

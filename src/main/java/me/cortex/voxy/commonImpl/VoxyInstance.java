@@ -1,6 +1,5 @@
 package me.cortex.voxy.commonImpl;
 
-import me.cortex.voxy.client.core.WorldImportWrapper;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.section.SectionStorage;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
@@ -8,7 +7,6 @@ import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.service.SectionSavingService;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
-import net.minecraft.client.world.ClientWorld;
 
 import java.util.HashSet;
 import java.util.List;
