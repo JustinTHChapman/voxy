@@ -1,5 +1,6 @@
 #version 460 core
 layout(binding = 0) uniform sampler2D blockModelAtlas;
+layout(binding = 2) uniform sampler2D depthTex;
 
 //#define DEBUG_RENDER
 
@@ -19,6 +20,10 @@ layout(location = 6) in flat uint quadDebug;
 #endif
 layout(location = 0) out vec4 outColour;
 void main() {
+    //Check the minimum bounding texture and ensure we are greater than it
+    if (gl_FragCoord.z < texelFetch(depthTex, ivec2(gl_FragCoord.xy), 0).r) {
+        discard;
+    }
     vec2 uv = mod(uv, vec2(1.0))*(1.0/(vec2(3.0,2.0)*256.0));
     //vec4 colour = solidColour;
     vec4 colour = texture(blockModelAtlas, uv + baseUV, ((flags>>1)&1u)*-4.0);

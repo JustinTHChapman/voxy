@@ -7,6 +7,7 @@ import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
+import me.cortex.voxy.client.core.rendering.ChunkBoundRenderer;
 import me.cortex.voxy.client.core.rendering.RenderDistanceTracker;
 import me.cortex.voxy.client.core.rendering.RenderService;
 import me.cortex.voxy.client.core.rendering.building.RenderDataFactory45;
@@ -22,6 +23,7 @@ import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.GlBackend;
@@ -29,6 +31,7 @@ import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL11;
 
 import java.util.ArrayList;
@@ -45,6 +48,7 @@ public class VoxyRenderSystem {
     private final PostProcessing postProcessing;
     private final WorldEngine worldIn;
     private final RenderDistanceTracker renderDistanceTracker;
+    public final ChunkBoundRenderer chunkBoundRenderer;
 
     public VoxyRenderSystem(WorldEngine world, ServiceThreadPool threadPool) {
         //Trigger the shared index buffer loading
@@ -62,6 +66,8 @@ public class VoxyRenderSystem {
                 this.renderer::removeTopLevelNode);
 
         this.renderDistanceTracker.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
+
+        this.chunkBoundRenderer = new ChunkBoundRenderer();
     }
 
     public void setRenderDistance(int renderDistance) {
@@ -130,13 +136,14 @@ public class VoxyRenderSystem {
     }
 
     //TODO: Make a reverse z buffer
-    private static Matrix4f computeProjectionMat() {
-        return new Matrix4f(RenderSystem.getProjectionMatrix()).mulLocal(
-                makeProjectionMatrix(0.05f, MinecraftClient.getInstance().gameRenderer.getFarPlaneDistance()).invert()
+    private static Matrix4f computeProjectionMat(Matrix4fc base) {
+        return base.mulLocal(
+                makeProjectionMatrix(0.05f, MinecraftClient.getInstance().gameRenderer.getFarPlaneDistance()).invert(),
+                new Matrix4f()
         ).mulLocal(makeProjectionMatrix(16, 16*3000));
     }
 
-    public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
+    public void renderOpaque(ChunkRenderMatrices matrices, double cameraX, double cameraY, double cameraZ) {
         if (IrisUtil.irisShadowActive()) {
             return;
         }
@@ -165,17 +172,13 @@ public class VoxyRenderSystem {
             cameraY += (16+(256-32-sector*30))*16;
         }
 
-        matrices.push();
-        matrices.translate(-cameraX, -cameraY, -cameraZ);
-        matrices.pop();
-
-        var projection = computeProjectionMat();//RenderSystem.getProjectionMatrix();
-        //var projection = RenderSystem.getProjectionMatrix();
+        var projection = computeProjectionMat(matrices.projection());//RenderSystem.getProjectionMatrix();
+        //var projection = new Matrix4f(matrices.projection());
 
         var viewport = this.renderer.getViewport();
         viewport
                 .setProjection(projection)
-                .setModelView(matrices.peek().getPositionMatrix())
+                .setModelView(new Matrix4f(matrices.modelView()))
                 .setCamera(cameraX, cameraY, cameraZ)
                 .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight)
                 .update();
@@ -190,22 +193,25 @@ public class VoxyRenderSystem {
         if (boundFB == 0) {
             throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
         }
+
+        this.chunkBoundRenderer.render(viewport);
+
         //TODO: use the raw depth buffer texture instead
         //int boundDepthBuffer = glGetNamedFramebufferAttachmentParameteri(boundFB, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
 
         //TODO:FIXME!!! ??
         this.postProcessing.setup(target.textureWidth, target.textureHeight, boundFB);
 
-        this.renderer.renderFarAwayOpaque(viewport);
+        this.renderer.renderFarAwayOpaque(viewport, this.chunkBoundRenderer.getDepthBoundTexture());
 
         //Compute the SSAO of the rendered terrain, TODO: fix it breaking depth or breaking _something_ am not sure what
-        this.postProcessing.computeSSAO(projection, matrices);
+        this.postProcessing.computeSSAO(viewport.MVP);
 
         //We can render the translucent directly after as it is the furthest translucent objects
-        this.renderer.renderFarAwayTranslucent(viewport);
+        this.renderer.renderFarAwayTranslucent(viewport, this.chunkBoundRenderer.getDepthBoundTexture());
 
 
-        this.postProcessing.renderPost(projection, RenderSystem.getProjectionMatrix(), boundFB);
+        this.postProcessing.renderPost(projection, matrices.projection(), boundFB);
         glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
         TimingStatistics.main.stop();
         TimingStatistics.all.stop();
@@ -225,7 +231,7 @@ public class VoxyRenderSystem {
         Logger.info("Flushing download stream");
         DownloadStream.INSTANCE.flushWaitClear();
         Logger.info("Shutting down rendering");
-        try {this.renderer.shutdown();} catch (Exception e) {Logger.error("Error shutting down renderer", e);}
+        try {this.renderer.shutdown();this.chunkBoundRenderer.free();} catch (Exception e) {Logger.error("Error shutting down renderer", e);}
         Logger.info("Shutting down post processor");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {Logger.error("Error shutting down post processor", e);}}
     }

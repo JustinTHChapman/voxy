@@ -619,12 +619,12 @@ public class ModelFactory {
         for (var dir : Direction.values()) {
             var data = textures[dir.getIndex()];
             float fd = TextureUtils.computeDepth(data, TextureUtils.DEPTH_MODE_AVG, checkMode);//Compute the min float depth, smaller means closer to the camera, range 0-1
-            int depth = Math.round(fd * MODEL_TEXTURE_SIZE);
+            //int depth = Math.round(fd * MODEL_TEXTURE_SIZE);
             //If fd is -1, it means that there was nothing rendered on that face and it should be discarded
             if (fd < -0.1) {
                 res[dir.ordinal()] = -1;
             } else {
-                res[dir.ordinal()] = ((float) depth)/MODEL_TEXTURE_SIZE;
+                res[dir.ordinal()] = fd;//((float) depth)/MODEL_TEXTURE_SIZE;
             }
         }
         return res;

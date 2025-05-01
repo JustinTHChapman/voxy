@@ -8,6 +8,8 @@ import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.Logger;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.joml.Vector3i;
@@ -19,6 +21,7 @@ import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30C.*;
+import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
 import static org.lwjgl.opengl.GL31.glDrawElementsInstanced;
 import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfv;
 
@@ -49,7 +52,8 @@ public class ChunkBoundRenderer {
             throw new IllegalStateException("At capacity");
         }
         if (this.chunk2idx.containsKey(pos)) {
-            throw new IllegalArgumentException("Chunk already in map");
+            Logger.warn("Chunk already in map: " + new ChunkPos(pos));
+            return;
         }
         int idx = this.chunk2idx.size();
         this.chunk2idx.put(pos, idx);
@@ -65,9 +69,10 @@ public class ChunkBoundRenderer {
     public void removeChunk(long pos) {
         int idx = this.chunk2idx.remove(pos);
         if (idx == -1) {
-            throw new IllegalArgumentException("Chunk pos not in map");
+            Logger.warn("Chunk not in map: " + new ChunkPos(pos));
+            return;
         }
-        if (idx == this.chunk2idx.size()-1) {
+        if (idx == this.chunk2idx.size()) {
             //Dont need to do anything as heap is already compact
             return;
         }
@@ -92,6 +97,8 @@ public class ChunkBoundRenderer {
 
     //Bind and render, changing as little gl state as possible so that the caller may configure how it wants to render
     public void render(Viewport<?> viewport) {
+        if (this.chunk2idx.isEmpty()) return;
+
         if (this.depthBuffer.getWidth() != viewport.width || this.depthBuffer.getHeight() != viewport.height) {
             this.depthBuffer.free();
             this.depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, viewport.width, viewport.height);
@@ -129,7 +136,10 @@ public class ChunkBoundRenderer {
         glBindVertexArray(RenderService.STATIC_VAO);
         glBindFramebuffer(GL_FRAMEBUFFER, this.frameBuffer.id);
         this.rasterShader.bind();
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
+        //TODO: BATCH with multiple cubes per instance, this helps fill the pipe and should greatly improve performance of this
+
         glDrawElementsInstanced(GL_TRIANGLES, 6*2*3, GL_UNSIGNED_BYTE, SharedIndexBuffer.CUBE_INDEX_OFFSET, this.chunk2idx.size());
 
         {
@@ -139,8 +149,12 @@ public class ChunkBoundRenderer {
 
             //TODO: check this is correct
             glEnable(GL_CULL_FACE);
-            glDisable(GL_DEPTH_TEST);
+            glEnable(GL_DEPTH_TEST);
         }
+    }
+
+    public void reset() {
+        this.chunk2idx.clear();
     }
 
     public void free() {
@@ -150,5 +164,9 @@ public class ChunkBoundRenderer {
         this.rasterShader.free();
         this.uniformBuffer.free();
         this.chunkPosBuffer.free();
+    }
+
+    public GlTexture getDepthBoundTexture() {
+        return this.depthBuffer;
     }
 }

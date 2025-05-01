@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.GlStateCapture;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL11C;
 
 import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
@@ -136,16 +137,14 @@ public class PostProcessing {
 
     //Computes ssao on the current framebuffer data and updates it
     // this means that translucency wont be effected etc
-    public void computeSSAO(Matrix4f projection, MatrixStack stack) {
+    public void computeSSAO(Matrix4f mvp) {
         this.didSSAO = true;
 
         this.ssaoComp.bind();
         float[] data = new float[4*4];
-        var mat = new Matrix4f(projection).mul(stack.peek().getPositionMatrix());
-        mat.get(data);
+        mvp.get(data);
         glUniformMatrix4fv(3, false, data);//MVP
-        mat.invert();
-        mat.get(data);
+        mvp.invert(new Matrix4f()).get(data);
         glUniformMatrix4fv(4, false, data);//invMVP
 
         glBindImageTexture(0, this.colourSSAO.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
@@ -159,7 +158,7 @@ public class PostProcessing {
 
 
     //Executes the post processing and emits to whatever framebuffer is currently bound via a blit
-    public void renderPost(Matrix4f fromProjection, Matrix4f tooProjection, int outputFB) {
+    public void renderPost(Matrix4f fromProjection, Matrix4fc tooProjection, int outputFB) {
         glDisable(GL_STENCIL_TEST);
 
 

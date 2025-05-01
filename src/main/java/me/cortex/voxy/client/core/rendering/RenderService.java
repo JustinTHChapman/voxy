@@ -4,6 +4,7 @@ import io.netty.util.internal.MathUtil;
 import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.core.gl.Capabilities;
+import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
@@ -58,7 +59,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         //Max geometry: 1 gb
         long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
-        //  geometryCapacity = 1<<24;
+        //geometryCapacity = 1<<24;
         //Max sections: ~500k
         this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, geometryCapacity);
         Logger.info("Using renderer: " + this.sectionRenderer.getClass().getSimpleName());
@@ -106,7 +107,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.modelService.tick();
     }
 
-    public void renderFarAwayOpaque(J viewport) {
+    public void renderFarAwayOpaque(J viewport, GlTexture depthBoundTexture) {
         //LightMapHelper.tickLightmap();
 
         //Render previous geometry with the abstract renderer
@@ -117,7 +118,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         // the section renderer is as it might have different backends, but they all accept a buffer containing the section list
 
 
-        this.sectionRenderer.renderOpaque(viewport);
+        this.sectionRenderer.renderOpaque(viewport, depthBoundTexture);
 
 
         //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
@@ -174,11 +175,12 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         }
         this.traversal.doTraversal(viewport, depthBuffer);
 
-        this.sectionRenderer.buildDrawCallsAndRenderTemporal(viewport, this.traversal.getRenderListBuffer());
+        this.sectionRenderer.buildDrawCalls(viewport, this.traversal.getRenderListBuffer());
+        this.sectionRenderer.renderTemporal(depthBoundTexture);
     }
 
-    public void renderFarAwayTranslucent(J viewport) {
-        this.sectionRenderer.renderTranslucent(viewport);
+    public void renderFarAwayTranslucent(J viewport, GlTexture depthBoundTexture) {
+        this.sectionRenderer.renderTranslucent(viewport, depthBoundTexture);
     }
 
     public void addDebugData(List<String> debug) {

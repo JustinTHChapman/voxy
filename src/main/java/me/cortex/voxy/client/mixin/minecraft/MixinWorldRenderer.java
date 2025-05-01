@@ -38,7 +38,7 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
         return this.renderer;
     }
 
-    @Inject(method = "reload()V", at = @At("TAIL"))
+    @Inject(method = "reload()V", at = @At("RETURN"), order = 900)//We want to inject before sodium
     private void reloadVoxyRenderer(CallbackInfo ci) {
         this.shutdownRenderer();
         if (this.world != null) {

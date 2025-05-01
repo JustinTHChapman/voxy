@@ -187,6 +187,12 @@ public class ModelTextureBakery {
         glBindFramebuffer(GL_FRAMEBUFFER, originalFramebuffer);
     }
 
+    private static boolean shouldReturnAirForFluid(BlockPos pos, int face) {
+        var fv = Direction.byIndex(face).getVector();
+        int dot = fv.getX()*pos.getX() + fv.getY()*pos.getY() + fv.getZ()*pos.getZ();
+        return dot >= 1;
+    }
+
     private final BufferAllocator allocator = new BufferAllocator(786432);
     private void rasterView(BlockState state, BlockStateModel model, Matrix4f transform, long randomValue, int face, boolean renderFluid, GpuTexture texture, boolean hasDiscard) {
         var bb = new BufferBuilder(this.allocator, VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR) {
@@ -244,7 +250,7 @@ public class ModelTextureBakery {
 
                 @Override
                 public BlockState getBlockState(BlockPos pos) {
-                    if (pos.equals(Direction.byIndex(face).getVector())) {
+                    if (shouldReturnAirForFluid(pos, face)) {
                         return Blocks.AIR.getDefaultState();
                     }
 
@@ -262,7 +268,7 @@ public class ModelTextureBakery {
 
                 @Override
                 public FluidState getFluidState(BlockPos pos) {
-                    if (pos.equals(Direction.byIndex(face).getVector())) {
+                    if (shouldReturnAirForFluid(pos, face)) {
                         return Blocks.AIR.getDefaultState().getFluidState();
                     }
                     //if (pos.getY() == 1) {

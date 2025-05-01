@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering.section;
 
 import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.model.ModelStore;
@@ -100,27 +101,28 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     }
 
 
-    private void bindRenderingBuffers() {
+    private void bindRenderingBuffers(GlTexture depthBoundTexture) {
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getGeometryBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.geometryManager.getMetadataBufferId());
         this.modelStore.bind(3, 4, 0);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.positionScratchBuffer.id);
         LightMapHelper.bind(1);
+        glBindTextureUnit(2, depthBoundTexture.id);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawCallBuffer.id);
         glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.drawCountCallBuffer.id);
     }
 
-    private void renderTerrain(long indirectOffset, long drawCountOffset, int maxDrawCount) {
+    private void renderTerrain(GlTexture depthBoundTexture, long indirectOffset, long drawCountOffset, int maxDrawCount) {
         //RenderLayer.getCutoutMipped().startDrawing();
 
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
         this.terrainShader.bind();
         glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
-        this.bindRenderingBuffers();
+        this.bindRenderingBuffers(depthBoundTexture);
 
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCountOffset, maxDrawCount, 0);
 
@@ -135,16 +137,16 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     }
 
     @Override
-    public void renderOpaque(MDICViewport viewport) {
+    public void renderOpaque(MDICViewport viewport, GlTexture dbt) {
         if (this.geometryManager.getSectionCount() == 0) return;
 
         this.uploadUniformBuffer(viewport);
 
-        this.renderTerrain(0, 4*3, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), 400_000));
+        this.renderTerrain(dbt, 0, 4*3, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), 400_000));
     }
 
     @Override
-    public void renderTranslucent(MDICViewport viewport) {
+    public void renderTranslucent(MDICViewport viewport, GlTexture depthBoundTexture) {
         if (this.geometryManager.getSectionCount() == 0) return;
         glEnable(GL_BLEND);
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -153,7 +155,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glEnable(GL_DEPTH_TEST);
         this.terrainShader.bind();
         glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
-        this.bindRenderingBuffers();
+        this.bindRenderingBuffers(depthBoundTexture);
 
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, Math.min(this.geometryManager.getSectionCount(), 100_000), 0);
 
@@ -168,7 +170,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     }
 
     @Override
-    public void buildDrawCallsAndRenderTemporal(MDICViewport viewport, GlBuffer sectionRenderList) {
+    public void buildDrawCalls(MDICViewport viewport, GlBuffer sectionRenderList) {
         if (this.geometryManager.getSectionCount() == 0) return;
         this.uploadUniformBuffer(viewport);
         //Can do a sneeky trick, since the sectionRenderList is a list to things to render, it invokes the culler
@@ -243,8 +245,13 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             }
         }
 
+    }
+
+    @Override
+    public void renderTemporal(GlTexture dbt) {
+        if (this.geometryManager.getSectionCount() == 0) return;
         //Render temporal
-        this.renderTerrain(TEMPORAL_OFFSET*5*4, 4*5, Math.min(this.geometryManager.getSectionCount(), 100_000));
+        this.renderTerrain(dbt, TEMPORAL_OFFSET*5*4, 4*5, Math.min(this.geometryManager.getSectionCount(), 100_000));
     }
 
     @Override
