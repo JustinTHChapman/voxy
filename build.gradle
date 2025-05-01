@@ -163,7 +163,7 @@ tasks.register('makeExcludedRocksDB', Zip) {
         if (!file.endsWith(".so")) {
             return false
         }
-        return ["osx", "linux32", "s390x", "riscv64", "ppc64le", "aarch64"].any(file::contains)
+        return ["osx", "linux32", "musl", "s390x", "riscv64", "ppc64le", "aarch64"].any(file::contains)
     }
 }
 
