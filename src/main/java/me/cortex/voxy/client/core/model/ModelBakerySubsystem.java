@@ -35,7 +35,7 @@ public class ModelBakerySubsystem {
         this.factory = new ModelFactory(mapper, this.storage);
     }
 
-    public void tick() {
+    public void tick(long totalBudget) {
         //Upload all biomes
         while (!this.biomeQueue.isEmpty()) {
             var biome = this.biomeQueue.poll();
@@ -65,12 +65,11 @@ public class ModelBakerySubsystem {
                 this.factory.addEntry(est[j]);
             }
         }*/
-        long totalBudget = 2_000_000;
         //TimingStatistics.modelProcess.start();
         long start = System.nanoTime();
         VarHandle.fullFence();
         {
-            long budget = Math.min(totalBudget-200_000, totalBudget-(this.factory.resultJobs.size()*20_000L))-200_000;
+            long budget = Math.min(totalBudget-150_000, totalBudget-(this.factory.resultJobs.size()*10_000L))-150_000;
             if (budget > 50_000) {
                 Integer i = this.blockIdQueue.poll();
                 if (i != null) {

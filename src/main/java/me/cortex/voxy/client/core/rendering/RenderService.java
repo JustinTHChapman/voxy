@@ -103,11 +103,11 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.nodeManager.removeTopLevelNode(pos);
     }
 
-    public void tickModelService() {
-        this.modelService.tick();
+    public void tickModelService(long budget) {
+        this.modelService.tick(budget);
     }
 
-    public void renderFarAwayOpaque(J viewport, GlTexture depthBoundTexture) {
+    public void renderFarAwayOpaque(J viewport, GlTexture depthBoundTexture, long frameStart) {
         //LightMapHelper.tickLightmap();
 
         //Render previous geometry with the abstract renderer
@@ -133,25 +133,15 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         {
             TimingStatistics.main.stop();
             TimingStatistics.dynamic.start();
-            long start = System.nanoTime();
-            VarHandle.fullFence();
 
             //Tick download stream
+            //TODO: make this so that can
             DownloadStream.INSTANCE.tick();
-
-            //Tick upload stream (this is ok to do here as upload ticking is just memory management)
-            UploadStream.INSTANCE.tick();
 
             this.sectionUpdateQueue.consume(128);
 
-            VarHandle.fullFence();
-            long updateBudget = Math.max(1_000_000-(System.nanoTime()-start), 0);
-            VarHandle.fullFence();
-
-            if (updateBudget > 50_000) {
-                //Cap the number of consumed sections per frame to 40 + 2% of the queue size, cap of 200
-                //int geoUpdateCap = 20;//Math.max(100, Math.min((int)(0.15*this.geometryUpdateQueue.count()), 260));
-                this.geometryUpdateQueue.consumeNano(updateBudget);
+            if (this.modelService.getProcessingCount() < 750) {//Very bad hack to try control things
+                this.geometryUpdateQueue.consumeNano(1_500_000 - (System.nanoTime() - frameStart));
             }
 
             this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??

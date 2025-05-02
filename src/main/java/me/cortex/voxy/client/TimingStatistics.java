@@ -71,7 +71,6 @@ public class TimingStatistics {
     }
 
     public static TimeSampler all = new TimeSampler();
-    public static TimeSampler setup = new TimeSampler();
     public static TimeSampler main = new TimeSampler();
     public static TimeSampler dynamic = new TimeSampler();
 

@@ -41,11 +41,11 @@ public class MessageQueue <T> {
     }
 
     public int consumeNano(long budget) {
+        if (budget < 25_000) return 0;
         if (this.count.get() == 0) {
             return 0;
         }
         int i = 0;
-        VarHandle.fullFence();
         long nano = System.nanoTime();
         VarHandle.fullFence();
         do {

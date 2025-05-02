@@ -16,6 +16,7 @@ import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.PrintfDebugUtil;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
+import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
@@ -107,17 +108,21 @@ public class VoxyRenderSystem {
             downstream.submit();
             downstream.tick();
         }*/
+    }
 
-        TimingStatistics.all.start();
-        TimingStatistics.setup.start();
-        this.renderDistanceTracker.setCenterAndProcess(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
+    private void autoBalanceSubDivSize() {
+        //only increase quality while there are very few mesh queues, this stops,
+        // e.g. while flying and is rendering alot of low quality chunks
+        boolean canDecreaseSize = this.renderer.getMeshQueueCount() < 5000;
+        float CHANGE_PER_SECOND = 30;
+        //Auto fps targeting
+        if (MinecraftClient.getInstance().getCurrentFps() < 45) {
+            VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 256);
+        }
 
-        //Done here as is allows less gl state resetup
-        this.renderer.tickModelService();
-
-        PrintfDebugUtil.tick();
-        TimingStatistics.setup.stop();
-        TimingStatistics.all.stop();
+        if (55 < MinecraftClient.getInstance().getCurrentFps() && canDecreaseSize) {
+            VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 30);
+        }
     }
 
     private static Matrix4f makeProjectionMatrix(float near, float far) {
@@ -147,30 +152,17 @@ public class VoxyRenderSystem {
         if (IrisUtil.irisShadowActive()) {
             return;
         }
-        TimingStatistics.all.start();
-        TimingStatistics.main.start();
-
-        if (false) {
-            //only increase quality while there are very few mesh queues, this stops,
-            // e.g. while flying and is rendering alot of low quality chunks
-            boolean canDecreaseSize = this.renderer.getMeshQueueCount() < 5000;
-            float CHANGE_PER_SECOND = 30;
-            //Auto fps targeting
-            if (MinecraftClient.getInstance().getCurrentFps() < 45) {
-                VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 256);
-            }
-
-            if (55 < MinecraftClient.getInstance().getCurrentFps() && canDecreaseSize) {
-                VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 30);
-            }
-        }
-
         //Do some very cheeky stuff for MiB
         if (false) {
             int sector = (((int)Math.floor(cameraX)>>4)+512)>>10;
             cameraX -= sector<<14;//10+4
             cameraY += (16+(256-32-sector*30))*16;
         }
+        long startTime = System.nanoTime();
+        TimingStatistics.all.start();
+        TimingStatistics.main.start();
+
+        //this.autoBalanceSubDivSize();
 
         var projection = computeProjectionMat(matrices.projection());//RenderSystem.getProjectionMatrix();
         //var projection = new Matrix4f(matrices.projection());
@@ -196,13 +188,9 @@ public class VoxyRenderSystem {
 
         this.chunkBoundRenderer.render(viewport);
 
-        //TODO: use the raw depth buffer texture instead
-        //int boundDepthBuffer = glGetNamedFramebufferAttachmentParameteri(boundFB, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-
-        //TODO:FIXME!!! ??
         this.postProcessing.setup(target.textureWidth, target.textureHeight, boundFB);
 
-        this.renderer.renderFarAwayOpaque(viewport, this.chunkBoundRenderer.getDepthBoundTexture());
+        this.renderer.renderFarAwayOpaque(viewport, this.chunkBoundRenderer.getDepthBoundTexture(), startTime);
 
         //Compute the SSAO of the rendered terrain, TODO: fix it breaking depth or breaking _something_ am not sure what
         this.postProcessing.computeSSAO(viewport.MVP);
@@ -212,6 +200,20 @@ public class VoxyRenderSystem {
 
 
         this.postProcessing.renderPost(projection, matrices.projection(), boundFB);
+
+        PrintfDebugUtil.tick();
+
+        //As much dynamic runtime stuff here
+        {
+            //Tick upload stream (this is ok to do here as upload ticking is just memory management)
+            UploadStream.INSTANCE.tick();
+
+            this.renderDistanceTracker.setCenterAndProcess(cameraX, cameraZ);
+
+            //Done here as is allows less gl state resetup
+            this.renderer.tickModelService(4_000_000-(System.nanoTime()-startTime));
+        }
+
         glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
         TimingStatistics.main.stop();
         TimingStatistics.all.stop();
@@ -222,7 +224,7 @@ public class VoxyRenderSystem {
         this.renderer.addDebugData(debug);
         {
             TimingStatistics.update();
-            debug.add("Voxy frame runtime (millis): " + TimingStatistics.setup.pVal() + ", " + TimingStatistics.dynamic.pVal() + ", " + TimingStatistics.main.pVal()+ ", " + TimingStatistics.all.pVal());
+            debug.add("Voxy frame runtime (millis): " + TimingStatistics.dynamic.pVal() + ", " + TimingStatistics.main.pVal()+ ", " + TimingStatistics.all.pVal());
         }
         PrintfDebugUtil.addToOut(debug);
     }
@@ -273,7 +275,7 @@ public class VoxyRenderSystem {
         {
             //Bake everything
             while (!modelService.areQueuesEmpty()) {
-                modelService.tick();
+                modelService.tick(5_000_000);
                 glFinish();
             }
         }
@@ -314,7 +316,7 @@ public class VoxyRenderSystem {
             }
             int i = 0;
             while (true) {
-                modelService.tick();
+                modelService.tick(5_000_000);
                 if (i++%5000==0)
                     System.out.println(completedCounter.get());
                 glFinish();
@@ -344,7 +346,7 @@ public class VoxyRenderSystem {
             while (true) {
                 //if (i++%5000==0)
                 //    System.out.println(completedCounter.get());
-                modelService.tick();
+                modelService.tick(5_000_000);
                 glFinish();
                 List<String> a = new ArrayList<>();
                 generationService.addDebugData(a);
