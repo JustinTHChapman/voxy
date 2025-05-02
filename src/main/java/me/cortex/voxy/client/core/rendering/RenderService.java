@@ -140,8 +140,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
             this.sectionUpdateQueue.consume(128);
 
-            if (this.modelService.getProcessingCount() < 750) {//Very bad hack to try control things
-                this.geometryUpdateQueue.consumeNano(1_500_000 - (System.nanoTime() - frameStart));
+            //if (this.modelService.getProcessingCount() < 750)
+            {//Very bad hack to try control things
+                this.geometryUpdateQueue.consumeNano(2_000_000 - (System.nanoTime() - frameStart));
             }
 
             this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
