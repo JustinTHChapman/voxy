@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering;
 
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
@@ -45,23 +46,31 @@ public class ChunkBoundRenderer {
 
     private GlTexture depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, 128, 128);
     private final GlFramebuffer frameBuffer = new GlFramebuffer().bind(GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
-    private final Long2ByteOpenHashMap updates = new Long2ByteOpenHashMap();
+    private final LongOpenHashSet addQueue = new LongOpenHashSet();
+    private final LongOpenHashSet remQueue = new LongOpenHashSet();
 
     public ChunkBoundRenderer() {
         this.chunk2idx.defaultReturnValue(-1);
     }
 
     public void addSection(long pos) {
-        this.updates.addTo(pos, (byte) 1);
+        this.addQueue.add(pos);
+        this.remQueue.remove(pos);
     }
 
     public void removeSection(long pos) {
-        this.updates.addTo(pos, (byte) -1);
+        this.remQueue.add(pos);
+        this.addQueue.remove(pos);
     }
 
     //Bind and render, changing as little gl state as possible so that the caller may configure how it wants to render
     public void render(Viewport<?> viewport) {
-        if (this.chunk2idx.isEmpty() && this.updates.isEmpty()) return;
+        if (!this.remQueue.isEmpty()) {
+            this.remQueue.forEach(this::_remPos);
+            this.remQueue.clear();
+        }
+
+        if (this.chunk2idx.isEmpty() && this.addQueue.isEmpty()) return;
 
         if (this.depthBuffer.getWidth() != viewport.width || this.depthBuffer.getHeight() != viewport.height) {
             this.depthBuffer.free();
@@ -121,54 +130,51 @@ public class ChunkBoundRenderer {
             glEnable(GL_CULL_FACE);
             glEnable(GL_DEPTH_TEST);
         }
-        this.processUpdates();
+
+
+        if (!this.addQueue.isEmpty()) {
+            this.addQueue.forEach(this::_addPos);
+            this.addQueue.clear();
+        }
     }
 
-    private void processUpdates() {
-        if (this.updates.isEmpty()) return;
-        var iter = this.updates.long2ByteEntrySet().fastIterator();
-        while (iter.hasNext()) {
-            var entry = iter.next();
-            if (entry.getByteValue()==0) continue;
-            long pos = entry.getLongKey();
-            if (0<entry.getByteValue()) {
-                if (this.chunk2idx.containsKey(pos)) {
-                    //Logger.warn("Chunk already in map: " + new ChunkPos(pos));
-                    continue;
-                }
-                this.ensureSize1();//Resize if needed
-
-                int idx = this.chunk2idx.size();
-                this.chunk2idx.put(pos, idx);
-                this.idx2chunk[idx] = pos;
-
-                this.put(idx, pos);
-            } else {
-                int idx = this.chunk2idx.remove(pos);
-                if (idx == -1) {
-                    //Logger.warn("Chunk not in map: " + new ChunkPos(pos));
-                    continue;
-                }
-                if (idx == this.chunk2idx.size()) {
-                    //Dont need to do anything as heap is already compact
-                    continue;
-                }
-                if (this.idx2chunk[idx] != pos) {
-                    throw new IllegalStateException();
-                }
-
-                //Move last entry on heap to this index
-                long ePos = this.idx2chunk[this.chunk2idx.size()];// since is already removed size is correct end idx
-                if (this.chunk2idx.put(ePos, idx) == -1) {
-                    throw new IllegalStateException();
-                }
-                this.idx2chunk[idx] = ePos;
-
-                //Put the end pos into the new idx
-                this.put(idx, ePos);
-            }
+    private void _remPos(long pos) {
+        int idx = this.chunk2idx.remove(pos);
+        if (idx == -1) {
+            Logger.warn("Chunk not in map: " + pos);
+            return;
         }
-        this.updates.clear();
+        if (idx == this.chunk2idx.size()) {
+            //Dont need to do anything as heap is already compact
+            return;
+        }
+        if (this.idx2chunk[idx] != pos) {
+            throw new IllegalStateException();
+        }
+
+        //Move last entry on heap to this index
+        long ePos = this.idx2chunk[this.chunk2idx.size()];// since is already removed size is correct end idx
+        if (this.chunk2idx.put(ePos, idx) == -1) {
+            throw new IllegalStateException();
+        }
+        this.idx2chunk[idx] = ePos;
+
+        //Put the end pos into the new idx
+        this.put(idx, ePos);
+    }
+
+    private void _addPos(long pos) {
+        if (this.chunk2idx.containsKey(pos)) {
+            Logger.warn("Chunk already in map: " + pos);
+            return;
+        }
+        this.ensureSize1();//Resize if needed
+
+        int idx = this.chunk2idx.size();
+        this.chunk2idx.put(pos, idx);
+        this.idx2chunk[idx] = pos;
+
+        this.put(idx, pos);
     }
 
     private void ensureSize1() {
