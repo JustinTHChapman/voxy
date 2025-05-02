@@ -135,7 +135,7 @@ public class ChunkBoundRenderer {
         glBindFramebuffer(GL_FRAMEBUFFER, this.frameBuffer.id);
         this.rasterShader.bind();
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BYTE.id());
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BB_BYTE.id());
         //TODO: BATCH with multiple cubes per instance, this helps fill the pipe and should greatly improve performance of this
 
         int count = this.chunk2idx.size();
