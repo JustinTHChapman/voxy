@@ -47,8 +47,6 @@ public class ChunkBoundRenderer {
     private GlTexture depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, 128, 128);
     private final GlFramebuffer frameBuffer = new GlFramebuffer().bind(GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
 
-    private final Int2LongOpenHashMap updates = new Int2LongOpenHashMap();
-
     public ChunkBoundRenderer() {
         this.chunk2idx.defaultReturnValue(-1);
     }
@@ -65,7 +63,7 @@ public class ChunkBoundRenderer {
         this.chunk2idx.put(pos, idx);
         this.idx2chunk[idx] = pos;
 
-        this.updates.put(idx, pos);
+        this.put(idx, pos);
     }
 
     public void removeChunk(long pos) {
@@ -90,7 +88,7 @@ public class ChunkBoundRenderer {
         this.idx2chunk[idx] = ePos;
 
         //Put the end pos into the new idx
-        this.updates.put(idx, ePos);
+        this.put(idx, ePos);
     }
 
     //Bind and render, changing as little gl state as possible so that the caller may configure how it wants to render
@@ -158,23 +156,14 @@ public class ChunkBoundRenderer {
             glEnable(GL_CULL_FACE);
             glEnable(GL_DEPTH_TEST);
         }
+    }
 
-        //Only apply after
-        if (!this.updates.isEmpty()) {
-            var iter = this.updates.int2LongEntrySet().fastIterator();
-            while (iter.hasNext()) {
-                var entry = iter.next();
-                int idx = entry.getIntKey();
-                long pos = entry.getLongValue();
-
-                long ptr2 = UploadStream.INSTANCE.upload(this.chunkPosBuffer, 8L*idx, 8);
-                //Need to do it in 2 parts because ivec2 is 2 parts
-                MemoryUtil.memPutInt(ptr2, (int)(pos&0xFFFFFFFFL)); ptr2 += 4;
-                MemoryUtil.memPutInt(ptr2, (int)((pos>>>32)&0xFFFFFFFFL));
-                UploadStream.INSTANCE.commit();
-            }
-            this.updates.clear();
-        }
+    private void put(int idx, long pos) {
+        long ptr2 = UploadStream.INSTANCE.upload(this.chunkPosBuffer, 8L*idx, 8);
+        //Need to do it in 2 parts because ivec2 is 2 parts
+        MemoryUtil.memPutInt(ptr2, (int)(pos&0xFFFFFFFFL)); ptr2 += 4;
+        MemoryUtil.memPutInt(ptr2, (int)((pos>>>32)&0xFFFFFFFFL));
+        UploadStream.INSTANCE.commit();
     }
 
     public void reset() {
