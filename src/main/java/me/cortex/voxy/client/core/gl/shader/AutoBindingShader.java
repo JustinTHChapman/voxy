@@ -55,7 +55,7 @@ public class AutoBindingShader extends Shader {
     }
 
     public AutoBindingShader ssbo(int index, GlBuffer buffer, long offset) {
-        this.bindings.add(new BufferBinding(GL_SHADER_STORAGE_BUFFER, index, buffer, offset, -1));
+        this.insertOrReplaceBinding(new BufferBinding(GL_SHADER_STORAGE_BUFFER, index, buffer, offset, -1));
         return this;
     }
 
@@ -69,10 +69,23 @@ public class AutoBindingShader extends Shader {
     }
 
     public AutoBindingShader ubo(int index, GlBuffer buffer, long offset) {
-        this.bindings.add(new BufferBinding(GL_UNIFORM_BUFFER, index, buffer, offset, -1));
+        this.insertOrReplaceBinding(new BufferBinding(GL_UNIFORM_BUFFER, index, buffer, offset, -1));
         return this;
     }
 
+    private void insertOrReplaceBinding(BufferBinding binding) {
+        //Check if there is already a binding at the index with the target, if so, replace it
+        for (int i = 0; i < this.bindings.size(); i++) {
+            var entry = this.bindings.get(i);
+            if (entry.target == binding.target && entry.index == binding.index) {
+                this.bindings.set(i, binding);
+                return;
+            }
+        }
+
+        //Else add the new binding
+        this.bindings.add(binding);
+    }
 
     public AutoBindingShader texture(String define, GlTexture texture) {
         return this.texture(define, -1, texture);
@@ -92,6 +105,7 @@ public class AutoBindingShader extends Shader {
         super.bind();
         if (!this.bindings.isEmpty()) {
             for (var binding : this.bindings) {
+                binding.buffer.assertNotFreed();
                 if (binding.offset == 0 && binding.size == -1) {
                     glBindBufferBase(binding.target, binding.index, binding.buffer.id);
                 } else {
@@ -102,6 +116,7 @@ public class AutoBindingShader extends Shader {
         if (!this.textureBindings.isEmpty()) {
             for (var binding : this.textureBindings) {
                 if (binding.texture != null) {
+                    binding.texture.assertNotFreed();
                     GlStateManager._activeTexture(GlConst.GL_TEXTURE0+binding.unit);
                     GlStateManager._bindTexture(0);
                     glBindTextureUnit(binding.unit, binding.texture.id);
