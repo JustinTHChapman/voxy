@@ -26,6 +26,7 @@ import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30C.*;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
 import static org.lwjgl.opengl.GL31.glDrawElementsInstanced;
+import static org.lwjgl.opengl.GL42.glDrawElementsInstancedBaseInstance;
 import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfv;
 
 //This is a render subsystem, its very simple in what it does
@@ -134,10 +135,19 @@ public class ChunkBoundRenderer {
         glBindFramebuffer(GL_FRAMEBUFFER, this.frameBuffer.id);
         this.rasterShader.bind();
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BYTE.id());
         //TODO: BATCH with multiple cubes per instance, this helps fill the pipe and should greatly improve performance of this
 
-        glDrawElementsInstanced(GL_TRIANGLES, 6*2*3, GL_UNSIGNED_BYTE, SharedIndexBuffer.CUBE_INDEX_OFFSET, this.chunk2idx.size());
+        int count = this.chunk2idx.size();
+        int i = 0;
+        if (count/32 > 0) {
+            glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3 * 32, GL_UNSIGNED_BYTE, SharedIndexBuffer.CUBE_INDEX_OFFSET, count/32);
+            i = (count/32)*32;
+            count -= i;
+        }
+        if (count > 0) {
+            glDrawElementsInstancedBaseInstance(GL_TRIANGLES, 6 * 2 * 3 * count, GL_UNSIGNED_BYTE, SharedIndexBuffer.CUBE_INDEX_OFFSET, 1, i);
+        }
 
         {
             glFrontFace(GL_CCW);//Restore winding order

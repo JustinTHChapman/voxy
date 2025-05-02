@@ -11,7 +11,9 @@ layout(binding = 1, std430) restrict readonly buffer ChunkPosBuffer {
 };
 
 void main() {
-    ivec3 origin = ivec3(chunkPos[gl_InstanceID], 0).xzy;
+    uint id = gl_InstanceID+gl_BaseInstance+(gl_VertexID>>3);
+
+    ivec3 origin = ivec3(chunkPos[id], 0).xzy;
     origin -= section.xyz;
 
     ivec3 cubeCornerI = ivec3(gl_VertexID&1, (gl_VertexID>>2)&1, (gl_VertexID>>1)&1);
