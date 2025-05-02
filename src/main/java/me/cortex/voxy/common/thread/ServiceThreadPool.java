@@ -24,6 +24,7 @@ public class ServiceThreadPool {
     }
 
     private volatile boolean running = true;
+    private volatile boolean releaseNow = false;
     private Thread[] workers = new Thread[0];
     private final Semaphore jobCounter = new Semaphore(0);
 
@@ -129,9 +130,11 @@ public class ServiceThreadPool {
 
     void steal(ServiceSlice service, int count) {
         this.totalJobWeight.addAndGet(-(service.weightPerJob*(long)count));
+        this.releaseNow = true;
         for (int i = 0; i < count; i++) {
             this.jobCounter.acquireUninterruptibly();
         }
+        this.releaseNow = false;
     }
 
     private void worker(int threadId) {
@@ -156,6 +159,15 @@ public class ServiceThreadPool {
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }
+                }
+                if (this.releaseNow) {
+                    this.jobCounter.release();
+                    try {
+                        Thread.sleep(20);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    break;
                 }
                 var ref = this.serviceSlices;
                 if (ref.length == 0) {
