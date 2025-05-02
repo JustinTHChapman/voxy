@@ -16,6 +16,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.ByteBuffer;
 import java.util.function.LongConsumer;
 
+//TODO: replace synchronize with StampedLock
 public class MemoryStorageBackend extends StorageBackend {
     private final Long2ObjectMap<MemoryBuffer>[] maps;
     private final Int2ObjectMap<ByteBuffer> idMappings = new Int2ObjectOpenHashMap<>();

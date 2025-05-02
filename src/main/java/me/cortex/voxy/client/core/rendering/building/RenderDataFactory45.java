@@ -331,6 +331,7 @@ public class RenderDataFactory45 {
         }
     }
 
+    //TODO: add neighbor face culling
     private void generateYZOpaqueInnerGeometry(int axis) {
         for (int layer = 0; layer < 31; layer++) {
             this.blockMesher.auxiliaryPosition = layer;

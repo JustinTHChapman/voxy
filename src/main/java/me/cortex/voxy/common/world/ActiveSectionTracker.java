@@ -18,7 +18,7 @@ public class ActiveSectionTracker {
     //Loaded section world cache, TODO: get rid of VolatileHolder and use something more sane
 
     private final Long2ObjectOpenHashMap<VolatileHolder<WorldSection>>[] loadedSectionCache;
-    private final ReentrantLock[] locks;
+    private final ReentrantLock[] locks;//TODO: replace with StampedLocks
     private final SectionLoader loader;
 
     private final int lruSize;
