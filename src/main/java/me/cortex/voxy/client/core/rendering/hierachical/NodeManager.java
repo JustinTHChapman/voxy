@@ -1325,9 +1325,7 @@ public class NodeManager {
         if (this.nodeUpdates.isEmpty()) {
             return false;
         }
-        for (int i : this.nodeUpdates) {
-            this.nodeData.writeNode(UploadStream.INSTANCE.upload(nodeBuffer, i*16L, 16L), i);
-        }
+        this.nodeUpdates.forEach((int i) -> this.nodeData.writeNode(UploadStream.INSTANCE.upload(nodeBuffer, i*16L, 16L), i));
         this.nodeUpdates.clear();
         return true;
     }

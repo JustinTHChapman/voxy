@@ -107,7 +107,7 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
     public void tick() {
         //Upload all invalidated bits
         if (!this.invalidatedSectionIds.isEmpty()) {
-            for (int id : this.invalidatedSectionIds) {
+            this.invalidatedSectionIds.forEach((int id)-> {
                 var meta = this.sectionMetadata.get(id);
                 long ptr = UploadStream.INSTANCE.upload(this.sectionMetadataBuffer, (long) id *SECTION_METADATA_SIZE, SECTION_METADATA_SIZE);
                 if (meta == null) {//We need to clear the gpu side buffer
@@ -115,7 +115,7 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
                 } else {
                     meta.writeMetadata(ptr);
                 }
-            }
+            });
             this.invalidatedSectionIds.clear();
             UploadStream.INSTANCE.commit();
         }
