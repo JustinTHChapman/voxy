@@ -36,12 +36,6 @@ public class RenderDistanceTracker {
     }
 
     public void setCenterAndProcess(double x, double z) {
-        //Do some very cheeky stuff for MiB
-        if (false) {
-            int sector = (((int)Math.floor(x)>>4)+512)>>10;
-            x -= sector<<14;//10+4
-        }
-
         double dx = this.posX-x;
         double dz = this.posZ-z;
         if (CHECK_DISTANCE_BLOCKS*CHECK_DISTANCE_BLOCKS<dx*dx+dz*dz) {

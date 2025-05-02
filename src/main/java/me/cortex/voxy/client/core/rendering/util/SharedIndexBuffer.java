@@ -10,6 +10,7 @@ public class SharedIndexBuffer {
     public static final int CUBE_INDEX_OFFSET = (1<<16)*6*2;
     public static final SharedIndexBuffer INSTANCE = new SharedIndexBuffer();
     public static final SharedIndexBuffer INSTANCE_BYTE = new SharedIndexBuffer(true);
+    public static final SharedIndexBuffer INSTANCE_BB_BYTE = new SharedIndexBuffer(true, true);
 
     private final GlBuffer indexBuffer;
 
@@ -37,6 +38,15 @@ public class SharedIndexBuffer {
         cubeBuff.cpyTo((1<<8)*6 + ptr);
 
         quadIndexBuff.free();
+        cubeBuff.free();
+    }
+
+    private SharedIndexBuffer(boolean type2, boolean type3) {
+        this.indexBuffer = new GlBuffer(6*2*3*(256/8));
+        var cubeBuff = generateByteCubesIndexBuffer(256/8);
+
+        cubeBuff.cpyTo(UploadStream.INSTANCE.upload(this.indexBuffer, 0, this.indexBuffer.size()));
+        UploadStream.INSTANCE.commit();
         cubeBuff.free();
     }
 
@@ -92,6 +102,66 @@ public class SharedIndexBuffer {
         MemoryUtil.memPutByte(ptr++, (byte) 7);
         MemoryUtil.memPutByte(ptr++, (byte) 3);
         MemoryUtil.memPutByte(ptr++, (byte) 5);
+
+        return buffer;
+    }
+
+    private static MemoryBuffer generateByteCubesIndexBuffer(int cnt) {
+        var buffer = new MemoryBuffer((long) cnt *6*2*3);
+        long ptr = buffer.address;
+        MemoryUtil.memSet(ptr, 0, buffer.size);
+
+        for (int i = 0; i < cnt; i++) {
+            int j = i*8;
+
+            //Bottom face
+            MemoryUtil.memPutByte(ptr++, (byte) (0+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (1+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (2+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (3+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (2+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (1+j));
+
+            //top face
+            MemoryUtil.memPutByte(ptr++, (byte) (6+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (5+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (4+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (5+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (6+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (7+j));
+
+            //north face
+            MemoryUtil.memPutByte(ptr++, (byte) (0+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (4+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (1+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (5+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (1+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (4+j));
+
+            //south face
+            MemoryUtil.memPutByte(ptr++, (byte) (3+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (6+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (2+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (6+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (3+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (7+j));
+
+            //west face
+            MemoryUtil.memPutByte(ptr++, (byte) (2+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (4+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (0+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (4+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (2+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (6+j));
+
+            //east face
+            MemoryUtil.memPutByte(ptr++, (byte) (1+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (5+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (3+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (7+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (3+j));
+            MemoryUtil.memPutByte(ptr++, (byte) (5+j));
+        }
 
         return buffer;
     }
