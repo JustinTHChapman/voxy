@@ -1,23 +1,22 @@
 package me.cortex.voxy.client.core.rendering;
 
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2LongLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
+import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
-import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.joml.Vector3i;
 import org.lwjgl.system.MemoryUtil;
 
+import static org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
@@ -32,68 +31,37 @@ import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfv;
 //This is a render subsystem, its very simple in what it does
 // it renders an AABB around loaded chunks, thats it
 public class ChunkBoundRenderer {
-    public static final int MAX_CHUNK_COUNT = 10_000;
-    private final GlBuffer chunkPosBuffer = new GlBuffer(MAX_CHUNK_COUNT*8);//Stored as ivec2
+    private static final int INIT_MAX_CHUNK_COUNT = 1<<12;
+    private GlBuffer chunkPosBuffer = new GlBuffer(INIT_MAX_CHUNK_COUNT*8);//Stored as ivec2
     private final GlBuffer uniformBuffer = new GlBuffer(128);
-    private final Long2IntOpenHashMap chunk2idx = new Long2IntOpenHashMap(MAX_CHUNK_COUNT);
-    private final long[] idx2chunk = new long[MAX_CHUNK_COUNT];
+    private final Long2IntOpenHashMap chunk2idx = new Long2IntOpenHashMap(INIT_MAX_CHUNK_COUNT);
+    private long[] idx2chunk = new long[INIT_MAX_CHUNK_COUNT];
     private final Shader rasterShader = Shader.makeAuto()
             .add(ShaderType.VERTEX, "voxy:chunkoutline/outline.vsh")
             .add(ShaderType.FRAGMENT, "voxy:chunkoutline/outline.fsh")
             .compile()
-            .ssbo(0, this.uniformBuffer)
+            .ubo(0, this.uniformBuffer)
             .ssbo(1, this.chunkPosBuffer);
 
     private GlTexture depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, 128, 128);
     private final GlFramebuffer frameBuffer = new GlFramebuffer().bind(GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
+    private final Long2ByteOpenHashMap updates = new Long2ByteOpenHashMap();
 
     public ChunkBoundRenderer() {
         this.chunk2idx.defaultReturnValue(-1);
     }
 
-    public void addChunk(long pos) {
-        if (this.chunk2idx.size() >= MAX_CHUNK_COUNT) {
-            throw new IllegalStateException("At capacity");
-        }
-        if (this.chunk2idx.containsKey(pos)) {
-            //Logger.warn("Chunk already in map: " + new ChunkPos(pos));
-            return;
-        }
-        int idx = this.chunk2idx.size();
-        this.chunk2idx.put(pos, idx);
-        this.idx2chunk[idx] = pos;
-
-        this.put(idx, pos);
+    public void addSection(long pos) {
+        this.updates.addTo(pos, (byte) 1);
     }
 
-    public void removeChunk(long pos) {
-        int idx = this.chunk2idx.remove(pos);
-        if (idx == -1) {
-            //Logger.warn("Chunk not in map: " + new ChunkPos(pos));
-            return;
-        }
-        if (idx == this.chunk2idx.size()) {
-            //Dont need to do anything as heap is already compact
-            return;
-        }
-        if (this.idx2chunk[idx] != pos) {
-            throw new IllegalStateException();
-        }
-
-        //Move last entry on heap to this index
-        long ePos = this.idx2chunk[this.chunk2idx.size()];// since is already removed size is correct end idx
-        if (this.chunk2idx.put(ePos, idx) == -1) {
-            throw new IllegalStateException();
-        }
-        this.idx2chunk[idx] = ePos;
-
-        //Put the end pos into the new idx
-        this.put(idx, ePos);
+    public void removeSection(long pos) {
+        this.updates.addTo(pos, (byte) -1);
     }
 
     //Bind and render, changing as little gl state as possible so that the caller may configure how it wants to render
     public void render(Viewport<?> viewport) {
-        if (this.chunk2idx.isEmpty()) return;
+        if (this.chunk2idx.isEmpty() && this.updates.isEmpty()) return;
 
         if (this.depthBuffer.getWidth() != viewport.width || this.depthBuffer.getHeight() != viewport.height) {
             this.depthBuffer.free();
@@ -118,8 +86,9 @@ public class ChunkBoundRenderer {
         UploadStream.INSTANCE.commit();
 
 
-        //TODO: NOTE: need to reverse the winding order since we want the back faces of the AABB, not the front
         {
+            //need to reverse the winding order since we want the back faces of the AABB, not the front
+
             glFrontFace(GL_CW);//Reverse winding order
 
             //"reverse depth buffer" it goes from 0->1 where 1 is far away
@@ -132,19 +101,15 @@ public class ChunkBoundRenderer {
         glBindVertexArray(RenderService.STATIC_VAO);
         glBindFramebuffer(GL_FRAMEBUFFER, this.frameBuffer.id);
         this.rasterShader.bind();
-        glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BB_BYTE.id());
-        //TODO: BATCH with multiple cubes per instance, this helps fill the pipe and should greatly improve performance of this
 
+        //Batch the draws into groups of size 32
         int count = this.chunk2idx.size();
-        int i = 0;
-        if (count/32 > 0) {
+        if (count > 32) {
             glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3 * 32, GL_UNSIGNED_BYTE, 0, count/32);
-            i = (count/32)*32;
-            count -= i;
         }
-        if (count > 0) {
-            glDrawElementsInstancedBaseInstance(GL_TRIANGLES, 6 * 2 * 3 * count, GL_UNSIGNED_BYTE, 0, 1, i);
+        if (count%32 != 0) {
+            glDrawElementsInstancedBaseInstance(GL_TRIANGLES, 6 * 2 * 3 * (count%32), GL_UNSIGNED_BYTE, 0, 1, (count/32)*32);
         }
 
         {
@@ -156,6 +121,70 @@ public class ChunkBoundRenderer {
             glEnable(GL_CULL_FACE);
             glEnable(GL_DEPTH_TEST);
         }
+        this.processUpdates();
+    }
+
+    private void processUpdates() {
+        if (this.updates.isEmpty()) return;
+        var iter = this.updates.long2ByteEntrySet().fastIterator();
+        while (iter.hasNext()) {
+            var entry = iter.next();
+            if (entry.getByteValue()==0) continue;
+            long pos = entry.getLongKey();
+            if (0<entry.getByteValue()) {
+                if (this.chunk2idx.containsKey(pos)) {
+                    //Logger.warn("Chunk already in map: " + new ChunkPos(pos));
+                    continue;
+                }
+                this.ensureSize1();//Resize if needed
+
+                int idx = this.chunk2idx.size();
+                this.chunk2idx.put(pos, idx);
+                this.idx2chunk[idx] = pos;
+
+                this.put(idx, pos);
+            } else {
+                int idx = this.chunk2idx.remove(pos);
+                if (idx == -1) {
+                    //Logger.warn("Chunk not in map: " + new ChunkPos(pos));
+                    continue;
+                }
+                if (idx == this.chunk2idx.size()) {
+                    //Dont need to do anything as heap is already compact
+                    continue;
+                }
+                if (this.idx2chunk[idx] != pos) {
+                    throw new IllegalStateException();
+                }
+
+                //Move last entry on heap to this index
+                long ePos = this.idx2chunk[this.chunk2idx.size()];// since is already removed size is correct end idx
+                if (this.chunk2idx.put(ePos, idx) == -1) {
+                    throw new IllegalStateException();
+                }
+                this.idx2chunk[idx] = ePos;
+
+                //Put the end pos into the new idx
+                this.put(idx, ePos);
+            }
+        }
+        this.updates.clear();
+    }
+
+    private void ensureSize1() {
+        if (this.chunk2idx.size() < this.idx2chunk.length) return;
+        int size = (int) (this.idx2chunk.length*1.5);
+        Logger.info("Resizing chunk position buffer to: " + size);
+        //Need to resize
+        var old = this.chunkPosBuffer;
+        this.chunkPosBuffer = new GlBuffer(size * 8L);
+        glCopyNamedBufferSubData(old.id, this.chunkPosBuffer.id, 0, 0, old.size());
+        old.free();
+        var old2 = this.idx2chunk;
+        this.idx2chunk = new long[size];
+        System.arraycopy(old2, 0, this.idx2chunk, 0, old2.length);
+        //Replace the old buffer with the new one
+        ((AutoBindingShader)this.rasterShader).ssbo(1, this.chunkPosBuffer);
     }
 
     private void put(int idx, long pos) {
