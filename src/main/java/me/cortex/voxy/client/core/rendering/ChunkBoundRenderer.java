@@ -141,12 +141,12 @@ public class ChunkBoundRenderer {
         int count = this.chunk2idx.size();
         int i = 0;
         if (count/32 > 0) {
-            glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3 * 32, GL_UNSIGNED_BYTE, SharedIndexBuffer.CUBE_INDEX_OFFSET, count/32);
+            glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3 * 32, GL_UNSIGNED_BYTE, 0, count/32);
             i = (count/32)*32;
             count -= i;
         }
         if (count > 0) {
-            glDrawElementsInstancedBaseInstance(GL_TRIANGLES, 6 * 2 * 3 * count, GL_UNSIGNED_BYTE, SharedIndexBuffer.CUBE_INDEX_OFFSET, 1, i);
+            glDrawElementsInstancedBaseInstance(GL_TRIANGLES, 6 * 2 * 3 * count, GL_UNSIGNED_BYTE, 0, 1, i);
         }
 
         {
