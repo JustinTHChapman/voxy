@@ -227,7 +227,6 @@ public class PrintfInjector implements IShaderProcessor {
 
     public void download() {
         DownloadStream.INSTANCE.download(this.textBuffer, this::processResult);
-        DownloadStream.INSTANCE.commit();
         nglClearNamedBufferSubData(this.textBuffer.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
     }
 
