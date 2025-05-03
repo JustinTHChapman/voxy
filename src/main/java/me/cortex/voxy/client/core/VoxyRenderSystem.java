@@ -200,6 +200,8 @@ public class VoxyRenderSystem {
 
 
         this.postProcessing.renderPost(projection, matrices.projection(), boundFB);
+        TimingStatistics.main.stop();
+        TimingStatistics.postDynamic.start();
 
         PrintfDebugUtil.tick();
 
@@ -211,11 +213,11 @@ public class VoxyRenderSystem {
             this.renderDistanceTracker.setCenterAndProcess(cameraX, cameraZ);
 
             //Done here as is allows less gl state resetup
-            this.renderer.tickModelService(5_000_000-(System.nanoTime()-startTime));
+            this.renderer.tickModelService(Math.max(5_000_000-(System.nanoTime()-startTime), 75_000));
         }
+        TimingStatistics.postDynamic.stop();
 
         glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
-        TimingStatistics.main.stop();
         TimingStatistics.all.stop();
     }
 
@@ -224,7 +226,7 @@ public class VoxyRenderSystem {
         this.renderer.addDebugData(debug);
         {
             TimingStatistics.update();
-            debug.add("Voxy frame runtime (millis): " + TimingStatistics.dynamic.pVal() + ", " + TimingStatistics.main.pVal()+ ", " + TimingStatistics.all.pVal());
+            debug.add("Voxy frame runtime (millis): " + TimingStatistics.dynamic.pVal() + ", " + TimingStatistics.main.pVal()+ ", " + TimingStatistics.postDynamic.pVal()+ ", " + TimingStatistics.all.pVal());
         }
         PrintfDebugUtil.addToOut(debug);
     }

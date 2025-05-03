@@ -51,8 +51,7 @@ public class SaveLoadSystem3 {
         long metadataPtr = ptr; ptr += 8;
 
         long blockPtr = ptr; ptr += WorldSection.SECTION_VOLUME*2;
-        for (int i = 0; i < WorldSection.SECTION_VOLUME; i++) {
-            long block = data[i];
+        for (long block : data) {
             short mapping = LUT.putIfAbsent(block, (short) LUT.size());
             if (mapping == -1) {
                 mapping = (short) (LUT.size()-1);

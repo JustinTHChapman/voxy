@@ -371,12 +371,19 @@ public class RenderDataFactory45 {
                         int iA = idx * 2 + (facingForward == 1 ? 0 : shift);
                         int iB = idx * 2 + (facingForward == 1 ? shift : 0);
 
+                        //Check if next culls this face
+                        if (false) {
+                            if (ModelQueries.faceOccludes(this.sectionData[iB + 1], (axis << 1) | (1 - facingForward))) {
+                                this.blockMesher.skip(1);
+                                continue;
+                            }
+                        }
+
                         long selfModel = this.sectionData[iA];
                         long nextModel = this.sectionData[iB];
-
                         this.blockMesher.putNext(((long) facingForward) |//Facing
                                 selfModel |
-                                (nextModel&(0xFFL<<55))//Apply lighting
+                                (nextModel & (0xFFL << 55))//Apply lighting
                         );
                     }
                 }
@@ -783,8 +790,19 @@ public class RenderDataFactory45 {
                         long B = this.sectionData[(idx + 1) * 2];
 
                         //Flip data with respect to facing direction
-                        long selfModel = facingForward==1?A:B;
-                        long nextModel = facingForward==1?B:A;
+                        int iA = idx * 2 + (facingForward == 1 ? 0 : 2);
+                        int iB = idx * 2 + (facingForward == 1 ? 2 : 0);
+
+                        //Check if next culls this face
+                        if (false) {
+                            if (ModelQueries.faceOccludes(this.sectionData[iB + 1], (2 << 1) | (1 - facingForward))) {
+                                mesher.skip(1);
+                                continue;
+                            }
+                        }
+
+                        long selfModel = this.sectionData[iA];
+                        long nextModel = this.sectionData[iB];
 
                         //Example thing thats just wrong but as example
                         mesher.putNext(((long) facingForward) |//Facing

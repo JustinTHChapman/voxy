@@ -70,17 +70,16 @@ public class ModelBakerySubsystem {
         VarHandle.fullFence();
         {
             long budget = Math.min(totalBudget-150_000, totalBudget-(this.factory.resultJobs.size()*10_000L))-150_000;
-            if (budget > 50_000) {
-                Integer i = this.blockIdQueue.poll();
-                if (i != null) {
-                    do {
-                        this.factory.addEntry(i);
-                        i = this.blockIdQueue.poll();
-                    } while (i != null && (System.nanoTime() - start < budget));
-                    if (i != null) {//We timedout on our budget and we have an entry so we must add it back
-                        this.blockIdQueue.add(i);
-                    }
-                }
+
+            //Always do 1 iteration minimum
+            Integer i = this.blockIdQueue.poll();
+            if (i != null) {
+                do {
+                    this.factory.addEntry(i);
+                    if (budget<(System.nanoTime() - start)+1000)
+                        break;
+                    i = this.blockIdQueue.poll();
+                } while (i != null);
             }
         }
 
