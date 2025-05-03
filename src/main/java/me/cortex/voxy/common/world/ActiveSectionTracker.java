@@ -9,6 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.StampedLock;
 
 public class ActiveSectionTracker {
 
@@ -18,7 +19,7 @@ public class ActiveSectionTracker {
     //Loaded section world cache, TODO: get rid of VolatileHolder and use something more sane
 
     private final Long2ObjectOpenHashMap<VolatileHolder<WorldSection>>[] loadedSectionCache;
-    private final ReentrantLock[] locks;//TODO: replace with StampedLocks
+    private final StampedLock[] locks;
     private final SectionLoader loader;
 
     private final int lruSize;
@@ -37,11 +38,11 @@ public class ActiveSectionTracker {
         this.loader = loader;
         this.loadedSectionCache = new Long2ObjectOpenHashMap[1<<numSlicesBits];
         this.lruSecondaryCache = new Long2ObjectLinkedOpenHashMap<>(cacheSize);
-        this.locks = new ReentrantLock[1<<numSlicesBits];
+        this.locks = new StampedLock[1<<numSlicesBits];
         this.lruSize = cacheSize;
         for (int i = 0; i < this.loadedSectionCache.length; i++) {
             this.loadedSectionCache[i] = new Long2ObjectOpenHashMap<>(1024);
-            this.locks[i] = new ReentrantLock();
+            this.locks[i] = new StampedLock();
         }
     }
 
@@ -55,26 +56,37 @@ public class ActiveSectionTracker {
         final var lock = this.locks[index];
         VolatileHolder<WorldSection> holder = null;
         boolean isLoader = false;
-        WorldSection section;
+        WorldSection section = null;
 
-        lock.lock();
         {
-            VarHandle.fullFence();
+            long stamp = lock.readLock();
             holder = cache.get(key);
-            if (holder == null) {
+            if (holder != null) {//Return already loaded entry
+                section = holder.obj;
+                if (section != null) {
+                    section.acquire();
+                    lock.unlockRead(stamp);
+                    return section;
+                }
+                lock.unlockRead(stamp);
+            } else {//Try to create holder
                 holder = new VolatileHolder<>();
-                cache.put(key, holder);
-                isLoader = true;
+                long ws = lock.tryConvertToWriteLock(stamp);
+                if (ws == 0) {//Failed to convert, unlock read and get write
+                    lock.unlockRead(stamp);
+                    stamp = lock.writeLock();
+                } else {
+                    stamp = ws;
+                }
+                var eHolder = cache.putIfAbsent(key, holder);//We put if absent because on failure to convert to write, it leaves race condition
+                lock.unlockWrite(stamp);
+                if (eHolder == null) {//We are the loader
+                    isLoader = true;
+                } else {
+                    holder = eHolder;
+                }
             }
-            section = holder.obj;
-            if (section != null) {
-                section.acquire();
-                lock.unlock();
-                return section;
-            }
-            VarHandle.fullFence();
         }
-        lock.unlock();
 
         if (isLoader) {
             synchronized (this.lruSecondaryCache) {
@@ -128,6 +140,8 @@ public class ActiveSectionTracker {
                 }
             }
             //lock.unlock();
+
+            //We failed everything, try get it again
             return this.acquire(key, nullOnEmpty);
         }
     }
@@ -137,9 +151,8 @@ public class ActiveSectionTracker {
         final var cache = this.loadedSectionCache[index];
         WorldSection sec = null;
         final var lock = this.locks[index];
-        lock.lock();
+        long stamp = lock.writeLock();
         {
-            VarHandle.fullFence();
             if (section.trySetFreed()) {
                 var cached = cache.remove(section.key);
                 var obj = cached.obj;
@@ -151,9 +164,8 @@ public class ActiveSectionTracker {
                 }
                 sec = section;
             }
-            VarHandle.fullFence();
         }
-        lock.unlock();
+        lock.unlockWrite(stamp);
 
         if (sec != null) {
             WorldSection a;

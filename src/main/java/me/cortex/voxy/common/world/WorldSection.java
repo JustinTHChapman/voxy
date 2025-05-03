@@ -119,10 +119,8 @@ public final class WorldSection {
 
     public int acquire(int count) {
         int state =((int)  ATOMIC_STATE_HANDLE.getAndAdd(this, count<<1)) + (count<<1);
-        if (VERIFY_WORLD_SECTION_EXECUTION) {
-            if ((state & 1) == 0) {
-                throw new IllegalStateException("Tried to acquire unloaded section");
-            }
+        if ((state & 1) == 0) {
+            throw new IllegalStateException("Tried to acquire unloaded section");
         }
         return state>>1;
     }
@@ -134,13 +132,11 @@ public final class WorldSection {
     //TODO: add the ability to hint to the tracker that yes the section is unloaded, try to cache it in a secondary cache since it will be reused/needed later
     public int release() {
         int state = ((int) ATOMIC_STATE_HANDLE.getAndAdd(this, -2)) - 2;
-        if (VERIFY_WORLD_SECTION_EXECUTION) {
-            if (state < 1) {
-                throw new IllegalStateException("Section got into an invalid state");
-            }
-            if ((state & 1) == 0) {
-                throw new IllegalStateException("Tried releasing a freed section");
-            }
+        if (state < 1) {
+            throw new IllegalStateException("Section got into an invalid state");
+        }
+        if ((state & 1) == 0) {
+            throw new IllegalStateException("Tried releasing a freed section");
         }
         if ((state>>1)==0) {
             if (this.tracker != null) {
@@ -159,10 +155,8 @@ public final class WorldSection {
     //Returns true on success, false on failure
     boolean trySetFreed() {
         int witness = (int) ATOMIC_STATE_HANDLE.compareAndExchange(this, 1, 0);
-        if (VERIFY_WORLD_SECTION_EXECUTION) {
-            if ((witness & 1) == 0 && witness != 0) {
-                throw new IllegalStateException("Section marked as free but has refs");
-            }
+        if ((witness & 1) == 0 && witness != 0) {
+            throw new IllegalStateException("Section marked as free but has refs");
         }
         return witness == 1;
     }
