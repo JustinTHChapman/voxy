@@ -130,8 +130,10 @@ public class ActiveSectionTracker {
             }
             return section;
         } else {
-            while ((section = holder.obj) == null)
+            while ((section = holder.obj) == null) {
+                Thread.onSpinWait();
                 Thread.yield();
+            }
 
             //lock.lock();
             {//Dont think need to lock here
