@@ -20,6 +20,8 @@ import java.util.Map;
 
 
 public class RenderDataFactory45 {
+    private static final boolean CHECK_NEIGHBOR_FACE_OCCLUSION = false;
+
     private static final boolean VERIFY_MESHING = VoxyCommon.isVerificationFlagOn("verifyMeshing");
 
     //TODO: MAKE a render cache that caches each WorldSection directional face generation, cause then can just pull that directly
@@ -59,7 +61,6 @@ public class RenderDataFactory45 {
     private int maxZ;
 
     private int quadCount = 0;
-
 
     //Wont work for double sided quads
     private final class Mesher extends ScanMesher2D {
@@ -372,7 +373,7 @@ public class RenderDataFactory45 {
                         int iB = idx * 2 + (facingForward == 1 ? shift : 0);
 
                         //Check if next culls this face
-                        if (false) {
+                        if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
                             if (ModelQueries.faceOccludes(this.sectionData[iB + 1], (axis << 1) | (1 - facingForward))) {
                                 this.blockMesher.skip(1);
                                 continue;
@@ -436,7 +437,7 @@ public class RenderDataFactory45 {
 
                             //This very funnily causes issues when not combined with meshing non full opaque geometry
                             //TODO:FIXME, when non opaque geometry is added
-                            if (false) {
+                            if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
                                 if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
                                     this.blockMesher.skip(1);
                                     continue;
@@ -505,6 +506,12 @@ public class RenderDataFactory45 {
                         int bi = facingForward == 1 ? b : a;
 
                         //TODO: check if must cull against next entries face
+                        if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
+                            if (ModelQueries.faceOccludes(this.sectionData[bi + 1], (axis << 1) | (1 - facingForward))) {
+                                this.blockMesher.skip(1);
+                                continue;
+                            }
+                        }
 
                         long A = this.sectionData[ai];
                         long Am = this.sectionData[ai+1];
@@ -599,9 +606,11 @@ public class RenderDataFactory45 {
                                 }
                             }
 
-                            if (ModelQueries.faceOccludes(meta, (axis<<1)|(1-side))) {
-                                this.blockMesher.skip(1);
-                                continue;
+                            if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
+                                if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
+                                    this.blockMesher.skip(1);
+                                    continue;
+                                }
                             }
                         }
 
@@ -658,17 +667,133 @@ public class RenderDataFactory45 {
 
                         long A = this.sectionData[idx * 2];
                         long B = this.sectionData[idx * 2+1];
-                        //TODO: filtering
 
-                        //Example thing thats just wrong but as example
-                        this.blockMesher.putNext((long) (false ? 0L : 1L) |
-                                A |
-                                (((0xFFL) & 0xFF) << 55)
-                        );
-                        this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
-                                A |
-                                (((0xFFL) & 0xFF) << 55)
-                        );
+                        long nA = this.sectionData[(idx+skipAmount)*2];
+                        long nB = this.sectionData[(idx+skipAmount)*2 + 1];
+
+                        //TODO: filtering
+                        if (ModelQueries.faceExists(B, (axis<<1)|0) && (nA&(0xFFFFL<<26)) != (A&(0xFFFFL<<26))&& (!ModelQueries.faceOccludes(nB, (axis<<1)|0))) {
+                            //ModelQueries.faceCanBeOccluded(B, (axis<<1)|(1))&&
+
+                            //Example thing thats just wrong but as example
+                            this.blockMesher.putNext((long) (false ? 0L : 1L) |
+                                    A |
+                                    ((ModelQueries.faceUsesSelfLighting(B, (axis<<1)|1)?A:nA) & (0xFFL << 55))//(((0xFFL) & 0xFF) << 55)
+                            );
+                        } else {
+                            this.blockMesher.skip(1);
+                        }
+
+
+                        nA = this.sectionData[(idx-skipAmount)*2];
+                        nB = this.sectionData[(idx-skipAmount)*2 + 1];
+                        if (ModelQueries.faceExists(B, (axis<<1)|1) && (nA&(0xFFFFL<<26)) != (A&(0xFFFFL<<26)) && (!ModelQueries.faceOccludes(nB, (axis<<1)|1))) {
+                            //ModelQueries.faceCanBeOccluded(B, (axis<<1)|(0))&&
+
+                            this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
+                                    A |
+                                    ((ModelQueries.faceUsesSelfLighting(B, (axis<<1)|0)?A:nA) & (0xFFL << 55))//(((0xFFL) & 0xFF) << 55)
+                            );
+                        } else {
+                            this.seondaryblockMesher.skip(1);
+                        }
+                    }
+                }
+                this.blockMesher.endRow();
+                this.seondaryblockMesher.endRow();
+            }
+            this.blockMesher.finish();
+            this.seondaryblockMesher.finish();
+        }
+    }
+
+    private void generateYZNonOpaqueOuterGeometry(int axis) {
+        //Note: think is ok to just reuse.. blockMesher
+        this.seondaryblockMesher.doAuxiliaryFaceOffset = false;
+        this.blockMesher.axis = axis;
+        this.seondaryblockMesher.axis = axis;
+        for (int side = 0; side < 2; side++) {//-, +
+            int layer = side == 0 ? 0 : 31;
+            int skipAmount = (axis==0?32*32:32) * (1-(side*2));
+            this.blockMesher.auxiliaryPosition = layer;
+            this.seondaryblockMesher.auxiliaryPosition = layer;
+            int cSkips = 0;
+            for (int other = 0; other < 32; other++) {
+                int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
+                int msk = this.nonOpaqueMasks[pidx];
+                if (msk == 0) {
+                    cSkips += 32;
+                    continue;
+                }
+
+                this.blockMesher.skip(cSkips);
+                this.seondaryblockMesher.skip(cSkips);
+                cSkips = 0;
+
+                int cIdx = -1;
+                while (msk != 0) {
+                    int index = Integer.numberOfTrailingZeros(msk);//Is also the x-axis index
+                    int delta = index - cIdx - 1;
+                    cIdx = index; //index--;
+                    if (delta != 0) {
+                        this.blockMesher.skip(delta);
+                        this.seondaryblockMesher.skip(delta);
+                    }
+                    msk &= ~Integer.lowestOneBit(msk);
+
+                    {
+                        int idx = index + (pidx * 32);
+
+
+                        int neighborIdx = ((axis+1)*32*32 * 2)+(side)*32*32;
+                        long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
+
+                        long A = this.sectionData[idx * 2];
+                        long B = this.sectionData[idx * 2 + 1];
+
+                        boolean fail = false;
+                        //Check and test if can cull W.R.T neighbor
+                        if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                            int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                            if (modelId == ((A>>26)&0xFFFF)) {
+                                fail = true;
+                            } else {
+                                long meta = this.modelMan.getModelMetadataFromClientId(modelId);
+
+                                if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
+                                    fail = true;
+                                }
+                            }
+                        }
+
+                        long nA = this.sectionData[(idx+skipAmount) * 2];
+                        long nB = this.sectionData[(idx+skipAmount) * 2 + 1];
+                        boolean failB = false;
+                        if ((nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {
+                            failB = true;
+                        } else {
+                            if (ModelQueries.faceOccludes(nB, (axis << 1) | (side))) {
+                                failB = true;
+                            }
+                        }
+
+                        if (ModelQueries.faceExists(B, (axis<<1)|1) && ((side==1&&!fail) || (side==0&&!failB))) {
+                            this.blockMesher.putNext((long) (false ? 0L : 1L) |
+                                    A |
+                                    0//((ModelQueries.faceUsesSelfLighting(B, (axis<<1)|1)?A:) & (0xFFL << 55))
+                            );
+                        } else {
+                            this.blockMesher.skip(1);
+                        }
+
+                        if (ModelQueries.faceExists(B, (axis<<1)|0) && ((side==0&&!fail) || (side==1&&!failB))) {
+                            this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
+                                    A |
+                                    0//(((0xFFL) & 0xFF) << 55)
+                            );
+                        } else {
+                            this.seondaryblockMesher.skip(1);
+                        }
                     }
                 }
                 this.blockMesher.endRow();
@@ -688,8 +813,10 @@ public class RenderDataFactory45 {
 
             this.generateYZFluidInnerGeometry(axis);
             this.generateYZFluidOuterGeometry(axis);
-
-            //this.generateYZNonOpaqueInnerGeometry(axis);
+            if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
+                this.generateYZNonOpaqueInnerGeometry(axis);
+                this.generateYZNonOpaqueOuterGeometry(axis);
+            }
         }
     }
 
@@ -786,15 +913,13 @@ public class RenderDataFactory45 {
                     {
                         int idx = index + (z * 32) + (y * 32 * 32);
                         //TODO: swap this out for something not getting the next entry
-                        long A = this.sectionData[idx * 2];
-                        long B = this.sectionData[(idx + 1) * 2];
 
                         //Flip data with respect to facing direction
                         int iA = idx * 2 + (facingForward == 1 ? 0 : 2);
                         int iB = idx * 2 + (facingForward == 1 ? 2 : 0);
 
                         //Check if next culls this face
-                        if (false) {
+                        if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
                             if (ModelQueries.faceOccludes(this.sectionData[iB + 1], (2 << 1) | (1 - facingForward))) {
                                 mesher.skip(1);
                                 continue;
@@ -860,11 +985,9 @@ public class RenderDataFactory45 {
                         long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
                         if (ModelQueries.isFullyOpaque(meta)) {
                             oki = false;
+                        } else if (CHECK_NEIGHBOR_FACE_OCCLUSION && ModelQueries.faceOccludes(meta, (2 << 1) | (1 - 1))) {
+                            oki = false;
                         }
-                        //TODO: check neibor face
-                        //else if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
-                        //    oki = false;
-                        //}
                     }
                     if (oki) {
                         ma.skip(skipA); skipA = 0;
@@ -883,11 +1006,9 @@ public class RenderDataFactory45 {
                         long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
                         if (ModelQueries.isFullyOpaque(meta)) {
                             oki = false;
+                        } else if (CHECK_NEIGHBOR_FACE_OCCLUSION && ModelQueries.faceOccludes(meta, (2 << 1) | (1 - 0))) {
+                            oki = false;
                         }
-                        //TODO: check neibor face
-                        //else if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
-                        //    oki = false;
-                        //}
                     }
                     if (oki) {
                         mb.skip(skipB); skipB = 0;
@@ -989,6 +1110,12 @@ public class RenderDataFactory45 {
                         int ai = (idx+(1-facingForward))*2;
                         int bi = (idx+facingForward)*2;
 
+                        if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
+                            if (ModelQueries.faceOccludes(this.sectionData[bi + 1], (2 << 1) | (1 - facingForward))) {
+                                this.blockMesher.skip(1);
+                                continue;
+                            }
+                        }
 
                         long A = this.sectionData[ai];
                         long Am = this.sectionData[ai+1];
@@ -1087,12 +1214,12 @@ public class RenderDataFactory45 {
                             oki = false;
                         }
 
-                        /*
-                        //TODO: check neibor face
-                        if (ModelQueries.faceOccludes(meta, (axis<<1)|(1-side))) {
-                            oki = false;
+                        //Check neighbor face
+                        if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
+                            if (ModelQueries.faceOccludes(meta, (2 << 1) | (1-0))) {
+                                oki = false;
+                            }
                         }
-                        */
 
                         if (ModelQueries.containsFluid(meta)) {
                             modelId = this.modelMan.getFluidClientStateId(modelId);
@@ -1147,12 +1274,12 @@ public class RenderDataFactory45 {
                             oki = false;
                         }
 
-                        /*
-                        //TODO: check neibor face
-                        if (ModelQueries.faceOccludes(meta, (axis<<1)|(1-side))) {
-                            oki = false;
+                        //Check neighbor face
+                        if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
+                            if (ModelQueries.faceOccludes(meta, (2 << 1) | (1-1))) {
+                                oki = false;
+                            }
                         }
-                        */
 
                         if (ModelQueries.containsFluid(meta)) {
                             modelId = this.modelMan.getFluidClientStateId(modelId);
