@@ -6,7 +6,6 @@ public abstract class ScanMesher2D {
 
     private static final int MAX_SIZE = 16;
 
-
     // is much faster if implemented inline into parent
     private final long[] rowData = new long[32];
     private final int[] rowLength = new int[32];//How long down does a row entry go
@@ -28,7 +27,7 @@ public abstract class ScanMesher2D {
             //If the previous data is not zero, that means it was not merge-able, so emit it at the pos
             if (this.currentData!=0) {
                 if ((this.rowBitset&(1<<31))!=0) {
-                    emitQuad(31, ((this.currentIndex-1)>>5)-1, this.rowLength[31], this.rowDepth[31], this.rowData[31]);
+                    this.emitQuad(31, ((this.currentIndex-1)>>5)-1, this.rowLength[31], this.rowDepth[31], this.rowData[31]);
                 }
                 this.rowBitset |= 1<<31;
                 this.rowLength[31] = this.currentSum;
@@ -84,14 +83,14 @@ public abstract class ScanMesher2D {
     private void emitRanged(int msk) {
         {//Emit quads that cover the previous indices
             int rowSet = this.rowBitset&msk;
+            this.rowBitset &= ~msk;
             while (rowSet!=0) {//Need to emit quads that would have skipped, note that this does not include the current index
                 int index = Integer.numberOfTrailingZeros(rowSet);
                 rowSet &= ~Integer.lowestOneBit(rowSet);
 
                 //Emit the quad, dont need to clear the data since it not existing in the bitmask is implicit no data
-                this.emitQuad(index, ((this.currentIndex-1)>>5)-1, this.rowLength[index], this.rowDepth[index], this.rowData[index]);
+                this.emitQuad(index, (this.currentIndex>>5)-1, this.rowLength[index], this.rowDepth[index], this.rowData[index]);
             }
-            this.rowBitset &= ~msk;
         }
     }
 
@@ -107,10 +106,14 @@ public abstract class ScanMesher2D {
         this.currentIndex += count;
          */
         if (count == 0) return;
-        this.putNext(0);
-        if (1<count) {
-            this.emitRanged(((1 << (Math.min(count, 32)-1)) - 1) << (this.currentIndex & 31));
-            this.currentIndex += count - 1;
+        if (this.currentData!=0) {
+            this.putNext(0);
+            count--;
+        }
+        if (0<count) {
+            int msk = (int) ((1L<<Math.min(32, count))-1) << (this.currentIndex & 31);
+            this.emitRanged(msk);
+            this.currentIndex += count;
         }
 
     }

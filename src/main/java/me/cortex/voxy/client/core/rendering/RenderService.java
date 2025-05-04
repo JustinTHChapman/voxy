@@ -80,7 +80,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
         this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool,
                 this.geometryUpdateQueue::push, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets,
-                ()->this.geometryUpdateQueue.count()<1000 && this.modelService.getProcessingCount()< 1000);
+                ()->this.geometryUpdateQueue.count()<1000);
 
         router.setCallbacks(this.renderGen::enqueueTask, section -> {
             section.acquire();

@@ -36,8 +36,12 @@ public class VoxyConfig implements OptionStorage<VoxyConfig> {
         if (Files.exists(path)) {
             try (FileReader reader = new FileReader(path.toFile())) {
                 var conf = GSON.fromJson(reader, VoxyConfig.class);
-                conf.save();
-                return conf;
+                if (conf != null) {
+                    conf.save();
+                    return conf;
+                } else {
+                    Logger.error("Failed to load voxy config, resetting");
+                }
             } catch (IOException e) {
                 Logger.error("Could not parse config",e);
             }

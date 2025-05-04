@@ -125,14 +125,18 @@ public class ActiveSectionTracker {
             }
 
             section.acquire();
+            VarHandle.fullFence();//Do not reorder setting this object
             holder.obj = section;
+            VarHandle.fullFence();
             if (nullOnEmpty && status == 1) {//If its air return null as stated, release the section aswell
                 section.release();
                 return null;
             }
             return section;
         } else {
+            VarHandle.fullFence();
             while ((section = holder.obj) == null) {
+                VarHandle.fullFence();
                 Thread.onSpinWait();
                 Thread.yield();
             }

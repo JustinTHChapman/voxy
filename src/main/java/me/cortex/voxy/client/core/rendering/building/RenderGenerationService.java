@@ -30,6 +30,7 @@ import java.util.function.Supplier;
 //TODO: to add remove functionallity add a "defunked" variable to the build task and set it to true on remove
 // and process accordingly
 public class RenderGenerationService {
+    private static final int MAX_HOLDING_SECTION_COUNT = 1000;
     private static final AtomicInteger COUNTER = new AtomicInteger();
     private static final class BuildTask {
         WorldSection section;
@@ -50,6 +51,8 @@ public class RenderGenerationService {
             this.addin = 0;
         }
     }
+
+    private final AtomicInteger holdingSectionCount = new AtomicInteger();//Used to limit section holding
 
     private final AtomicInteger taskQueueCount = new AtomicInteger();
     private final PriorityBlockingQueue<BuildTask> taskQueue = new PriorityBlockingQueue<>(320000, (a,b)-> Long.compareUnsigned(a.priority, b.priority));
@@ -181,6 +184,9 @@ public class RenderGenerationService {
                     if (task.hasDoneModelRequestOuter) {
                         other.hasDoneModelRequestOuter = true;
                     }
+                    if (task.section != null) {
+                        this.holdingSectionCount.decrementAndGet();
+                    }
                     task.section = null;
                     shouldFreeSection = true;
                     task = null;
@@ -227,8 +233,15 @@ public class RenderGenerationService {
                 }
 
                 //Keep the lock on the section, and attach it to the task, this prevents needing to re-aquire it later
-                task.section = section;
-                shouldFreeSection = false;
+                if (task.section == null) {
+                    if (this.holdingSectionCount.get() < MAX_HOLDING_SECTION_COUNT) {
+                        this.holdingSectionCount.incrementAndGet();
+                        task.section = section;
+                        shouldFreeSection = false;
+                    }
+                } else {
+                    shouldFreeSection = false;
+                }
 
                 task.updatePriority();
                 this.taskQueue.add(task);
@@ -241,6 +254,9 @@ public class RenderGenerationService {
         }
 
         if (shouldFreeSection) {
+            if (task != null && task.section != null) {
+                this.holdingSectionCount.decrementAndGet();
+            }
             section.release();
         }
 
@@ -285,6 +301,7 @@ public class RenderGenerationService {
                     var task = this.taskQueue.remove();
                     if (task.section != null) {
                         task.section.release();
+                        this.holdingSectionCount.decrementAndGet();
                     }
                     if (this.taskMap.remove(task.position) != task) {
                         throw new IllegalStateException();
@@ -304,6 +321,7 @@ public class RenderGenerationService {
             this.taskQueueCount.decrementAndGet();
             if (task.section != null) {
                 task.section.release();
+                this.holdingSectionCount.decrementAndGet();
             }
 
             long stamp = this.taskMapLock.writeLock();
