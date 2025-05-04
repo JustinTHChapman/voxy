@@ -213,7 +213,7 @@ public class VoxyRenderSystem {
             this.renderDistanceTracker.setCenterAndProcess(cameraX, cameraZ);
 
             //Done here as is allows less gl state resetup
-            this.renderer.tickModelService(Math.max(5_000_000-(System.nanoTime()-startTime), 75_000));
+            this.renderer.tickModelService(Math.max(3_000_000-(System.nanoTime()-startTime), 75_000));
         }
         TimingStatistics.postDynamic.stop();
 
