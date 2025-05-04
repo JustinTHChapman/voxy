@@ -66,17 +66,21 @@ public class ChunkBoundRenderer {
     //Bind and render, changing as little gl state as possible so that the caller may configure how it wants to render
     public void render(Viewport<?> viewport) {
         if (!this.remQueue.isEmpty()) {
+            boolean wasEmpty = this.chunk2idx.isEmpty();
             this.remQueue.forEach(this::_remPos);
             this.remQueue.clear();
+            if (this.chunk2idx.isEmpty()&&!wasEmpty) {//When going from stuff to nothing need to clear the depth buffer
+                glClearNamedFramebufferfv(this.frameBuffer.id, GL_DEPTH, 0, new float[]{0});
+            }
         }
-
-        if (this.chunk2idx.isEmpty() && this.addQueue.isEmpty()) return;
 
         if (this.depthBuffer.getWidth() != viewport.width || this.depthBuffer.getHeight() != viewport.height) {
             this.depthBuffer.free();
             this.depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, viewport.width, viewport.height);
             this.frameBuffer.bind(GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
         }
+
+        if (this.chunk2idx.isEmpty() && this.addQueue.isEmpty()) return;
 
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 128);
         long matPtr = ptr; ptr += 4*4*4;

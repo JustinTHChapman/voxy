@@ -42,7 +42,7 @@ vec4 uint2vec4RGBA(uint colour) {
 }
 
 vec4 getFaceSize(uint faceData) {
-    float EPSILON = 0.001f;
+    float EPSILON = 0.0005f;
 
     vec4 faceOffsetsSizes = extractFaceSizes(faceData);
 
