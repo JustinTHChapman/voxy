@@ -105,10 +105,10 @@ public class ModelBakerySubsystem {
 
     public void requestBlockBake(int blockId) {
         this.blockIdQueue.add(blockId);
+        this.blockIdCount.incrementAndGet();
     }
 
     public void addBiome(Mapper.BiomeEntry biomeEntry) {
-        this.blockIdCount.incrementAndGet();
         this.biomeQueue.add(biomeEntry);
     }
 
