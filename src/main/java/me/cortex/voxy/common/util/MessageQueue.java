@@ -41,7 +41,7 @@ public class MessageQueue <T> {
     }
 
     public int consumeNano(long budget) {
-        if (budget < 25_000) return 0;
+        //if (budget < 25_000) return 0;
         if (this.count.get() == 0) {
             return 0;
         }
@@ -61,9 +61,13 @@ public class MessageQueue <T> {
     }
 
     public final void clear(Consumer<T> cleaner) {
-        while (!this.queue.isEmpty()) {
-            cleaner.accept(this.queue.pop());
-        }
+        do {
+            var v = this.queue.poll();
+            if (v == null) {
+                break;
+            }
+            cleaner.accept(v);
+        } while (true);
     }
 
     public int count() {

@@ -23,7 +23,9 @@ public class ActiveSectionTracker {
     private final SectionLoader loader;
 
     private final int lruSize;
+    private final StampedLock lruLock = new StampedLock();
     private final Long2ObjectLinkedOpenHashMap<WorldSection> lruSecondaryCache;//TODO: THIS NEEDS TO BECOME A GLOBAL STATIC CACHE
+
     @Nullable
     public final WorldEngine engine;
 
@@ -89,9 +91,9 @@ public class ActiveSectionTracker {
         }
 
         if (isLoader) {
-            synchronized (this.lruSecondaryCache) {
-                section = this.lruSecondaryCache.remove(key);
-            }
+            long stamp = this.lruLock.writeLock();
+            section = this.lruSecondaryCache.remove(key);
+            this.lruLock.unlockWrite(stamp);
         }
 
         //If this thread was the one to create the reference then its the thread to load the section
@@ -170,14 +172,15 @@ public class ActiveSectionTracker {
         lock.unlockWrite(stamp);
 
         if (sec != null) {
-            WorldSection a;
-            synchronized (this.lruSecondaryCache) {
-                a = this.lruSecondaryCache.put(section.key, section);
-                //If cache is bigger than its ment to be, remove the least recently used and free it
-                if (a == null && this.lruSize < this.lruSecondaryCache.size()) {
-                    a = this.lruSecondaryCache.removeFirst();
-                }
+            stamp = this.lruLock.writeLock();
+
+            WorldSection a = this.lruSecondaryCache.put(section.key, section);
+            //If cache is bigger than its ment to be, remove the least recently used and free it
+            if (a == null && this.lruSize < this.lruSecondaryCache.size()) {
+                a = this.lruSecondaryCache.removeFirst();
             }
+            this.lruLock.unlockWrite(stamp);
+
             if (a != null) {
                 a._releaseArray();
             }

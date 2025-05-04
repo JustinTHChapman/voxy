@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.StampedLock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -50,7 +51,9 @@ public class RenderGenerationService {
         }
     }
 
+    private final AtomicInteger taskQueueCount = new AtomicInteger();
     private final PriorityBlockingQueue<BuildTask> taskQueue = new PriorityBlockingQueue<>(320000, (a,b)-> Long.compareUnsigned(a.priority, b.priority));
+    private final StampedLock taskMapLock = new StampedLock();
     private final Long2ObjectOpenHashMap<BuildTask> taskMap = new Long2ObjectOpenHashMap<>(320000);
 
     private final WorldEngine world;
@@ -124,6 +127,7 @@ public class RenderGenerationService {
     //TODO: add a generated render data cache
     private void processJob(RenderDataFactory45 factory, IntOpenHashSet seenMissedIds) {
         BuildTask task = this.taskQueue.poll();
+        this.taskQueueCount.decrementAndGet();
 
         //long time = BuiltSection.getTime();
         boolean shouldFreeSection = true;
@@ -142,21 +146,24 @@ public class RenderGenerationService {
         section.assertNotFree();
         BuiltSection mesh = null;
 
-        synchronized (this.taskMap) {
+        {
+            long stamp = this.taskMapLock.writeLock();
             var rtask = this.taskMap.remove(task.position);
             if (rtask != task) {
+                this.taskMapLock.unlockWrite(stamp);
                 throw new IllegalStateException();
             }
+            this.taskMapLock.unlockWrite(stamp);
         }
 
         try {
             mesh = factory.generateMesh(section);
         } catch (IdNotYetComputedException e) {
             {
-                BuildTask other;
-                synchronized (this.taskMap) {
-                    other = this.taskMap.putIfAbsent(task.position, task);
-                }
+                long stamp = this.taskMapLock.writeLock();
+                BuildTask other = this.taskMap.putIfAbsent(task.position, task);
+                this.taskMapLock.unlockWrite(stamp);
+
                 if (other != null) {//Weve been replaced
                     //Request the block
                     if (e.isIdBlockId) {
@@ -225,6 +232,7 @@ public class RenderGenerationService {
 
                 task.updatePriority();
                 this.taskQueue.add(task);
+                this.taskQueueCount.incrementAndGet();
 
                 if (this.threads.isAlive()) {//Only execute if were not dead
                     this.threads.execute();//Since we put in queue, release permit
@@ -244,17 +252,18 @@ public class RenderGenerationService {
 
     public void enqueueTask(long pos) {
         boolean[] isOurs = new boolean[1];
-        BuildTask task;
-        synchronized (this.taskMap) {
-            task = this.taskMap.computeIfAbsent(pos, p->{
+        long stamp = this.taskMapLock.writeLock();
+        BuildTask task = this.taskMap.computeIfAbsent(pos, p->{
                 isOurs[0] = true;
                 return new BuildTask(p);
             });
-        }
+        this.taskMapLock.unlockWrite(stamp);
+
         if (isOurs[0]) {//If its not ours we dont care about it
             //Set priority and insert into queue and execute
             task.updatePriority();
             this.taskQueue.add(task);
+            this.taskQueueCount.incrementAndGet();
             this.threads.execute();
         }
     }
@@ -270,8 +279,8 @@ public class RenderGenerationService {
         while (this.threads.hasJobs()) {
             int i = this.threads.drain();
             if (i == 0) break;
-
-            synchronized (this.taskMap) {
+            {
+                long stamp = this.taskMapLock.writeLock();
                 for (int j = 0; j < i; j++) {
                     var task = this.taskQueue.remove();
                     if (task.section != null) {
@@ -281,6 +290,8 @@ public class RenderGenerationService {
                         throw new IllegalStateException();
                     }
                 }
+                this.taskMapLock.unlockWrite(stamp);
+                this.taskQueueCount.addAndGet(-i);
             }
         }
 
@@ -290,22 +301,24 @@ public class RenderGenerationService {
         //Cleanup any remaining data
         while (!this.taskQueue.isEmpty()) {
             var task = this.taskQueue.remove();
+            this.taskQueueCount.decrementAndGet();
             if (task.section != null) {
                 task.section.release();
             }
-            synchronized (this.taskMap) {
-                if (this.taskMap.remove(task.position) != task) {
-                    throw new IllegalStateException();
-                }
+
+            long stamp = this.taskMapLock.writeLock();
+            if (this.taskMap.remove(task.position) != task) {
+                throw new IllegalStateException();
             }
+            this.taskMapLock.unlockWrite(stamp);
         }
     }
 
     public void addDebugData(List<String> debug) {
-        debug.add("RSSQ: " + this.taskQueue.size());//render section service queue
+        debug.add("RSSQ: " + this.taskQueueCount.get());//render section service queue
     }
 
     public int getTaskCount() {
-        return this.taskQueue.size();
+        return this.taskQueueCount.get();
     }
 }

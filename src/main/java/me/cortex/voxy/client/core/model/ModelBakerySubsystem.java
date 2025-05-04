@@ -15,6 +15,7 @@ import org.lwjgl.opengl.GL11;
 import java.lang.invoke.VarHandle;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.lwjgl.opengl.ARBFramebufferObject.GL_COLOR_ATTACHMENT0;
 import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
@@ -28,6 +29,7 @@ public class ModelBakerySubsystem {
 
     private final ModelStore storage = new ModelStore();
     public final ModelFactory factory;
+    private final AtomicInteger blockIdCount = new AtomicInteger();
     private final ConcurrentLinkedDeque<Integer> blockIdQueue = new ConcurrentLinkedDeque<>();//TODO: replace with custom DS
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeQueue = new ConcurrentLinkedDeque<>();
 
@@ -68,19 +70,22 @@ public class ModelBakerySubsystem {
         //TimingStatistics.modelProcess.start();
         long start = System.nanoTime();
         VarHandle.fullFence();
-        {
+        if (this.blockIdCount.get() != 0) {
             long budget = Math.min(totalBudget-150_000, totalBudget-(this.factory.resultJobs.size()*10_000L))-150_000;
 
             //Always do 1 iteration minimum
             Integer i = this.blockIdQueue.poll();
+            int j = 0;
             if (i != null) {
                 do {
                     this.factory.addEntry(i);
+                    j++;
                     if (budget<(System.nanoTime() - start)+1000)
                         break;
                     i = this.blockIdQueue.poll();
                 } while (i != null);
             }
+            this.blockIdCount.addAndGet(-j);
         }
 
         this.factory.tick();
@@ -103,11 +108,12 @@ public class ModelBakerySubsystem {
     }
 
     public void addBiome(Mapper.BiomeEntry biomeEntry) {
+        this.blockIdCount.incrementAndGet();
         this.biomeQueue.add(biomeEntry);
     }
 
     public void addDebugData(List<String> debug) {
-        debug.add(String.format("MQ/IF/MC: %04d, %03d, %04d", this.blockIdQueue.size(), this.factory.getInflightCount(),  this.factory.getBakedCount()));//Model bake queue/in flight/model baked count
+        debug.add(String.format("MQ/IF/MC: %04d, %03d, %04d", this.blockIdCount.get(), this.factory.getInflightCount(),  this.factory.getBakedCount()));//Model bake queue/in flight/model baked count
     }
 
     public ModelStore getStore() {
@@ -115,10 +121,10 @@ public class ModelBakerySubsystem {
     }
 
     public boolean areQueuesEmpty() {
-        return this.blockIdQueue.isEmpty() && this.factory.getInflightCount() == 0 && this.biomeQueue.isEmpty();
+        return this.blockIdCount.get()==0 && this.factory.getInflightCount() == 0 && this.biomeQueue.isEmpty();
     }
 
     public int getProcessingCount() {
-        return this.blockIdQueue.size() + this.factory.getInflightCount();
+        return this.blockIdCount.get() + this.factory.getInflightCount();
     }
 }
