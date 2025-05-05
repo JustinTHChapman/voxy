@@ -31,6 +31,8 @@ import java.util.function.Supplier;
 // and process accordingly
 public class RenderGenerationService {
     private static final int MAX_HOLDING_SECTION_COUNT = 1000;
+
+    public static final AtomicInteger MESH_FAILED_COUNTER = new AtomicInteger();
     private static final AtomicInteger COUNTER = new AtomicInteger();
     private static final class BuildTask {
         WorldSection section;
@@ -168,6 +170,7 @@ public class RenderGenerationService {
                 this.taskMapLock.unlockWrite(stamp);
 
                 if (other != null) {//Weve been replaced
+                    MESH_FAILED_COUNTER.incrementAndGet();
                     //Request the block
                     if (e.isIdBlockId) {
                         //TODO: maybe move this to _after_ task as been readded to queue??
@@ -206,6 +209,7 @@ public class RenderGenerationService {
                 }
 
                 if (task.hasDoneModelRequestInner && task.hasDoneModelRequestOuter) {
+                    MESH_FAILED_COUNTER.incrementAndGet();
                     task.attempts++;
                     try {
                         Thread.sleep(1);
@@ -222,6 +226,7 @@ public class RenderGenerationService {
                     //If this happens... aahaha painnnn
                     if (task.hasDoneModelRequestOuter) {
                         task.attempts++;
+                        MESH_FAILED_COUNTER.incrementAndGet();
                     }
 
                     if ((!task.hasDoneModelRequestOuter) && e.auxData != null) {
@@ -332,8 +337,16 @@ public class RenderGenerationService {
         }
     }
 
+    private long lastChangedTime = 0;
+    private int failedCounter = 0;
     public void addDebugData(List<String> debug) {
-        debug.add("RSSQ: " + this.taskQueueCount.get());//render section service queue
+        if (System.currentTimeMillis()-this.lastChangedTime > 1000) {
+            this.failedCounter = 0;
+            this.lastChangedTime = System.currentTimeMillis();
+        }
+        this.failedCounter += MESH_FAILED_COUNTER.getAndSet(0);
+        debug.add("RSSQ/TFC: " + this.taskQueueCount.get() + "/" + this.failedCounter);//render section service queue, Task Fail Counter
+
     }
 
     public int getTaskCount() {
