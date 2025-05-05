@@ -80,7 +80,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
         this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool,
                 this.geometryUpdateQueue::push, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets,
-                ()->this.geometryUpdateQueue.count()<1000);
+                ()->this.geometryUpdateQueue.count()<7000);
 
         router.setCallbacks(this.renderGen::enqueueTask, section -> {
             section.acquire();
@@ -142,7 +142,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
             //if (this.modelService.getProcessingCount() < 750)
             {//Very bad hack to try control things
-                this.geometryUpdateQueue.consumeNano(1_000_000 - (System.nanoTime() - frameStart));
+                this.geometryUpdateQueue.consumeNano(1_500_000 - (System.nanoTime() - frameStart));
             }
 
             this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??

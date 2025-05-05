@@ -6,11 +6,13 @@ import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 
+import static org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferfv;
 import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL11.GL_STENCIL_INDEX;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.GL43.*;
+import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfi;
 
 public class GlViewCapture {
     private final int width;
@@ -55,6 +57,11 @@ public class GlViewCapture {
         this.copyOutShader.bind();
         glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 3, buffer, offset, (this.width*3L)*(this.height*2L)*4L*2);//its 2*4 because colour + depth stencil
         glDispatchCompute(3, 2, 1);
+    }
+
+    public void clear() {
+        glClearNamedFramebufferfv(this.framebuffer.id, GL_COLOR, 0, new float[]{0,0,0,0});
+        glClearNamedFramebufferfi(this.framebuffer.id, GL_DEPTH_STENCIL, 0, 1.0f, 0);
     }
 
     public void free() {

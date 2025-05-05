@@ -123,7 +123,7 @@ public class BakedBlockEntityModel {
             layer.putInto(bb);
             var mesh = bb.endNullable();
             if (mesh!=null)
-                BudgetBufferRenderer.draw(mesh, texture, matrix);
+                BudgetBufferRenderer.drawFast(mesh, texture, matrix);
         }
     }
 

@@ -219,6 +219,8 @@ public class ModelTextureBakery {
         if (!renderFluid) {
             //TODO: need to do 2 variants for quads, one which have coloured, ones that dont, might be able to pull a spare bit
             // at the end whether or not a pixel should be mixed with texture
+
+            //TODO: CACHE THE BUILT MODEL AND REUSE AND JUST RENDER FROM DIFFERENT VIEWS
             renderQuads(bb, model, new MatrixStack(), randomValue);
         } else {
             MinecraftClient.getInstance().getBlockRenderManager().renderFluid(BlockPos.ORIGIN, new BlockRenderView() {
@@ -291,7 +293,7 @@ public class ModelTextureBakery {
 
         var mesh = bb.endNullable();
         if (mesh != null)
-            BudgetBufferRenderer.draw(mesh, texture, transform);
+            BudgetBufferRenderer.drawFast(mesh, texture, transform);
     }
 
     private static void renderQuads(BufferBuilder builder, BlockStateModel model, MatrixStack stack, long randomValue) {

@@ -1,13 +1,13 @@
 #version 430
 
 layout(location=0) uniform sampler2D tex;
-in vec2 texCoord;
 in flat uint metadata;
+in vec2 texCoord;
 out vec4 colour;
 
 void main() {
-    colour = texture(tex, texCoord)*(metadata&1);
-    if (colour.a <0.0001f) {
+    colour = texture(tex, texCoord);
+    if (colour.a < 0.0001f && ((metadata&1u)!=0)) {
         discard;
     }
 }

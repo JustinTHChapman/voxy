@@ -206,7 +206,7 @@ public class ServiceThreadPool {
             if (service == null) {
                 Logger.warn("No available jobs, sleeping releasing returning");
                 try {
-                    Thread.sleep(500);
+                    Thread.sleep((long) (200*Math.random()+5));
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }

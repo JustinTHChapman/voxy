@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.model.bakery.ModelTextureBakery;
+import me.cortex.voxy.client.core.model.bakery.ModelTextureBakery2;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
@@ -67,7 +68,7 @@ public class ModelFactory {
 
     private final Biome DEFAULT_BIOME = MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME).get(BiomeKeys.PLAINS);
 
-    public final ModelTextureBakery bakery;
+    public final ModelTextureBakery2 bakery;
 
 
     //Model data might also contain a constant colour if the colour resolver produces a constant colour, this saves space in the
@@ -125,7 +126,7 @@ public class ModelFactory {
     public ModelFactory(Mapper mapper, ModelStore storage) {
         this.mapper = mapper;
         this.storage = storage;
-        this.bakery = new ModelTextureBakery(MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
+        this.bakery = new ModelTextureBakery2(MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
 
         this.metadataCache = new long[1<<16];
         this.fluidStateLUT = new int[1<<16];
@@ -194,7 +195,7 @@ public class ModelFactory {
             }
             this.resultJobs.add(()->processTextureBakeResult(blockId, blockState, textureData));
         });
-        this.bakery.renderFacesToStream(blockState, 123456, isFluid, this.downstream.getBufferId(), allocation);
+        this.bakery.renderToStream(blockState, this.downstream.getBufferId(), allocation);
         return true;
     }
 

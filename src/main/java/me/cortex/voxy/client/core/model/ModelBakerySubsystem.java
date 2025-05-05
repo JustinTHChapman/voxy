@@ -21,8 +21,12 @@ import java.util.concurrent.locks.StampedLock;
 
 import static org.lwjgl.opengl.ARBFramebufferObject.GL_COLOR_ATTACHMENT0;
 import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11.glGetInteger;
 import static org.lwjgl.opengl.GL11C.GL_NEAREST;
+import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
+import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_BINDING;
 import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
+import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
 import static org.lwjgl.opengl.GL45.glBlitNamedFramebuffer;
 
 public class ModelBakerySubsystem {
@@ -79,6 +83,8 @@ public class ModelBakerySubsystem {
             Integer i = this.blockIdQueue.poll();
             int j = 0;
             if (i != null) {
+                int fbBinding = glGetInteger(GL_FRAMEBUFFER_BINDING);
+
                 do {
                     this.factory.addEntry(i);
                     j++;
@@ -86,6 +92,8 @@ public class ModelBakerySubsystem {
                         break;
                     i = this.blockIdQueue.poll();
                 } while (i != null);
+
+                glBindFramebuffer(GL_FRAMEBUFFER, fbBinding);//This is done here as stops needing to set then unset the fb in the thing 1000x
             }
             this.blockIdCount.addAndGet(-j);
         }
