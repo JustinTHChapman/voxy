@@ -30,6 +30,7 @@ public class HierarchicalOcclusionTraverser {
     public static final boolean HIERARCHICAL_SHADER_DEBUG = System.getProperty("voxy.hierarchicalShaderDebug", "false").equals("true");
 
     public static final int REQUEST_QUEUE_SIZE = 50;
+    public static final int MAX_QUEUE_SIZE = 200_000;
 
 
     private static final int MAX_ITERATIONS = WorldEngine.MAX_LOD_LAYER+1;
@@ -42,17 +43,17 @@ public class HierarchicalOcclusionTraverser {
 
     private final GlBuffer nodeBuffer;
     private final GlBuffer uniformBuffer = new GlBuffer(1024).zero();
-    private final GlBuffer renderList = new GlBuffer(100_000 * 4 + 4).zero();//100k sections max to render, TODO: Maybe move to render service or somewhere else
+    private final GlBuffer renderList = new GlBuffer(MAX_QUEUE_SIZE * 4 + 4).zero();//MAX_QUEUE_SIZE sections max to render, TODO: Maybe move to render service or somewhere else
     private final GlBuffer statisticsBuffer = new GlBuffer(1024).zero();
 
 
     private int topNodeCount;
     private final Int2IntOpenHashMap topNode2idxMapping = new Int2IntOpenHashMap();//Used to store mapping from TLN to array index
     private final int[] idx2topNodeMapping = new int[100_000];//Used to map idx to TLN id
-    private final GlBuffer topNodeIds = new GlBuffer(100_000*4).zero();
+    private final GlBuffer topNodeIds = new GlBuffer(MAX_QUEUE_SIZE*4).zero();
     private final GlBuffer queueMetaBuffer = new GlBuffer(4*4*MAX_ITERATIONS).zero();
-    private final GlBuffer scratchQueueA = new GlBuffer(100_000*4).zero();
-    private final GlBuffer scratchQueueB = new GlBuffer(100_000*4).zero();
+    private final GlBuffer scratchQueueA = new GlBuffer(MAX_QUEUE_SIZE*4).zero();
+    private final GlBuffer scratchQueueB = new GlBuffer(MAX_QUEUE_SIZE*4).zero();
 
     private static int BINDING_COUNTER = 1;
     private static final int SCENE_UNIFORM_BINDING = BINDING_COUNTER++;
@@ -125,7 +126,7 @@ public class HierarchicalOcclusionTraverser {
 
     private void addTLN(int id) {
         int aid = this.topNodeCount++;//Increment buffer
-        if (this.topNodeCount > 100_000) {
+        if (this.topNodeCount > this.topNodeIds.size()/4) {
             throw new IllegalStateException("Top level node count greater than capacity");
         }
 
