@@ -43,13 +43,12 @@ public class HierarchicalOcclusionTraverser {
 
     private final GlBuffer nodeBuffer;
     private final GlBuffer uniformBuffer = new GlBuffer(1024).zero();
-    private final GlBuffer renderList = new GlBuffer(MAX_QUEUE_SIZE * 4 + 4).zero();//MAX_QUEUE_SIZE sections max to render, TODO: Maybe move to render service or somewhere else
     private final GlBuffer statisticsBuffer = new GlBuffer(1024).zero();
 
 
     private int topNodeCount;
     private final Int2IntOpenHashMap topNode2idxMapping = new Int2IntOpenHashMap();//Used to store mapping from TLN to array index
-    private final int[] idx2topNodeMapping = new int[100_000];//Used to map idx to TLN id
+    private final int[] idx2topNodeMapping = new int[MAX_QUEUE_SIZE];//Used to map idx to TLN id
     private final GlBuffer topNodeIds = new GlBuffer(MAX_QUEUE_SIZE*4).zero();
     private final GlBuffer queueMetaBuffer = new GlBuffer(4*4*MAX_ITERATIONS).zero();
     private final GlBuffer scratchQueueA = new GlBuffer(MAX_QUEUE_SIZE*4).zero();
@@ -114,7 +113,6 @@ public class HierarchicalOcclusionTraverser {
         this.traversal
                 .ubo("SCENE_UNIFORM_BINDING", this.uniformBuffer)
                 .ssbo("REQUEST_QUEUE_BINDING", this.requestBuffer)
-                .ssbo("RENDER_QUEUE_BINDING", this.renderList)
                 .ssbo("NODE_DATA_BINDING", this.nodeBuffer)
                 .ssbo("NODE_QUEUE_META_BINDING", this.queueMetaBuffer)
                 .ssbo("RENDER_TRACKER_BINDING", this.nodeCleaner.visibilityBuffer)
@@ -183,7 +181,7 @@ public class HierarchicalOcclusionTraverser {
 
         setFrustum(viewport, ptr); ptr += 4*4*6;
 
-        MemoryUtil.memPutInt(ptr, (int) (this.renderList.size()/4-1)); ptr += 4;
+        MemoryUtil.memPutInt(ptr, (int) (viewport.getRenderList().size()/4-1)); ptr += 4;
 
 
         final float screenspaceAreaDecreasingSize = VoxyConfig.CONFIG.subDivisionSize*VoxyConfig.CONFIG.subDivisionSize;
@@ -194,12 +192,13 @@ public class HierarchicalOcclusionTraverser {
         MemoryUtil.memPutInt(ptr, this.nodeCleaner.visibilityId); ptr += 4;
     }
 
-    private void bindings() {
+    private void bindings(Viewport<?> viewport) {
         glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.queueMetaBuffer.id);
 
         //Bind the hiz buffer
         glBindTextureUnit(0, this.hiZBuffer.getHizTextureId());
         glBindSampler(0, this.hizSampler);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_QUEUE_BINDING, viewport.getRenderList().id);
     }
 
     public void doTraversal(Viewport<?> viewport, int depthBuffer) {
@@ -210,13 +209,17 @@ public class HierarchicalOcclusionTraverser {
         //UploadStream.INSTANCE.commit(); //Done inside traversal
 
         this.traversal.bind();
-        this.bindings();
+        this.bindings(viewport);
         PrintfDebugUtil.bind();
 
         if (RenderStatistics.enabled) {
             this.statisticsBuffer.zero();
         }
 
+        //Clear the render output counter
+        nglClearNamedBufferSubData(viewport.getRenderList().id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+
+        //Traverse
         this.traverseInternal();
 
         this.downloadResetRequestQueue();
@@ -247,10 +250,6 @@ public class HierarchicalOcclusionTraverser {
             glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
             glPixelStorei(GL_UNPACK_SKIP_IMAGES, 0);
         }
-
-        //Clear the render output counter
-        nglClearNamedBufferSubData(this.renderList.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
-
 
         int firstDispatchSize = (this.topNodeCount+(1<<LOCAL_WORK_SIZE_BITS)-1)>>LOCAL_WORK_SIZE_BITS;
         /*
@@ -309,10 +308,6 @@ public class HierarchicalOcclusionTraverser {
         nglClearNamedBufferSubData(this.requestBuffer.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
     }
 
-    public GlBuffer getRenderListBuffer() {
-        return this.renderList;
-    }
-
     private void forwardDownloadResult(long ptr, long size) {
         int count = MemoryUtil.memGetInt(ptr);ptr += 8;//its 8 since we need to skip the second value (which is empty)
         if (count < 0 || count > 50000) {
@@ -352,7 +347,6 @@ public class HierarchicalOcclusionTraverser {
         this.nodeBuffer.free();
         this.uniformBuffer.free();
         this.statisticsBuffer.free();
-        this.renderList.free();
         this.queueMetaBuffer.free();
         this.topNodeIds.free();
         this.scratchQueueA.free();

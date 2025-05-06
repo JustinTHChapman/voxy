@@ -172,24 +172,18 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     }
 
     @Override
-    public void buildDrawCalls(MDICViewport viewport, GlBuffer sectionRenderList) {
+    public void buildDrawCalls(MDICViewport viewport) {
         if (this.geometryManager.getSectionCount() == 0) return;
         this.uploadUniformBuffer(viewport);
         //Can do a sneeky trick, since the sectionRenderList is a list to things to render, it invokes the culler
         // which only marks visible sections
 
 
-
-        //TODO: dont do a copy
-        // make it so that the viewport contains the original indirectLookupBuffer list!!!
-        // that way dont need to copy the array
-        glCopyNamedBufferSubData(sectionRenderList.id, viewport.indirectLookupBuffer.id, 0, 0, sectionRenderList.size());
-
         {//Dispatch prep
             this.prepShader.bind();
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCountCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sectionRenderList.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.getRenderList().id);
             glDispatchCompute(1,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }

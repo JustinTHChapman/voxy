@@ -166,7 +166,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         }
         this.traversal.doTraversal(viewport, depthBuffer);
 
-        this.sectionRenderer.buildDrawCalls(viewport, this.traversal.getRenderListBuffer());
+        this.sectionRenderer.buildDrawCalls(viewport);
         this.sectionRenderer.renderTemporal(depthBoundTexture);
     }
 
