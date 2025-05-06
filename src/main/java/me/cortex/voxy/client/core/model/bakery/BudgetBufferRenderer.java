@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.model;
+package me.cortex.voxy.client.core.model.bakery;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.opengl.GlConst;
 import com.mojang.blaze3d.opengl.GlStateManager;
@@ -31,6 +31,8 @@ import static org.lwjgl.opengl.GL43.glBindVertexBuffer;
 import static org.lwjgl.opengl.GL45.*;
 
 public class BudgetBufferRenderer {
+    public static final int VERTEX_FORMAT_SIZE = 24;
+
     private static final Shader bakeryShader = Shader.make()
             .add(ShaderType.VERTEX, "voxy:bakery/position_tex.vsh")
             .add(ShaderType.FRAGMENT, "voxy:bakery/position_tex.fsh")
