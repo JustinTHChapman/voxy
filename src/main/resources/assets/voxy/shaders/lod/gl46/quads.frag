@@ -27,6 +27,7 @@ void main() {
     vec2 uv = mod(uv, vec2(1.0))*(1.0/(vec2(3.0,2.0)*256.0));
     vec2 texPos = uv + baseUV;
     //vec4 colour = solidColour;
+    //TODO: FIXME, need to manually compute the mip colour
     vec4 colour = texture(blockModelAtlas, texPos, ((flags>>1)&1u)*-5.0);//TODO: FIXME mipping needs to be fixed so that it doesnt go cross model bounds
     //Also, small quad is really fking over the mipping level somehow
     if ((flags&1u) == 1 && colour.a <= 0.25f) {

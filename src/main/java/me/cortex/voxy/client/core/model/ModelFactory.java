@@ -415,6 +415,10 @@ public class ModelFactory {
         }
 
         metadata |= fullyOpaque?(1L<<(48+6)):0;
+
+        boolean canBeCorrectlyRendered = true;//This represents if a model can be correctly (perfectly) represented
+        // i.e. no gaps
+
         this.metadataCache[modelId] = metadata;
 
         uploadPtr += 4*6;
@@ -627,6 +631,10 @@ public class ModelFactory {
             }
         }
         return res;
+    }
+
+    public int[] _unsafeRawAccess() {
+        return this.idMappings;
     }
 
     public int getModelId(int blockId) {

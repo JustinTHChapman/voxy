@@ -80,7 +80,7 @@ public class UploadStream {
 
 
     public void commit() {
-        glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
+        glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT|GL_BUFFER_UPDATE_BARRIER_BIT);
         //Execute all the copies
         for (var entry : this.uploadList) {
             glCopyNamedBufferSubData(this.uploadBuffer.id, entry.target.id, entry.uploadOffset, entry.targetOffset, entry.size);
