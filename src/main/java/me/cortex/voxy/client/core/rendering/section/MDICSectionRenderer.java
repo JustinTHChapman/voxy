@@ -124,6 +124,8 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
         this.bindRenderingBuffers(depthBoundTexture);
 
+        glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);//Barrier everything is needed
+
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCountOffset, maxDrawCount, 0);
 
         glEnable(GL_CULL_FACE);
