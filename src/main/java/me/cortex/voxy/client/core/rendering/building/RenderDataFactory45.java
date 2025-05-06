@@ -179,7 +179,6 @@ public class RenderDataFactory45 {
         }
     }
 
-
     private final Mesher blockMesher = new Mesher();
     private final Mesher seondaryblockMesher = new Mesher();//Used for dual non-opaque geometry
 
@@ -214,6 +213,7 @@ public class RenderDataFactory45 {
 
     private int prepareSectionData() {
         final var sectionData = this.sectionData;
+        final var rawModelIds = this.modelMan._unsafeRawAccess();
         int opaque = 0;
         int notEmpty = 0;
         int pureFluid = 0;
@@ -226,7 +226,10 @@ public class RenderDataFactory45 {
                 sectionData[i * 2] = (block&(0xFFL<<56))>>1;
                 sectionData[i * 2 + 1] = 0;
             } else {
-                int modelId = this.modelMan.getModelId(Mapper.getBlockId(block));
+                int modelId = rawModelIds[Mapper.getBlockId(block)];
+                if (modelId == -1) {//Failed, so just return error
+                    return Mapper.getBlockId(block)|(1<<31);
+                }
                 long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
 
                 sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
@@ -238,8 +241,6 @@ public class RenderDataFactory45 {
                 pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
                 partialFluid |= ModelQueries.containsFluid(modelMetadata) ? msk : 0;
             }
-
-            //TODO: here also do bitmask of what neighboring sections are needed to compute (may be getting rid of this in future)
 
             //Do increment here
             i++;
@@ -332,7 +333,24 @@ public class RenderDataFactory45 {
         }
     }
 
-    //TODO: add neighbor face culling
+    private static boolean shouldMeshNonOpaqueBlockFace(int face, long quad, long meta, long neighborQuad, long neighborMeta) {
+        if (((quad^neighborQuad)&(0xFFFFL<<26))==0) return false;//This is a hack, if the neigbor and this are the same, dont mesh the face
+        if (!ModelQueries.faceExists(meta, face)) return false;//Dont mesh if no face
+        //if (ModelQueries.faceCanBeOccluded(meta, face)) //TODO: maybe enable this
+            if (ModelQueries.faceOccludes(neighborMeta, face^1)) return false;
+        return true;
+    }
+
+    private static void meshNonOpaqueFace(int face, long quad, long meta, long neighborQuad, long neighborMeta, Mesher mesher) {
+        if (shouldMeshNonOpaqueBlockFace(face, quad, meta, neighborQuad, neighborMeta)) {
+            mesher.putNext((long) (face&1) |
+                    quad |
+                    ((ModelQueries.faceUsesSelfLighting(meta, face)?quad:neighborQuad) & (0xFFL << 55)));
+        } else {
+            mesher.skip(1);
+        }
+    }
+
     private void generateYZOpaqueInnerGeometry(int axis) {
         for (int layer = 0; layer < 31; layer++) {
             this.blockMesher.auxiliaryPosition = layer;
@@ -668,35 +686,8 @@ public class RenderDataFactory45 {
                         long A = this.sectionData[idx * 2];
                         long B = this.sectionData[idx * 2+1];
 
-                        long nA = this.sectionData[(idx+skipAmount)*2];
-                        long nB = this.sectionData[(idx+skipAmount)*2 + 1];
-
-                        //TODO: filtering
-                        if (ModelQueries.faceExists(B, (axis<<1)|0) && (nA&(0xFFFFL<<26)) != (A&(0xFFFFL<<26))&& (!ModelQueries.faceOccludes(nB, (axis<<1)|0))) {
-                            //ModelQueries.faceCanBeOccluded(B, (axis<<1)|(1))&&
-
-                            //Example thing thats just wrong but as example
-                            this.blockMesher.putNext((long) (false ? 0L : 1L) |
-                                    A |
-                                    ((ModelQueries.faceUsesSelfLighting(B, (axis<<1)|1)?A:nA) & (0xFFL << 55))//(((0xFFL) & 0xFF) << 55)
-                            );
-                        } else {
-                            this.blockMesher.skip(1);
-                        }
-
-
-                        nA = this.sectionData[(idx-skipAmount)*2];
-                        nB = this.sectionData[(idx-skipAmount)*2 + 1];
-                        if (ModelQueries.faceExists(B, (axis<<1)|1) && (nA&(0xFFFFL<<26)) != (A&(0xFFFFL<<26)) && (!ModelQueries.faceOccludes(nB, (axis<<1)|1))) {
-                            //ModelQueries.faceCanBeOccluded(B, (axis<<1)|(0))&&
-
-                            this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
-                                    A |
-                                    ((ModelQueries.faceUsesSelfLighting(B, (axis<<1)|0)?A:nA) & (0xFFL << 55))//(((0xFFL) & 0xFF) << 55)
-                            );
-                        } else {
-                            this.seondaryblockMesher.skip(1);
-                        }
+                        meshNonOpaqueFace((axis<<1)|0, A, B, this.sectionData[(idx-skipAmount)*2], this.sectionData[(idx-skipAmount)*2+1], this.seondaryblockMesher);//-
+                        meshNonOpaqueFace((axis<<1)|1, A, B, this.sectionData[(idx+skipAmount)*2], this.sectionData[(idx+skipAmount)*2+1], this.blockMesher);//+
                     }
                 }
                 this.blockMesher.endRow();
@@ -822,12 +813,22 @@ public class RenderDataFactory45 {
 
 
     private final Mesher[] xAxisMeshers = new Mesher[32];
+    private final Mesher[] secondaryXAxisMeshers = new Mesher[32];
     {
         for (int i = 0; i < 32; i++) {
             var mesher = new Mesher();
             mesher.auxiliaryPosition = i;
             mesher.axis = 2;//X axis
             this.xAxisMeshers[i] = mesher;
+        }
+        if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
+            for (int i = 0; i < 32; i++) {
+                var mesher = new Mesher();
+                mesher.auxiliaryPosition = i;
+                mesher.axis = 2;//X axis
+                mesher.doAuxiliaryFaceOffset = false;
+                this.secondaryXAxisMeshers[i] = mesher;
+            }
         }
     }
 
@@ -1318,7 +1319,191 @@ public class RenderDataFactory45 {
     }
 
     private void generateXNonOpaqueInnerGeometry() {
+        for (int y = 0; y < 32; y++) {
+            long sumA = 0;
+            long sumB = 0;
+            long sumC = 0;
+            int partialHasCount = -1;
+            int msk = 0;
+            for (int z = 0; z < 32; z++) {
+                msk = this.nonOpaqueMasks[y*32+z]&(~0x80000001);//Dont mesh the outer layer
 
+                //Always increment cause can do funny trick (i.e. -1 on skip amount)
+                sumA += X_I_MSK;
+                sumB += X_I_MSK;
+                sumC += X_I_MSK;
+
+                partialHasCount &= ~msk;
+
+                if (z == 30 && partialHasCount != 0) {//Hackfix for incremental count overflow issue
+                    int cmsk = partialHasCount;
+                    while (cmsk!=0) {
+                        int index = Integer.numberOfTrailingZeros(cmsk);
+                        cmsk &= ~Integer.lowestOneBit(cmsk);
+
+                        this.xAxisMeshers[index].skip(31);
+                        this.secondaryXAxisMeshers[index].skip(31);
+                    }
+                    //Clear the sum
+                    sumA &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount), X_I_MSK)*0x1F);
+                    sumB &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>11, X_I_MSK)*0x1F);
+                    sumC &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>22, X_I_MSK)*0x1F);
+                }
+
+                if (msk == 0) {
+                    continue;
+                }
+
+                int iter = msk;
+                while (iter!=0) {
+                    int index = Integer.numberOfTrailingZeros(iter);
+                    iter &= ~Integer.lowestOneBit(iter);
+
+
+                    int skipCount;//Compute the skip count
+                    {//TODO: Branch-less
+                        //Compute skip and clear
+                        if (index<11) {
+                            skipCount = (int) (sumA>>(index*5));
+                            sumA &= ~(0x1FL<<(index*5));
+                        } else if (index<22) {
+                            skipCount = (int) (sumB>>((index-11)*5));
+                            sumB &= ~(0x1FL<<((index-11)*5));
+                        } else {
+                            skipCount = (int) (sumC>>((index-22)*5));
+                            sumC &= ~(0x1FL<<((index-22)*5));
+                        }
+                        skipCount &= 0x1F;
+                        skipCount--;
+                    }
+
+                    var mesherA = this.xAxisMeshers[index];
+                    var mesherB = this.secondaryXAxisMeshers[index];
+                    if (skipCount != 0) {
+                        mesherA.skip(skipCount);
+                        mesherB.skip(skipCount);
+                    }
+
+                    {
+                        int idx = index + (z * 32) + (y * 32 * 32);
+
+                        long A = this.sectionData[idx*2];
+                        long Am = this.sectionData[idx*2+1];
+
+                        //Check and generate the mesh for both + and - faces
+                        meshNonOpaqueFace(2<<1, A, Am, this.sectionData[(idx-1)*2], this.sectionData[(idx-1)*2+1], mesherB);//-
+                        meshNonOpaqueFace((2<<1)|1, A, Am, this.sectionData[(idx+1)*2], this.sectionData[(idx+1)*2+1], mesherA);//+
+                    }
+                }
+            }
+
+            //Need to skip the remaining entries in the skip array
+            {
+                msk = ~msk;//Invert the mask as we only need to set stuff that isnt 0
+                while (msk!=0) {
+                    int index = Integer.numberOfTrailingZeros(msk);
+                    msk &= ~Integer.lowestOneBit(msk);
+                    int skipCount;
+                    if (index < 11) {
+                        skipCount = (int) (sumA>>(index*5));
+                    } else if (index<22) {
+                        skipCount = (int) (sumB>>((index-11)*5));
+                    } else {
+                        skipCount = (int) (sumC>>((index-22)*5));
+                    }
+                    skipCount &= 0x1F;
+
+                    if (skipCount != 0) {
+                        this.xAxisMeshers[index].skip(skipCount);
+                        this.secondaryXAxisMeshers[index].skip(skipCount);
+                    }
+                }
+            }
+        }
+    }
+
+
+
+    private static void dualMeshNonOpaqueOuterX(int side, long quad, long meta, int neighborAId, int neighborLight, long neighborAMeta, long neighborBQuad, long neighborBMeta, Mesher ma, Mesher mb) {
+        //side == 0 if is on 0 side and 1 if on 31 side
+
+        //TODO: Check (neighborAId!=0) && works oki
+        if ((neighborAId==0 && ModelQueries.faceExists(meta, ((2<<1)|0)^side))||(neighborAId!=0&&shouldMeshNonOpaqueBlockFace(((2<<1)|0)^side, quad, meta, ((long)neighborAId)<<26, neighborAMeta))) {
+            ma.putNext(((long)side)|
+                    quad |
+                    (ModelQueries.faceUsesSelfLighting(meta, ((2<<1)|0)^side)?quad:(((long)neighborLight)<<55))
+            );
+        } else {
+            ma.skip(1);
+        }
+
+        if (shouldMeshNonOpaqueBlockFace(((2<<1)|1)^side, quad, meta, neighborBQuad, neighborBMeta)) {
+            mb.putNext(((long)(side^1))|
+                    quad |
+                    ((ModelQueries.faceUsesSelfLighting(meta, ((2<<1)|1)^side)?quad:neighborBQuad)&(0xFFL<<55))
+            );
+        } else {
+            mb.skip(1);
+        }
+    }
+
+    private void generateXNonOpaqueOuterGeometry() {
+        var npx = this.xAxisMeshers[0]; npx.finish();
+        var nnx = this.secondaryXAxisMeshers[0]; nnx.finish();
+        var ppx = this.xAxisMeshers[31]; ppx.finish();
+        var pnx = this.secondaryXAxisMeshers[31]; pnx.finish();
+
+        for (int y = 0; y < 32; y++) {
+            int skipA = 0;
+            int skipB = 0;
+            for (int z = 0; z < 32; z++) {
+                int i = y*32+z;
+                int msk = this.nonOpaqueMasks[i];
+                if ((msk & 1) != 0) {//-x
+                    long neighborId = this.neighboringFaces[i];
+
+                    int sidx = (i<<5) * 2;
+                    long A = this.sectionData[sidx];
+                    long Am = this.sectionData[sidx + 1];
+
+                    int modelId = 0;
+                    long nM = 0;
+                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                        modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                        nM = this.modelMan.getModelMetadataFromClientId(modelId);
+                    }
+
+                    nnx.skip(skipA);
+                    npx.skip(skipA); skipA = 0;
+
+                    dualMeshNonOpaqueOuterX(0, A, Am, modelId, Mapper.getLightId(neighborId), nM, this.sectionData[sidx+2], this.sectionData[sidx+3], nnx, npx);
+                } else {skipA++;}
+
+                if ((msk & (1<<31)) != 0) {//+x
+                    long neighborId = this.neighboringFaces[i+32*32];
+
+                    int sidx = (i*32+31) * 2;
+                    long A = this.sectionData[sidx];
+                    long Am = this.sectionData[sidx + 1];
+
+                    int modelId = 0;
+                    long nM = 0;
+                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                        modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                        nM = this.modelMan.getModelMetadataFromClientId(modelId);
+                    }
+
+                    pnx.skip(skipB);
+                    ppx.skip(skipB); skipB = 0;
+
+                    dualMeshNonOpaqueOuterX(1, A, Am, modelId, Mapper.getLightId(neighborId), nM, this.sectionData[sidx-2], this.sectionData[sidx-1], ppx, pnx);
+                } else {skipB++;}
+            }
+            nnx.skip(skipA);
+            npx.skip(skipA);
+            pnx.skip(skipB);
+            ppx.skip(skipB);
+        }
     }
 
     private void generateXFaces() {
@@ -1334,6 +1519,17 @@ public class RenderDataFactory45 {
 
         for (var mesher : this.xAxisMeshers) {
             mesher.finish();
+        }
+        if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
+            this.generateXNonOpaqueInnerGeometry();
+            this.generateXNonOpaqueOuterGeometry();
+
+            for (var mesher : this.xAxisMeshers) {
+                mesher.finish();
+            }
+            for (var mesher : this.secondaryXAxisMeshers) {
+                mesher.finish();
+            }
         }
     }
 
@@ -1359,6 +1555,12 @@ public class RenderDataFactory45 {
                 mesher.reset();
                 mesher.doAuxiliaryFaceOffset = true;
             }
+            if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
+                for (var mesher : this.secondaryXAxisMeshers) {
+                    mesher.reset();
+                    mesher.doAuxiliaryFaceOffset = false;
+                }
+            }
         }
 
         this.minX = Integer.MAX_VALUE;
@@ -1375,6 +1577,9 @@ public class RenderDataFactory45 {
 
         //Prepare everything
         int neighborMsk = this.prepareSectionData();
+        if (neighborMsk>>31!=0) {//We failed to get everything so throw exception
+            throw new IdNotYetComputedException(neighborMsk&(~(1<<31)), true);
+        }
         this.acquireNeighborData(section, neighborMsk);
 
         try {
