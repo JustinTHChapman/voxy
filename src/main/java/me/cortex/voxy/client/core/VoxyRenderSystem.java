@@ -10,7 +10,7 @@ import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.ChunkBoundRenderer;
 import me.cortex.voxy.client.core.rendering.RenderDistanceTracker;
 import me.cortex.voxy.client.core.rendering.RenderService;
-import me.cortex.voxy.client.core.rendering.building.RenderDataFactory45;
+import me.cortex.voxy.client.core.rendering.building.RenderDataFactory;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
@@ -30,7 +30,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.GlBackend;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
-import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL11;
@@ -248,7 +247,7 @@ public class VoxyRenderSystem {
 
     private void testMeshingPerformance() {
         var modelService = new ModelBakerySubsystem(this.worldIn.getMapper());
-        var factory = new RenderDataFactory45(this.worldIn, modelService.factory, false);
+        var factory = new RenderDataFactory(this.worldIn, modelService.factory, false);
 
         List<WorldSection> sections = new ArrayList<>();
 
