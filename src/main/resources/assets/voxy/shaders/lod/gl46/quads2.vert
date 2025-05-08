@@ -119,7 +119,7 @@ void main() {
         flags |= uint(!modelHasMipmaps(model))<<1;
 
         //Compute lighting
-        tinting = getLighting(extractLightId(quad)).rgb;
+        tinting = getLighting(extractLightId(quad));
 
         //Apply model colour tinting
         uint tintColour = model.colourTint;
