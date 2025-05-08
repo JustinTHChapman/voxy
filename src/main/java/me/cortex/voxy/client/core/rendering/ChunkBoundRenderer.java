@@ -12,6 +12,7 @@ import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -86,7 +87,8 @@ public class ChunkBoundRenderer {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 128);
         long matPtr = ptr; ptr += 4*4*4;
 
-        final float renderDistance = 32*16;
+        final float renderDistance = MinecraftClient.getInstance().options.getClampedViewDistance()*16;//In blocks
+
         {//This is recomputed to be in chunk section space not worldsection
             int sx = MathHelper.floor(viewport.cameraX) >> 4;
             int sy = MathHelper.floor(viewport.cameraY) >> 4;
