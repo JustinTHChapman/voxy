@@ -138,18 +138,18 @@ public class ServiceThreadPool {
 
         long[] seed = new long[]{1234342^(threadId*124987198651981L+215987981111L)};
         int[] revolvingSelector = new int[1];
-
+        long[] logIO = new long[] {0, System.currentTimeMillis()};
         while (true) {
             this.jobCounter.acquireUninterruptibly();
             if (!this.running) {
                 break;
             }
             //This is because of JIT moment (it cant really replace methods while they are executing afak)
-            this.worker_work(threadId, seed, revolvingSelector);
+            this.worker_work(threadId, seed, revolvingSelector, logIO);
         }
     }
 
-    private void worker_work(int threadId, long[] seedIO, int[] revolvingSelectorIO) {
+    private void worker_work(int threadId, long[] seedIO, int[] revolvingSelectorIO, long[] logIO) {
         final int ATTEMPT_COUNT = 50;
         int attempts = ATTEMPT_COUNT;
         while (true) {
@@ -204,9 +204,15 @@ public class ServiceThreadPool {
                 }
             }
             if (service == null) {
-                Logger.warn("No available jobs, sleeping releasing returning");
+                logIO[0]++;
+                long delta = System.currentTimeMillis()-logIO[1];
+                if (delta>30_000) {
+                    logIO[1] = System.currentTimeMillis();
+                    Logger.warn("No available jobs, sleeping releasing returning: " + (delta/1000) + " attempts " + logIO[0]);
+                    logIO[0] = 0;
+                }
                 try {
-                    Thread.sleep((long) (200*Math.random()+5));
+                    Thread.sleep((long) (300*Math.random()+5));
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
