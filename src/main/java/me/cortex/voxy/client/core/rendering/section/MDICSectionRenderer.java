@@ -125,7 +125,6 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.bindRenderingBuffers(depthBoundTexture);
 
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);//Barrier everything is needed
-
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCountOffset, maxDrawCount, 0);
 
         glEnable(GL_CULL_FACE);
@@ -184,6 +183,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCountCallBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.getRenderList().id);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
             glDispatchCompute(1,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }
@@ -200,15 +200,15 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glEnable(GL_DEPTH_TEST);
             glColorMask(false, false, false, false);
             glDepthMask(false);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT|GL_COMMAND_BARRIER_BIT);
             glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_BYTE, 6*4);
             glDepthMask(true);
             glColorMask(true, true, true, true);
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
             glDisable(GL_DEPTH_TEST);
         }
 
 
-        {
+        {//Generate the commands
             this.commandGenShader.bind();
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCallBuffer.id);
@@ -224,6 +224,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             }
 
             glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountCallBuffer.id);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
             glDispatchComputeIndirect(0);
             glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
 

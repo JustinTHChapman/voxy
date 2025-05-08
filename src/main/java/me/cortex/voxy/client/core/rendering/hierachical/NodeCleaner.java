@@ -119,7 +119,6 @@ public class NodeCleaner {
             int c = (int) (((((double) gm.getUsedCapacity() / gm.geometryCapacity) - 0.75) * 4 * 10) + 1);
             c = 1;
             for (int i = 0; i < c; i++) {
-                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
                 this.outputBuffer.fill(this.nodeManager.maxNodeCount - 2);//TODO: maybe dont set to zero??
 
                 this.sorter.bind();
@@ -127,8 +126,8 @@ public class NodeCleaner {
 
                 //TODO: choose whether this is in nodeSpace or section/geometryId space
                 //
-                glDispatchCompute((this.nodeManager.getCurrentMaxNodeId() + (SORTING_WORKER_SIZE+WORK_PER_THREAD) - 1) / (SORTING_WORKER_SIZE+WORK_PER_THREAD), 1, 1);
                 glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+                glDispatchCompute((this.nodeManager.getCurrentMaxNodeId() + (SORTING_WORKER_SIZE+WORK_PER_THREAD) - 1) / (SORTING_WORKER_SIZE+WORK_PER_THREAD), 1, 1);
 
                 this.resultTransformer.bind();
                 glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, this.outputBuffer.id, 0, 4 * OUTPUT_COUNT);
@@ -137,6 +136,7 @@ public class NodeCleaner {
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.visibilityBuffer.id);
                 glUniform1ui(0, this.visibilityId);
 
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
                 glDispatchCompute(1, 1, 1);
                 glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 

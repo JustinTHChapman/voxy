@@ -124,7 +124,6 @@ public class DownloadStream {
     public void tick() {
         this.commit();
         if (!this.thisFrameAllocations.isEmpty()) {
-            glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
             this.frames.add(new DownloadFrame(new GlFence(), new LongArrayList(this.thisFrameAllocations), new ArrayList<>(this.thisFrameDownloadList)));
             this.thisFrameAllocations.clear();
             this.thisFrameDownloadList.clear();
@@ -136,6 +135,7 @@ public class DownloadStream {
             if (!this.frames.peek().fence.signaled()) {
                 break;
             }
+
             //Release all the allocations from the frame
             var frame = this.frames.pop();
 

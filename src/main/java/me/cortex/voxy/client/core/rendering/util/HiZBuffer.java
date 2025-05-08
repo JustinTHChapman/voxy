@@ -8,6 +8,7 @@ import me.cortex.voxy.client.core.rendering.RenderService;
 import org.lwjgl.opengl.GL11;
 
 import static org.lwjgl.opengl.ARBDirectStateAccess.*;
+import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_TEXTURE_FETCH_BARRIER_BIT;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30C.*;
 import static org.lwjgl.opengl.GL33.glBindSampler;
@@ -103,7 +104,7 @@ public class HiZBuffer {
             cw = Math.max(cw/2, 1); ch = Math.max(ch/2, 1); glViewport(0, 0, cw, ch);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
             glTextureBarrier();
-            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
+            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
         }
         glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, 0);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, 1000);//TODO: CHECK IF ITS -1 or -0
