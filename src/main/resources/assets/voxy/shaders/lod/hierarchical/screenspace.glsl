@@ -137,7 +137,7 @@ bool isCulledByHiz() {
     miplevel = ceil(miplevel);
     miplevel = clamp(miplevel, 0, 20);
 
-    if (miplevel >= 10f) {//Level 9 or 10// TODO: FIX THIS JANK SHIT
+    if (miplevel >= 10.0f) {//Level 9 or 10// TODO: FIX THIS JANK SHIT
         return false;
     }
 
