@@ -142,14 +142,14 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
             //if (this.modelService.getProcessingCount() < 750)
             {//Very bad hack to try control things
-                this.geometryUpdateQueue.consumeNano(1_500_000 - (System.nanoTime() - frameStart));
+                this.geometryUpdateQueue.consumeNano(Math.max(3_000_000 - (System.nanoTime() - frameStart), 50_000));
             }
-
-            this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
 
             if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
                 UploadStream.INSTANCE.commit();
             }
+            this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
+
 
             //this needs to go after, due to geometry updates committed by the nodeManager
             this.sectionRenderer.getGeometryManager().tick();
