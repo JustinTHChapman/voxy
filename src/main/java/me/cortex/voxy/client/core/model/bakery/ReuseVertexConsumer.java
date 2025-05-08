@@ -60,6 +60,7 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     public ReuseVertexConsumer quad(BakedQuad quad, int metadata) {
+        this.ensureCanPut();
         int[] data = quad.vertexData();
         for (int i = 0; i < 4; i++) {
             float x = Float.intBitsToFloat(data[i * 8]);
@@ -76,12 +77,12 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     private void ensureCanPut() {
-        if ((long) (this.count + 1) * VERTEX_FORMAT_SIZE < this.buffer.size) {
+        if ((long) (this.count + 5) * VERTEX_FORMAT_SIZE < this.buffer.size) {
             return;
         }
         long offset = this.buffer.address-this.ptr;
         //1.5x the size
-        var newBuffer = new MemoryBuffer((((int)(this.buffer.size*1.5)+VERTEX_FORMAT_SIZE-1)/VERTEX_FORMAT_SIZE)*VERTEX_FORMAT_SIZE);
+        var newBuffer = new MemoryBuffer((((int)(this.buffer.size*2)+VERTEX_FORMAT_SIZE-1)/VERTEX_FORMAT_SIZE)*VERTEX_FORMAT_SIZE);
         this.buffer.cpyTo(newBuffer.address);
         this.buffer.free();
         this.buffer = newBuffer;
