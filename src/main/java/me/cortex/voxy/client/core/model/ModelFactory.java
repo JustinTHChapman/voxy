@@ -385,7 +385,7 @@ public class ModelFactory {
             metadata |= canBeOccluded?4:0;
 
             //Face uses its own lighting if its not flat against the adjacent block & isnt traslucent
-            metadata |= (offset != 0 || blockRenderLayer == RenderLayer.getTranslucent())?0b1000:0;
+            metadata |= (offset > 0.01 || blockRenderLayer == RenderLayer.getTranslucent())?0b1000:0;
 
 
 
