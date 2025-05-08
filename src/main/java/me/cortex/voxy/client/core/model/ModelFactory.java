@@ -359,6 +359,7 @@ public class ModelFactory {
             boolean faceCoversFullBlock = faceSize[0] == 0 && faceSize[2] == 0 &&
                     faceSize[1] == (MODEL_TEXTURE_SIZE-1) && faceSize[3] == (MODEL_TEXTURE_SIZE-1);
 
+            //TODO: use faceSize and the depths to compute if mesh can be correctly rendered
 
             metadata |= faceCoversFullBlock?2:0;
 
@@ -660,6 +661,7 @@ public class ModelFactory {
         return this.metadataCache[clientId];
     }
 
+    //TODO: redo to batch blit, instead of 6 seperate blits, and also fix mipping
     private void putTextures(int id, ColourDepthTextureData[] textures) {
         int X = (id&0xFF) * MODEL_TEXTURE_SIZE*3;
         int Y = ((id>>8)&0xFF) * MODEL_TEXTURE_SIZE*2;

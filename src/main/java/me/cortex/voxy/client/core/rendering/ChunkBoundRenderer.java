@@ -14,6 +14,7 @@ import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
 import org.joml.Vector3i;
 import org.lwjgl.system.MemoryUtil;
 
@@ -84,17 +85,23 @@ public class ChunkBoundRenderer {
 
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 128);
         long matPtr = ptr; ptr += 4*4*4;
+
+        final float renderDistance = 32*16;
         {//This is recomputed to be in chunk section space not worldsection
             int sx = MathHelper.floor(viewport.cameraX) >> 4;
             int sy = MathHelper.floor(viewport.cameraY) >> 4;
             int sz = MathHelper.floor(viewport.cameraZ) >> 4;
             new Vector3i(sx, sy, sz).getToAddress(ptr); ptr += 4*4;
 
-            viewport.MVP.translate(
+            var negInnerSec = new Vector3f(
                     -(float) (viewport.cameraX - (sx << 4)),
                     -(float) (viewport.cameraY - (sy << 4)),
-                    -(float) (viewport.cameraZ - (sz << 4)),
-                    new Matrix4f()).getToAddress(matPtr);
+                    -(float) (viewport.cameraZ - (sz << 4)));
+
+            viewport.MVP.translate(negInnerSec, new Matrix4f()).getToAddress(matPtr);
+
+            negInnerSec.getToAddress(ptr); ptr += 4*3;
+            MemoryUtil.memPutFloat(ptr, renderDistance); ptr += 4;
         }
         UploadStream.INSTANCE.commit();
 
