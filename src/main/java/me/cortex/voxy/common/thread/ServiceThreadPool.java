@@ -212,7 +212,7 @@ public class ServiceThreadPool {
                     logIO[0] = 0;
                 }
                 try {
-                    Thread.sleep((long) (300*Math.random()+5));
+                    Thread.sleep((long) (500*Math.random()+200));
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
