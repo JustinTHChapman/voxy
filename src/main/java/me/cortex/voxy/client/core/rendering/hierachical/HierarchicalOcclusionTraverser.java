@@ -132,7 +132,9 @@ public class HierarchicalOcclusionTraverser {
         //Use clear buffer, yes know is a bad idea, TODO: replace
         //Add the new top level node to the queue
         glClearNamedBufferSubData(this.topNodeIds.id, GL_R32UI, aid*4L, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[]{id});
-        this.topNode2idxMapping.put(id, aid);
+        if (this.topNode2idxMapping.put(id, aid) != -1) {
+            throw new IllegalStateException();
+        }
         this.idx2topNodeMapping[aid] = id;
     }
 

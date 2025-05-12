@@ -133,6 +133,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
             DownloadStream.INSTANCE.tick();
 
             this.nodeManager.tick(this.traversal.getNodeBuffer());
+            //glFlush();
 
             this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
 
@@ -184,14 +185,14 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         this.world.getMapper().setBiomeCallback(null);
         this.world.getMapper().setStateCallback(null);
 
+        this.nodeManager.stop();
+
         this.modelService.shutdown();
         this.renderGen.shutdown();
         this.viewportSelector.free();
         this.sectionRenderer.free();
         this.traversal.free();
         this.nodeCleaner.free();
-
-        this.nodeManager.stop();
 
         this.geometryData.free();
     }

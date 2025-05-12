@@ -4,7 +4,6 @@ import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntConsumer;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.longs.LongConsumer;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.ISectionWatcher;
@@ -13,6 +12,7 @@ import me.cortex.voxy.client.core.rendering.section.geometry.BasicAsyncGeometryM
 import me.cortex.voxy.client.core.rendering.section.geometry.BasicSectionGeometryData;
 import me.cortex.voxy.client.core.rendering.section.geometry.IGeometryData;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldSection;
 import org.lwjgl.system.MemoryUtil;
@@ -30,16 +30,19 @@ import static me.cortex.voxy.client.core.rendering.section.geometry.BasicSection
 // this is done off thread to reduce the amount of work done on the render thread, improving frame stability and reducing runtime overhead
 public class AsyncNodeManager {
     private static final VarHandle RESULT_HANDLE;
+    private static final VarHandle RESULT_CACHE_1_HANDLE;
+    private static final VarHandle RESULT_CACHE_2_HANDLE;
     static {
         try {
             RESULT_HANDLE = MethodHandles.lookup().findVarHandle(AsyncNodeManager.class, "results", SyncResults.class);
+            RESULT_CACHE_1_HANDLE = MethodHandles.lookup().findVarHandle(AsyncNodeManager.class, "resultCache1", SyncResults.class);
+            RESULT_CACHE_2_HANDLE = MethodHandles.lookup().findVarHandle(AsyncNodeManager.class, "resultCache2", SyncResults.class);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
     }
 
     private final Thread thread;
-    private final StampedLock lock = new StampedLock();
     public final int maxNodeCount;
     private volatile boolean running = true;
 
@@ -50,10 +53,14 @@ public class AsyncNodeManager {
     private final AtomicInteger workCounter = new AtomicInteger();
 
     private volatile SyncResults results = null;
+    private volatile SyncResults resultCache1 = new SyncResults();
+    private volatile SyncResults resultCache2 = new SyncResults();
+
 
 
     //locals for during iteration
     private final IntOpenHashSet tlnIdChange = new IntOpenHashSet();//"Encoded" add/remove id, first bit indicates if its add or remove, 1 is add
+    private boolean needsWaitForSync = false;
 
     public AsyncNodeManager(int maxNodeCount, ISectionWatcher watcher, IGeometryData geometryData) {
         //Note the current implmentation of ISectionWatcher is threadsafe
@@ -64,10 +71,13 @@ public class AsyncNodeManager {
 
         this.maxNodeCount = maxNodeCount;
         this.thread = new Thread(()->{
-            while (this.running) {
-                this.run();
+            try {
+                while (this.running) {
+                    this.run();
+                }
+            } catch (Exception e) {
+                Logger.error("Critical error occurred in async processor, things will be broken", e);
             }
-            //TODO: cleanup here? maybe?
         });
         this.thread.setName("Async Node Manager");
 
@@ -91,13 +101,30 @@ public class AsyncNodeManager {
         });
         this.manager.setTLNCallbacks(id->{
             if (!this.tlnIdChange.remove(id)) {
-                this.tlnIdChange.add(id|(1<<31));
+                if (!this.tlnIdChange.add(id|(1<<31))) {
+                    throw new IllegalStateException();
+                }
             }
         }, id -> {
             if (!this.tlnIdChange.remove(id|(1<<31))) {
-                this.tlnIdChange.add(id);
+                if (!this.tlnIdChange.add(id)) {
+                    throw new IllegalStateException();
+                }
             }
         });
+    }
+
+    private SyncResults getMakeResultObject() {
+        SyncResults resultSet = (SyncResults)RESULT_CACHE_1_HANDLE.getAndSet(this, null);
+        if (resultSet == null) {//Not in the first object
+            resultSet = (SyncResults)RESULT_CACHE_2_HANDLE.getAndSet(this, null);
+        }
+        if (resultSet == null) {
+            throw new IllegalStateException("There should always be an object in the result set cache pair");
+        }
+        //Reset everything to default
+        resultSet.reset();
+        return resultSet;
     }
 
     private void run() {
@@ -114,7 +141,7 @@ public class AsyncNodeManager {
 
         //This is a funny thing, wait a bit, this allows for better batching, but this thread is independent of everything else so waiting a bit should be mostly ok
         try {
-            Thread.sleep(20);
+            Thread.sleep(10);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -165,7 +192,7 @@ public class AsyncNodeManager {
             job.release();
         } while (true);
 
-        for (int limit = 0; limit < 100; limit++) {//Limit uploading
+        for (int limit = 0; limit < 200; limit++) {//Limit uploading
             var job = this.geometryUpdateQueue.poll();
             if (job == null)
                 break;
@@ -214,9 +241,20 @@ public class AsyncNodeManager {
         } while (true);
 
         if (this.workCounter.addAndGet(-workDone) < 0) {
-            throw new IllegalStateException("Work counter less than zero");
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            //Due to synchronization "issues", wait a millis (give up this time slice)
+            if (this.workCounter.get() < 0) {
+                throw new IllegalStateException("Work counter less than zero");
+            }
         }
 
+        if (workDone == 0) {//Nothing happened, which is odd, but just return
+            return;
+        }
         //=====================
         //process output events and atomically sync to results
 
@@ -259,12 +297,13 @@ public class AsyncNodeManager {
 
         //TODO: also note! this can be done for the processing of rendered out block models!!
         // (it might be able to also be put in this thread, maybe? but is proabably worth putting in own thread for latency reasons)
-
-        while (RESULT_HANDLE.get(this) != null && this.running) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
+        if (this.needsWaitForSync) {
+            while (RESULT_HANDLE.get(this) != null && this.running) {
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
 
@@ -272,7 +311,8 @@ public class AsyncNodeManager {
         var prev = (SyncResults) RESULT_HANDLE.getAndSet(this, null);
         SyncResults results = null;
         if (prev == null) {
-            results = new SyncResults();
+            this.needsWaitForSync = false;
+            results = this.getMakeResultObject();
             //Clear old data (if it exists), create a new result set
             results.tlnDelta.addAll(this.tlnIdChange);
             this.tlnIdChange.clear();
@@ -288,8 +328,9 @@ public class AsyncNodeManager {
                 var iter = this.tlnIdChange.intIterator();
                 while (iter.hasNext()) {
                     int val = iter.nextInt();
-                    results.tlnDelta.remove(val ^ (1 << 31));//Remove opposite
-                    results.tlnDelta.add(val);//Add this
+                    if (!results.tlnDelta.remove(val ^ (1 << 31))) {//Remove opposite
+                        results.tlnDelta.add(val);//Add this if not added
+                    }
                 }
                 this.tlnIdChange.clear();
             }
@@ -336,6 +377,7 @@ public class AsyncNodeManager {
                     this.geometryManager.writeMetadata(val, placeId*32L + results.geometryIdUpdateData.address);
                 }
                 ids.clear();
+                this.needsWaitForSync |= results.geometryIdUpdateMap.size()>250;
             }
 
             //Node updates
@@ -353,6 +395,7 @@ public class AsyncNodeManager {
                     this.manager.writeNode(val, placeId*16L + results.nodeIdUpdateData.address);
                 }
                 ids.clear();
+                this.needsWaitForSync |= results.nodeIdUpdateMap.size()>=512;
             }
         }
 
@@ -430,8 +473,14 @@ public class AsyncNodeManager {
         if (doCommit) {
             UploadStream.INSTANCE.commit();
         }
-        results.nodeIdUpdateData.free();
-        results.geometryIdUpdateData.free();
+
+        //Insert the result set into the cache
+        if (!RESULT_CACHE_1_HANDLE.compareAndSet(this, null, results)) {
+            //Failed to insert into result set 1, insert it into result set 2
+            if (!RESULT_CACHE_2_HANDLE.compareAndSet(this, null, results)) {
+                throw new IllegalStateException("Could not insert result into cache");
+            }
+        }
     }
 
 
@@ -461,28 +510,35 @@ public class AsyncNodeManager {
         }
     }
 
-    public void submitRequestBatch(MemoryBuffer batch) {
+    public void submitRequestBatch(MemoryBuffer batch) {//Only called from render thread
         this.requestBatchQueue.add(batch);
         this.addWork();
     }
 
     public void submitChildChange(WorldSection section) {
+        if (!this.running) {
+            return;
+        }
         section.acquire();//We must acquire the section before putting in the queue
         this.childUpdateQueue.add(section);
         this.addWork();
     }
 
     public void submitGeometryResult(BuiltSection geometry) {
+        if (!this.running) {
+            geometry.free();
+            return;
+        }
         this.geometryUpdateQueue.add(geometry);
         this.addWork();
     }
 
-    public void submitRemoveBatch(MemoryBuffer batch) {
+    public void submitRemoveBatch(MemoryBuffer batch) {//Only called from render thread
         this.removeBatchQueue.add(batch);
         this.addWork();
     }
 
-    public void addTopLevel(long section) {
+    public void addTopLevel(long section) {//Only called from render thread
         if (!this.running) throw new IllegalStateException("Not running");
         long stamp = this.tlnLock.writeLock();
         int state = this.tlnAdd.add(section)?1:0;
@@ -495,7 +551,7 @@ public class AsyncNodeManager {
         this.tlnLock.unlockWrite(stamp);
     }
 
-    public void removeTopLevel(long section) {
+    public void removeTopLevel(long section) {//Only called from render thread
         if (!this.running) throw new IllegalStateException("Not running");
         long stamp = this.tlnLock.writeLock();
         int state = this.tlnRem.add(section)?1:0;
@@ -548,7 +604,23 @@ public class AsyncNodeManager {
             buffer.free();
         }
 
-        //TODO: CLEANUP the sync data!
+        if (RESULT_HANDLE.get(this) != null) {
+            var result = (SyncResults)RESULT_HANDLE.getAndSet(this, null);
+            result.geometryUploads.forEach((a,b)->b.free());
+            result.nodeIdUpdateData.free();
+            result.geometryIdUpdateData.free();
+        }
+
+        if (RESULT_CACHE_1_HANDLE.get(this) != null) {//Clear cache 1
+            var result = (SyncResults)RESULT_CACHE_1_HANDLE.getAndSet(this, null);
+            result.nodeIdUpdateData.free();
+            result.geometryIdUpdateData.free();
+        }
+        if (RESULT_CACHE_2_HANDLE.get(this) != null) {//Clear cache 2
+            var result = (SyncResults)RESULT_CACHE_2_HANDLE.getAndSet(this, null);
+            result.nodeIdUpdateData.free();
+            result.geometryIdUpdateData.free();
+        }
     }
 
     //Results object, which is to be synced between the render thread and worker thread
@@ -579,5 +651,13 @@ public class AsyncNodeManager {
             this.geometryIdUpdateMap.defaultReturnValue(-1);
         }
 
+        public void reset() {
+            this.nodeIdUpdateMap.clear();
+            this.currentMaxNodeId = 0;
+            this.tlnDelta.clear();
+            this.geometrySectionCount = 0;
+            this.geometryUploads.clear();
+            this.geometryIdUpdateMap.clear();
+        }
     }
 }

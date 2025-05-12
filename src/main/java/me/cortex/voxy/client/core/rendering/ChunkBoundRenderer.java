@@ -56,13 +56,15 @@ public class ChunkBoundRenderer {
     }
 
     public void addSection(long pos) {
-        this.addQueue.add(pos);
-        this.remQueue.remove(pos);
+        if (!this.remQueue.remove(pos)) {
+            this.addQueue.add(pos);
+        }
     }
 
     public void removeSection(long pos) {
-        this.remQueue.add(pos);
-        this.addQueue.remove(pos);
+        if (!this.addQueue.remove(pos)) {
+            this.remQueue.add(pos);
+        }
     }
 
     //Bind and render, changing as little gl state as possible so that the caller may configure how it wants to render

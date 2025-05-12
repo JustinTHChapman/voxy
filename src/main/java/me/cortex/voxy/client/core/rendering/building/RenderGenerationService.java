@@ -266,6 +266,9 @@ public class RenderGenerationService {
 
 
     public void enqueueTask(long pos) {
+        if (!this.threads.isAlive()) {
+            return;
+        }
         boolean[] isOurs = new boolean[1];
         long stamp = this.taskMapLock.writeLock();
         BuildTask task = this.taskMap.computeIfAbsent(pos, p->{
