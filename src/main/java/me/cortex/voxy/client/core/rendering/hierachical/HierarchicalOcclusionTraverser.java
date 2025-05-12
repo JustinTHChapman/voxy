@@ -12,6 +12,7 @@ import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
 import org.lwjgl.system.MemoryUtil;
 
@@ -36,7 +37,7 @@ public class HierarchicalOcclusionTraverser {
     private static final int MAX_ITERATIONS = WorldEngine.MAX_LOD_LAYER+1;
     private static final int LOCAL_WORK_SIZE_BITS = 5;
 
-    private final NodeManager nodeManager;
+    private final AsyncNodeManager nodeManager;
     private final NodeCleaner nodeCleaner;
 
     private final GlBuffer requestBuffer;
@@ -96,7 +97,7 @@ public class HierarchicalOcclusionTraverser {
             .compile();
 
 
-    public HierarchicalOcclusionTraverser(NodeManager nodeManager, NodeCleaner nodeCleaner) {
+    public HierarchicalOcclusionTraverser(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner) {
         this.nodeCleaner = nodeCleaner;
         this.nodeManager = nodeManager;
         this.requestBuffer = new GlBuffer(REQUEST_QUEUE_SIZE*8L+8).zero();
@@ -119,7 +120,7 @@ public class HierarchicalOcclusionTraverser {
                 .ssboIf("STATISTICS_BUFFER_BINDING", this.statisticsBuffer);
 
         this.topNode2idxMapping.defaultReturnValue(-1);
-        this.nodeManager.setTLNCallbacks(this::addTLN, this::remTLN);
+        this.nodeManager.setTLNAddRemoveCallbacks(this::addTLN, this::remTLN);
     }
 
     private void addTLN(int id) {
@@ -322,19 +323,15 @@ public class HierarchicalOcclusionTraverser {
             //Logger.warn("Count over max buffer size, clamping, got count: " + count + ".");
 
             count = (int) ((this.requestBuffer.size()>>3)-1);
+
+            //Write back the clamped count
+            MemoryUtil.memPutInt(ptr-8, count);
         }
         //if (count > REQUEST_QUEUE_SIZE) {
         //    Logger.warn("Count larger than 'maxRequestCount', overflow captured. Overflowed by " + (count-REQUEST_QUEUE_SIZE));
         //}
         if (count != 0) {
-            //this.nodeManager.processRequestQueue(count, ptr + 8);
-
-            //It just felt more appropriate putting the loop here
-            for (int requestIndex = 0; requestIndex < count; requestIndex++) {
-                long pos = ((long)MemoryUtil.memGetInt(ptr))<<32; ptr += 4;
-                pos |= Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr)); ptr += 4;
-                this.nodeManager.processRequest(pos);
-            }
+            this.nodeManager.submitRequestBatch(new MemoryBuffer(count*8L+8).cpyFrom(ptr-8));// the -8 is because we incremented it by 8
         }
     }
 

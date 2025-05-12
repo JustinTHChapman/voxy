@@ -9,7 +9,7 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.ISectionWatcher;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
-import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
+import me.cortex.voxy.client.core.rendering.section.geometry.IGeometryManager;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.core.util.ExpandingObjectAllocationList;
 import me.cortex.voxy.common.Logger;
@@ -82,7 +82,7 @@ public class NodeManager {
     private final ExpandingObjectAllocationList<SingleNodeRequest> singleRequests = new ExpandingObjectAllocationList<>(SingleNodeRequest[]::new);
     private final ExpandingObjectAllocationList<NodeChildRequest> childRequests = new ExpandingObjectAllocationList<>(NodeChildRequest[]::new);
     private final IntOpenHashSet nodeUpdates = new IntOpenHashSet();
-    private final AbstractSectionGeometryManager geometryManager;
+    private final IGeometryManager geometryManager;
     private final ISectionWatcher watcher;
     private final Long2IntOpenHashMap activeSectionMap = new Long2IntOpenHashMap();
     private final NodeStore nodeData;
@@ -110,7 +110,7 @@ public class NodeManager {
         this.topLevelNodeIdRemovedCallback = onRemove;
     }
 
-    public NodeManager(int maxNodeCount, AbstractSectionGeometryManager geometryManager, ISectionWatcher watcher) {
+    public NodeManager(int maxNodeCount, IGeometryManager geometryManager, ISectionWatcher watcher) {
         if (!MathUtil.isPowerOfTwo(maxNodeCount)) {
             throw new IllegalArgumentException("Max node count must be a power of 2");
         }
@@ -232,6 +232,14 @@ public class NodeManager {
         }
     }
 
+    private void removeGeometryCached(long pos, int id) {
+        //Removes geometry possible with downloading to cache
+        this.geometryManager.removeSection(id);
+    }
+    //TODO: FIXME: add method to clear geometry cache of position, or the geometry is empty etc jkdfgsl
+    // this is for cpu/ram side geometry caching
+    // TODO: IMPLEMENT
+
     private int uploadReplaceSection(int meshId, BuiltSection section) {
         if (section.isEmpty()) {
             if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
@@ -317,13 +325,14 @@ public class NodeManager {
                         byte rem = (byte) (change&oldMsk);
                         for (int i = 0; i < 8; i++) {
                             if ((rem&(1<<i))==0) continue;
+                            //Remove child geometry and from being watched and activeSections
+                            long cPos = makeChildPos(pos, i);
+
                             int meshId = request.removeAndUnRequire(i);
                             if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
-                                this.geometryManager.removeSection(meshId);
+                                this.removeGeometryCached(cPos, meshId);
                             }
 
-                            //Remove child from being watched and activeSections
-                            long cPos = makeChildPos(pos, i);
                             if (this.activeSectionMap.remove(cPos) == -1) {//TODO: verify the removed section is a request type of child and the request id matches this
                                 throw new IllegalStateException("Child pos was in a request but not in active section map");
                             }
@@ -429,13 +438,15 @@ public class NodeManager {
                     //There are things in the request to remove
                     for (int i = 0; i < 8; i++) {
                         if ((reqRem & (1 << i)) == 0) continue;
+
+                        //Remove child geometry and from being watched and activeSections
+                        long cPos = makeChildPos(pos, i);
+
                         int meshId = request.removeAndUnRequire(i);
                         if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
-                            this.geometryManager.removeSection(meshId);
+                            this.removeGeometryCached(cPos, meshId);
                         }
 
-                        //Remove child from being watched and activeSections
-                        long cPos = makeChildPos(pos, i);
                         int cnid = this.activeSectionMap.remove(cPos);
                         if (cnid == -1 || (cnid&NODE_TYPE_MSK) != NODE_TYPE_REQUEST) {//TODO: verify the removed section is a request type of child and the request id matches this
                             throw new IllegalStateException("Child pos was in a request but not in active section map");
@@ -621,12 +632,13 @@ public class NodeManager {
         for (int i = 0; i < 8; i++) {
             if ((req.getMsk()&(1<<i))==0) continue;
 
-            int mesh = req.getChildMesh(i);
-            if (mesh != EMPTY_GEOMETRY_ID && mesh != NULL_GEOMETRY_ID)
-                this.geometryManager.removeSection(mesh);
-
             //Unwatch the request position
             long childPos = makeChildPos(pos, i);
+
+            int meshId = req.getChildMesh(i);
+            if (meshId != EMPTY_GEOMETRY_ID && meshId != NULL_GEOMETRY_ID)
+                this.removeGeometryCached(childPos, meshId);
+
             //Remove from section tracker
             int cId = this.activeSectionMap.remove(childPos);
             if (cId == -1) {
@@ -748,9 +760,9 @@ public class NodeManager {
 
             if (!onlyRemoveChildren) {
                 //Free geometry and related memory for this node
-                int geometry = this.nodeData.getNodeGeometry(nodeId);
-                if (geometry != EMPTY_GEOMETRY_ID && geometry != NULL_GEOMETRY_ID)
-                    this.geometryManager.removeSection(geometry);
+                int meshId = this.nodeData.getNodeGeometry(nodeId);
+                if (meshId != EMPTY_GEOMETRY_ID && meshId != NULL_GEOMETRY_ID)
+                    this.removeGeometryCached(pos, meshId);
 
                 this.nodeData.free(nodeId);
                 this.clearFreeId(nodeId);
@@ -779,9 +791,9 @@ public class NodeManager {
 
                 this.singleRequests.release(nodeId);
                 if (req.hasMeshSet()) {
-                    int mesh = req.getMesh();
-                    if (mesh != EMPTY_GEOMETRY_ID && mesh != NULL_GEOMETRY_ID)
-                        this.geometryManager.removeSection(mesh);
+                    int meshId = req.getMesh();
+                    if (meshId != EMPTY_GEOMETRY_ID && meshId != NULL_GEOMETRY_ID)
+                        this.removeGeometryCached(pos, meshId);
                 }
 
             } else {
@@ -1293,26 +1305,23 @@ public class NodeManager {
     }
 
     private void clearGeometryInternal(long pos, int nodeId) {
-        int geometryId = this.nodeData.getNodeGeometry(nodeId);
+        int meshId = this.nodeData.getNodeGeometry(nodeId);
 
         //TODO: if isNodeGeometryInFlight is true and geometryId == NULL_GEOMETRY_ID, probably need to
         // unwatch from watcher and unmark
 
-        if (geometryId != NULL_GEOMETRY_ID && geometryId != EMPTY_GEOMETRY_ID) {
+        if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
             //Unwatch node geometry changes
             if (this.watcher.unwatch(pos, WorldEngine.UPDATE_TYPE_BLOCK_BIT)) {
                 throw new IllegalStateException("Unwatching position for geometry removal at: " + WorldEngine.pprintPos(pos) + " resulted in full removal");
             }
             //Remove geometry and set to null
-            this.geometryManager.downloadAndRemove(geometryId, section->{
-                //TODO: download and remove instead of just removing, and store in ram cache for later!!
-                section.free();
-            });
+            this.removeGeometryCached(pos, meshId);
             this.nodeData.setNodeGeometry(nodeId, NULL_GEOMETRY_ID);
             this.invalidateNode(nodeId);//Only need to invalidate on change
             this.nodeData.unmarkNodeGeometryInFlight(nodeId);//Remove geometry inflight as well, its removed
         } else {
-            if (geometryId == NULL_GEOMETRY_ID) {
+            if (meshId == NULL_GEOMETRY_ID) {
                 //Logger.info("Tried removing geometry of internal node but geometry was null");
             }
         }
@@ -1328,6 +1337,16 @@ public class NodeManager {
         this.nodeUpdates.forEach((int i) -> this.nodeData.writeNode(UploadStream.INSTANCE.upload(nodeBuffer, i*16L, 16L), i));
         this.nodeUpdates.clear();
         return true;
+    }
+
+    //Used for raw access to the update map, internal (used in async)
+    IntOpenHashSet getNodeUpdates() {
+        return this.nodeUpdates;
+    }
+
+    //Used to write a specified node into a specific address (used in async)
+    void writeNode(int node, long address) {
+        this.nodeData.writeNode(address, node);
     }
 
     public MemoryBuffer _generateChangeList() {
@@ -1388,9 +1407,6 @@ public class NodeManager {
         return this.nodeData.getEndNodeId();
     }
 
-    public AbstractSectionGeometryManager getGeometryManager() {
-        return this.geometryManager;
-    }
 
     //==================================================================================================================
 

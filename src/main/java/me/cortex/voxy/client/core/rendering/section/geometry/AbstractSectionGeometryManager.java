@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering.section;
+package me.cortex.voxy.client.core.rendering.section.geometry;
 
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import net.caffeinemc.mods.sodium.client.util.MathUtil;
@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 //Does not care about the position of the sections, multiple sections that have the same position can be uploaded
 // it is up to the traversal system to manage what sections exist in the geometry buffer
 // the system is basicly "dumb" as in it just follows orders
-public abstract class AbstractSectionGeometryManager {
+public abstract class AbstractSectionGeometryManager implements IGeometryManager {
     public final int maxSections;
     public final long geometryCapacity;
     protected AbstractSectionGeometryManager(int maxSections, long geometryCapacity) {

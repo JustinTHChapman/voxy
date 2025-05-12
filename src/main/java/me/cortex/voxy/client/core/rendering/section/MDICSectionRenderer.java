@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.model.ModelStore;
+import me.cortex.voxy.client.core.rendering.section.geometry.BasicSectionGeometryData;
 import me.cortex.voxy.client.core.rendering.util.LightMapHelper;
 import me.cortex.voxy.client.core.rendering.RenderService;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
@@ -31,10 +32,9 @@ import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL45.glBindTextureUnit;
-import static org.lwjgl.opengl.GL45.glCopyNamedBufferSubData;
 
 //Uses MDIC to render the sections
-public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryManager> {
+public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryData> {
     private static final int TRANSLUCENT_OFFSET = 400_000;//in draw calls
     private static final int TEMPORAL_OFFSET = 500_000;//in draw calls
     private static final int STATISTICS_BUFFER_BINDING = 7;
@@ -73,13 +73,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     //Statistics
     private final GlBuffer statisticsBuffer = new GlBuffer(1024).zero();
 
-    private final int maxSectionCount;
-
-    public MDICSectionRenderer(ModelStore modelStore, int maxSectionCount, long geometryCapacity) {
-        super(modelStore, new BasicSectionGeometryManager(maxSectionCount, geometryCapacity));
-        this.maxSectionCount = maxSectionCount;
+    public MDICSectionRenderer(ModelStore modelStore, BasicSectionGeometryData geometryData) {
+        super(modelStore, geometryData);
     }
-
 
     private void uploadUniformBuffer(MDICViewport viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniform, 0, 1024);
@@ -103,8 +99,8 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     private void bindRenderingBuffers(GlTexture depthBoundTexture) {
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getGeometryBufferId());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.geometryManager.getMetadataBufferId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getGeometryBuffer().id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.geometryManager.getMetadataBuffer().id);
         this.modelStore.bind(3, 4, 0);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.positionScratchBuffer.id);
         LightMapHelper.bind(1);
@@ -192,7 +188,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             this.cullShader.bind();
             glBindVertexArray(RenderService.STATIC_VAO);
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getMetadataBufferId());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getMetadataBuffer().id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.visibilityBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, viewport.indirectLookupBuffer.id);
             glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawCountCallBuffer.id);
@@ -213,7 +209,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCallBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.drawCountCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBufferId());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBuffer().id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.positionScratchBuffer.id);
@@ -254,17 +250,16 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     @Override
     public void addDebug(List<String> lines) {
         super.addDebug(lines);
-        lines.add("SC/GS: " + this.geometryManager.getSectionCount() + "/" + (this.geometryManager.getGeometryUsed()/(1024*1024)));//section count/geometry size (MB)
+        //lines.add("SC/GS: " + this.geometryManager.getSectionCount() + "/" + (this.geometryManager.getGeometryUsed()/(1024*1024)));//section count/geometry size (MB)
     }
 
     @Override
     public MDICViewport createViewport() {
-        return new MDICViewport(this.maxSectionCount);
+        return new MDICViewport(this.geometryManager.getMaxSectionCount());
     }
 
     @Override
     public void free() {
-        super.free();
         this.uniform.free();
         this.terrainShader.free();
         this.commandGenShader.free();

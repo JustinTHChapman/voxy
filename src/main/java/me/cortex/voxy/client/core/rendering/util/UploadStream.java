@@ -6,6 +6,7 @@ import me.cortex.voxy.client.core.gl.GlFence;
 import me.cortex.voxy.client.core.gl.GlPersistentMappedBuffer;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.AllocationArena;
+import me.cortex.voxy.common.util.MemoryBuffer;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -36,6 +37,9 @@ public class UploadStream {
 
     private long caddr = -1;
     private long offset = 0;
+    public void upload(GlBuffer buffer, long destOffset, MemoryBuffer data) {//Note: does not free data, nor does it commit
+        data.cpyTo(this.upload(buffer, destOffset, data.size));
+    }
     public long upload(GlBuffer buffer, long destOffset, long size) {
         if (destOffset<0) {
             throw new IllegalArgumentException();
@@ -81,6 +85,9 @@ public class UploadStream {
 
 
     public void commit() {
+        if (this.uploadList.isEmpty()) {
+            return;
+        }
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT|GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT|GL_BUFFER_UPDATE_BARRIER_BIT);
         //Execute all the copies
         for (var entry : this.uploadList) {
