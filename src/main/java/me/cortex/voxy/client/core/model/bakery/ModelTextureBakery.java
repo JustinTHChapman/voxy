@@ -21,8 +21,7 @@ import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 
-import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_FRAMEBUFFER_BARRIER_BIT;
-import static org.lwjgl.opengl.ARBShaderImageLoadStore.glMemoryBarrier;
+import static org.lwjgl.opengl.ARBShaderImageLoadStore.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL30.*;
@@ -268,7 +267,7 @@ public class ModelTextureBakery {
         glDisable(GL_BLEND);
 
         //Finish and download
-        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
+        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_UPDATE_BARRIER_BIT|GL_PIXEL_BUFFER_BARRIER_BIT|GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);//Am not sure if barriers are right
         this.capture.emitToStream(streamBuffer, streamOffset);
 
         glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);

@@ -1,10 +1,5 @@
 package me.cortex.voxy.client.core.model.bakery;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.opengl.GlConst;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
-import com.mojang.blaze3d.systems.RenderPass;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.vertex.VertexFormat;
@@ -12,22 +7,14 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
-import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
-import me.cortex.voxy.common.util.UnsafeUtil;
-import net.minecraft.client.gl.*;
+import net.minecraft.client.gl.GlGpuBuffer;
 import net.minecraft.client.render.BuiltBuffer;
-import net.minecraft.client.render.VertexFormats;
-import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
-import static org.lwjgl.opengl.ARBVertexArrayObject.glBindVertexArray;
-import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
-import static org.lwjgl.opengl.GL15.glBindBuffer;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 import static org.lwjgl.opengl.GL33.glBindSampler;
-import static org.lwjgl.opengl.GL43.glBindVertexBuffer;
 import static org.lwjgl.opengl.GL45.*;
 
 public class BudgetBufferRenderer {
@@ -82,9 +69,6 @@ public class BudgetBufferRenderer {
             throw new IllegalStateException();
         }
 
-        GlStateManager._activeTexture(GlConst.GL_TEXTURE0);
-        GlStateManager._bindTexture(0);
-
         quadCount = quads;
 
         long size = quads * 4L * STRIDE;
@@ -101,6 +85,7 @@ public class BudgetBufferRenderer {
 
         bakeryShader.bind();
         VA.bind();
+        glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
         glBindSampler(0, 0);
         glBindTextureUnit(0, texId);
     }

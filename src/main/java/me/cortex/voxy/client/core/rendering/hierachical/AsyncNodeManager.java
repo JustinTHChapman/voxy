@@ -130,8 +130,14 @@ public class AsyncNodeManager {
     private void run() {
         if (this.workCounter.get() == 0) {
             LockSupport.park();
-            if (this.workCounter.get() == 0) {//No work
+            if (this.workCounter.get() == 0 || !this.running) {//No work
                 return;
+            }
+            //This is a funny thing, wait a bit, this allows for better batching, but this thread is independent of everything else so waiting a bit should be mostly ok
+            try {
+                Thread.sleep(25);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
             }
         }
 
@@ -139,12 +145,6 @@ public class AsyncNodeManager {
             return;
         }
 
-        //This is a funny thing, wait a bit, this allows for better batching, but this thread is independent of everything else so waiting a bit should be mostly ok
-        try {
-            Thread.sleep(10);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
 
         int workDone = 0;
 
@@ -370,8 +370,14 @@ public class AsyncNodeManager {
                     int val = iter.nextInt();
                     int placeId = results.geometryIdUpdateMap.putIfAbsent(val, results.geometryIdUpdateMap.size());
                     placeId = placeId==-1?results.geometryIdUpdateMap.size()-1:placeId;
-                    if (512<=placeId) {
-                        throw new IllegalStateException("Outside range of allowed updates");
+                    if (results.geometryIdUpdateData.size<=placeId*32L) {
+                        //We need to expand the buffer :(
+                        var old = results.geometryIdUpdateData;
+                        var newBuffer = new MemoryBuffer((long) (old.size*1.5));
+                        Logger.info("Expanding geometry update buffer to " + newBuffer.size);
+                        old.cpyTo(newBuffer.address);
+                        old.free();
+                        results.geometryIdUpdateData = newBuffer;
                     }
                     //Write updated data
                     this.geometryManager.writeMetadata(val, placeId*32L + results.geometryIdUpdateData.address);
@@ -388,8 +394,14 @@ public class AsyncNodeManager {
                     int val = iter.nextInt();
                     int placeId = results.nodeIdUpdateMap.putIfAbsent(val, results.nodeIdUpdateMap.size());
                     placeId = placeId==-1?results.nodeIdUpdateMap.size()-1:placeId;
-                    if (1024<=placeId) {
-                        throw new IllegalStateException("Outside range of allowed updates");
+                    if (results.nodeIdUpdateData.size<=placeId*16L) {
+                        //We need to expand the buffer :(
+                        var old = results.nodeIdUpdateData;
+                        var newBuffer = new MemoryBuffer((long) (old.size*1.5));
+                        Logger.info("Expanding node update buffer to " + newBuffer.size);
+                        old.cpyTo(newBuffer.address);
+                        old.free();
+                        results.nodeIdUpdateData = newBuffer;
                     }
                     //Write updated data
                     this.manager.writeNode(val, placeId*16L + results.nodeIdUpdateData.address);
@@ -633,7 +645,7 @@ public class AsyncNodeManager {
 
         //Node id updates + size
         private final Int2IntOpenHashMap nodeIdUpdateMap = new Int2IntOpenHashMap();//node id to update data location
-        private final MemoryBuffer nodeIdUpdateData = new MemoryBuffer(8192*2);//capacity for 1024 entries, TODO: ADD RESIZE
+        private MemoryBuffer nodeIdUpdateData = new MemoryBuffer(8192*2);//capacity for 1024 entries, TODO: ADD RESIZE
         private int currentMaxNodeId;// the id of the ending of the node ids
 
         //TLN add/rem
@@ -643,7 +655,7 @@ public class AsyncNodeManager {
         private int geometrySectionCount;
         private final Int2ObjectOpenHashMap<MemoryBuffer> geometryUploads = new Int2ObjectOpenHashMap<>();
         private final Int2IntOpenHashMap geometryIdUpdateMap = new Int2IntOpenHashMap();//geometry id to update data location
-        private final MemoryBuffer geometryIdUpdateData = new MemoryBuffer(8192*2);//capacity for 512 entries, TODO: ADD RESIZE
+        private MemoryBuffer geometryIdUpdateData = new MemoryBuffer(8192*2);//capacity for 512 entries, TODO: ADD RESIZE
 
 
         public SyncResults() {

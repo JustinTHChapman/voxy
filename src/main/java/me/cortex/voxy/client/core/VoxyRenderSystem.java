@@ -1,11 +1,13 @@
 package me.cortex.voxy.client.core;
 
 import com.mojang.blaze3d.opengl.GlConst;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.ChunkBoundRenderer;
 import me.cortex.voxy.client.core.rendering.RenderDistanceTracker;
@@ -42,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
 import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
+import static org.lwjgl.opengl.GL33.glBindSampler;
 
 public class VoxyRenderSystem {
     private final RenderService renderer;
@@ -217,11 +220,27 @@ public class VoxyRenderSystem {
         TimingStatistics.postDynamic.stop();
 
         glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
+
+        {//Reset state manager stuffs
+            GlStateManager._glBindVertexArray(0);//Clear binding
+
+            GlStateManager._activeTexture(GlConst.GL_TEXTURE0);
+            GlStateManager._bindTexture(0);
+            glBindSampler(0, 0);
+
+            GlStateManager._activeTexture(GlConst.GL_TEXTURE1);
+            GlStateManager._bindTexture(0);
+            glBindSampler(1, 0);
+
+            GlStateManager._activeTexture(GlConst.GL_TEXTURE2);
+            GlStateManager._bindTexture(0);
+            glBindSampler(2, 0);
+        }
         TimingStatistics.all.stop();
     }
 
     public void addDebugInfo(List<String> debug) {
-        debug.add("GlBuffer, Count/Size (mb): " + GlBuffer.getCount() + "/" + (GlBuffer.getTotalSize()/1_000_000));
+        debug.add("Buf/Tex [#/Mb]: [" + GlBuffer.getCount() + "/" + (GlBuffer.getTotalSize()/1_000_000) + "],[" + GlTexture.getCount() + "/" + (GlTexture.getEstimatedTotalSize()/1_000_000)+"]");
         this.renderer.addDebugData(debug);
         {
             TimingStatistics.update();

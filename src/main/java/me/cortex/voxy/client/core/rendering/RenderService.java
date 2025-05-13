@@ -39,15 +39,27 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
 
     private final WorldEngine world;
 
+    private static long getGeometryBufferSize() {
+        long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
+        //Limit to available dedicated memory if possible
+        if (Capabilities.INSTANCE.canQueryGpuMemory) {
+            //512mb less than avalible,
+            long limit = Capabilities.INSTANCE.getFreeDedicatedGpuMemory() - 512*1024*1024;
+            // Give a minimum of 512 mb requirement
+            limit = Math.max(512*1024*1024, limit);
+
+            geometryCapacity = Math.min(geometryCapacity, limit);
+        }
+        //geometryCapacity = 1<<24;
+        return geometryCapacity;
+    }
+
     @SuppressWarnings("unchecked")
     public RenderService(WorldEngine world, ServiceThreadPool serviceThreadPool) {
         this.world = world;
         this.modelService = new ModelBakerySubsystem(world.getMapper());
 
-        //Max geometry: 1 gb
-        long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
-        //geometryCapacity = 1<<24;
-
+        long geometryCapacity = getGeometryBufferSize();
         this.geometryData = (Q) new BasicSectionGeometryData(1<<20, geometryCapacity);
 
         //Max sections: ~500k
@@ -101,7 +113,6 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
 
 
         this.sectionRenderer.renderOpaque(viewport, depthBoundTexture);
-
 
         //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
         // sections
