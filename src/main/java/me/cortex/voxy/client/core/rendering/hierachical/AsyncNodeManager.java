@@ -69,6 +69,8 @@ public class AsyncNodeManager {
     private volatile SyncResults resultCache1 = new SyncResults();
     private volatile SyncResults resultCache2 = new SyncResults();
 
+    //Yes. this is stupid. yes. it is a large amount of runtime. Is it profiler bias, probably
+    private ConcurrentLinkedDeque<MemoryBuffer> buffersToFreeQueue = new ConcurrentLinkedDeque<>();
 
 
     //locals for during iteration
@@ -148,6 +150,14 @@ public class AsyncNodeManager {
             .compile();
 
     private void run() {
+        while (true) {
+            var buffer = this.buffersToFreeQueue.poll();
+            if (buffer == null) {
+                break;
+            }
+            buffer.free();
+        }
+
         if (this.workCounter.get() == 0) {
             LockSupport.park();
             if (this.workCounter.get() == 0 || !this.running) {//No work
@@ -264,7 +274,7 @@ public class AsyncNodeManager {
 
         if (this.workCounter.addAndGet(-workDone) < 0) {
             try {
-                Thread.sleep(1);
+                Thread.sleep(500);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -461,7 +471,8 @@ public class AsyncNodeManager {
                     var val = iter.next();
                     var buffer = val.getValue();
                     UploadStream.INSTANCE.upload(store.getGeometryBuffer(), Integer.toUnsignedLong(val.getIntKey()) * 8L, buffer);
-                    buffer.free();//Free the buffer was uploading
+                    //Put the queue into the buffer queue to free... yes this is stupid that need todo this...
+                    this.buffersToFreeQueue.add(buffer);//buffer.free();//Free the buffer was uploading
                 }
                 UploadStream.INSTANCE.commit();
             }
@@ -633,6 +644,15 @@ public class AsyncNodeManager {
         }
 
         this.scatterWrite.free();
+
+
+        while (true) {
+            var buffer = this.buffersToFreeQueue.poll();
+            if (buffer == null) {
+                break;
+            }
+            buffer.free();
+        }
     }
 
     //Results object, which is to be synced between the render thread and worker thread

@@ -22,6 +22,7 @@ public class MixinWindow {
         }
 
         //Force the current thread priority to be realtime
+        Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
         ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_PRIORITY_TIME_CRITICAL);
     }
 }

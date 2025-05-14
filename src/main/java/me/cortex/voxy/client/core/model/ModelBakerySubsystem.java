@@ -88,7 +88,7 @@ public class ModelBakerySubsystem {
                 do {
                     this.factory.addEntry(i);
                     j++;
-                    if (25<j)//budget<(System.nanoTime() - start)+1000
+                    if (24<j)//budget<(System.nanoTime() - start)+1000
                         break;
                     i = this.blockIdQueue.poll();
                 } while (i != null);

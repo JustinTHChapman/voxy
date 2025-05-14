@@ -150,6 +150,7 @@ public class ChunkBoundRenderer {
         if (!this.addQueue.isEmpty()) {
             this.addQueue.forEach(this::_addPos);
             this.addQueue.clear();
+            UploadStream.INSTANCE.commit();
         }
     }
 
@@ -213,7 +214,6 @@ public class ChunkBoundRenderer {
         //Need to do it in 2 parts because ivec2 is 2 parts
         MemoryUtil.memPutInt(ptr2, (int)(pos&0xFFFFFFFFL)); ptr2 += 4;
         MemoryUtil.memPutInt(ptr2, (int)((pos>>>32)&0xFFFFFFFFL));
-        UploadStream.INSTANCE.commit();
     }
 
     public void reset() {

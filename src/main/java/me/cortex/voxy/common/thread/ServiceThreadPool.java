@@ -254,6 +254,9 @@ public class ServiceThreadPool {
             if (this.totalJobWeight.addAndGet(-service.weightPerJob)<0) {
                 throw new IllegalStateException("Total job weight is negative");
             }
+
+            //Sleep for a bit after running a job, yeild the thread
+            Thread.yield();
             break;
         }
     }
