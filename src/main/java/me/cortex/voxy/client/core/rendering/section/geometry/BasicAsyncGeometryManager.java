@@ -140,18 +140,36 @@ public class BasicAsyncGeometryManager implements IGeometryManager {
         }
     }
 
+    public void writeMetadataSplit(int sectionId, long ptrA, long ptrB) {
+        if (SECTION_METADATA_SIZE != 32) {//This system only works with 32 byte metadata
+            throw new IllegalStateException();
+        }
+        var sec = this.sectionMetadata.get(sectionId);
+        if (sec == null) {
+            //Write nothing
+            MemoryUtil.memSet(ptrA, 0, 16);
+            MemoryUtil.memSet(ptrB, 0, 16);
+        } else {
+            sec.writeMetadataSplitParts(ptrA, ptrB);
+        }
+    }
+
     private record SectionMeta(long position, int aabb, int geometryPtr, int itemCount, int[] offsets, byte childExistence) {
         public void writeMetadata(long ptr) {
-            //Split the long into 2 ints to solve endian issues
-            MemoryUtil.memPutInt(ptr, (int) (this.position>>32)); ptr += 4;
-            MemoryUtil.memPutInt(ptr, (int) this.position); ptr += 4;
-            MemoryUtil.memPutInt(ptr, (int) this.aabb); ptr += 4;
-            MemoryUtil.memPutInt(ptr, this.geometryPtr + this.offsets[0]); ptr += 4;
+            this.writeMetadataSplitParts(ptr, ptr+16);
+        }
 
-            MemoryUtil.memPutInt(ptr, (this.offsets[1]-this.offsets[0])|((this.offsets[2]-this.offsets[1])<<16)); ptr += 4;
-            MemoryUtil.memPutInt(ptr, (this.offsets[3]-this.offsets[2])|((this.offsets[4]-this.offsets[3])<<16)); ptr += 4;
-            MemoryUtil.memPutInt(ptr, (this.offsets[5]-this.offsets[4])|((this.offsets[6]-this.offsets[5])<<16)); ptr += 4;
-            MemoryUtil.memPutInt(ptr, (this.offsets[7]-this.offsets[6])|((this.itemCount -this.offsets[7])<<16)); ptr += 4;
+        public void writeMetadataSplitParts(long ptrA, long ptrB) {//First 16 bytes are put into ptrA the remaining 16 bytes are put into ptrB
+            //Split the long into 2 ints to solve endian issues
+            MemoryUtil.memPutInt(ptrA, (int) (this.position>>32)); ptrA += 4;
+            MemoryUtil.memPutInt(ptrA, (int) this.position); ptrA += 4;
+            MemoryUtil.memPutInt(ptrA, (int) this.aabb); ptrA += 4;
+            MemoryUtil.memPutInt(ptrA, this.geometryPtr + this.offsets[0]); ptrA += 4;
+
+            MemoryUtil.memPutInt(ptrB, (this.offsets[1]-this.offsets[0])|((this.offsets[2]-this.offsets[1])<<16)); ptrB += 4;
+            MemoryUtil.memPutInt(ptrB, (this.offsets[3]-this.offsets[2])|((this.offsets[4]-this.offsets[3])<<16)); ptrB += 4;
+            MemoryUtil.memPutInt(ptrB, (this.offsets[5]-this.offsets[4])|((this.offsets[6]-this.offsets[5])<<16)); ptrB += 4;
+            MemoryUtil.memPutInt(ptrB, (this.offsets[7]-this.offsets[6])|((this.itemCount -this.offsets[7])<<16)); ptrB += 4;
         }
     }
 }

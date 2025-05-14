@@ -40,11 +40,25 @@ public class UploadStream {
     public void upload(GlBuffer buffer, long destOffset, MemoryBuffer data) {//Note: does not free data, nor does it commit
         data.cpyTo(this.upload(buffer, destOffset, data.size));
     }
+
     public long upload(GlBuffer buffer, long destOffset, long size) {
-        if (destOffset<0) {
-            throw new IllegalArgumentException();
+        long addr = this.rawUploadAddress((int) size);
+
+        this.uploadList.add(new UploadData(buffer, addr, destOffset, size));
+
+        return this.uploadBuffer.addr() + addr;
+    }
+
+    public long rawUpload(int size) {
+        return this.uploadBuffer.addr() + this.rawUploadAddress(size);
+    }
+
+    public long rawUploadAddress(int size) {
+        if (size < 0) {
+            throw new IllegalStateException("Negative size");
         }
-        if (size > Integer.MAX_VALUE) {
+
+        if (size > this.uploadBuffer.size()) {
             throw new IllegalArgumentException();
         }
 
@@ -78,11 +92,8 @@ public class UploadStream {
             throw new IllegalStateException();
         }
 
-        this.uploadList.add(new UploadData(buffer, addr, destOffset, size));
-
-        return this.uploadBuffer.addr() + addr;
+        return addr;
     }
-
 
     public void commit() {
         if (this.uploadList.isEmpty()) {
@@ -125,6 +136,14 @@ public class UploadStream {
             frame.allocations.forEach(this.allocationArena::free);
             frame.fence.free();
         }
+    }
+
+    public long getBaseAddress() {
+        return this.uploadBuffer.addr();
+    }
+
+    public int getRawBufferId() {
+        return this.uploadBuffer.id;
     }
 
     private record UploadFrame(GlFence fence, LongArrayList allocations) {}
