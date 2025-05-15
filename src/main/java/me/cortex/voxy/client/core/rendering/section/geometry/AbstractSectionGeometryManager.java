@@ -1,7 +1,6 @@
 package me.cortex.voxy.client.core.rendering.section.geometry;
 
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
-import net.caffeinemc.mods.sodium.client.util.MathUtil;
 
 import java.util.function.Consumer;
 
@@ -12,7 +11,7 @@ public abstract class AbstractSectionGeometryManager implements IGeometryManager
     public final int maxSections;
     public final long geometryCapacity;
     protected AbstractSectionGeometryManager(int maxSections, long geometryCapacity) {
-        if (!MathUtil.isPowerOfTwo(maxSections)) {//TODO: Maybe not do this, as it isnt a strict requirement
+        if ((maxSections&(maxSections-1))!=0) {//TODO: Maybe not do this, as it isnt a strict requirement
             throw new IllegalArgumentException("Max sections should be a power of 2");
         }
         this.maxSections = maxSections;

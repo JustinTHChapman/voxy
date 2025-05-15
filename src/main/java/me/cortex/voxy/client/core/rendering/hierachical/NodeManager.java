@@ -15,7 +15,6 @@ import me.cortex.voxy.client.core.util.ExpandingObjectAllocationList;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
-import net.caffeinemc.mods.sodium.client.util.MathUtil;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
@@ -111,7 +110,7 @@ public class NodeManager {
     }
 
     public NodeManager(int maxNodeCount, IGeometryManager geometryManager, ISectionWatcher watcher) {
-        if (!MathUtil.isPowerOfTwo(maxNodeCount)) {
+        if ((maxNodeCount&(maxNodeCount-1))!=0) {
             throw new IllegalArgumentException("Max node count must be a power of 2");
         }
         if (maxNodeCount>(1<<24)) {
