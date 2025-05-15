@@ -56,7 +56,7 @@ public class BakedBlockEntityModel {
         entity.setWorld(MinecraftClient.getInstance().world);
         if (renderer != null) {
             try {
-                renderer.render(entity, 0.0f, new MatrixStack(), layer->map.computeIfAbsent(layer, rl -> new LayerConsumer(rl, new ReuseVertexConsumer())).consumer, 0, 0, new Vec3d(0,0,0));
+                renderer.render(entity, 0.0f, new MatrixStack(), layer->map.computeIfAbsent(layer, rl -> new LayerConsumer(rl, new ReuseVertexConsumer().setDefaultMeta(ModelTextureBakery.getMetaFromLayer(rl)))).consumer, 0, 0, new Vec3d(0,0,0));
             } catch (Exception e) {
                 Logger.error("Unable to bake block entity: " + entity, e);
             }

@@ -12,15 +12,22 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     private MemoryBuffer buffer = new MemoryBuffer(8192);
     private long ptr;
     private int count;
+    private int defaultMeta;
 
     public ReuseVertexConsumer() {
         this.reset();
+    }
+
+    public ReuseVertexConsumer setDefaultMeta(int meta) {
+        this.defaultMeta = meta;
+        return this;
     }
 
     @Override
     public ReuseVertexConsumer vertex(float x, float y, float z) {
         this.ensureCanPut();
         this.ptr += VERTEX_FORMAT_SIZE; this.count++; //Goto next vertex
+        this.meta(this.defaultMeta);
         MemoryUtil.memPutFloat(this.ptr, x);
         MemoryUtil.memPutFloat(this.ptr + 4, y);
         MemoryUtil.memPutFloat(this.ptr + 8, z);
@@ -90,6 +97,7 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     public ReuseVertexConsumer reset() {
+        this.defaultMeta = 0;//RESET THE DEFAULT META
         this.count = 0;
         this.ptr = this.buffer.address - VERTEX_FORMAT_SIZE;//the thing is first time this gets incremented by FORMAT_STRIDE
         return this;

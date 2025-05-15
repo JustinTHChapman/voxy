@@ -42,15 +42,28 @@ public class ModelTextureBakery {
         this.height = height;
     }
 
+    public static int getMetaFromLayer(RenderLayer layer) {
+        boolean hasDiscard = layer == RenderLayer.getCutout() ||
+                layer == RenderLayer.getCutoutMipped() ||
+                layer == RenderLayer.getTripwire();
+
+        boolean isMipped = layer == RenderLayer.getCutoutMipped() ||
+                layer == RenderLayer.getSolid() ||
+                layer == RenderLayer.getTranslucent() ||
+                layer == RenderLayer.getTripwire();
+
+        int meta = hasDiscard?1:0;
+        meta |= isMipped?2:0;
+        return meta;
+    }
+
     private void bakeBlockModel(BlockState state, RenderLayer layer) {
         var model = MinecraftClient.getInstance()
                 .getBakedModelManager()
                 .getBlockModels()
                 .getModel(state);
 
-        boolean hasDiscard = layer == RenderLayer.getCutout() ||
-                layer == RenderLayer.getCutoutMipped() ||
-                layer == RenderLayer.getTripwire();
+        int meta = getMetaFromLayer(layer);
 
         for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
             for (var part : model.getParts(new LocalRandom(42L))) {
@@ -58,7 +71,6 @@ public class ModelTextureBakery {
                 for (var quad : quads) {
                     //TODO: add meta specifiying quad has a tint
 
-                    int meta = hasDiscard?1:0;
                     this.vc.quad(quad, meta);
                 }
             }
@@ -66,7 +78,8 @@ public class ModelTextureBakery {
     }
 
 
-    private void bakeFluidState(BlockState state, int face) {
+    private void bakeFluidState(BlockState state, RenderLayer layer, int face) {
+        this.vc.setDefaultMeta(getMetaFromLayer(layer));//Set the meta while baking
         MinecraftClient.getInstance().getBlockRenderManager().renderFluid(BlockPos.ORIGIN, new BlockRenderView() {
             @Override
             public float getBrightness(Direction direction, boolean shaded) {
@@ -131,6 +144,7 @@ public class ModelTextureBakery {
                 return 0;
             }
         }, this.vc, state, state.getFluidState());
+        this.vc.setDefaultMeta(0);//Reset default meta
     }
 
     private static boolean shouldReturnAirForFluid(BlockPos pos, int face) {
@@ -220,7 +234,7 @@ public class ModelTextureBakery {
             var mat = new Matrix4f();
             for (int i = 0; i < VIEWS.length; i++) {
                 this.vc.reset();
-                this.bakeFluidState(state, i);
+                this.bakeFluidState(state, layer, i);
                 if (this.vc.isEmpty()) continue;
                 BudgetBufferRenderer.setup(this.vc.getAddress(), this.vc.quadCount(), blockTextureId);
 
