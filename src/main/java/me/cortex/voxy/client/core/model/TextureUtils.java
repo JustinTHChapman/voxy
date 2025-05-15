@@ -96,8 +96,8 @@ public class TextureUtils {
 
         //Shouldent be needed due to the compute bake copy
         depthF *= 2;
-        if (depthF > 1.00001f) {
-            System.err.println("Warning: Depth greater than 1");
+        if (depthF > 1.00001f) {//Basicly only happens when a model goes out of bounds (thing)
+            //System.err.println("Warning: Depth greater than 1");
             depthF = 1.0f;
         }
         return depthF;
