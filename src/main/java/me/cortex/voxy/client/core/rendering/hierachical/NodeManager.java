@@ -1219,7 +1219,7 @@ public class NodeManager {
         int nodeType = nodeId&NODE_TYPE_MSK;
         nodeId &= NODE_ID_MSK;
         if (nodeType == NODE_TYPE_REQUEST) {
-            Logger.error("Tried removing geometry for pos: " + WorldEngine.pprintPos(pos) + " but its type was a request, ignoring!");
+            Logger.warn("Tried removing geometry for pos: " + WorldEngine.pprintPos(pos) + " but its type was a request, ignoring!");
             return;
         }
         //this.clearId(nodeId);
