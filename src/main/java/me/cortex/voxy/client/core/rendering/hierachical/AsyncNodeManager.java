@@ -158,9 +158,9 @@ public class AsyncNodeManager {
             buffer.free();
         }
 
-        if (this.workCounter.get() == 0) {
+        if (this.workCounter.get() <= 0) {
             LockSupport.park();
-            if (this.workCounter.get() == 0 || !this.running) {//No work
+            if (this.workCounter.get() <= 0 || !this.running) {//No work
                 return;
             }
             //This is a funny thing, wait a bit, this allows for better batching, but this thread is independent of everything else so waiting a bit should be mostly ok
@@ -280,8 +280,8 @@ public class AsyncNodeManager {
             }
             //Due to synchronization "issues", wait a millis (give up this time slice)
             if (this.workCounter.get() < 0) {
-                Logger.error("Work counter less than zero, returning and hope it fixes itself");
-                return;
+                Logger.error("Work counter less than zero, hope it fixes itself...");
+                //return;
             }
         }
 
