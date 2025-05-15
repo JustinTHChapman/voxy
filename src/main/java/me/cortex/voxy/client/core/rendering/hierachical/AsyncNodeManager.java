@@ -17,7 +17,6 @@ import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldSection;
-import net.fabricmc.loader.impl.util.log.Log;
 import org.lwjgl.system.MemoryUtil;
 
 import java.lang.invoke.MethodHandles;
@@ -27,7 +26,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.StampedLock;
 
-import static me.cortex.voxy.client.core.rendering.section.geometry.BasicSectionGeometryData.SECTION_METADATA_SIZE;
 import static org.lwjgl.opengl.ARBUniformBufferObject.glBindBufferBase;
 import static org.lwjgl.opengl.GL30C.glUniform1ui;
 import static org.lwjgl.opengl.GL42C.GL_UNIFORM_BARRIER_BIT;
@@ -57,6 +55,7 @@ public class AsyncNodeManager {
 
     private final Thread thread;
     public final int maxNodeCount;
+    private final long geometryCapacity;
     private volatile boolean running = true;
 
     private final NodeManager manager;
@@ -70,7 +69,7 @@ public class AsyncNodeManager {
     private volatile SyncResults resultCache2 = new SyncResults();
 
     //Yes. this is stupid. yes. it is a large amount of runtime. Is it profiler bias, probably
-    private ConcurrentLinkedDeque<MemoryBuffer> buffersToFreeQueue = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<MemoryBuffer> buffersToFreeQueue = new ConcurrentLinkedDeque<>();
 
 
     //locals for during iteration
@@ -86,8 +85,10 @@ public class AsyncNodeManager {
         // it MUST ONLY be accessed on the render thread
         // AsyncNodeManager will use an AsyncGeometryManager as the manager for the data store, and sync the results on the render thread
         this.geometryData = geometryData;
+        this.geometryCapacity = ((BasicSectionGeometryData)geometryData).getGeometryCapacityBytes();
 
         this.maxNodeCount = maxNodeCount;
+
         this.thread = new Thread(()->{
             try {
                 while (this.running) {
@@ -99,7 +100,7 @@ public class AsyncNodeManager {
         });
         this.thread.setName("Async Node Manager");
 
-        this.geometryManager = new BasicAsyncGeometryManager(((BasicSectionGeometryData)geometryData).getMaxSectionCount(), ((BasicSectionGeometryData)geometryData).getGeometryCapacity());
+        this.geometryManager = new BasicAsyncGeometryManager(((BasicSectionGeometryData)geometryData).getMaxSectionCount(), this.geometryCapacity);
         this.manager = new NodeManager(maxNodeCount, this.geometryManager, watcher);
         //Dont do the move... is just to much effort
         this.manager.setClear(new NodeManager.ICleaner() {
@@ -446,6 +447,7 @@ public class AsyncNodeManager {
         }
 
         results.geometrySectionCount = this.geometryManager.getSectionCount();
+        results.usedGeometry = this.geometryManager.getGeometryUsedBytes();
         results.currentMaxNodeId = this.manager.getCurrentMaxNodeId();
 
         this.needsWaitForSync |= results.geometryUploads.size() > UPLOAD_LIMIT;//Max of 200 uploads per frame :(
@@ -520,6 +522,7 @@ public class AsyncNodeManager {
         }
 
         this.currentMaxNodeId = results.currentMaxNodeId;
+        this.usedGeometryAmount = results.usedGeometry;
 
         //Insert the result set into the cache
         if (!RESULT_CACHE_1_HANDLE.compareAndSet(this, null, results)) {
@@ -540,6 +543,16 @@ public class AsyncNodeManager {
     public int getCurrentMaxNodeId() {
         return this.currentMaxNodeId;
     }
+
+    private long usedGeometryAmount = 0;
+    public long getUsedGeometryCapacity() {
+        return this.usedGeometryAmount;
+    }
+
+    public long getGeometryCapacity() {
+        return this.geometryCapacity;
+    }
+
 
     //==================================================================================================================
     //Incoming events
@@ -700,6 +713,7 @@ public class AsyncNodeManager {
 
         //Deltas for geometry store
         private int geometrySectionCount;
+        private long usedGeometry;
         private final Int2ObjectOpenHashMap<MemoryBuffer> geometryUploads = new Int2ObjectOpenHashMap<>();
 
 

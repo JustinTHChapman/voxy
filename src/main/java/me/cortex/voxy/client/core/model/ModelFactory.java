@@ -8,6 +8,7 @@ import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.model.bakery.ModelTextureBakery;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
@@ -35,6 +36,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.util.*;
 
 import static me.cortex.voxy.client.core.model.ModelStore.MODEL_SIZE;
+import static org.lwjgl.opengl.ARBDirectStateAccess.nglTextureSubImage2D;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL33.glDeleteSamplers;
 import static org.lwjgl.opengl.GL33.glGenSamplers;
@@ -661,8 +663,54 @@ public class ModelFactory {
         return this.metadataCache[clientId];
     }
 
+
+    private static int computeSizeWithMips(int size) {
+        int total = 0;
+        for (;size!=0;size>>=1) total += size*size;
+        return total;
+    }
+    private static final MemoryBuffer SCRATCH_TEX = new MemoryBuffer((2L*3*computeSizeWithMips(MODEL_TEXTURE_SIZE))*4);
+    private static final int LAYERS = Integer.numberOfTrailingZeros(MODEL_TEXTURE_SIZE);
     //TODO: redo to batch blit, instead of 6 seperate blits, and also fix mipping
     private void putTextures(int id, ColourDepthTextureData[] textures) {
+        if (MODEL_TEXTURE_SIZE != 16) {throw new IllegalStateException("THIS METHOD MUST BE REDONE IF THIS CONST CHANGES");}
+
+
+        //Copy all textures into scratch
+        final long addr = SCRATCH_TEX.address;
+        final int LENGTH_B = MODEL_TEXTURE_SIZE*3;
+        for (int i = 0; i < 6; i++) {
+            int x = (i>>1)*MODEL_TEXTURE_SIZE;
+            int y = (i&1)*MODEL_TEXTURE_SIZE;
+            int j = 0;
+            for (int t : textures[i].colour()) {
+                int o = ((y+(j>>LAYERS))*LENGTH_B + ((j&(MODEL_TEXTURE_SIZE-1))+x))*4; j++;//LAYERS here is just cause faster
+                MemoryUtil.memPutInt(addr+o, t);
+            }
+        }
+
+        //Mip the scratch
+        long dAddr = addr;
+        for (int i = 0; i < LAYERS-1; i++) {
+            long sAddr = dAddr;
+            dAddr += (MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*3*2*4)>>(i<<1);//is.. i*2 because shrink both MODEL_TEXTURE_SIZE by >>i so is 2*i total shift
+            int width = (MODEL_TEXTURE_SIZE*3)>>(i+1);
+            int sWidth = (MODEL_TEXTURE_SIZE*3)>>i;
+            int height = (MODEL_TEXTURE_SIZE*2)>>(i+1);
+            //TODO: OPTIMZIE THIS
+            for (int px = 0; px < width; px++) {
+                for (int py = 0; py < height; py++) {
+                    long bp = sAddr + (px*2 + py*2*sWidth)*4;
+                    int C00 = MemoryUtil.memGetInt(bp);
+                    int C01 = MemoryUtil.memGetInt(bp+sWidth*4);
+                    int C10 = MemoryUtil.memGetInt(bp+4);
+                    int C11 = MemoryUtil.memGetInt(bp+sWidth*4+4);
+                    MemoryUtil.memPutInt(dAddr + (px+py*width) * 4L, TextureUtils.mipColours(C00, C01, C10, C11));
+                }
+            }
+        }
+
+
         int X = (id&0xFF) * MODEL_TEXTURE_SIZE*3;
         int Y = ((id>>8)&0xFF) * MODEL_TEXTURE_SIZE*2;
 
@@ -671,31 +719,10 @@ public class ModelFactory {
         glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
-        for (int subTex = 0; subTex < 6; subTex++) {
-            int x = X + (subTex>>1)*MODEL_TEXTURE_SIZE;
-            int y = Y + (subTex&1)*MODEL_TEXTURE_SIZE;
-
-            var current = textures[subTex].colour();
-            var next = new int[current.length>>1];
-            final int layers = Integer.numberOfTrailingZeros(MODEL_TEXTURE_SIZE);
-            for (int i = 0; i < layers; i++) {
-                glTextureSubImage2D(this.storage.textures.id, i, x>>i, y>>i, MODEL_TEXTURE_SIZE>>i, MODEL_TEXTURE_SIZE>>i, GL_RGBA, GL_UNSIGNED_BYTE, current);
-
-                int nSize = MODEL_TEXTURE_SIZE>>(i+1);
-                int size = MODEL_TEXTURE_SIZE>>i;
-                for (int pX = 0; pX < nSize; pX++) {
-                    for (int pY = 0; pY < nSize; pY++) {
-                        int C00 = current[(pY*2)*size+pX*2];
-                        int C01 = current[(pY*2+1)*size+pX*2];
-                        int C10 = current[(pY*2)*size+pX*2+1];
-                        int C11 = current[(pY*2+1)*size+pX*2+1];
-                        next[pY*nSize+pX] = TextureUtils.mipColours(C00, C01, C10, C11);
-                    }
-                }
-
-                current = next;
-                next = new int[current.length>>1];
-            }
+        long cAddr = addr;
+        for (int lvl = 0; lvl < LAYERS; lvl++) {
+            nglTextureSubImage2D(this.storage.textures.id, lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, GL_RGBA, GL_UNSIGNED_BYTE, cAddr);
+            cAddr += (MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*3*2*4)>>(lvl<<1);
         }
     }
 

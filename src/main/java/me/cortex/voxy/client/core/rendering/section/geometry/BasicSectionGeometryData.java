@@ -40,7 +40,7 @@ public class BasicSectionGeometryData implements IGeometryData {
         return this.maxSectionCount;
     }
 
-    public long getGeometryCapacity() {//In bytes
+    public long getGeometryCapacityBytes() {//In bytes
         return this.geometryBuffer.size();
     }
 

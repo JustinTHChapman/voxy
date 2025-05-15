@@ -136,7 +136,8 @@ public class NodeCleaner {
         //return this.nodeManager.getGeometryManager().getRemainingCapacity() < 1_000_000_000L;
 
         //If used more than 75% of geometry buffer
-        return false;//return 3<((double)this.nodeManager.getGeometryManager().getUsedCapacity())/((double)this.nodeManager.getGeometryManager().getRemainingCapacity());
+        long used = this.nodeManager.getUsedGeometryCapacity();
+        return 1<((double)used)/((double)(this.nodeManager.getGeometryCapacity()-used));
     }
 
     public void updateIds(IntOpenHashSet collection) {

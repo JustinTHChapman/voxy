@@ -27,6 +27,7 @@ public class BasicAsyncGeometryManager implements IGeometryManager {
     //Note!: the int part is an unsigned int ptr, must be scaled by GEOMETRY_ELEMENT_SIZE
     private final Int2ObjectOpenHashMap<MemoryBuffer> heapUploads = new Int2ObjectOpenHashMap<>(1024);//Uploads into the buffer at the given location
     private final IntOpenHashSet heapRemoveUploads = new IntOpenHashSet(1024);//Any removals are added here, so that it can be properly synced
+    private long usedCapacity = 0;
 
     public BasicAsyncGeometryManager(int maxSectionCount, long geometryCapacity) {
         this.allocationSet = new HierarchicalBitSet(maxSectionCount);
@@ -85,7 +86,7 @@ public class BasicAsyncGeometryManager implements IGeometryManager {
         var oldMetadata = this.sectionMetadata.set(id, null);
         int ptr = oldMetadata.geometryPtr;
         //Free from the heap
-        this.allocationHeap.free(Integer.toUnsignedLong(ptr));
+        this.usedCapacity -= this.allocationHeap.free(Integer.toUnsignedLong(ptr));
         //Free the upload if it was uploading
         var buf = this.heapUploads.remove(ptr);
         if (buf != null) {
@@ -100,6 +101,7 @@ public class BasicAsyncGeometryManager implements IGeometryManager {
         int size = (int) (section.geometryBuffer.size/GEOMETRY_ELEMENT_SIZE);
         //Address
         int addr = (int)this.allocationHeap.alloc(size);
+        this.usedCapacity += size;
         //Create upload
         if (this.heapUploads.put(addr, section.geometryBuffer) != null) {
             throw new IllegalStateException();
@@ -124,6 +126,10 @@ public class BasicAsyncGeometryManager implements IGeometryManager {
 
     public int getSectionCount() {
         return this.allocationSet.getCount();
+    }
+
+    public long getGeometryUsedBytes() {
+        return this.usedCapacity * GEOMETRY_ELEMENT_SIZE;
     }
 
     public IntOpenHashSet getUpdateIds() {
