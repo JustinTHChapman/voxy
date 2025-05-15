@@ -666,28 +666,30 @@ public class ModelFactory {
         int X = (id&0xFF) * MODEL_TEXTURE_SIZE*3;
         int Y = ((id>>8)&0xFF) * MODEL_TEXTURE_SIZE*2;
 
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+        glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+
         for (int subTex = 0; subTex < 6; subTex++) {
             int x = X + (subTex>>1)*MODEL_TEXTURE_SIZE;
             int y = Y + (subTex&1)*MODEL_TEXTURE_SIZE;
 
-            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-            glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
-            glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
             var current = textures[subTex].colour();
             var next = new int[current.length>>1];
             final int layers = Integer.numberOfTrailingZeros(MODEL_TEXTURE_SIZE);
             for (int i = 0; i < layers; i++) {
                 glTextureSubImage2D(this.storage.textures.id, i, x>>i, y>>i, MODEL_TEXTURE_SIZE>>i, MODEL_TEXTURE_SIZE>>i, GL_RGBA, GL_UNSIGNED_BYTE, current);
 
-                int size = MODEL_TEXTURE_SIZE>>(i+1);
-                for (int pX = 0; pX < size; pX++) {
-                    for (int pY = 0; pY < size; pY++) {
+                int nSize = MODEL_TEXTURE_SIZE>>(i+1);
+                int size = MODEL_TEXTURE_SIZE>>i;
+                for (int pX = 0; pX < nSize; pX++) {
+                    for (int pY = 0; pY < nSize; pY++) {
                         int C00 = current[(pY*2)*size+pX*2];
                         int C01 = current[(pY*2+1)*size+pX*2];
                         int C10 = current[(pY*2)*size+pX*2+1];
                         int C11 = current[(pY*2+1)*size+pX*2+1];
-                        next[pY*size+pX] = TextureUtils.mipColours(C00, C01, C10, C11);
+                        next[pY*nSize+pX] = TextureUtils.mipColours(C00, C01, C10, C11);
                     }
                 }
 
