@@ -32,9 +32,6 @@ public class NodeCleaner {
     static final int OUTPUT_COUNT = 256;
 
 
-    private static final int BATCH_SET_SIZE = 2048;
-
-
     private final AutoBindingShader sorter = Shader.makeAuto(PrintfDebugUtil.PRINTF_processor)
             .define("WORK_SIZE", SORTING_WORKER_SIZE)
             .define("ELEMS_PER_THREAD", WORK_PER_THREAD)
@@ -63,10 +60,6 @@ public class NodeCleaner {
 
     final GlBuffer visibilityBuffer;
     private final GlBuffer outputBuffer = new GlBuffer(OUTPUT_COUNT*4+OUTPUT_COUNT*8);//Scratch + output
-    private final GlBuffer scratchBuffer = new GlBuffer(BATCH_SET_SIZE*4);//Scratch buffer for setting ids with
-
-    private final IntOpenHashSet allocIds = new IntOpenHashSet();
-    private final IntOpenHashSet freeIds = new IntOpenHashSet();
 
     private final AsyncNodeManager nodeManager;
     int visibilityId = 0;
@@ -78,8 +71,7 @@ public class NodeCleaner {
         this.visibilityBuffer.fill(-1);
 
         this.batchClear
-                .ssbo("VISIBILITY_BUFFER_BINDING", this.visibilityBuffer)
-                .ssbo("LIST_BUFFER_BINDING", this.scratchBuffer);
+                .ssbo("VISIBILITY_BUFFER_BINDING", this.visibilityBuffer);
 
         this.sorter
                 .ssbo("VISIBILITY_BUFFER_BINDING", this.visibilityBuffer)
@@ -111,10 +103,6 @@ public class NodeCleaner {
 
     public void tick(GlBuffer nodeDataBuffer) {
         this.visibilityId++;
-
-        this.setIds(this.allocIds, this.visibilityId);
-        this.setIds(this.freeIds, -1);
-
         if (this.shouldCleanGeometry()) {
             this.outputBuffer.fill(this.nodeManager.maxNodeCount - 2);//TODO: maybe dont set to zero??
 
@@ -124,7 +112,7 @@ public class NodeCleaner {
             //TODO: choose whether this is in nodeSpace or section/geometryId space
             //
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-            //glDispatchCompute((this.nodeManager.getCurrentMaxNodeId() + (SORTING_WORKER_SIZE+WORK_PER_THREAD) - 1) / (SORTING_WORKER_SIZE+WORK_PER_THREAD), 1, 1);
+            glDispatchCompute((this.nodeManager.getCurrentMaxNodeId() + (SORTING_WORKER_SIZE+WORK_PER_THREAD) - 1) / (SORTING_WORKER_SIZE+WORK_PER_THREAD), 1, 1);
 
             this.resultTransformer.bind();
             glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, this.outputBuffer.id, 0, 4 * OUTPUT_COUNT);
@@ -151,22 +139,26 @@ public class NodeCleaner {
         return false;//return 3<((double)this.nodeManager.getGeometryManager().getUsedCapacity())/((double)this.nodeManager.getGeometryManager().getRemainingCapacity());
     }
 
-    private void setIds(IntOpenHashSet collection, int setTo) {
+    public void updateIds(IntOpenHashSet collection) {
         if (!collection.isEmpty()) {
-            this.batchClear.bind();
+            int count = collection.size();
+            long addr = UploadStream.INSTANCE.rawUploadAddress(count * 4 + 16);//TODO ensure alignment, create method todo alignment things
+            addr = (addr+15)&~15L;//Align to 16 bytes
+
+            long ptr = UploadStream.INSTANCE.getBaseAddress() + addr;
             var iter = collection.iterator();
             while (iter.hasNext()) {
-                int cnt = Math.min(collection.size(), BATCH_SET_SIZE);
-                long ptr = UploadStream.INSTANCE.upload(this.scratchBuffer, 0, cnt * 4L);
-                for (int i = 0; i < cnt; i++) {
-                    MemoryUtil.memPutInt(ptr + i * 4, iter.nextInt());
-                    iter.remove();
-                }
-                UploadStream.INSTANCE.commit();
-                glUniform1ui(0, cnt);
-                glUniform1ui(1, setTo);
-                glDispatchCompute((cnt+127)/128, 1, 1);
+                MemoryUtil.memPutInt(ptr, iter.nextInt()); ptr+=4;
             }
+            UploadStream.INSTANCE.commit();
+
+            this.batchClear.bind();
+            glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, UploadStream.INSTANCE.getRawBufferId(), addr, count*4L);
+            glUniform1ui(0, count);
+            glUniform1ui(1, this.visibilityId);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+            glDispatchCompute((count+127)/128, 1, 1);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }
     }
 
@@ -174,7 +166,6 @@ public class NodeCleaner {
         this.sorter.free();
         this.visibilityBuffer.free();
         this.outputBuffer.free();
-        this.scratchBuffer.free();
         this.batchClear.free();
         this.resultTransformer.free();
     }

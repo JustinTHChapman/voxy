@@ -143,7 +143,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
             //Tick download stream
             DownloadStream.INSTANCE.tick();
 
-            this.nodeManager.tick(this.traversal.getNodeBuffer());
+            this.nodeManager.tick(this.traversal.getNodeBuffer(), this.nodeCleaner);
             //glFlush();
 
             this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??

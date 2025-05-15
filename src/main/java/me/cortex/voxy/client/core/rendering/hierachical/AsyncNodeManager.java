@@ -75,6 +75,9 @@ public class AsyncNodeManager {
 
     //locals for during iteration
     private final IntOpenHashSet tlnIdChange = new IntOpenHashSet();//"Encoded" add/remove id, first bit indicates if its add or remove, 1 is add
+    //Top bit indicates clear or reset
+    private final IntOpenHashSet cleanerIdResetClear = new IntOpenHashSet();//Tells the cleaner if it needs to clear the id to 0, or reset the id to the current frame
+
     private boolean needsWaitForSync = false;
 
     public AsyncNodeManager(int maxNodeCount, ISectionWatcher watcher, IGeometryData geometryData) {
@@ -98,20 +101,23 @@ public class AsyncNodeManager {
 
         this.geometryManager = new BasicAsyncGeometryManager(((BasicSectionGeometryData)geometryData).getMaxSectionCount(), ((BasicSectionGeometryData)geometryData).getGeometryCapacity());
         this.manager = new NodeManager(maxNodeCount, this.geometryManager, watcher);
+        //Dont do the move... is just to much effort
         this.manager.setClear(new NodeManager.ICleaner() {
             @Override
             public void alloc(int id) {
-
+                AsyncNodeManager.this.cleanerIdResetClear.remove(id);//Remove clear
+                AsyncNodeManager.this.cleanerIdResetClear.add(id|(1<<31));//Add reset
             }
 
             @Override
             public void move(int from, int to) {
-
+                //noop (sorry :( will cause some perf loss/incorrect cleaning )
             }
 
             @Override
             public void free(int id) {
-
+                AsyncNodeManager.this.cleanerIdResetClear.remove(id|(1<<31));//Remove reset
+                AsyncNodeManager.this.cleanerIdResetClear.add(id);//Add clear
             }
         });
         this.manager.setTLNCallbacks(id->{
@@ -353,6 +359,7 @@ public class AsyncNodeManager {
             results.geometryUploads.putAll(this.geometryManager.getUploads());
             this.geometryManager.getUploads().clear();//Put in new data into sync set
             this.geometryManager.getHeapRemovals().clear();//We dont do removals on new data (as there is "none")
+            results.cleanerOperations.addAll(this.cleanerIdResetClear); this.cleanerIdResetClear.clear();
         } else {
             results = prev;
             // merge with the previous result set
@@ -366,6 +373,16 @@ public class AsyncNodeManager {
                     }
                 }
                 this.tlnIdChange.clear();
+            }
+
+            if (!this.cleanerIdResetClear.isEmpty()) {//Merge top level node id changes
+                var iter = this.cleanerIdResetClear.intIterator();
+                while (iter.hasNext()) {
+                    int val = iter.nextInt();
+                    results.cleanerOperations.remove(val^(1<<31));//Remove opposite
+                    results.cleanerOperations.add(val);//Add this
+                }
+                this.cleanerIdResetClear.clear();
             }
 
             if (!this.geometryManager.getHeapRemovals().isEmpty()) {//Remove and free all the removed geometry uploads
@@ -440,7 +457,7 @@ public class AsyncNodeManager {
 
     private IntConsumer tlnAddCallback; private IntConsumer tlnRemoveCallback;
     //Render thread synchronization
-    public void tick(GlBuffer nodeBuffer) {//TODO: dont pass nodeBuffer here??, do something else thats better
+    public void tick(GlBuffer nodeBuffer, NodeCleaner cleaner) {//TODO: dont pass nodeBuffer here??, do something else thats better
         var results = (SyncResults)RESULT_HANDLE.getAndSet(this, null);//Acquire the results
         if (results == null) {//There are no new results to process, return
             return;
@@ -498,6 +515,12 @@ public class AsyncNodeManager {
             glMemoryBarrier(GL_UNIFORM_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
         }
 
+        if (!results.cleanerOperations.isEmpty()) {
+            cleaner.updateIds(results.cleanerOperations);
+        }
+
+        this.currentMaxNodeId = results.currentMaxNodeId;
+
         //Insert the result set into the cache
         if (!RESULT_CACHE_1_HANDLE.compareAndSet(this, null, results)) {
             //Failed to insert into result set 1, insert it into result set 2
@@ -511,6 +534,11 @@ public class AsyncNodeManager {
     public void setTLNAddRemoveCallbacks(IntConsumer add, IntConsumer remove) {
         this.tlnAddCallback = add;
         this.tlnRemoveCallback = remove;
+    }
+
+    private int currentMaxNodeId = 0;
+    public int getCurrentMaxNodeId() {
+        return this.currentMaxNodeId;
     }
 
     //==================================================================================================================
@@ -679,11 +707,15 @@ public class AsyncNodeManager {
         private MemoryBuffer scatterWriteBuffer = new MemoryBuffer(8192*2);
         private final Int2IntOpenHashMap scatterWriteLocationMap = new Int2IntOpenHashMap(1024);
 
+        //Cleaner operations
+        private final IntOpenHashSet cleanerOperations = new IntOpenHashSet();
+
         public SyncResults() {
             this.scatterWriteLocationMap.defaultReturnValue(-1);
         }
 
         public void reset() {
+            this.cleanerOperations.clear();
             this.scatterWriteLocationMap.clear();
             this.currentMaxNodeId = 0;
             this.tlnDelta.clear();

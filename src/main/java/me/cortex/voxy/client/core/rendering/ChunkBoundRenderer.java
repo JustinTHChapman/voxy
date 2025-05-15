@@ -195,6 +195,9 @@ public class ChunkBoundRenderer {
 
     private void ensureSize1() {
         if (this.chunk2idx.size() < this.idx2chunk.length) return;
+        //Commit any copies, ensures is synced to new buffer
+        UploadStream.INSTANCE.commit();
+
         int size = (int) (this.idx2chunk.length*1.5);
         Logger.info("Resizing chunk position buffer to: " + size);
         //Need to resize
