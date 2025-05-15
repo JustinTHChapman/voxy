@@ -675,6 +675,8 @@ public class ModelFactory {
     private void putTextures(int id, ColourDepthTextureData[] textures) {
         if (MODEL_TEXTURE_SIZE != 16) {throw new IllegalStateException("THIS METHOD MUST BE REDONE IF THIS CONST CHANGES");}
 
+        //TODO: need to use a write mask to see what pixels must be used to contribute to mipping
+        // as in, using the depth/stencil info, check if pixel was written to, if so, use that pixel when blending, else dont
 
         //Copy all textures into scratch
         final long addr = SCRATCH_TEX.address;
