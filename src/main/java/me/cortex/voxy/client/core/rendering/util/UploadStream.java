@@ -61,6 +61,9 @@ public class UploadStream {
         if (size > this.uploadBuffer.size()) {
             throw new IllegalArgumentException();
         }
+        //Force natural size alignment, this should ensure that _all_ allocations are aligned to this size, note, this only effects the allocation block
+        // not how much data is moved or copied
+        size = (size+15)&~15;//Alignment to 16 bytes
 
         long addr;
         if (this.caddr == -1 || !this.allocationArena.expand(this.caddr, (int) size)) {
