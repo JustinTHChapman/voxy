@@ -274,13 +274,14 @@ public class AsyncNodeManager {
 
         if (this.workCounter.addAndGet(-workDone) < 0) {
             try {
-                Thread.sleep(500);
+                Thread.sleep(1000);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
             //Due to synchronization "issues", wait a millis (give up this time slice)
             if (this.workCounter.get() < 0) {
-                throw new IllegalStateException("Work counter less than zero");
+                Logger.error("Work counter less than zero, returning and hope it fixes itself");
+                return;
             }
         }
 
