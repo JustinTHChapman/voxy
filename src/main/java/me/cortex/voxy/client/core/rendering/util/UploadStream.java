@@ -30,8 +30,10 @@ public class UploadStream {
     private final LongArrayList thisFrameAllocations = new LongArrayList();
     private final Deque<UploadData> uploadList = new ArrayDeque<>();
 
+    private static final boolean USE_COHERENT = true;
+
     public UploadStream(long size) {
-        this.uploadBuffer = new GlPersistentMappedBuffer(size,GL_MAP_WRITE_BIT|GL_MAP_UNSYNCHRONIZED_BIT|GL_MAP_COHERENT_BIT).name("UploadStream");
+        this.uploadBuffer = new GlPersistentMappedBuffer(size,GL_MAP_WRITE_BIT|GL_MAP_UNSYNCHRONIZED_BIT|(USE_COHERENT?GL_MAP_COHERENT_BIT:0)).name("UploadStream");
         this.allocationArena.setLimit(size);
     }
 
@@ -102,7 +104,7 @@ public class UploadStream {
         if (this.uploadList.isEmpty()) {
             return;
         }
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT|GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT|GL_BUFFER_UPDATE_BARRIER_BIT);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT|GL_BUFFER_UPDATE_BARRIER_BIT|(USE_COHERENT?0:GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT));
         //Execute all the copies
         for (var entry : this.uploadList) {
             glCopyNamedBufferSubData(this.uploadBuffer.id, entry.target.id, entry.uploadOffset, entry.targetOffset, entry.size);

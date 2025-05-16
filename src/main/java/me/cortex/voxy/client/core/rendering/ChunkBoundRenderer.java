@@ -71,7 +71,7 @@ public class ChunkBoundRenderer {
     public void render(Viewport<?> viewport) {
         if (!this.remQueue.isEmpty()) {
             boolean wasEmpty = this.chunk2idx.isEmpty();
-            this.remQueue.forEach(this::_remPos);
+            this.remQueue.forEach(this::_remPos);//TODO: REPLACE WITH SCATTER COMPUTE
             this.remQueue.clear();
             if (this.chunk2idx.isEmpty()&&!wasEmpty) {//When going from stuff to nothing need to clear the depth buffer
                 glClearNamedFramebufferfv(this.frameBuffer.id, GL_DEPTH, 0, new float[]{0});
@@ -148,7 +148,7 @@ public class ChunkBoundRenderer {
 
 
         if (!this.addQueue.isEmpty()) {
-            this.addQueue.forEach(this::_addPos);
+            this.addQueue.forEach(this::_addPos);//TODO: REPLACE WITH SCATTER COMPUTE
             this.addQueue.clear();
             UploadStream.INSTANCE.commit();
         }
