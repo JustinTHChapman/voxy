@@ -21,11 +21,10 @@ import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 
-import static org.lwjgl.opengl.ARBShaderImageLoadStore.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL30.*;
-import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfv;
+import static org.lwjgl.opengl.GL45.glTextureBarrier;
 
 public class ModelTextureBakery {
     //Note: the first bit of metadata is if alpha discard is enabled
@@ -188,7 +187,8 @@ public class ModelTextureBakery {
                 glEnable(GL_BLEND);
                 glBlendFuncSeparate(GL_ONE_MINUS_DST_ALPHA, GL_DST_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             } else {
-                glDisable(GL_BLEND);
+                glDisable(GL_BLEND);//FUCK YOU INTEL (screams), for _some reason_ discard or something... JUST DOESNT WORK??
+                //glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ONE);
             }
 
             glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
@@ -281,7 +281,7 @@ public class ModelTextureBakery {
         glDisable(GL_BLEND);
 
         //Finish and download
-        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_UPDATE_BARRIER_BIT|GL_PIXEL_BUFFER_BARRIER_BIT|GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);//Am not sure if barriers are right
+        glTextureBarrier();
         this.capture.emitToStream(streamBuffer, streamOffset);
 
         glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);

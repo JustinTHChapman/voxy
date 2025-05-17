@@ -100,6 +100,7 @@ public class ModelBakerySubsystem {
 
         this.factory.tick();
 
+        start = System.nanoTime();
         while (!this.factory.resultJobs.isEmpty()) {
             this.factory.resultJobs.poll().run();
             if (totalBudget<(System.nanoTime()-start))
