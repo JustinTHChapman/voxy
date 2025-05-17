@@ -63,9 +63,8 @@ public class AsyncNodeManager {
 
     private final AtomicInteger workCounter = new AtomicInteger();
 
-    private volatile SyncResults results = null;
-    private volatile SyncResults resultCache1 = new SyncResults();
-    private volatile SyncResults resultCache2 = new SyncResults();
+    @SuppressWarnings("FieldMayBeFinal")
+    private volatile SyncResults results = null, resultCache1 = new SyncResults(), resultCache2 = new SyncResults();
 
 
     //locals for during iteration
