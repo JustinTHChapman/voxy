@@ -43,7 +43,7 @@ public class RenderGenerationService {
             int unique = COUNTER.incrementAndGet();
             int lvl = WorldEngine.MAX_LOD_LAYER-WorldEngine.getLevel(this.position);
             lvl = Math.min(lvl, 3);//Make the 2 highest quality have equal priority
-            this.priority = (((lvl*3L + Math.min(this.attempts, 4))*2 + this.addin) <<32) + Integer.toUnsignedLong(unique);
+            this.priority = (((lvl*3L + Math.min(this.attempts, 5))*2 + this.addin) <<32) + Integer.toUnsignedLong(unique);
             this.addin = 0;
         }
     }
@@ -164,7 +164,6 @@ public class RenderGenerationService {
                 this.taskMapLock.unlockWrite(stamp);
 
                 if (other != null) {//Weve been replaced
-                    MESH_FAILED_COUNTER.incrementAndGet();
                     //Request the block
                     if (e.isIdBlockId) {
                         //TODO: maybe move this to _after_ task as been readded to queue??
@@ -202,8 +201,11 @@ public class RenderGenerationService {
                     }
                 }
 
-                if (task.hasDoneModelRequestInner && task.hasDoneModelRequestOuter) {
+                if (task.hasDoneModelRequestOuter || task.hasDoneModelRequestInner) {
                     MESH_FAILED_COUNTER.incrementAndGet();
+                }
+
+                if (task.hasDoneModelRequestInner && task.hasDoneModelRequestOuter) {
                     task.attempts++;
                     try {
                         Thread.sleep(1);
@@ -211,6 +213,10 @@ public class RenderGenerationService {
                         throw new RuntimeException(ex);
                     }
                 } else {
+                    if (task.hasDoneModelRequestInner) {
+                        task.attempts++;//This is because it can be baking and just model thing isnt keeping up
+                    }
+
                     if (!task.hasDoneModelRequestInner) {
                         //The reason for the extra id parameter is that we explicitly add/check against the exception id due to e.g. requesting accross a chunk boarder wont be captured in the request
                         if (e.auxData == null)//the null check this is because for it to be, the inner must already be computed
@@ -220,7 +226,6 @@ public class RenderGenerationService {
                     //If this happens... aahaha painnnn
                     if (task.hasDoneModelRequestOuter) {
                         task.attempts++;
-                        MESH_FAILED_COUNTER.incrementAndGet();
                     }
 
                     if ((!task.hasDoneModelRequestOuter) && e.auxData != null) {
