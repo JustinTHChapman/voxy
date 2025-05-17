@@ -112,7 +112,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         // the section renderer is as it might have different backends, but they all accept a buffer containing the section list
 
 
+        TimingStatistics.G.start();
         this.sectionRenderer.renderOpaque(viewport, depthBoundTexture);
+        TimingStatistics.G.stop();
 
         //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
         // sections
@@ -140,8 +142,10 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
             }*/
 
 
+            TimingStatistics.D.start();
             //Tick download stream
             DownloadStream.INSTANCE.tick();
+            TimingStatistics.D.stop();
 
             this.nodeManager.tick(this.traversal.getNodeBuffer(), this.nodeCleaner);
             //glFlush();
@@ -158,10 +162,17 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         if (depthBuffer == 0) {
             depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
         }
+        TimingStatistics.I.start();
         this.traversal.doTraversal(viewport, depthBuffer);
+        TimingStatistics.I.stop();
 
+        TimingStatistics.H.start();
         this.sectionRenderer.buildDrawCalls(viewport);
+        TimingStatistics.H.stop();
+
+        TimingStatistics.G.start();
         this.sectionRenderer.renderTemporal(depthBoundTexture);
+        TimingStatistics.G.stop();
     }
 
     public void renderFarAwayTranslucent(J viewport, GlTexture depthBoundTexture) {
@@ -172,6 +183,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         this.modelService.addDebugData(debug);
         this.renderGen.addDebugData(debug);
         this.sectionRenderer.addDebug(debug);
+        this.nodeManager.addDebug(debug);
 
         if (RenderStatistics.enabled) {
             debug.add("HTC: [" + Arrays.stream(flipCopy(RenderStatistics.hierarchicalTraversalCounts)).mapToObj(Integer::toString).collect(Collectors.joining(", "))+"]");

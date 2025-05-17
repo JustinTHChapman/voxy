@@ -1,10 +1,8 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.ints.IntConsumer;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
@@ -15,12 +13,14 @@ import me.cortex.voxy.client.core.rendering.section.geometry.BasicSectionGeometr
 import me.cortex.voxy.client.core.rendering.section.geometry.IGeometryData;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.util.AllocationArena;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldSection;
 import org.lwjgl.system.MemoryUtil;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
@@ -31,7 +31,6 @@ import static org.lwjgl.opengl.GL30C.glUniform1ui;
 import static org.lwjgl.opengl.GL42C.GL_UNIFORM_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
 import static org.lwjgl.opengl.GL43C.*;
-import static org.lwjgl.opengl.GL44.GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT;
 
 //TODO: create an "async upload stream", that is, the upload stream is a raw mapped buffer pointer that can be written to
 // which is then synced to the gpu on "render thread sync",
@@ -67,9 +66,6 @@ public class AsyncNodeManager {
     private volatile SyncResults results = null;
     private volatile SyncResults resultCache1 = new SyncResults();
     private volatile SyncResults resultCache2 = new SyncResults();
-
-    //Yes. this is stupid. yes. it is a large amount of runtime. Is it profiler bias, probably
-    private final ConcurrentLinkedDeque<MemoryBuffer> buffersToFreeQueue = new ConcurrentLinkedDeque<>();
 
 
     //locals for during iteration
@@ -156,15 +152,14 @@ public class AsyncNodeManager {
             .add(ShaderType.COMPUTE, "voxy:util/scatter.comp")
             .compile();
 
-    private void run() {
-        while (true) {
-            var buffer = this.buffersToFreeQueue.poll();
-            if (buffer == null) {
-                break;
-            }
-            buffer.free();
-        }
+    private final Shader multiMemcpy = Shader.make()
+            .define("INPUT_HEADER_BUFFER_BINDING", 0)
+            .define("INPUT_DATA_BUFFER_BINDING", 1)
+            .define("OUTPUT_BUFFER_BINDING", 2)
+            .add(ShaderType.COMPUTE, "voxy:util/memcpy.comp")
+            .compile();
 
+    private void run() {
         if (this.workCounter.get() <= 0) {
             LockSupport.park();
             if (this.workCounter.get() <= 0 || !this.running) {//No work
@@ -229,7 +224,7 @@ public class AsyncNodeManager {
             job.release();
         } while (true);
 
-        final int UPLOAD_LIMIT = 200;
+        final int UPLOAD_LIMIT = 500;
         for (int limit = 0; limit < UPLOAD_LIMIT/2; limit++) //Limit uploading, TODO: limit this by frame sync count, not here
         {
             var job = this.geometryUpdateQueue.poll();
@@ -357,8 +352,16 @@ public class AsyncNodeManager {
             results.tlnDelta.addAll(this.tlnIdChange);
             this.tlnIdChange.clear();
 
-            results.geometryUploads.putAll(this.geometryManager.getUploads());
-            this.geometryManager.getUploads().clear();//Put in new data into sync set
+            if (!this.geometryManager.getUploads().isEmpty()){//Put in new data into sync set
+                var iter = this.geometryManager.getUploads().int2ObjectEntrySet().fastIterator();
+                while (iter.hasNext()) {
+                    var val = iter.next();
+                    results.geometryUpload.upload(val.getIntKey(), val.getValue());
+                    val.getValue().free();
+                }
+                this.geometryManager.getUploads().clear();
+            }
+
             this.geometryManager.getHeapRemovals().clear();//We dont do removals on new data (as there is "none")
             results.cleanerOperations.addAll(this.cleanerIdResetClear); this.cleanerIdResetClear.clear();
         } else {
@@ -390,10 +393,7 @@ public class AsyncNodeManager {
                 var rem = this.geometryManager.getHeapRemovals();
                 var iter = rem.intIterator();
                 while (iter.hasNext()) {
-                    var buffer = results.geometryUploads.remove(iter.nextInt());
-                    if (buffer != null) {
-                        buffer.free();
-                    }
+                    results.geometryUpload.remove(iter.nextInt());
                 }
                 rem.clear();
             }
@@ -403,10 +403,8 @@ public class AsyncNodeManager {
                 var iter = add.int2ObjectEntrySet().fastIterator();
                 while (iter.hasNext()) {
                     var val = iter.next();
-                    var prevBuffer = results.geometryUploads.put(val.getIntKey(), val.getValue());
-                    if (prevBuffer != null) {
-                        prevBuffer.free();
-                    }
+                    results.geometryUpload.upload(val.getIntKey(), val.getValue());
+                    val.getValue().free();
                 }
                 add.clear();
             }
@@ -450,7 +448,7 @@ public class AsyncNodeManager {
         results.usedGeometry = this.geometryManager.getGeometryUsedBytes();
         results.currentMaxNodeId = this.manager.getCurrentMaxNodeId();
 
-        this.needsWaitForSync |= results.geometryUploads.size() > UPLOAD_LIMIT;//Max of 200 uploads per frame :(
+        this.needsWaitForSync |= results.geometryUpload.currentElemCopyAmount*8L > 4L<<20;//4mb limit per frame
 
         if (!RESULT_HANDLE.compareAndSet(this, null, results)) {
             throw new IllegalArgumentException("Should always have null");
@@ -484,20 +482,35 @@ public class AsyncNodeManager {
 
             store.setSectionCount(results.geometrySectionCount);
 
-            //Do geometry uploads
-            if (!results.geometryUploads.isEmpty()) {
-                var iter = results.geometryUploads.int2ObjectEntrySet().fastIterator();
-                while (iter.hasNext()) {
-                    var val = iter.next();
-                    var buffer = val.getValue();
-                    UploadStream.INSTANCE.upload(store.getGeometryBuffer(), Integer.toUnsignedLong(val.getIntKey()) * 8L, buffer);
-                    //Put the queue into the buffer queue to free... yes this is stupid that need todo this...
-                    this.buffersToFreeQueue.add(buffer);//buffer.free();//Free the buffer was uploading
+            var upload = results.geometryUpload;
+            if (!upload.dataUploadPoints.isEmpty()) {
+                TimingStatistics.A.start();
+
+                int copies = upload.dataUploadPoints.size();
+                int scratchSize = (int) upload.arena.getSize() * 8;
+                long ptr = UploadStream.INSTANCE.rawUploadAddress(scratchSize + copies * 16);
+                MemoryUtil.memCopy(upload.scratchHeaderBuffer.address, UploadStream.INSTANCE.getBaseAddress() + ptr, copies * 16L);
+                MemoryUtil.memCopy(upload.scratchDataBuffer.address, UploadStream.INSTANCE.getBaseAddress() + ptr + copies * 16L, scratchSize);
+                UploadStream.INSTANCE.commit();//Commit the buffer
+
+                this.multiMemcpy.bind();
+                glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, UploadStream.INSTANCE.getRawBufferId(), ptr, copies*16L);
+                glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, UploadStream.INSTANCE.getRawBufferId(), ptr+copies*16L, scratchSize);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ((BasicSectionGeometryData) this.geometryData).getGeometryBuffer().id);
+
+                if (copies > 500) {
+                    Logger.warn("Large amount of copies, lag will probably happen: " + copies);
                 }
-                UploadStream.INSTANCE.commit();
+
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+                glDispatchCompute(copies, 1, 1);//Execute the copies
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+                TimingStatistics.A.stop();
             }
         }
 
+        TimingStatistics.B.start();
         if (!results.scatterWriteLocationMap.isEmpty()) {//Scatter write
             int count = results.scatterWriteLocationMap.size();//Number of writes, not chunks or uvec4 count
             int chunks = (count+3)/4;
@@ -512,14 +525,17 @@ public class AsyncNodeManager {
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nodeBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ((BasicSectionGeometryData) this.geometryData).getMetadataBuffer().id);
             glUniform1ui(0, count);
-            glMemoryBarrier(GL_UNIFORM_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT|GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
+            glMemoryBarrier(GL_UNIFORM_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
             glDispatchCompute((count+127)/128, 1, 1);
             glMemoryBarrier(GL_UNIFORM_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
         }
+        TimingStatistics.B.stop();
 
+        TimingStatistics.C.start();
         if (!results.cleanerOperations.isEmpty()) {
             cleaner.updateIds(results.cleanerOperations);
         }
+        TimingStatistics.C.stop();
 
         this.currentMaxNodeId = results.currentMaxNodeId;
         this.usedGeometryAmount = results.usedGeometry;
@@ -671,30 +687,28 @@ public class AsyncNodeManager {
 
         if (RESULT_HANDLE.get(this) != null) {
             var result = (SyncResults)RESULT_HANDLE.getAndSet(this, null);
-            result.geometryUploads.forEach((a,b)->b.free());
+            result.geometryUpload.free();
             result.scatterWriteBuffer.free();
         }
 
         if (RESULT_CACHE_1_HANDLE.get(this) != null) {//Clear cache 1
             var result = (SyncResults)RESULT_CACHE_1_HANDLE.getAndSet(this, null);
+            result.geometryUpload.free();
             result.scatterWriteBuffer.free();
         }
 
         if (RESULT_CACHE_2_HANDLE.get(this) != null) {//Clear cache 2
             var result = (SyncResults)RESULT_CACHE_2_HANDLE.getAndSet(this, null);
+            result.geometryUpload.free();
             result.scatterWriteBuffer.free();
         }
 
         this.scatterWrite.free();
+        this.multiMemcpy.free();
+    }
 
-
-        while (true) {
-            var buffer = this.buffersToFreeQueue.poll();
-            if (buffer == null) {
-                break;
-            }
-            buffer.free();
-        }
+    public void addDebug(List<String> debug) {
+        debug.add("UC/GC: " + (this.getUsedGeometryCapacity()/(1<<20))+"/"+(this.getGeometryCapacity()/(1<<20)));
     }
 
     //Results object, which is to be synced between the render thread and worker thread
@@ -714,19 +728,16 @@ public class AsyncNodeManager {
         //Deltas for geometry store
         private int geometrySectionCount;
         private long usedGeometry;
-        private final Int2ObjectOpenHashMap<MemoryBuffer> geometryUploads = new Int2ObjectOpenHashMap<>();
+        private final ComputeMemoryCopy geometryUpload = new ComputeMemoryCopy();
 
 
         //Scatter writes for both geometry and node metadata
         private MemoryBuffer scatterWriteBuffer = new MemoryBuffer(8192*2);
         private final Int2IntOpenHashMap scatterWriteLocationMap = new Int2IntOpenHashMap(1024);
+        {this.scatterWriteLocationMap.defaultReturnValue(-1);}
 
         //Cleaner operations
         private final IntOpenHashSet cleanerOperations = new IntOpenHashSet();
-
-        public SyncResults() {
-            this.scatterWriteLocationMap.defaultReturnValue(-1);
-        }
 
         public void reset() {
             this.cleanerOperations.clear();
@@ -734,7 +745,8 @@ public class AsyncNodeManager {
             this.currentMaxNodeId = 0;
             this.tlnDelta.clear();
             this.geometrySectionCount = 0;
-            this.geometryUploads.clear();
+            this.usedGeometry = 0;
+            this.geometryUpload.reset();
         }
 
         //Get or create a scatter write address for the given location
@@ -773,6 +785,144 @@ public class AsyncNodeManager {
                 this.scatterWriteBuffer.free();
                 this.scatterWriteBuffer = newBuffer;
             }
+        }
+    }
+
+    private static class ComputeMemoryCopy {
+        public int currentElemCopyAmount;
+        private MemoryBuffer scratchHeaderBuffer = new MemoryBuffer(1<<16);
+        private MemoryBuffer scratchDataBuffer = new MemoryBuffer(1<<20);
+
+        private final AllocationArena arena = new AllocationArena();
+        private final Int2IntOpenHashMap dataUploadPoints = new Int2IntOpenHashMap();//Points to the header index
+        {this.dataUploadPoints.defaultReturnValue(-1);}
+
+
+        public void remove(int point) {
+            int header = this.dataUploadPoints.remove(point);
+            if (header == -1) {//No upload for point
+                return;
+            }
+            int size = MemoryUtil.memGetInt(this.scratchHeaderBuffer.address + header*16L + 8L);
+            this.currentElemCopyAmount -= size;
+            //Free the old memory addr from arena
+            if (this.arena.free(MemoryUtil.memGetInt(this.scratchHeaderBuffer.address + header*16L)) != size) {
+                throw new IllegalStateException("Freed memory not same size as expected");
+            }
+            if (MemoryUtil.memGetInt(this.scratchHeaderBuffer.address + header*16L + 4L) != point) {
+                throw new IllegalStateException("Destination not the same as point");
+            }
+
+            //If we were the end upload header, return as we dont need to shuffle
+            if (header == this.dataUploadPoints.size()) {
+                long A = this.scratchHeaderBuffer.address + header*16L;
+                //Zero the memory, for consistancy
+                MemoryUtil.memPutLong(A, 0);
+                MemoryUtil.memPutLong(A+8, 0);
+                return;
+            }
+
+            //Else: we need to move the ending upload header from the end to where the freed point was
+            int endingPoint = MemoryUtil.memGetInt(this.scratchHeaderBuffer.address + this.dataUploadPoints.size()*16L + 4);
+            if (this.dataUploadPoints.get(endingPoint) != this.dataUploadPoints.size()) {
+                throw new IllegalStateException("ending header not pointing at end point");
+            }
+
+            //Move the end header to the old header location
+            long A = this.scratchHeaderBuffer.address + this.dataUploadPoints.size()*16L;
+            long B = this.scratchHeaderBuffer.address + header*16L;
+            MemoryUtil.memPutLong(B, MemoryUtil.memGetLong(A)); MemoryUtil.memPutLong(A, 0);
+            MemoryUtil.memPutLong(B+8, MemoryUtil.memGetLong(A+8)); MemoryUtil.memPutLong(A+8, 0);
+
+            //Update the map
+            this.dataUploadPoints.put(endingPoint, header);
+        }
+
+        public void upload(int point, MemoryBuffer data) {
+            if ((data.size%8)!=0) throw new IllegalStateException("Data must be of size multiple 8");
+            int elemSize = (int) (data.size / 8);
+            int header = this.dataUploadPoints.get(point);
+            if (header != -1) {
+                //If we already have a header location, we just need to reallocate the data
+                long headerPtr = this.scratchHeaderBuffer.address + header*16L;
+                if (MemoryUtil.memGetInt(headerPtr+4L) != point) {
+                    throw new IllegalStateException("Existing destination not the point");
+                }
+                int pSize = MemoryUtil.memGetInt(headerPtr+8L);//Previous size
+                if (pSize == elemSize) {
+                    //The data we are replacing is the same size, so just overwrite it, this is the easiest
+                    data.cpyTo(this.scratchDataBuffer.address+MemoryUtil.memGetInt(headerPtr)*8L);
+                } else {
+                    //Dealloc
+                    if (this.arena.free(MemoryUtil.memGetInt(headerPtr)) != pSize) {
+                        throw new IllegalStateException("Freed allocation not size as expected");
+                    }
+
+                    this.currentElemCopyAmount -= pSize;
+                    this.currentElemCopyAmount += elemSize;
+
+                    int alloc = this.allocScratchDataPos(elemSize);//New allocation position
+                    //Copy data into position
+                    data.cpyTo(this.scratchDataBuffer.address+alloc*8L);
+
+                    //Update the header
+                    MemoryUtil.memPutInt(headerPtr, alloc);
+                    MemoryUtil.memPutInt(headerPtr+8, elemSize);
+                }
+            } else {
+                //We need to create and allocate a new header for the upload
+                header = this.dataUploadPoints.size();
+                this.dataUploadPoints.put(point, header);
+
+                if (this.scratchHeaderBuffer.size<=header*16L) {
+                    //We must resize the header buffer
+                    long newSize = Math.max(this.scratchHeaderBuffer.size*2, header*16L);
+                    Logger.info("Resizing scratch header buffer to: " + newSize);
+                    var newScratch = new MemoryBuffer(newSize);
+                    this.scratchHeaderBuffer.cpyTo(newScratch.address);
+                    this.scratchHeaderBuffer.free();
+                    this.scratchHeaderBuffer = newScratch;
+                }
+
+                long headerPtr = this.scratchHeaderBuffer.address + header*16L;//Header resize has happened so this is a stable address
+
+                this.currentElemCopyAmount += elemSize;
+
+                int alloc = this.allocScratchDataPos(elemSize);//New allocation position
+                //Copy data into position
+                data.cpyTo(this.scratchDataBuffer.address+alloc*8L);
+
+                //Set header data
+                MemoryUtil.memPutInt(headerPtr, alloc);
+                MemoryUtil.memPutInt(headerPtr+4, point);
+                MemoryUtil.memPutInt(headerPtr+8, elemSize);
+            }
+        }
+
+        //This is done here as it enables easily doing scratch data resizing
+        private int allocScratchDataPos(int size) {
+            int pos = (int) this.arena.alloc(size);
+            if (this.scratchDataBuffer.size <= (pos+size)*8L) {
+                //We must resize :cri:
+                long newSize = Math.max(this.scratchDataBuffer.size*2, (pos+size)*8L);
+                Logger.info("Resizing scratch data buffer to: " + newSize);
+                var newScratch = new MemoryBuffer(newSize);
+                this.scratchDataBuffer.cpyTo(newScratch.address);
+                this.scratchDataBuffer.free();
+                this.scratchDataBuffer = newScratch;
+            }
+            return pos;
+        }
+
+        public void reset() {
+            this.currentElemCopyAmount = 0;
+            this.dataUploadPoints.clear();
+            this.arena.reset();
+        }
+
+        public void free() {
+            this.scratchHeaderBuffer.free(); this.scratchHeaderBuffer = null;
+            this.scratchDataBuffer.free(); this.scratchDataBuffer = null;
         }
     }
 }

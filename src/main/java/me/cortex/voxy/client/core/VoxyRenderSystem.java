@@ -188,20 +188,32 @@ public class VoxyRenderSystem {
             throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
         }
 
+        TimingStatistics.E.start();
         this.chunkBoundRenderer.render(viewport);
+        TimingStatistics.E.stop();
 
+        TimingStatistics.F.start();
         this.postProcessing.setup(target.textureWidth, target.textureHeight, boundFB);
+        TimingStatistics.F.stop();
 
         this.renderer.renderFarAwayOpaque(viewport, this.chunkBoundRenderer.getDepthBoundTexture(), startTime);
 
+
+        TimingStatistics.F.start();
         //Compute the SSAO of the rendered terrain, TODO: fix it breaking depth or breaking _something_ am not sure what
         this.postProcessing.computeSSAO(viewport.MVP);
+        TimingStatistics.F.stop();
 
+        TimingStatistics.G.start();
         //We can render the translucent directly after as it is the furthest translucent objects
         this.renderer.renderFarAwayTranslucent(viewport, this.chunkBoundRenderer.getDepthBoundTexture());
+        TimingStatistics.G.stop();
 
 
+        TimingStatistics.F.start();
         this.postProcessing.renderPost(projection, matrices.projection(), boundFB);
+        TimingStatistics.F.stop();
+
         TimingStatistics.main.stop();
         TimingStatistics.postDynamic.start();
 
@@ -245,6 +257,8 @@ public class VoxyRenderSystem {
         {
             TimingStatistics.update();
             debug.add("Voxy frame runtime (millis): " + TimingStatistics.dynamic.pVal() + ", " + TimingStatistics.main.pVal()+ ", " + TimingStatistics.postDynamic.pVal()+ ", " + TimingStatistics.all.pVal());
+            debug.add("Extra time: " + TimingStatistics.A.pVal() + ", " + TimingStatistics.B.pVal() + ", " + TimingStatistics.C.pVal() + ", " + TimingStatistics.D.pVal());
+            debug.add("Extra 2 time: " + TimingStatistics.E.pVal() + ", " + TimingStatistics.F.pVal() + ", " + TimingStatistics.G.pVal() + ", " + TimingStatistics.H.pVal() + ", " + TimingStatistics.I.pVal());
         }
         PrintfDebugUtil.addToOut(debug);
     }
