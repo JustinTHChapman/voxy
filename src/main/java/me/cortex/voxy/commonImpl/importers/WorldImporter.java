@@ -120,8 +120,12 @@ public class WorldImporter implements IDataImporter {
 
     @Override
     public void runImport(IUpdateCallback updateCallback, ICompletionCallback completionCallback) {
-        if (this.isRunning || this.worker == null) {
+        if (this.isRunning) {
             throw new IllegalStateException();
+        }
+        if (this.worker == null) {//Can happen if no files
+            completionCallback.onCompletion(0);
+            return;
         }
         this.isRunning = true;
         this.updateCallback = updateCallback;
