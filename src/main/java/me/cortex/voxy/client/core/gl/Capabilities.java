@@ -20,8 +20,12 @@ public class Capabilities {
     public final boolean canQueryGpuMemory;
     public final long totalDedicatedMemory;//Bytes, dedicated memory
     public final long totalDynamicMemory;//Bytes, total allocation memory - dedicated memory
+    public final boolean compute;
+    public final boolean indirectParameters;
     public Capabilities() {
         var cap = GL.getCapabilities();
+        this.compute = cap.glDispatchComputeIndirect != 0;
+        this.indirectParameters = cap.glMultiDrawElementsIndirectCountARB != 0;
         this.meshShaders = cap.GL_NV_mesh_shader && cap.GL_NV_representative_fragment_test;
         this.canQueryGpuMemory = cap.GL_NVX_gpu_memory_info;
         //this.INT64_t = cap.GL_ARB_gpu_shader_int64 || cap.GL_AMD_gpu_shader_int64;
