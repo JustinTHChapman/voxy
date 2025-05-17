@@ -40,9 +40,8 @@ public class BudgetBufferRenderer {
     private static final int STRIDE = 24;
     private static final GlVertexArray VA = new GlVertexArray()
             .setStride(STRIDE)
-            .setF(0, GL_FLOAT, 3, 0)//pos
-            .setI(1, GL_INT, 1, 4 * 3)//metadata
-            .setF(2, GL_FLOAT, 2, 4 * 4)//UV
+            .setF(0, GL_FLOAT, 4, 0)//pos, metadata
+            .setF(1, GL_FLOAT, 2, 4 * 4)//UV
             .bindElementBuffer(indexBuffer.id);
 
     private static GlBuffer immediateBuffer;
