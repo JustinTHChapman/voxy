@@ -26,6 +26,14 @@ public class AllocationArena {
     //Flags
     private boolean resized;//If the required memory of the entire buffer grew
 
+    public void reset() {
+        this.FREE.clear();
+        this.TAKEN.clear();
+        this.sizeLimit = Long.MAX_VALUE;
+        this.totalSize = 0;
+        this.resized = false;
+    }
+
     //Gets and resets the resized flag
     public boolean getResetResized() {
         boolean ret = this.resized;
