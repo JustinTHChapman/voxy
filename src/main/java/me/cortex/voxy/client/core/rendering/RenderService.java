@@ -60,11 +60,12 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         this.modelService = new ModelBakerySubsystem(world.getMapper());
 
         long geometryCapacity = getGeometryBufferSize();
+
         this.geometryData = (Q) new BasicSectionGeometryData(1<<20, geometryCapacity);
 
         //Max sections: ~500k
         this.sectionRenderer = (T) new MDICSectionRenderer(this.modelService.getStore(), (BasicSectionGeometryData) this.geometryData);
-        Logger.info("Using renderer: " + this.sectionRenderer.getClass().getSimpleName());
+        Logger.info("Using renderer: " + this.sectionRenderer.getClass().getSimpleName() + " with geometry buffer of: " + geometryCapacity + " bytes");
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
         var router = new SectionUpdateRouter();

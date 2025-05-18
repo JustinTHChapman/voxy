@@ -223,8 +223,10 @@ public class AsyncNodeManager {
             job.release();
         } while (true);
 
-        final int UPLOAD_LIMIT = 500;
-        for (int limit = 0; limit < UPLOAD_LIMIT/2; limit++) //Limit uploading, TODO: limit this by frame sync count, not here
+
+        //Limit uploading as well as by geometry capacity being available
+        // must have 50 mb of free geometry space to upload
+        for (int limit = 0; limit < 200 && (this.geometryCapacity-this.geometryManager.getGeometryUsedBytes())>50_000_000; limit++)
         {
             var job = this.geometryUpdateQueue.poll();
             if (job == null)
