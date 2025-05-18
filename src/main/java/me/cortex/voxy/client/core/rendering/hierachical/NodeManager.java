@@ -123,7 +123,27 @@ public class NodeManager {
         this.geometryManager = geometryManager;
     }
 
+    private static void assertPosValid(long pos) {
+        int lvl = WorldEngine.getLevel(pos);
+        int x = WorldEngine.getX(pos);
+        int y = WorldEngine.getY(pos);
+        int z = WorldEngine.getZ(pos);
+        if (WorldEngine.getWorldSectionId(lvl, x, y, z) != pos) {
+            throw new IllegalStateException("Reconstructed pos not same as original");
+        }
+        x <<= lvl;
+        y <<= lvl;
+        z <<= lvl;
+        long p2 = WorldEngine.getWorldSectionId(0, x, y, z);
+        if (WorldEngine.getLevel(p2) != 0 || WorldEngine.getX(p2) != x || WorldEngine.getY(p2) != y || WorldEngine.getZ(p2) != z) {
+            throw new IllegalStateException("Position not valid at all levels");
+        }
+    }
+
     public void insertTopLevelNode(long pos) {
+        //Verify that pos is actually valid
+        assertPosValid(pos);
+
         if ((pos&0xF) != 0) {
             throw new IllegalStateException("BAD POS !! YOU DID SOMETHING VERY BAD");
         }
@@ -399,7 +419,7 @@ public class NodeManager {
             // so add the new nodes to it
             int requestId = this.nodeData.getNodeRequest(nodeId);
             var request = this.childRequests.get(requestId);// TODO: do not assume request is childRequest (it will probably always be)
-            if (request.getPosition() != pos) throw new IllegalStateException("Request is not at pos");
+            if (request.getPosition() != pos) throw new IllegalStateException("Request is not at pos: got " + WorldEngine.pprintPos(pos) + " expected: " + WorldEngine.pprintPos(request.getPosition()));
 
             //Add all new children to the request
             for (int i = 0; i < 8; i++) {

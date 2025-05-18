@@ -61,10 +61,18 @@ public class VoxyRenderSystem {
         this.worldIn = world;
         this.renderer = new RenderService(world, threadPool);
         this.postProcessing = new PostProcessing();
+        int minSec = MinecraftClient.getInstance().world.getBottomSectionCoord()>>5;
+        int maxSec = (MinecraftClient.getInstance().world.getTopSectionCoord()-1)>>5;
+
+        //Do some very cheeky stuff for MiB
+        if (false) {
+            minSec = -8;
+            maxSec = 7;
+        }
 
         this.renderDistanceTracker = new RenderDistanceTracker(20,
-                MinecraftClient.getInstance().world.getBottomSectionCoord()>>5,
-                (MinecraftClient.getInstance().world.getTopSectionCoord()-1)>>5,
+                minSec,
+                maxSec,
                 this.renderer::addTopLevelNode,
                 this.renderer::removeTopLevelNode);
 
@@ -160,6 +168,7 @@ public class VoxyRenderSystem {
             cameraX -= sector<<14;//10+4
             cameraY += (16+(256-32-sector*30))*16;
         }
+
         long startTime = System.nanoTime();
         TimingStatistics.all.start();
         TimingStatistics.main.start();
