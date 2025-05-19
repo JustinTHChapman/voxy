@@ -64,6 +64,7 @@ public class CpuLayout {
             }
             res[i++] = new Core((!allSameClass)&&eclz==0, new Affinity(msk, core.groupMask[0].group));
         }
+        sort(res);
         return res;
     }
 
@@ -94,8 +95,23 @@ public class CpuLayout {
             }
             cores[i++] = new Core(core.getEfficiency()==0&&!allSameEfficiency, aff);
         }
-
+        sort(cores);
         return cores;
+    }
+
+
+    private static void sort(Core[] cores) {
+        Arrays.sort(cores, (a,b)->{
+            if (a.isEfficiency == b.isEfficiency) {
+                int c = Short.compareUnsigned(a.affinity.group, b.affinity.group);
+                if (c==0) {
+                    return Long.compareUnsigned(a.affinity.msk, b.affinity.msk);
+                }
+                return c;
+            } else {
+                return a.isEfficiency?1:-1;
+            }
+        });
     }
 
     public record Affinity(long msk, short group) {}
@@ -115,6 +131,7 @@ public class CpuLayout {
     }
 
     public static void main(String[] args) throws InterruptedException {
+        System.err.println(Arrays.toString(CORES));
         setThreadAffinity(CORES[0], CORES[1]);
         for (int i = 0; i < 20; i++) {
             int finalI = i;
