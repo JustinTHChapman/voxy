@@ -10,6 +10,7 @@ import me.cortex.voxy.commonImpl.ImportManager;
 import me.cortex.voxy.commonImpl.VoxyInstance;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.world.World;
 
 import java.util.Random;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -28,7 +29,19 @@ public class VoxyClientInstance extends VoxyInstance {
         return new ClientImportManager();
     }
 
-    public WorldEngine getOrMakeRenderWorld(ClientWorld world) {
+
+    private WorldEngine getOrCreateEngine(World world) {
+        /*
+        ClientWorld cw = null;
+        if (world instanceof ClientWorld && MinecraftClient.getInstance().isIntegratedServerRunning()) {
+            cw = (ClientWorld) world;
+            var world2 = MinecraftClient.getInstance().getServer().getWorld(world.getRegistryKey());
+            if (world2 == null) {
+                Logger.error("could not get server world for client world with registry key: " + world.getRegistryKey());
+            } else {
+                world = world2;
+            }
+        }*/
         var vworld = ((IVoxyWorld)world).getWorldEngine();
         if (vworld == null) {
             vworld = this.createWorld(SELECTOR.getBestSelectionOrCreate(world).createSectionStorageBackend());
@@ -42,6 +55,9 @@ public class VoxyClientInstance extends VoxyInstance {
         return vworld;
     }
 
+    public WorldEngine getOrMakeRenderWorld(World world) {
+        return this.getOrCreateEngine(world);
+    }
 
 
     private static void testDbPerformance(WorldEngine engine) {
