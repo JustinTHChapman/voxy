@@ -233,14 +233,16 @@ dependencies {
     //implementation 'redis.clients:jedis:5.1.0'
 }
 
-repositories {
-    maven {
-        url = "https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1"
+if (!isInGHA) {
+    repositories {
+        maven {
+            url = "https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1"
+        }
     }
-}
 
-dependencies {
-    modRuntimeOnly('me.djtheredstoner:DevAuth-fabric:1.1.0') {
-        exclude group: 'net.fabricmc', module: 'fabric-loader'
+    dependencies {
+        modRuntimeOnly('me.djtheredstoner:DevAuth-fabric:1.1.0') {
+            exclude group: 'net.fabricmc', module: 'fabric-loader'
+        }
     }
 }
