@@ -15,6 +15,7 @@ import me.cortex.voxy.common.thread.ServiceThreadPool;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.WorldSavePath;
+import net.minecraft.world.World;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -119,7 +120,7 @@ public class ContextSelectionSystem {
     }
 
     //Gets dimension independent base world, if singleplayer, its the world name, if multiplayer, its the server ip
-    private static Path getBasePath(ClientWorld world) {
+    private static Path getBasePath() {
         //TODO: improve this
         Path basePath = MinecraftClient.getInstance().runDirectory.toPath().resolve(".voxy").resolve("saves");
         var iserver = MinecraftClient.getInstance().getServer();
@@ -159,7 +160,7 @@ public class ContextSelectionSystem {
         return hexString.toString();
     }
 
-    private static String getWorldId(ClientWorld world) {
+    private static String getWorldId(World world) {
         String data = world.getBiomeAccess().seed + world.getRegistryKey().toString();
         try {
             return bytesToHex(MessageDigest.getInstance("SHA-256").digest(data.getBytes())).substring(0, 32);
@@ -175,8 +176,8 @@ public class ContextSelectionSystem {
     }
 
 
-    public Selection getBestSelectionOrCreate(ClientWorld world) {
-        var path = getBasePath(world);
+    public Selection getBestSelectionOrCreate(World world) {
+        var path = getBasePath();
         try {
             Files.createDirectories(path);
         } catch (IOException e) {
