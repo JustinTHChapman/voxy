@@ -39,7 +39,7 @@ public class ContextSelectionSystem {
         var baseDB = new RocksDBStorageBackend.Config();
 
         var compressor = new ZSTDCompressor.Config();
-        compressor.compressionLevel = 3;
+        compressor.compressionLevel = 1;
 
         var compression = new CompressionStorageAdaptor.Config();
         compression.delegate = baseDB;
