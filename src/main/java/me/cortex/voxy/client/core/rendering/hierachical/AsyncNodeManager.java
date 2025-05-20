@@ -667,7 +667,6 @@ public class AsyncNodeManager {
             throw new RuntimeException(e);
         }
 
-        //TODO CLEAN
         while (true) {
             var buffer = this.requestBatchQueue.poll();
             if (buffer == null) break;
@@ -675,7 +674,7 @@ public class AsyncNodeManager {
         }
 
         while (true) {
-            var buffer = this.requestBatchQueue.poll();
+            var buffer = this.removeBatchQueue.poll();
             if (buffer == null) break;
             buffer.free();
         }
@@ -684,6 +683,12 @@ public class AsyncNodeManager {
             var buffer = this.geometryUpdateQueue.poll();
             if (buffer == null) break;
             buffer.free();
+        }
+
+        while (true) {
+            var section = this.childUpdateQueue.poll();
+            if (section == null) break;
+            section.release();
         }
 
         if (RESULT_HANDLE.get(this) != null) {

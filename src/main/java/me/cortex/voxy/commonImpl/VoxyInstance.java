@@ -127,7 +127,7 @@ public class VoxyInstance {
         this.importManager.cancelImport(world);
 
         if (world.getActiveSectionCount() != 0) {
-            Logger.warn("Waiting for world to finish use");
+            Logger.warn("Waiting for world to finish use: " + world );
             while (world.getActiveSectionCount() != 0) {
                 try {
                     Thread.sleep(100);

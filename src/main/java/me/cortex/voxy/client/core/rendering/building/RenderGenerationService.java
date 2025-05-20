@@ -337,6 +337,9 @@ public class RenderGenerationService {
             }
             this.taskMapLock.unlockWrite(stamp);
         }
+        if (this.taskQueueCount.get() != 0) {
+            throw new IllegalStateException();
+        }
     }
 
     private long lastChangedTime = 0;
