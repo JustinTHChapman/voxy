@@ -74,6 +74,8 @@ public class WorldEngine {
         return this.sectionTracker.acquire(pos, true);
     }
 
+    public static final int POS_FORMAT_VERSION = 1;
+
     //TODO: Fixme/optimize, cause as the lvl gets higher, the size of x,y,z gets smaller so i can dynamically compact the format
     // depending on the lvl, which should optimize colisions and whatnot
     public static long getWorldSectionId(int lvl, int x, int y, int z) {
