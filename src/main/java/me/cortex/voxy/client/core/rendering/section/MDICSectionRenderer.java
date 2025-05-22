@@ -30,6 +30,7 @@ import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
 import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
+import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL45.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45.glClearNamedBufferData;
@@ -263,20 +264,6 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);//Am unsure if is needed
             glDispatchCompute(1,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-            //glFinish();
-            /*
-            DownloadStream.INSTANCE.download(this.distanceCountBuffer, 0, 1024*4, (ptr,size)->{
-                int[] a = new int[1024];
-                for (int i = 0; i < 1024; i++) {
-                    a[i] = MemoryUtil.memGetInt(ptr+4*i);
-                }
-                for (int i = 0; i < 1023; i++){
-                    if (a[i+1]<a[i]) {
-                        System.out.println(a[i]+","+a[i+1]);
-                    }
-                }
-            });
-            */
 
             this.translucentGenShader.bind();
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
@@ -287,6 +274,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.distanceCountBuffer.id);
 
             glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountCallBuffer.id);//This isnt great but its a nice trick to bound it, even if its inefficent ;-;
+            glMemoryBarrier(-1);
             glDispatchComputeIndirect(0);
             glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
         }

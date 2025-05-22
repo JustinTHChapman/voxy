@@ -43,6 +43,10 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
 
     private static long getGeometryBufferSize() {
         long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
+        if (Capabilities.INSTANCE.isIntel) {
+            geometryCapacity = Math.max(geometryCapacity, 1L<<30);//intel moment, force min 1gb
+        }
+
         //Limit to available dedicated memory if possible
         if (Capabilities.INSTANCE.canQueryGpuMemory) {
             //512mb less than avalible,
