@@ -32,12 +32,13 @@ import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL45.glBindTextureUnit;
+import static org.lwjgl.opengl.GL45.glClearNamedBufferData;
 
 //Uses MDIC to render the sections
 public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryData> {
     private static final int TRANSLUCENT_OFFSET = 400_000;//in draw calls
     private static final int TEMPORAL_OFFSET = 500_000;//in draw calls
-    private static final int STATISTICS_BUFFER_BINDING = 7;
+    private static final int STATISTICS_BUFFER_BINDING = 8;
     private final Shader terrainShader = Shader.make()
             .defineIf("DEBUG_RENDER", false)
             .add(ShaderType.VERTEX, "voxy:lod/gl46/quads2.vert")
@@ -45,8 +46,10 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             .compile();
 
     private final Shader commandGenShader = Shader.make()
-            .define("TRANSLUCENT_OFFSET", TRANSLUCENT_OFFSET)
+            .define("TRANSLUCENT_WRITE_BASE", 1024)
             .define("TEMPORAL_OFFSET", TEMPORAL_OFFSET)
+
+            .define("TRANSLUCENT_DISTANCE_BUFFER_BINDING", 7)
 
             .defineIf("HAS_STATISTICS", RenderStatistics.enabled)
             .defineIf("STATISTICS_BUFFER_BINDING", RenderStatistics.enabled, STATISTICS_BUFFER_BINDING)
@@ -63,9 +66,23 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             .add(ShaderType.FRAGMENT, "voxy:lod/gl46/cull/raster.frag")
             .compile();
 
+    private final Shader prefixSumShader = Shader.make()
+            .add(ShaderType.COMPUTE, "voxy:util/prefixsum/inital3.comp")
+            .define("IO_BUFFER", 0)
+            .compile();
+
+    private final Shader translucentGenShader = Shader.make()
+            .add(ShaderType.COMPUTE, "voxy:lod/gl46/buildtranslucents.comp")
+            .define("TRANSLUCENT_WRITE_BASE", 1024)//The size of the prefix sum array
+            .define("TRANSLUCENT_DISTANCE_BUFFER_BINDING", 5)
+            .define("TRANSLUCENT_OFFSET", TRANSLUCENT_OFFSET)
+
+            .compile();
+
     private final GlBuffer uniform = new GlBuffer(1024).zero();
 
     //TODO: needs to be in the viewport, since it contains the compute indirect call/values
+    private final GlBuffer distanceCountBuffer = new GlBuffer(1024*4+100_000*4).zero();
     private final GlBuffer drawCountCallBuffer = new GlBuffer(1024).zero();
     private final GlBuffer drawCallBuffer = new GlBuffer(5*4*(400_000+100_000+100_000)).zero();//400k draw calls
     private final GlBuffer positionScratchBuffer  = new GlBuffer(8*400000).zero();//400k positions
@@ -205,6 +222,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
 
         {//Generate the commands
+            this.distanceCountBuffer.zeroRange(0, 1024*4);
             this.commandGenShader.bind();
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCallBuffer.id);
@@ -213,6 +231,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.positionScratchBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.distanceCountBuffer.id);
 
             if (RenderStatistics.enabled) {
                 this.statisticsBuffer.zero();
@@ -238,6 +257,40 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             }
         }
 
+        {//Do translucency sorting
+            this.prefixSumShader.bind();
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.distanceCountBuffer.id);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);//Am unsure if is needed
+            glDispatchCompute(1,1,1);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+            //glFinish();
+            /*
+            DownloadStream.INSTANCE.download(this.distanceCountBuffer, 0, 1024*4, (ptr,size)->{
+                int[] a = new int[1024];
+                for (int i = 0; i < 1024; i++) {
+                    a[i] = MemoryUtil.memGetInt(ptr+4*i);
+                }
+                for (int i = 0; i < 1023; i++){
+                    if (a[i+1]<a[i]) {
+                        System.out.println(a[i]+","+a[i+1]);
+                    }
+                }
+            });
+            */
+
+            this.translucentGenShader.bind();
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCallBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.drawCountCallBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBuffer().id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.indirectLookupBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.distanceCountBuffer.id);
+
+            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountCallBuffer.id);//This isnt great but its a nice trick to bound it, even if its inefficent ;-;
+            glDispatchComputeIndirect(0);
+            glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
+        }
+
     }
 
     @Override
@@ -261,10 +314,13 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     @Override
     public void free() {
         this.uniform.free();
+        this.distanceCountBuffer.free();
         this.terrainShader.free();
         this.commandGenShader.free();
         this.cullShader.free();
         this.prepShader.free();
+        this.translucentGenShader.free();
+        this.prefixSumShader.free();
         this.drawCallBuffer.free();
         this.drawCountCallBuffer.free();
         this.positionScratchBuffer.free();
