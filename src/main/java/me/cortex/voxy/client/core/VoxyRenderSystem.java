@@ -4,6 +4,7 @@ import com.mojang.blaze3d.opengl.GlConst;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.TimingStatistics;
+import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
@@ -233,7 +234,7 @@ public class VoxyRenderSystem {
             //Tick upload stream (this is ok to do here as upload ticking is just memory management)
             UploadStream.INSTANCE.tick();
 
-            this.renderDistanceTracker.setCenterAndProcess(cameraX, cameraZ);
+            while (this.renderDistanceTracker.setCenterAndProcess(cameraX, cameraZ) && VoxyClient.isFrexActive());//While FF is active, run until everything is processed
 
             //Done here as is allows less gl state resetup
             this.renderer.tickModelService(Math.max(3_000_000-(System.nanoTime()-startTime), 500_000));

@@ -22,6 +22,8 @@ public class Capabilities {
     public final long totalDynamicMemory;//Bytes, total allocation memory - dedicated memory
     public final boolean compute;
     public final boolean indirectParameters;
+    public final boolean isIntel;
+
     public Capabilities() {
         var cap = GL.getCapabilities();
         this.compute = cap.glDispatchComputeIndirect != 0;
@@ -42,6 +44,7 @@ public class Capabilities {
         this.ssboMaxSize = glGetInteger64(GL_MAX_SHADER_STORAGE_BLOCK_SIZE);
 
         this.isMesa = glGetString(GL_VERSION).toLowerCase().contains("mesa");
+        this.isIntel = glGetString(GL_VENDOR).toLowerCase().contains("intel");
 
         if (this.canQueryGpuMemory) {
             this.totalDedicatedMemory = glGetInteger64(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX)*1024;//Since its in Kb

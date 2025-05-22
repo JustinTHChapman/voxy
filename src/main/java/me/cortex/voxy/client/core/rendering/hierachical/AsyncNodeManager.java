@@ -717,6 +717,10 @@ public class AsyncNodeManager {
         debug.add("UC/GC: " + (this.getUsedGeometryCapacity()/(1<<20))+"/"+(this.getGeometryCapacity()/(1<<20)));
     }
 
+    public boolean hasWork() {
+        return this.workCounter.get()!=0 && RESULT_HANDLE.get(this) != null;
+    }
+
     //Results object, which is to be synced between the render thread and worker thread
     private static final class SyncResults {
         //Contains

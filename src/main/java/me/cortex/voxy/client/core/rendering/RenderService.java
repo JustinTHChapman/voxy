@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.TimingStatistics;
+import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
@@ -14,6 +15,7 @@ import me.cortex.voxy.client.core.rendering.section.geometry.*;
 import me.cortex.voxy.client.core.rendering.section.IUsesMeshlets;
 import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
+import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
@@ -117,18 +119,12 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         this.sectionRenderer.renderOpaque(viewport, depthBoundTexture);
         TimingStatistics.G.stop();
 
-        //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
-        // sections
-
-
-        //FIXME: we only want to tick once per full frame, this is due to how the data of sections is updated
-        // we basicly need the data to stay stable from one frame to the next, till after renderOpaque
-        // this is because e.g. shadows, cause this pipeline to be invoked multiple times
-        // which may cause the geometry to become outdated resulting in corruption rendering in renderOpaque
-        //TODO: Need to find a proper way to fix this (if there even is one)
-        {
-            TimingStatistics.main.stop();
-            TimingStatistics.dynamic.start();
+        do {
+            //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
+            // sections
+            {
+                TimingStatistics.main.stop();
+                TimingStatistics.dynamic.start();
 
             /*
             this.sectionUpdateQueue.consume(128);
@@ -143,29 +139,40 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
             }*/
 
 
-            TimingStatistics.D.start();
-            //Tick download stream
-            DownloadStream.INSTANCE.tick();
-            TimingStatistics.D.stop();
+                TimingStatistics.D.start();
+                //Tick download stream
+                DownloadStream.INSTANCE.tick();
+                TimingStatistics.D.stop();
 
-            this.nodeManager.tick(this.traversal.getNodeBuffer(), this.nodeCleaner);
-            //glFlush();
+                this.nodeManager.tick(this.traversal.getNodeBuffer(), this.nodeCleaner);
+                //glFlush();
 
-            this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
+                this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
 
-            TimingStatistics.dynamic.stop();
-            TimingStatistics.main.start();
-        }
+                TimingStatistics.dynamic.stop();
+                TimingStatistics.main.start();
+            }
 
-        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_PIXEL_BUFFER_BARRIER_BIT);
+            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT | GL_PIXEL_BUFFER_BARRIER_BIT);
 
-        int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-        if (depthBuffer == 0) {
-            depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-        }
-        TimingStatistics.I.start();
-        this.traversal.doTraversal(viewport, depthBuffer);
-        TimingStatistics.I.stop();
+            int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+            if (depthBuffer == 0) {
+                depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+            }
+
+            TimingStatistics.I.start();
+            this.traversal.doTraversal(viewport, depthBuffer);
+            TimingStatistics.I.stop();
+
+
+            if (VoxyClient.isFrexActive()) {//If frex is running we must tick everything to ensure correctness
+                UploadStream.INSTANCE.tick();
+                //Done here as is allows less gl state resetup
+                this.tickModelService(100_000_000);
+                glFinish();
+            }
+        } while (VoxyClient.isFrexActive() && (this.nodeManager.hasWork() || this.renderGen.getTaskCount()!=0 || !this.modelService.areQueuesEmpty()));
+
 
         TimingStatistics.H.start();
         this.sectionRenderer.buildDrawCalls(viewport);
