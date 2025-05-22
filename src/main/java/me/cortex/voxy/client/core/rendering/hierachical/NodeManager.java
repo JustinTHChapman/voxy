@@ -18,6 +18,7 @@ import me.cortex.voxy.common.world.WorldEngine;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 import static me.cortex.voxy.common.world.WorldEngine.MAX_LOD_LAYER;
 import static me.cortex.voxy.common.world.WorldEngine.UPDATE_TYPE_BLOCK_BIT;
@@ -255,9 +256,6 @@ public class NodeManager {
         //Removes geometry possible with downloading to cache
         this.geometryManager.removeSection(id);
     }
-    //TODO: FIXME: add method to clear geometry cache of position, or the geometry is empty etc jkdfgsl
-    // this is for cpu/ram side geometry caching
-    // TODO: IMPLEMENT
 
     private int uploadReplaceSection(int meshId, BuiltSection section) {
         if (section.isEmpty()) {

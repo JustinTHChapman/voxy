@@ -6,6 +6,7 @@ import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.GeometryCache;
 import me.cortex.voxy.client.core.rendering.ISectionWatcher;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.section.geometry.BasicAsyncGeometryManager;
@@ -60,6 +61,8 @@ public class AsyncNodeManager {
     private final NodeManager manager;
     private final BasicAsyncGeometryManager geometryManager;
     private final IGeometryData geometryData;
+
+    private final GeometryCache geometryCache = new GeometryCache(1L<<32);
 
     private final AtomicInteger workCounter = new AtomicInteger();
 
@@ -739,6 +742,9 @@ public class AsyncNodeManager {
         private int geometrySectionCount;
         private long usedGeometry;
         private final ComputeMemoryCopy geometryUpload = new ComputeMemoryCopy();
+
+        //Gpu geometry downloads
+
 
 
         //Scatter writes for both geometry and node metadata
