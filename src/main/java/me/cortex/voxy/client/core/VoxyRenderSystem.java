@@ -191,9 +191,10 @@ public class VoxyRenderSystem {
 
 
         int oldFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
+        int boundFB = oldFB;
 
         var target = DefaultTerrainRenderPasses.CUTOUT.getTarget();
-        int boundFB = ((net.minecraft.client.texture.GlTexture) target.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getFramebufferManager(), target.getDepthAttachment());
+        //boundFB = ((net.minecraft.client.texture.GlTexture) target.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getFramebufferManager(), target.getDepthAttachment());
         if (boundFB == 0) {
             throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
         }
