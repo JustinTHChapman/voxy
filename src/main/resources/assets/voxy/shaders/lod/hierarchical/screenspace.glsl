@@ -138,7 +138,7 @@ bool isCulledByHiz() {
     miplevel = clamp(miplevel, 0, 20);
 
     if (miplevel >= 10.0f) {//Level 9 or 10// TODO: FIX THIS JANK SHIT
-        return false;
+        //return false;
     }
 
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
