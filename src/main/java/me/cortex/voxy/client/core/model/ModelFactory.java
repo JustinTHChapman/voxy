@@ -13,6 +13,7 @@ import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.FluidBlock;
+import net.minecraft.block.LeavesBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.color.block.BlockColorProvider;
@@ -258,7 +259,11 @@ public class ModelFactory {
         if (blockState.getBlock() instanceof FluidBlock) {
             blockRenderLayer = RenderLayers.getFluidLayer(blockState.getFluidState());
         } else {
-            blockRenderLayer = RenderLayers.getBlockLayer(blockState);
+            if (blockState.getBlock() instanceof LeavesBlock) {
+                blockRenderLayer = RenderLayer.getSolid();
+            } else {
+                blockRenderLayer = RenderLayers.getBlockLayer(blockState);
+            }
         }
 
 

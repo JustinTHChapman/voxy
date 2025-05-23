@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.model.bakery;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.FluidBlock;
+import net.minecraft.block.LeavesBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
@@ -166,7 +167,11 @@ public class ModelTextureBakery {
             layer = RenderLayers.getFluidLayer(state.getFluidState());
             isBlock = false;
         } else {
-            layer = RenderLayers.getBlockLayer(state);
+            if (state.getBlock() instanceof LeavesBlock) {
+                layer = RenderLayer.getSolid();
+            } else {
+                layer = RenderLayers.getBlockLayer(state);
+            }
         }
 
         //TODO: support block model entities
