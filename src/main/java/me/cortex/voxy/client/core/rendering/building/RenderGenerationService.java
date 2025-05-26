@@ -57,21 +57,20 @@ public class RenderGenerationService {
 
     private final WorldEngine world;
     private final ModelBakerySubsystem modelBakery;
-    private final Consumer<BuiltSection> resultConsumer;
+    private Consumer<BuiltSection> resultConsumer;
     private final boolean emitMeshlets;
 
     private final ServiceSlice threads;
 
 
-    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, Consumer<BuiltSection> consumer, boolean emitMeshlets) {
-        this(world, modelBakery, serviceThreadPool, consumer, emitMeshlets, ()->true);
+    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, boolean emitMeshlets) {
+        this(world, modelBakery, serviceThreadPool, emitMeshlets, ()->true);
     }
 
-    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, Consumer<BuiltSection> consumer, boolean emitMeshlets, BooleanSupplier taskLimiter) {
+    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, boolean emitMeshlets, BooleanSupplier taskLimiter) {
         this.emitMeshlets = emitMeshlets;
         this.world = world;
         this.modelBakery = modelBakery;
-        this.resultConsumer = consumer;
 
         this.threads = serviceThreadPool.createService("Section mesh generation service", 100, ()->{
             //Thread local instance of the factory
@@ -81,6 +80,10 @@ public class RenderGenerationService {
                 this.processJob(factory, seenMissed);
             }, factory::free);
         }, taskLimiter);
+    }
+
+    public void setResultConsumer(Consumer<BuiltSection> consumer) {
+        this.resultConsumer = consumer;
     }
 
     //NOTE: the biomes are always fully populated/kept up to date
@@ -139,7 +142,9 @@ public class RenderGenerationService {
         }
 
         if (section == null) {
-            this.resultConsumer.accept(BuiltSection.empty(task.position));
+            if (this.resultConsumer != null) {
+                this.resultConsumer.accept(BuiltSection.empty(task.position));
+            }
             return;
         }
         section.assertNotFree();
@@ -265,7 +270,11 @@ public class RenderGenerationService {
         }
 
         if (mesh != null) {//If the mesh is null it means it didnt finish, so dont submit
-            this.resultConsumer.accept(mesh);
+            if (this.resultConsumer != null) {
+                this.resultConsumer.accept(mesh);
+            } else {
+                mesh.free();
+            }
         }
     }
 

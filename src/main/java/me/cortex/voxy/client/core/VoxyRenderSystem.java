@@ -346,8 +346,8 @@ public class VoxyRenderSystem {
     private void testFullMesh() {
         var modelService = new ModelBakerySubsystem(this.worldIn.getMapper());
         var completedCounter = new AtomicInteger();
-        var generationService = new RenderGenerationService(this.worldIn, modelService, VoxyCommon.getInstance().getThreadPool(), a-> {completedCounter.incrementAndGet(); a.free();}, false);
-
+        var generationService = new RenderGenerationService(this.worldIn, modelService, VoxyCommon.getInstance().getThreadPool(), false);
+        generationService.setResultConsumer(a-> {completedCounter.incrementAndGet(); a.free();});
 
         var r = new Random(12345);
         {

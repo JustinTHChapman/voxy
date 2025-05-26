@@ -7,8 +7,9 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.GeometryCache;
-import me.cortex.voxy.client.core.rendering.ISectionWatcher;
+import me.cortex.voxy.client.core.rendering.SectionUpdateRouter;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
+import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.section.geometry.BasicAsyncGeometryManager;
 import me.cortex.voxy.client.core.rendering.section.geometry.BasicSectionGeometryData;
 import me.cortex.voxy.client.core.rendering.section.geometry.IGeometryData;
@@ -16,6 +17,7 @@ import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.AllocationArena;
 import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import org.lwjgl.system.MemoryUtil;
 
@@ -61,6 +63,7 @@ public class AsyncNodeManager {
     private final NodeManager manager;
     private final BasicAsyncGeometryManager geometryManager;
     private final IGeometryData geometryData;
+    private final SectionUpdateRouter router;
 
     private final GeometryCache geometryCache = new GeometryCache(1L<<32);
 
@@ -77,7 +80,7 @@ public class AsyncNodeManager {
 
     private boolean needsWaitForSync = false;
 
-    public AsyncNodeManager(int maxNodeCount, ISectionWatcher watcher, IGeometryData geometryData) {
+    public AsyncNodeManager(int maxNodeCount, IGeometryData geometryData, RenderGenerationService renderService) {
         //Note the current implmentation of ISectionWatcher is threadsafe
         //Note: geometry data is the data store/source, not the management, it is just a raw store of data
         // it MUST ONLY be accessed on the render thread
@@ -99,7 +102,20 @@ public class AsyncNodeManager {
         this.thread.setName("Async Node Manager");
 
         this.geometryManager = new BasicAsyncGeometryManager(((BasicSectionGeometryData)geometryData).getMaxSectionCount(), this.geometryCapacity);
-        this.manager = new NodeManager(maxNodeCount, this.geometryManager, watcher);
+
+        this.router = new SectionUpdateRouter();
+        this.router.setCallbacks(pos->{//On initial render gen, try get from geometry cache
+            var cachedGeometry = this.geometryCache.remove(pos);
+            if (cachedGeometry != null) {//Use the cached geometry
+                this.submitGeometryResult(cachedGeometry);
+            } else {//Else we need to request it
+                renderService.enqueueTask(pos);
+            }
+        }, renderService::enqueueTask, this::submitChildChange);
+        renderService.setResultConsumer(this::submitGeometryResult);
+
+        this.manager = new NodeManager(maxNodeCount, this.geometryManager, this.router);
+
         //Dont do the move... is just to much effort
         this.manager.setClear(new NodeManager.ICleaner() {
             @Override
@@ -270,6 +286,12 @@ public class AsyncNodeManager {
 
                 if (pos == -1) {
                     //TODO: investigate how or what this happens
+                    continue;
+                }
+
+                if (pos == 0) {
+                    //THIS SHOULD BE IMPOSSIBLE
+                    //TODO: VVVVV MUCH MEGA FIX
                     continue;
                 }
 
@@ -600,7 +622,7 @@ public class AsyncNodeManager {
         this.addWork();
     }
 
-    public void submitChildChange(WorldSection section) {
+    private void submitChildChange(WorldSection section) {
         if (!this.running) {
             return;
         }
@@ -609,7 +631,7 @@ public class AsyncNodeManager {
         this.addWork();
     }
 
-    public void submitGeometryResult(BuiltSection geometry) {
+    private void submitGeometryResult(BuiltSection geometry) {
         if (!this.running) {
             geometry.free();
             return;
@@ -722,6 +744,13 @@ public class AsyncNodeManager {
 
     public boolean hasWork() {
         return this.workCounter.get()!=0 && RESULT_HANDLE.get(this) != null;
+    }
+
+    public void worldEvent(WorldSection section, int flags) {
+        //If there is any change, we need to clear the geometry cache before emitting update
+        this.geometryCache.clear(section.key);
+
+        this.router.forwardEvent(section, flags);
     }
 
     //Results object, which is to be synced between the render thread and worker thread
