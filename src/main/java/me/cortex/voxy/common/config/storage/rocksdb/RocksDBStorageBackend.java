@@ -6,6 +6,7 @@ import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.config.storage.StorageConfig;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
+import me.cortex.voxy.common.world.WorldEngine;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.rocksdb.*;
@@ -49,9 +50,13 @@ public class RocksDBStorageBackend extends StorageBackend {
             }
         }
          */
+        RocksDB.loadLibrary();
 
+        //TODO: FIXME: DONT USE THE SAME options PER COLUMN FAMILY
         final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
+                .setCompressionType(CompressionType.NO_COMPRESSION)
                 .optimizeForPointLookup(128);
+
 
         final List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
             new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
@@ -116,7 +121,7 @@ public class RocksDBStorageBackend extends StorageBackend {
             //HATE JAVA HATE JAVA HATE JAVA, Long.reverseBytes()
             //THIS WILL ONLY WORK ON LITTLE ENDIAN SYSTEM AAAAAAAAA ;-;
 
-            MemoryUtil.memPutLong(MemoryUtil.memAddress(buffer), Long.reverseBytes(key));
+            MemoryUtil.memPutLong(MemoryUtil.memAddress(buffer), Long.reverseBytes(swizzlePos(key)));
 
             var result = this.db.get(this.worldSections,
                     this.sectionReadOps,
@@ -138,7 +143,7 @@ public class RocksDBStorageBackend extends StorageBackend {
     public void setSectionData(long key, MemoryBuffer data) {
         try (var stack = MemoryStack.stackPush()) {
             var keyBuff = stack.calloc(8);
-            MemoryUtil.memPutLong(MemoryUtil.memAddress(keyBuff), Long.reverseBytes(key));
+            MemoryUtil.memPutLong(MemoryUtil.memAddress(keyBuff), Long.reverseBytes(swizzlePos(key)));
             this.db.put(this.worldSections, this.sectionWriteOps, keyBuff, data.asByteBuffer());
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
@@ -148,7 +153,7 @@ public class RocksDBStorageBackend extends StorageBackend {
     @Override
     public void deleteSectionData(long key) {
         try {
-            this.db.delete(this.worldSections, longToBytes(key));
+            this.db.delete(this.worldSections, longToBytes(swizzlePos(key)));
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
@@ -225,5 +230,16 @@ public class RocksDBStorageBackend extends StorageBackend {
         public static String getConfigTypeName() {
             return "RocksDB";
         }
+    }
+
+    private static long swizzlePos(long key) {
+        if (true) {
+            return key;
+        }
+        if (WorldEngine.POS_FORMAT_VERSION != 1) throw new IllegalStateException("TODO: UPDATE THIS");
+        return  (key&(0xFL<<60)) |
+                Long.expand((key>>> 4)&((1L<<24)-1), 0b01010101010101010101010101010101_001001001001001001001001L) |
+                Long.expand((key>>>52)&0xFF,         0b00000000000000000000000000000000_100100100100100100100100L) |
+                Long.expand((key>>>28)&((1L<<24)-1), 0b10101010101010101010101010101010_010010010010010010010010L);
     }
 }
