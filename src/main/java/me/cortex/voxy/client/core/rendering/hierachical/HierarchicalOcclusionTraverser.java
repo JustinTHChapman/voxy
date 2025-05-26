@@ -67,7 +67,6 @@ public class HierarchicalOcclusionTraverser {
     private static final int RENDER_TRACKER_BINDING = BINDING_COUNTER++;
     private static final int STATISTICS_BUFFER_BINDING = BINDING_COUNTER++;
 
-    private final HiZBuffer hiZBuffer = new HiZBuffer();
     private final int hizSampler = glGenSamplers();
 
     private final AutoBindingShader traversal = Shader.makeAuto(PRINTF_processor)
@@ -199,14 +198,14 @@ public class HierarchicalOcclusionTraverser {
         glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.queueMetaBuffer.id);
 
         //Bind the hiz buffer
-        glBindTextureUnit(0, this.hiZBuffer.getHizTextureId());
+        glBindTextureUnit(0, viewport.hiZBuffer.getHizTextureId());
         glBindSampler(0, this.hizSampler);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_QUEUE_BINDING, viewport.getRenderList().id);
     }
 
     public void doTraversal(Viewport<?> viewport, int depthBuffer) {
         //Compute the mip chain
-        this.hiZBuffer.buildMipChain(depthBuffer, viewport.width, viewport.height);
+        viewport.hiZBuffer.buildMipChain(depthBuffer, viewport.width, viewport.height);
 
         this.uploadUniform(viewport);
         //UploadStream.INSTANCE.commit(); //Done inside traversal
@@ -344,7 +343,6 @@ public class HierarchicalOcclusionTraverser {
     public void free() {
         this.traversal.free();
         this.requestBuffer.free();
-        this.hiZBuffer.free();
         this.nodeBuffer.free();
         this.uniformBuffer.free();
         this.statisticsBuffer.free();

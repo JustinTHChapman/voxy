@@ -157,10 +157,10 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
 
             glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT | GL_PIXEL_BUFFER_BARRIER_BIT);
 
-            int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-            if (depthBuffer == 0) {
-                depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-            }
+            int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+            //if (depthBuffer == 0) {
+            //    depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+            //}
 
             TimingStatistics.I.start();
             this.traversal.doTraversal(viewport, depthBuffer);
@@ -181,7 +181,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         TimingStatistics.H.stop();
 
         TimingStatistics.G.start();
-        this.sectionRenderer.renderTemporal(depthBoundTexture);
+        this.sectionRenderer.renderTemporal(viewport, depthBoundTexture);
         TimingStatistics.G.stop();
     }
 
