@@ -736,6 +736,7 @@ public class AsyncNodeManager {
 
         this.scatterWrite.free();
         this.multiMemcpy.free();
+        this.geometryCache.free();
     }
 
     public void addDebug(List<String> debug) {

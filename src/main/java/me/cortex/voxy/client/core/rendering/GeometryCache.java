@@ -55,4 +55,11 @@ public class GeometryCache {
             sec.free();
         }
     }
+
+    public void free() {
+        this.lock.lock();
+        this.cache.values().forEach(BuiltSection::free);
+        this.cache.clear();
+        this.lock.unlock();
+    }
 }
