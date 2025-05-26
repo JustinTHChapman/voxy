@@ -42,6 +42,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
+import static org.lwjgl.opengl.GL11.glGetIntegerv;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
 import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
@@ -174,37 +176,39 @@ public class VoxyRenderSystem {
         TimingStatistics.all.start();
         TimingStatistics.main.start();
 
-        //this.autoBalanceSubDivSize();
-
-        var projection = computeProjectionMat(matrices.projection());//RenderSystem.getProjectionMatrix();
-        //var projection = new Matrix4f(matrices.projection());
-
-        var viewport = this.renderer.getViewport();
-        viewport
-                .setProjection(projection)
-                .setModelView(new Matrix4f(matrices.modelView()))
-                .setCamera(cameraX, cameraY, cameraZ)
-                .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight)
-                .update();
-        viewport.frameId++;
-
 
 
         int oldFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         int boundFB = oldFB;
 
-        var target = DefaultTerrainRenderPasses.CUTOUT.getTarget();
+        //var target = DefaultTerrainRenderPasses.CUTOUT.getTarget();
         //boundFB = ((net.minecraft.client.texture.GlTexture) target.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getFramebufferManager(), target.getDepthAttachment());
         if (boundFB == 0) {
             throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
         }
+
+        //this.autoBalanceSubDivSize();
+
+        var projection = computeProjectionMat(matrices.projection());//RenderSystem.getProjectionMatrix();
+        //var projection = new Matrix4f(matrices.projection());
+
+        int[] dims = new int[4];
+        glGetIntegerv(GL_VIEWPORT, dims);
+        var viewport = this.renderer.getViewport();
+        viewport
+                .setProjection(projection)
+                .setModelView(new Matrix4f(matrices.modelView()))
+                .setCamera(cameraX, cameraY, cameraZ)
+                .setScreenSize(dims[2], dims[3])
+                .update();
+        viewport.frameId++;
 
         TimingStatistics.E.start();
         this.chunkBoundRenderer.render(viewport);
         TimingStatistics.E.stop();
 
         TimingStatistics.F.start();
-        this.postProcessing.setup(target.textureWidth, target.textureHeight, boundFB);
+        this.postProcessing.setup(viewport.width, viewport.height, boundFB);
         TimingStatistics.F.stop();
 
         this.renderer.renderFarAwayOpaque(viewport, this.chunkBoundRenderer.getDepthBoundTexture(), startTime);
