@@ -25,7 +25,8 @@ public class CpuLayout {
     }
 
     public static void setThreadAffinity(Affinity... affinities) {
-        if (Platform.get() == Platform.WINDOWS) {
+        var platform = Platform.get();
+        if (platform == Platform.WINDOWS) {
             long[] msks = new long[affinities.length];
             short[] groups = new short[affinities.length];Arrays.fill(groups, (short) -1);
             int i = 0;
@@ -36,8 +37,15 @@ public class CpuLayout {
                 msks[idx] |= a.msk;
             }
             ThreadUtils.SetThreadSelectedCpuSetMasksWin32(Arrays.copyOf(msks, i), Arrays.copyOf(groups, i));
+        } else if (platform == Platform.LINUX) {
+            Arrays.sort(affinities, (a, b) -> a.group - b.group);
+            long[] msks = new long[affinities.length];
+            for (int i=0; i<affinities.length; i++) {
+                msks[i] = affinities[i].msk;
+            }
+            ThreadUtils.schedSetaffinityLinux(msks);
         } else {
-            Logger.error("TODO: THIS");
+            Logger.error("Don't know how to set thread affinity on this platform.");
         }
     }
 

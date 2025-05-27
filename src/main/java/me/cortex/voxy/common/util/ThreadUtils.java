@@ -5,6 +5,7 @@ import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Platform;
 import org.lwjgl.system.windows.Kernel32;
+import org.lwjgl.system.APIUtil;
 
 //Platform specific code to assist in thread utilities
 public class ThreadUtils {
@@ -15,6 +16,7 @@ public class ThreadUtils {
     private static final boolean isWindows = Platform.get() == Platform.WINDOWS;
     private static final long SetThreadPriority;
     private static final long SetThreadSelectedCpuSetMasks;
+    private static final long schedSetaffinity;
     static {
         if (isWindows) {
             SetThreadPriority = Kernel32.getLibrary().getFunctionAddress("SetThreadPriority");
@@ -22,6 +24,13 @@ public class ThreadUtils {
         } else {
             SetThreadPriority = 0;
             SetThreadSelectedCpuSetMasks = 0;
+        }
+
+        if (Platform.get() == Platform.LINUX) {
+            var libc = APIUtil.apiCreateLibrary("libc.so.6");
+            schedSetaffinity = APIUtil.apiGetFunctionAddress(libc, "sched_setaffinity");
+        } else {
+            schedSetaffinity = 0;
         }
     }
 
@@ -69,5 +78,23 @@ public class ThreadUtils {
             throw new IllegalStateException("Operation failed");
         }
         return true;
+    }
+
+    public static boolean schedSetaffinityLinux(long masks[]) {
+        if (schedSetaffinity == 0 || isWindows) {
+            return false;
+        }
+        try (var stack = MemoryStack.stackPush()) {
+            long ptr = stack.ncalloc(8, masks.length, 8);
+            for (int i=0; i<masks.length; i++) {
+                MemoryUtil.memPutLong(ptr+i*8L, masks[i]);
+            }
+
+            int retVal = JNI.invokePPI(0, (long)masks.length*8, ptr, schedSetaffinity);
+            if (retVal != 0) {
+                throw new IllegalStateException();
+            }
+            return true;
+        }
     }
 }
