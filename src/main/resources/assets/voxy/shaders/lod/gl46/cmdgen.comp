@@ -113,7 +113,8 @@ void main() {
             translucentCommandData[tp] = drawId;
             uvec3 absRel = abs(relative);
             uint distToCamera = (absRel.x+absRel.y+absRel.z)<<detail;
-            distToCamera = TRANSLUCENT_WRITE_BASE-min(distToCamera, TRANSLUCENT_WRITE_BASE);
+            //The -1 is because we want 0 to TRANSLUCENT_WRITE_BASE, exclusive of ending, not inclusive (0->1023)
+            distToCamera = (TRANSLUCENT_WRITE_BASE-1)-min(distToCamera, (TRANSLUCENT_WRITE_BASE-1));
             atomicAdd(translucentCommandData[distToCamera], 1);
             #ifdef HAS_STATISTICS
             totalQuads += count;

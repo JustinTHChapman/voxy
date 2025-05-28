@@ -80,10 +80,10 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
             .compile();
 
-    private final GlBuffer uniform = new GlBuffer(1024).zero();
+    private final GlBuffer uniform = new GlBuffer(1024).zero();//TODO move to viewport?
 
     //TODO: needs to be in the viewport, since it contains the compute indirect call/values
-    private final GlBuffer distanceCountBuffer = new GlBuffer(1024*4+100_000*4).zero();
+    private final GlBuffer distanceCountBuffer = new GlBuffer(1024*4+100_000*4).zero();//TODO move to viewport?
 
     //Statistics
     private final GlBuffer statisticsBuffer = new GlBuffer(1024).zero();

@@ -23,7 +23,6 @@ layout(binding = TRANSLUCENT_DISTANCE_BUFFER_BINDING, std430) restrict buffer Tr
     uint[] translucentCommandData;
 };
 
-//Note: if i want reverse indexing i need to use the index buffer offset to offset
 void writeCmd(uint idx, uint instance, uint offset, uint quadCount) {
     DrawCommand cmd;
     cmd.count = quadCount * 6;
@@ -44,7 +43,8 @@ void main() {
 
     uvec3 rel = abs(extractPosition(meta)-(baseSectionPos>>detail));
     uint dist = (rel.x+rel.y+rel.z)<<detail;
-    dist = TRANSLUCENT_WRITE_BASE-min(dist, TRANSLUCENT_WRITE_BASE);
+    //The -1 is because we want 0 to TRANSLUCENT_WRITE_BASE, exclusive of ending, not inclusive (0->1023)
+    dist = (TRANSLUCENT_WRITE_BASE-1)-min(dist, (TRANSLUCENT_WRITE_BASE-1));
 
     uint drawPtr = atomicAdd(translucentCommandData[dist],1)+TRANSLUCENT_OFFSET;
     writeCmd(drawPtr, drawId, extractQuadStart(meta), meta.cntA&0xFFFF);

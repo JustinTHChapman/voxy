@@ -87,7 +87,7 @@ void main() {
     memoryBarrierShared();
     barrier();
 
-    if (gl_SubgroupID == 0) {
+    if (subgroupId == 0) {
         uint val = warpPrefixSum[gl_SubgroupInvocationID];
         subgroupBarrier();
         //Use warp to do entire add in 1 reduction
