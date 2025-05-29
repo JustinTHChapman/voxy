@@ -80,10 +80,12 @@ public class VoxyClientInstance extends VoxyInstance {
             try {
                 config = Serialization.GSON.fromJson(Files.readString(json), Config.class);
                 if (config == null) {
-                    throw new IllegalStateException("Config deserialization null, reverting to default");
-                }
-                if (config.sectionStorageConfig == null) {
-                    throw new IllegalStateException("Config section storage null, reverting to default");
+                    Logger.error("Config deserialization null, reverting to default");
+                } else {
+                    if (config.sectionStorageConfig == null) {
+                        Logger.error("Config section storage null, reverting to default");
+                        config = null;
+                    }
                 }
             } catch (Exception e) {
                 Logger.error("Failed to load the storage configuration file, resetting it to default, this will probably break your save if you used a custom storage config", e);
