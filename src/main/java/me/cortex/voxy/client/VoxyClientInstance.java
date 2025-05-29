@@ -29,6 +29,11 @@ public class VoxyClientInstance extends VoxyInstance {
     private final Path basePath = getBasePath();
     public VoxyClientInstance() {
         super(VoxyConfig.CONFIG.serviceThreads);
+        try {
+            Files.createDirectories(this.basePath);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
         this.storageConfig = getCreateStorageConfig(this.basePath);
     }
 
@@ -147,7 +152,7 @@ public class VoxyClientInstance extends VoxyInstance {
                 }
             }
         }
-        return basePath;
+        return basePath.toAbsolutePath();
     }
 
     /*
