@@ -85,16 +85,13 @@ public class VoxyClientInstance extends VoxyInstance {
             }
         }
 
-        try {
+        if (config == null) {
             config = DEFAULT_STORAGE_CONFIG;
-
-            try {
-                Files.writeString(json, Serialization.GSON.toJson(config));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+        }
+        try {
+            Files.writeString(json, Serialization.GSON.toJson(config));
         } catch (Exception e) {
-            throw new RuntimeException("Failed to deserialize the default config, aborting!", e);
+            throw new RuntimeException("Failed write the config, aborting!", e);
         }
         if (config == null) {
             throw new IllegalStateException("Config is still null\n");
@@ -150,7 +147,7 @@ public class VoxyClientInstance extends VoxyInstance {
                 }
             }
         }
-        return basePath.toAbsolutePath();
+        return basePath;
     }
 
     /*
