@@ -162,7 +162,7 @@ public class NodeManager {
 
     public void removeTopLevelNode(long pos) {
         if (!this.topLevelNodes.remove(pos)) {
-            throw new IllegalStateException("Position not in top level map");
+            throw new IllegalStateException("Position not in top level map: " + WorldEngine.pprintPos(pos));
         }
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {

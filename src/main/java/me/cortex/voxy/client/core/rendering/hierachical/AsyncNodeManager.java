@@ -648,8 +648,12 @@ public class AsyncNodeManager {
     public void addTopLevel(long section) {//Only called from render thread
         if (!this.running) throw new IllegalStateException("Not running");
         long stamp = this.tlnLock.writeLock();
-        int state = this.tlnAdd.add(section)?1:0;
-        state -= this.tlnRem.remove(section)?1:0;
+        int state = 0;
+        if (!this.tlnRem.remove(section)) {
+            state += this.tlnAdd.add(section)?1:0;
+        } else {
+            state -= 1;
+        }
         if (state != 0) {
             if (this.workCounter.getAndAdd(state) == 0) {
                 LockSupport.unpark(this.thread);
@@ -661,8 +665,12 @@ public class AsyncNodeManager {
     public void removeTopLevel(long section) {//Only called from render thread
         if (!this.running) throw new IllegalStateException("Not running");
         long stamp = this.tlnLock.writeLock();
-        int state = this.tlnRem.add(section)?1:0;
-        state -= this.tlnAdd.remove(section)?1:0;
+        int state = 0;
+        if (!this.tlnAdd.remove(section)) {
+            state += this.tlnRem.add(section)?1:0;
+        } else {
+            state -= 1;
+        }
         if (state != 0) {
             if (this.workCounter.getAndAdd(state) == 0) {
                 LockSupport.unpark(this.thread);
