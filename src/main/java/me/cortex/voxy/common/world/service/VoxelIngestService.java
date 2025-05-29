@@ -8,9 +8,11 @@ import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceSlice;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldUpdater;
-import me.cortex.voxy.commonImpl.IVoxyWorld;
+import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
+import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkNibbleArray;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.WorldChunk;
@@ -83,17 +85,6 @@ public class VoxelIngestService {
         return true;
     }
 
-    public void enqueueIngest(WorldChunk chunk, boolean ignoreOnNullWorld) {
-        var engine = ((IVoxyWorld)chunk.getWorld()).getWorldEngine();
-        if (engine == null) {
-            if (!ignoreOnNullWorld) {
-                Logger.error("Could not ingest chunk as does not have world engine");
-            }
-            return;
-        }
-        this.enqueueIngest(engine, chunk);
-    }
-
     public void enqueueIngest(WorldEngine engine, WorldChunk chunk) {
         if (!engine.isLive()) {
             throw new IllegalStateException("Tried inserting chunk into WorldEngine that was not alive");
@@ -136,5 +127,21 @@ public class VoxelIngestService {
 
     public void shutdown() {
         this.threads.shutdown();
+    }
+
+    //Utility method to ingest a chunk into the given WorldIdentifier or world
+    public static boolean tryIngestChunk(WorldIdentifier worldId, WorldChunk chunk) {
+        if (worldId == null) return false;
+        var instance = VoxyCommon.getInstance();
+        if (instance == null) return false;
+        var engine = instance.getOrCreate(worldId);
+        if (engine == null) return false;
+        instance.getIngestService().enqueueIngest(engine, chunk);
+        return true;
+    }
+
+    //Try to automatically ingest the chunk into the correct world
+    public static boolean tryAutoIngestChunk(WorldChunk chunk) {
+        return tryIngestChunk(WorldIdentifier.of(chunk.getWorld()), chunk);
     }
 }

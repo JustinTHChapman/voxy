@@ -42,9 +42,13 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.lwjgl.opengl.GL11.GL_ONE;
+import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
+import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
 import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
 import static org.lwjgl.opengl.GL11.glGetIntegerv;
 import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL14.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
 import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
 import static org.lwjgl.opengl.GL33.glBindSampler;
@@ -82,6 +86,9 @@ public class VoxyRenderSystem {
         this.renderDistanceTracker.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
 
         this.chunkBoundRenderer = new ChunkBoundRenderer();
+
+        //Keep the world loaded
+        this.worldIn.acquireRef();
     }
 
     public void setRenderDistance(int renderDistance) {
@@ -285,6 +292,9 @@ public class VoxyRenderSystem {
         try {this.renderer.shutdown();this.chunkBoundRenderer.free();} catch (Exception e) {Logger.error("Error shutting down renderer", e);}
         Logger.info("Shutting down post processor");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {Logger.error("Error shutting down post processor", e);}}
+
+        //Release hold on the world
+        this.worldIn.releaseRef();
     }
 
 

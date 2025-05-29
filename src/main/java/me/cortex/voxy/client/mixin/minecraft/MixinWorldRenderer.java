@@ -6,8 +6,8 @@ import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.commonImpl.IVoxyWorld;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.ObjectAllocator;
 import net.minecraft.client.world.ClientWorld;
@@ -50,10 +50,6 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
     private void voxy$captureSetWorld(ClientWorld world, CallbackInfo ci) {
         if (this.world != world) {
             this.shutdownRenderer();
-
-            if (this.world != null) {
-                ((IVoxyWorld)this.world).shutdownEngine();
-            }
         }
     }
 
@@ -86,7 +82,7 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             Logger.error("Not creating renderer due to null instance");
             return;
         }
-        WorldEngine world = instance.getOrMakeRenderWorld(this.world);
+        WorldEngine world = WorldIdentifier.ofEngine(this.world);
         if (world == null) {
             Logger.error("Null world selected");
             return;

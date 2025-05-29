@@ -55,9 +55,6 @@ public class WorldImporter implements IDataImporter {
     private final ServiceSlice threadPool;
 
     private volatile boolean isRunning;
-    public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, SectionSavingService savingService) {
-        this(worldEngine, mcWorld, servicePool, ()->savingService.getTaskCount() < 4000);
-    }
 
     public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, BooleanSupplier runChecker) {
         this.world = worldEngine;
@@ -128,6 +125,7 @@ public class WorldImporter implements IDataImporter {
             return;
         }
         this.isRunning = true;
+        this.world.acquireRef();
         this.updateCallback = updateCallback;
         this.completionCallback = completionCallback;
         this.worker.start();
@@ -148,6 +146,7 @@ public class WorldImporter implements IDataImporter {
             }
         }
         if (!this.threadPool.isFreed()) {
+            this.world.releaseRef();
             this.threadPool.shutdown();
         }
     }
@@ -260,6 +259,7 @@ public class WorldImporter implements IDataImporter {
                 }
             }
             this.worker = null;
+            this.world.releaseRef();
             this.threadPool.shutdown();
             this.completionCallback.onCompletion(this.totalChunks.get());
         });

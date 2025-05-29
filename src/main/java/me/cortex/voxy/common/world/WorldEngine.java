@@ -3,12 +3,14 @@ package me.cortex.voxy.common.world;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.section.SectionStorage;
 import me.cortex.voxy.common.util.TrackedObject;
-import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyInstance;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.invoke.VarHandle;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class WorldEngine {
     public static final int MAX_LOD_LAYER = 4;
 
@@ -40,6 +42,8 @@ public class WorldEngine {
     public boolean isLive() {return this.isLive;}
 
     public final @Nullable VoxyInstance instanceIn;
+    private final AtomicInteger refCount = new AtomicInteger();
+    volatile long lastActiveTime = System.currentTimeMillis();//Time in millis the world was last "active" i.e. had a total ref count or active section count of != 0
 
     public WorldEngine(SectionStorage storage) {
         this(storage, null);
@@ -127,18 +131,51 @@ public class WorldEngine {
         return this.sectionTracker.getLoadedCacheCount();
     }
 
-
     public void free() {
+        if (!this.isLive) throw new IllegalStateException();
+        this.isLive = false;
+        VarHandle.fullFence();
         //Cannot free while there are loaded sections
         if (this.sectionTracker.getLoadedCacheCount() != 0) {
             throw new IllegalStateException();
         }
 
         this.thisTracker.free();
-        this.isLive = false;
         try {this.mapper.close();} catch (Exception e) {Logger.error(e);}
         try {this.storage.flush();} catch (Exception e) {Logger.error(e);}
         //Shutdown in this order to preserve as much data as possible
         try {this.storage.close();} catch (Exception e) {Logger.error(e);}
+    }
+
+    private static final long TIMEOUT_MILLIS = 10_000;//10 second timeout (is to long? or to short??)
+    public boolean isWorldUsed() {
+        if (!this.isLive) throw new IllegalStateException();
+        return this.refCount.get() != 0 || this.sectionTracker.getLoadedCacheCount() != 0;
+    }
+
+    public boolean isWorldIdle() {
+        if (this.isWorldUsed()) {
+            this.lastActiveTime = System.currentTimeMillis();//Force an update if is not active
+            VarHandle.fullFence();
+            return false;
+        }
+        return TIMEOUT_MILLIS<(System.currentTimeMillis()-this.lastActiveTime);
+    }
+
+    public void markActive() {
+        this.lastActiveTime = System.currentTimeMillis();
+    }
+
+    public void acquireRef() {
+        this.refCount.incrementAndGet();
+        this.lastActiveTime = System.currentTimeMillis();
+    }
+
+    public void releaseRef() {
+        if (this.refCount.decrementAndGet()<0) {
+            throw new IllegalStateException("ref count less than 0");
+        }
+        //TODO: maybe dont need to tick the last active time?
+        this.lastActiveTime = System.currentTimeMillis();
     }
 }

@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.VarHandle;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.StampedLock;
 
@@ -18,6 +19,7 @@ public class ActiveSectionTracker {
 
     //Loaded section world cache, TODO: get rid of VolatileHolder and use something more sane
 
+    private final AtomicInteger loadedSections = new AtomicInteger();
     private final Long2ObjectOpenHashMap<VolatileHolder<WorldSection>>[] loadedSectionCache;
     private final StampedLock[] locks;
     private final SectionLoader loader;
@@ -53,6 +55,7 @@ public class ActiveSectionTracker {
     }
 
     public WorldSection acquire(long key, boolean nullOnEmpty) {
+        if (this.engine != null) this.engine.lastActiveTime = System.currentTimeMillis();
         int index = this.getCacheArrayIndex(key);
         var cache = this.loadedSectionCache[index];
         final var lock = this.locks[index];
@@ -91,6 +94,7 @@ public class ActiveSectionTracker {
         }
 
         if (isLoader) {
+            this.loadedSections.incrementAndGet();
             long stamp = this.lruLock.writeLock();
             section = this.lruSecondaryCache.remove(key);
             this.lruLock.unlockWrite(stamp);
@@ -155,6 +159,7 @@ public class ActiveSectionTracker {
     }
 
     void tryUnload(WorldSection section) {
+        if (this.engine != null) this.engine.lastActiveTime = System.currentTimeMillis();
         int index = this.getCacheArrayIndex(section.key);
         final var cache = this.loadedSectionCache[index];
         WorldSection sec = null;
@@ -194,6 +199,10 @@ public class ActiveSectionTracker {
         if (aa != null) {
             aa._releaseArray();
         }
+
+        if (sec != null) {
+            this.loadedSections.decrementAndGet();
+        }
     }
 
     private int getCacheArrayIndex(long pos) {
@@ -207,11 +216,7 @@ public class ActiveSectionTracker {
     }
 
     public int getLoadedCacheCount() {
-        int res = 0;
-        for (var cache : this.loadedSectionCache) {
-            res += cache.size();
-        }
-        return res;
+        return this.loadedSections.get();
     }
 
     public int getSecondaryCacheSize() {
