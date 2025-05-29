@@ -21,6 +21,7 @@ import net.minecraft.world.biome.ColorResolver;
 import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL14;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
@@ -292,6 +293,10 @@ public class ModelTextureBakery {
         glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
         glClearDepth(1);
         glClear(GL_DEPTH_BUFFER_BIT);
+        if (layer == RenderLayer.getTranslucent()) {
+            //reset the blend func
+            GL14.glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        }
     }
 
 
