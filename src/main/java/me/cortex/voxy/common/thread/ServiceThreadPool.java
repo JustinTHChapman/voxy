@@ -274,8 +274,7 @@ public class ServiceThreadPool {
     }
 
     private void handleUncaughtException(Thread thread, Throwable throwable) {
-        System.err.println("Service worker thread has exploded unexpectedly! this is really not good very very bad.");
-        throwable.printStackTrace();
+        Logger.error("Service worker thread has exploded unexpectedly! this is really not good very very bad.", throwable);
     }
 
     public void shutdown() {

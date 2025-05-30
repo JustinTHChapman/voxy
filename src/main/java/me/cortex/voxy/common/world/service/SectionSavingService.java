@@ -69,7 +69,7 @@ public class SectionSavingService {
 
     public void shutdown() {
         if (this.threads.getJobCount() != 0) {
-            System.err.println("Voxy section saving still in progress, estimated " + this.threads.getJobCount() + " sections remaining.");
+            Logger.error("Voxy section saving still in progress, estimated " + this.threads.getJobCount() + " sections remaining.");
             while (this.threads.getJobCount() != 0) {
                 Thread.onSpinWait();
             }

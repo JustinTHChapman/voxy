@@ -175,7 +175,7 @@ public class Shader extends TrackedObject {
             String log = GL20C.glGetShaderInfoLog(shader);
 
             if (!log.isEmpty()) {
-                System.err.println(log);
+                Logger.warn(log);
             }
 
             int result = GL20C.glGetShaderi(shader, GL20C.GL_COMPILE_STATUS);

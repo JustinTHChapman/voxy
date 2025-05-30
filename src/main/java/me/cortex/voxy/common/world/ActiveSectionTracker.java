@@ -2,6 +2,7 @@ package me.cortex.voxy.common.world;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.VolatileHolder;
 import me.cortex.voxy.common.world.other.Mapper;
 import org.jetbrains.annotations.Nullable;
@@ -115,7 +116,7 @@ public class ActiveSectionTracker {
                 if (status < 0) {
                     //TODO: Instead if throwing an exception do something better, like attempting to regen
                     //throw new IllegalStateException("Unable to load section: ");
-                    System.err.println("Unable to load section " + section.key + " setting to air");
+                    Logger.error("Unable to load section " + section.key + " setting to air");
                     status = 1;
                 }
 

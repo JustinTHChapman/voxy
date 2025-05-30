@@ -327,7 +327,7 @@ public class WorldImporter implements IDataImporter {
 
             //TODO: create memory copy for each section
             if (regionFile.size < ((sectorCount-1) + sectorStart) * 4096L) {
-                System.err.println("Cannot access chunk sector as it goes out of bounds. start bytes: " + (sectorStart*4096) + " sector count: " + sectorCount + " fileSize: " + regionFile.size);
+                Logger.warn("Cannot access chunk sector as it goes out of bounds. start bytes: " + (sectorStart*4096) + " sector count: " + sectorCount + " fileSize: " + regionFile.size);
                 continue;
             }
 
@@ -341,7 +341,7 @@ public class WorldImporter implements IDataImporter {
                 } else {
                     int n = m - 1;
                     if (regionFile.size < (n + sectorStart*4096L)) {
-                        System.err.println("Chunk stream to small");
+                        Logger.warn("Chunk stream to small");
                     } else if ((b & 128) != 0) {
                         if (n != 0) {
                             Logger.error("Chunk has both internal and external streams");
