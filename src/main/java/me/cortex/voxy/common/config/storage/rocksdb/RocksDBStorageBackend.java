@@ -54,22 +54,39 @@ public class RocksDBStorageBackend extends StorageBackend {
 
         //TODO: FIXME: DONT USE THE SAME options PER COLUMN FAMILY
         final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
+                .setCompressionType(CompressionType.ZSTD_COMPRESSION)
+                .optimizeForSmallDb();
+
+        final ColumnFamilyOptions cfWorldSecOpts = new ColumnFamilyOptions()
                 .setCompressionType(CompressionType.NO_COMPRESSION)
+                .setCompactionPriority(CompactionPriority.MinOverlappingRatio)
+                .setLevelCompactionDynamicLevelBytes(true)
                 .optimizeForPointLookup(128);
 
+        var bCache = new HyperClockCache(128*1024L*1024L,0, 4, false);
+        var filter = new BloomFilter(10);
+        cfWorldSecOpts.setTableFormatConfig(new BlockBasedTableConfig()
+                .setCacheIndexAndFilterBlocksWithHighPriority(true)
+                .setBlockCache(bCache)
+                .setDataBlockHashTableUtilRatio(0.75)
+                //.setIndexType(IndexType.kHashSearch)//Maybe?
+                .setDataBlockIndexType(DataBlockIndexType.kDataBlockBinaryAndHash)
+                .setFilterPolicy(filter)
+        );
 
         final List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
             new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
-            new ColumnFamilyDescriptor("world_sections".getBytes(), cfOpts),
+            new ColumnFamilyDescriptor("world_sections".getBytes(), cfWorldSecOpts),
             new ColumnFamilyDescriptor("id_mappings".getBytes(), cfOpts)
         );
 
         final DBOptions options = new DBOptions()
+                //.setUnorderedWrite(true)
                 .setAvoidUnnecessaryBlockingIO(true)
                 .setIncreaseParallelism(2)
                 .setCreateIfMissing(true)
                 .setCreateMissingColumnFamilies(true)
-                .setMaxTotalWalSize(1024*1024*512);//512 mb max WAL size
+                .setMaxTotalWalSize(1024*1024*128);//128 mb max WAL size
 
         List<ColumnFamilyHandle> handles = new ArrayList<>();
 
@@ -85,8 +102,11 @@ public class RocksDBStorageBackend extends StorageBackend {
             this.closeList.add(this.db);
             this.closeList.add(options);
             this.closeList.add(cfOpts);
+            this.closeList.add(cfWorldSecOpts);
             this.closeList.add(this.sectionReadOps);
             this.closeList.add(this.sectionWriteOps);
+            this.closeList.add(filter);
+            this.closeList.add(bCache);
 
             this.worldSections = handles.get(1);
             this.idMappings = handles.get(2);
@@ -193,6 +213,7 @@ public class RocksDBStorageBackend extends StorageBackend {
 
     @Override
     public void close() {
+        this.flush();
         this.closeList.forEach(AbstractImmutableNativeReference::close);
     }
 
