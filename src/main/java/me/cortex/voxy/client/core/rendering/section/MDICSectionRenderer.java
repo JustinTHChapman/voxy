@@ -136,6 +136,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.bindRenderingBuffers(viewport, depthBoundTexture);
 
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);//Barrier everything is needed
+        glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCountOffset, maxDrawCount, 0);
 
         glEnable(GL_CULL_FACE);
@@ -169,6 +170,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
         this.bindRenderingBuffers(viewport, depthBoundTexture);
 
+        glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, Math.min(this.geometryManager.getSectionCount(), 100_000), 0);
 
         glEnable(GL_CULL_FACE);

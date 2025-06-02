@@ -104,13 +104,16 @@ void main() {
     uvec2 encPos = positionBuffer[gl_BaseInstance];
     uint lodLevel = extractDetail(encPos);
 
-
-    vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
-    baseUV = modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
-
     ivec2 quadSize = extractSize(quad);
 
-    { //Generate tinting and flag data
+
+
+    if (cornerIdx == 1) //Only if we are the provoking vertex
+    {
+        vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
+        baseUV = modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
+
+        //Generate tinting and flag data
         flags = faceHasAlphaCuttout(faceData);
 
         //We need to have a conditional override based on if the model size is < a full face + quadSize > 1
