@@ -163,15 +163,18 @@ public class WorldEngine {
     }
 
     public void markActive() {
+        if (!this.isLive) throw new IllegalStateException();
         this.lastActiveTime = System.currentTimeMillis();
     }
 
     public void acquireRef() {
+        if (!this.isLive) throw new IllegalStateException();
         this.refCount.incrementAndGet();
         this.lastActiveTime = System.currentTimeMillis();
     }
 
     public void releaseRef() {
+        if (!this.isLive) throw new IllegalStateException();
         if (this.refCount.decrementAndGet()<0) {
             throw new IllegalStateException("ref count less than 0");
         }
