@@ -245,7 +245,8 @@ public class AsyncNodeManager {
 
         //Limit uploading as well as by geometry capacity being available
         // must have 50 mb of free geometry space to upload
-        for (int limit = 0; limit < 200 && (this.geometryCapacity-this.geometryManager.getGeometryUsedBytes())>50_000_000; limit++)
+        boolean hasGeometryCapacity = true;
+        for (int limit = 0; limit < 200 && (hasGeometryCapacity=(this.geometryCapacity-this.geometryManager.getGeometryUsedBytes())>50_000_000); limit++)
         {
             var job = this.geometryUpdateQueue.poll();
             if (job == null)
@@ -314,6 +315,11 @@ public class AsyncNodeManager {
         }
 
         if (workDone == 0) {//Nothing happened, which is odd, but just return
+            //we need to do an unsafe hack here
+            if (!hasGeometryCapacity) {
+                this.usedGeometryAmount = this.geometryManager.getGeometryUsedBytes();
+                VarHandle.fullFence();
+            }
             return;
         }
         //=====================
@@ -749,6 +755,7 @@ public class AsyncNodeManager {
 
     public void addDebug(List<String> debug) {
         debug.add("UC/GC: " + (this.getUsedGeometryCapacity()/(1<<20))+"/"+(this.getGeometryCapacity()/(1<<20)));
+        //debug.add("GUQ/NRC: " + this.geometryUpdateQueue.size()+"/"+this.removeBatchQueue.size());
     }
 
     public boolean hasWork() {
