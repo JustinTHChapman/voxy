@@ -43,7 +43,7 @@ public class RenderGenerationService {
             int unique = COUNTER.incrementAndGet();
             int lvl = WorldEngine.MAX_LOD_LAYER-WorldEngine.getLevel(this.position);
             lvl = Math.min(lvl, 3);//Make the 2 highest quality have equal priority
-            this.priority = (((lvl*3L + Math.min(this.attempts, 5))*2 + this.addin) <<32) + Integer.toUnsignedLong(unique);
+            this.priority = (((lvl*3L + Math.min(this.attempts, 3))*2 + this.addin) <<32) + Integer.toUnsignedLong(unique);
             this.addin = 0;
         }
     }
@@ -238,7 +238,7 @@ public class RenderGenerationService {
                         task.hasDoneModelRequestOuter = true;
                     }
 
-                    task.addin = WorldEngine.getLevel(task.position)>2?3:0;//Single time addin which gives the models time to bake before the task executes
+                    task.addin = WorldEngine.getLevel(task.position)>2?1:0;//Single time addin which gives the models time to bake before the task executes
                 }
 
                 //Keep the lock on the section, and attach it to the task, this prevents needing to re-aquire it later

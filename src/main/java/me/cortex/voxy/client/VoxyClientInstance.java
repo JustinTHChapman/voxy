@@ -107,6 +107,7 @@ public class VoxyClientInstance extends VoxyInstance {
     }
 
     private static class Config {
+        public int version = 1;
         public SectionStorageConfig sectionStorageConfig;
     }
     private static final Config DEFAULT_STORAGE_CONFIG;
