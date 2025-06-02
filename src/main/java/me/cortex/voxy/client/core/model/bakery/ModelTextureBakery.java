@@ -221,6 +221,12 @@ public class ModelTextureBakery {
 
                 var mat = new Matrix4f();
                 for (int i = 0; i < VIEWS.length; i++) {
+                    if (i==1||i==2||i==4) {
+                        glCullFace(GL_FRONT);
+                    } else {
+                        glCullFace(GL_BACK);
+                    }
+
                     glViewport((i % 3) * this.width, (i / 3) * this.height, this.width, this.height);
 
                     //The projection matrix
@@ -239,6 +245,12 @@ public class ModelTextureBakery {
 
             var mat = new Matrix4f();
             for (int i = 0; i < VIEWS.length; i++) {
+                if (i==1||i==2||i==4) {
+                    glCullFace(GL_FRONT);
+                } else {
+                    glCullFace(GL_BACK);
+                }
+
                 this.vc.reset();
                 this.bakeFluidState(state, layer, i);
                 if (this.vc.isEmpty()) continue;
@@ -264,6 +276,12 @@ public class ModelTextureBakery {
 
             var mat = new Matrix4f();
             for (int i = 0; i < VIEWS.length; i++) {
+                if (i==1||i==2||i==4) {
+                    glCullFace(GL_FRONT);
+                } else {
+                    glCullFace(GL_BACK);
+                }
+
                 glViewport((i % 3) * this.width, (i / 3) * this.height, this.width, this.height);
 
                 //The projection matrix
@@ -302,24 +320,25 @@ public class ModelTextureBakery {
 
 
 
-    static  {
-        //TODO: FIXME: need to bake in the correct orientation, HOWEVER some orientations require a flipped winding order!!!!
+    static {
+        //the face/direction is the face (e.g. down is the down face)
+        addView(0, -90,0, 0, 0);//Direction.DOWN
+        addView(1, 90,0, 0, 0b100);//Direction.UP
 
-        addView(0, -90,0, 0, false);//Direction.DOWN
-        addView(1, 90,0, 0, false);//Direction.UP
-        addView(2, 0,180, 0, true);//Direction.NORTH
-        addView(3, 0,0, 0, false);//Direction.SOUTH
-        //TODO: check these arnt the wrong way round
-        addView(4, 0,90, 270, false);//Direction.EAST
-        addView(5, 0,270, 270, false);//Direction.WEST
+        addView(2, 0,180, 0, 0b001);//Direction.NORTH
+        addView(3, 0,0, 0, 0);//Direction.SOUTH
+
+        addView(4, 0,90, 270, 0b100);//Direction.WEST
+        addView(5, 0,270, 270, 0);//Direction.EAST
     }
 
-    private static void addView(int i, float pitch, float yaw, float rotation, boolean flipX) {
+    private static void addView(int i, float pitch, float yaw, float rotation, int flip) {
         var stack = new MatrixStack();
         stack.translate(0.5f,0.5f,0.5f);
         stack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rotation));
         stack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(pitch));
         stack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(yaw));
+        stack.multiplyPositionMatrix(new Matrix4f().scale(1-2*(flip&1), 1-(flip&2), 1-((flip>>1)&2)));
         stack.translate(-0.5f,-0.5f,-0.5f);
         VIEWS[i] = new Matrix4f(stack.peek().getPositionMatrix());
     }
