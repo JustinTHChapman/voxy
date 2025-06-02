@@ -131,7 +131,7 @@ public abstract class VoxyInstance {
         if (this.activeWorlds.containsKey(identifier)) {
             throw new IllegalStateException("Existing world with identifier");
         }
-        Logger.info("Creating new world engine");
+        Logger.info("Creating new world engine: " + identifier.getLongHash());
         var world = new WorldEngine(this.createStorage(identifier), this);
         world.setSaveCallback(this.savingService::enqueueSave);
         this.activeWorlds.put(identifier, world);
@@ -158,6 +158,7 @@ public abstract class VoxyInstance {
                 var world = this.activeWorlds.remove(id);
                 if (world == null) continue;//Race condition between unlock read and acquire write
                 if (!world.isWorldIdle()) {this.activeWorlds.put(id, world); continue;}//No longer idle
+                Logger.info("Shutting down idle world: " + id.getLongHash());
                 //If is here close and free the world
                 world.free();
             }

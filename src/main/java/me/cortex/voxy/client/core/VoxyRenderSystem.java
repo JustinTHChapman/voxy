@@ -61,6 +61,10 @@ public class VoxyRenderSystem {
     public final ChunkBoundRenderer chunkBoundRenderer;
 
     public VoxyRenderSystem(WorldEngine world, ServiceThreadPool threadPool) {
+        //Keep the world loaded, NOTE: this is done FIRST, to keep and ensure that even if the rest of loading takes more
+        // than timeout, we keep the world acquired
+        world.acquireRef();
+
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         Capabilities.init();//Ensure clinit is called
@@ -86,9 +90,6 @@ public class VoxyRenderSystem {
         this.renderDistanceTracker.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
 
         this.chunkBoundRenderer = new ChunkBoundRenderer();
-
-        //Keep the world loaded
-        this.worldIn.acquireRef();
     }
 
     public void setRenderDistance(int renderDistance) {

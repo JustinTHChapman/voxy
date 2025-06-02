@@ -101,4 +101,8 @@ public class WorldIdentifier {
         seed = (seed ^ seed >>> 27) * -7723592293110705685L;
         return seed ^ seed >>> 31;
     }
+
+    public long getLongHash() {
+        return this.hashCode;
+    }
 }
