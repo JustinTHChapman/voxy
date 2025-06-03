@@ -13,6 +13,7 @@ public class Capabilities {
 
     public static final Capabilities INSTANCE = new Capabilities();
 
+    public final boolean repFragTest;
     public final boolean meshShaders;
     public final boolean INT64_t;
     public final long ssboMaxSize;
@@ -28,7 +29,8 @@ public class Capabilities {
         var cap = GL.getCapabilities();
         this.compute = cap.glDispatchComputeIndirect != 0;
         this.indirectParameters = cap.glMultiDrawElementsIndirectCountARB != 0;
-        this.meshShaders = cap.GL_NV_mesh_shader && cap.GL_NV_representative_fragment_test;
+        this.repFragTest = cap.GL_NV_representative_fragment_test;
+        this.meshShaders = cap.GL_NV_mesh_shader;
         this.canQueryGpuMemory = cap.GL_NVX_gpu_memory_info;
         //this.INT64_t = cap.GL_ARB_gpu_shader_int64 || cap.GL_AMD_gpu_shader_int64;
         //The only reliable way to test for int64 support is to try compile a shader
