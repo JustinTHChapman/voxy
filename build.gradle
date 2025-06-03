@@ -188,7 +188,9 @@ processIncludeJars {
 }
 
 remapJar {
-    delete getDestinationDirectory().get()
+    doFirst {
+        delete fileTree(getDestinationDirectory().get())
+    }
 
     def hash = gitCommitHash();
     if (!hash.equals("<UnknownCommit>")) {
