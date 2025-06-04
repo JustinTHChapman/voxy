@@ -50,7 +50,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         //Limit to available dedicated memory if possible
         if (Capabilities.INSTANCE.canQueryGpuMemory) {
             //512mb less than avalible,
-            long limit = Capabilities.INSTANCE.getFreeDedicatedGpuMemory() - 512*1024*1024;
+            long limit = Capabilities.INSTANCE.getFreeDedicatedGpuMemory() - 1024*1024*1024;
             // Give a minimum of 512 mb requirement
             limit = Math.max(512*1024*1024, limit);
 
