@@ -11,8 +11,8 @@ layout(local_size_x = 128) in;
 #define POSITION_SCRATCH_BINDING 6
 #define POSITION_SCRATCH_ACCESS writeonly
 
-#import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/section.glsl>
+#import <voxy:lod/gl46/bindings.glsl>
 
 //https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_16bit_storage.txt
 // adds support for uint8_t which can use for compact visibility buffer

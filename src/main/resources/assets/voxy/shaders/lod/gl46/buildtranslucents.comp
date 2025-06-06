@@ -8,8 +8,8 @@ layout(local_size_x = 128) in;
 #define SECTION_METADATA_BUFFER_BINDING 3
 #define INDIRECT_SECTION_LOOKUP_BINDING 4
 
-#import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/section.glsl>
+#import <voxy:lod/gl46/bindings.glsl>
 
 /*
     uint  count;

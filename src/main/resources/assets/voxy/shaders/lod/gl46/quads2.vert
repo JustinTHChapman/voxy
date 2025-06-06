@@ -2,7 +2,6 @@
 #extension GL_ARB_gpu_shader_int64 : enable
 
 #define QUAD_BUFFER_BINDING 1
-#define SECTION_METADATA_BUFFER_BINDING 2
 #define MODEL_BUFFER_BINDING 3
 #define MODEL_COLOUR_BUFFER_BINDING 4
 #define POSITION_SCRATCH_BINDING 5
@@ -10,8 +9,8 @@
 
 
 #import <voxy:lod/quad_format.glsl>
-#import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/block_model.glsl>
+#import <voxy:lod/gl46/bindings.glsl>
 
 //#define DEBUG_RENDER
 
