@@ -8,6 +8,7 @@ import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.PrintfDebugUtil;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import org.lwjgl.opengl.ARBDirectStateAccess;
 import org.lwjgl.system.MemoryUtil;
 
 import static org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData;
@@ -112,7 +113,7 @@ public class NodeCleaner {
             //TODO: choose whether this is in nodeSpace or section/geometryId space
             //
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-            glDispatchCompute((this.nodeManager.getCurrentMaxNodeId() + (SORTING_WORKER_SIZE+WORK_PER_THREAD) - 1) / (SORTING_WORKER_SIZE+WORK_PER_THREAD), 1, 1);
+            glDispatchCompute((this.nodeManager.getCurrentMaxNodeId() + (SORTING_WORKER_SIZE*WORK_PER_THREAD) - 1) / (SORTING_WORKER_SIZE*WORK_PER_THREAD), 1, 1);
 
             this.resultTransformer.bind();
             glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, this.outputBuffer.id, 0, 4 * OUTPUT_COUNT);
@@ -163,6 +164,22 @@ public class NodeCleaner {
             glDispatchCompute((count+127)/128, 1, 1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }
+    }
+
+    private void dumpDebugData() {
+        int[] outData = new int[OUTPUT_COUNT*3];
+        ARBDirectStateAccess.glGetNamedBufferSubData(this.outputBuffer.id, 0, outData);
+        for(int i =0;i < OUTPUT_COUNT; i++) {
+            System.out.println(outData[i]);
+        }
+        /*
+        System.out.println("---------------\n");
+        for(int i =0;i < OUTPUT_COUNT; i++) {
+            System.out.println(data[i*2+OUTPUT_COUNT]+", "+data[i*2+OUTPUT_COUNT+1]);
+        }*/
+        int[] visData = new int[(int) (this.visibilityBuffer.size()/4)];
+        ARBDirectStateAccess.glGetNamedBufferSubData(this.visibilityBuffer.id, 0, visData);
+        int a = 0;
     }
 
     public void free() {
