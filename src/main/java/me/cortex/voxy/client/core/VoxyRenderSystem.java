@@ -65,6 +65,9 @@ public class VoxyRenderSystem {
         // than timeout, we keep the world acquired
         world.acquireRef();
 
+        //wait for opengl to be finished, this should hopefully ensure all memory allocations are free
+        glFinish();glFinish();
+
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         Capabilities.init();//Ensure clinit is called
