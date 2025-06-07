@@ -113,6 +113,7 @@ public class NodeCleaner {
             //TODO: choose whether this is in nodeSpace or section/geometryId space
             //
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+            //This should (IN THEORY naturally align its self to the pow2 max boarder, if not... well undefined behavior is ok right?)
             glDispatchCompute((this.nodeManager.getCurrentMaxNodeId() + (SORTING_WORKER_SIZE*WORK_PER_THREAD) - 1) / (SORTING_WORKER_SIZE*WORK_PER_THREAD), 1, 1);
 
             this.resultTransformer.bind();
