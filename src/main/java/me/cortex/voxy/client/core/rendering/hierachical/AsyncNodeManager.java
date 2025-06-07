@@ -245,9 +245,7 @@ public class AsyncNodeManager {
 
         //Limit uploading as well as by geometry capacity being available
         // must have 50 mb of free geometry space to upload
-        boolean hasGeometryCapacity = true;
-        for (int limit = 0; limit < 200 && (hasGeometryCapacity=(this.geometryCapacity-this.geometryManager.getGeometryUsedBytes())>50_000_000); limit++)
-        {
+        for (int limit = 0; limit < 200 && ((this.geometryCapacity-this.geometryManager.getGeometryUsedBytes())>50_000_000); limit++) {
             var job = this.geometryUpdateQueue.poll();
             if (job == null)
                 break;
@@ -315,11 +313,7 @@ public class AsyncNodeManager {
         }
 
         if (workDone == 0) {//Nothing happened, which is odd, but just return
-            //we need to do an unsafe hack here
-            if (!hasGeometryCapacity) {
-                this.usedGeometryAmount = this.geometryManager.getGeometryUsedBytes();
-                VarHandle.fullFence();
-            }
+            //Should probably log that nothing happened, at least once
             return;
         }
         //=====================
