@@ -27,7 +27,7 @@ public class WorldIdentifier {
         this.key = key;
         this.biomeSeed = biomeSeed;
         this.dimension = dimension;
-        this.hashCode = mixStafford13(key.hashCode()^biomeSeed)^mixStafford13(dimension.hashCode()^biomeSeed);
+        this.hashCode = mixStafford13(registryKeyHashCode(key))^mixStafford13(registryKeyHashCode(dimension))^mixStafford13(biomeSeed);
     }
 
     @Override
@@ -104,5 +104,13 @@ public class WorldIdentifier {
 
     public long getLongHash() {
         return this.hashCode;
+    }
+
+    private static long registryKeyHashCode(RegistryKey<?> key) {
+        var A = key.getRegistry();
+        var B = key.getValue();
+        int a = A==null?0:A.hashCode();
+        int b = B==null?0:B.hashCode();
+        return (Integer.toUnsignedLong(a)<<32)|Integer.toUnsignedLong(b);
     }
 }
