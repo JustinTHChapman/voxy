@@ -106,7 +106,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         this.modelService.tick(budget);
     }
 
-    public void renderFarAwayOpaque(J viewport, GlTexture depthBoundTexture, long frameStart) {
+    public void renderFarAwayOpaque(J viewport, GlTexture depthBoundTexture) {
         //LightMapHelper.tickLightmap();
 
         //Render previous geometry with the abstract renderer

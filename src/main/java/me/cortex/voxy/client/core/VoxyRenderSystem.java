@@ -222,7 +222,7 @@ public class VoxyRenderSystem {
         this.postProcessing.setup(viewport.width, viewport.height, boundFB);
         TimingStatistics.F.stop();
 
-        this.renderer.renderFarAwayOpaque(viewport, this.chunkBoundRenderer.getDepthBoundTexture(), startTime);
+        this.renderer.renderFarAwayOpaque(viewport, this.chunkBoundRenderer.getDepthBoundTexture());
 
 
         TimingStatistics.F.start();
