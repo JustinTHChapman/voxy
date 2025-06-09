@@ -46,15 +46,19 @@ public class ServiceThreadPool {
                     //Set worker affinity if possible
                     CpuLayout.setThreadAffinity(CpuLayout.CORES[2 + (threadId % (CpuLayout.CORES.length - 2))]);
                 }
-
-                ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_PRIORITY_LOWEST);
-                //ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_MODE_BACKGROUND_BEGIN);
-
+                if (threadId != 0) {
+                    ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_PRIORITY_LOWEST);
+                    //ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_MODE_BACKGROUND_BEGIN);
+                }
                 this.worker(threadId);
             });
             worker.setDaemon(false);
             worker.setName("Service worker #" + i);
-            worker.setPriority(priority);
+            if (i == 0) {//Give the first thread normal priority, this helps if the system is under huge load for voxy to get some work done
+                worker.setPriority(Thread.NORM_PRIORITY);
+            } else {
+                worker.setPriority(priority);
+            }
             worker.start();
             worker.setUncaughtExceptionHandler(this::handleUncaughtException);
             this.workers[i]  = worker;

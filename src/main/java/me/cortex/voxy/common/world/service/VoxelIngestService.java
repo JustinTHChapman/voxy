@@ -86,6 +86,9 @@ public class VoxelIngestService {
     }
 
     public void enqueueIngest(WorldEngine engine, WorldChunk chunk) {
+        if (!this.threads.isAlive()) {
+            return;
+        }
         if (!engine.isLive()) {
             throw new IllegalStateException("Tried inserting chunk into WorldEngine that was not alive");
         }
@@ -117,7 +120,12 @@ public class VoxelIngestService {
             }
 
             this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));
-            this.threads.execute();
+            try {
+                this.threads.execute();
+            } catch (Exception e) {
+                Logger.error("Executing had an error: assume shutting down, aborting",e);
+                break;
+            }
         }
     }
 
