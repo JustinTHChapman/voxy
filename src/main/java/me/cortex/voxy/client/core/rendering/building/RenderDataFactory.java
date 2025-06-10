@@ -207,7 +207,7 @@ public class RenderDataFactory {
         return quadData;
     }
 
-    private int prepareSectionData() {
+    private int prepareSectionData(final long[] rawSectionData) {
         final var sectionData = this.sectionData;
         final var rawModelIds = this.modelMan._unsafeRawAccess();
         int opaque = 0;
@@ -217,7 +217,7 @@ public class RenderDataFactory {
 
         int neighborAcquireMsk = 0;//-+x, -+y, -+Z
         for (int i = 0; i < 32*32*32;) {
-            long block = sectionData[i + 32 * 32 * 32];//Get the block mapping
+            long block = rawSectionData[i];//Get the block mapping
             if (Mapper.isAir(block)) {//If it is air, just emit lighting
                 sectionData[i * 2] = (block&(0xFFL<<56))>>1;
                 sectionData[i * 2 + 1] = 0;
@@ -1542,7 +1542,7 @@ public class RenderDataFactory {
         //THE EXCEPTION THAT THIS THROWS CAUSES MAJOR ISSUES
 
         //Copy section data to end of array so that can mutate array while reading safely
-        section.copyDataTo(this.sectionData, 32*32*32);
+        //section.copyDataTo(this.sectionData, 32*32*32);
 
         //We must reset _everything_ that could have changed as we dont exactly know the state due to how the model id exception
         // throwing system works
@@ -1578,7 +1578,7 @@ public class RenderDataFactory {
         Arrays.fill(this.fluidMasks, 0);
 
         //Prepare everything
-        int neighborMsk = this.prepareSectionData();
+        int neighborMsk = this.prepareSectionData(section._unsafeGetRawDataArray());
         if (neighborMsk>>31!=0) {//We failed to get everything so throw exception
             throw new IdNotYetComputedException(neighborMsk&(~(1<<31)), true);
         }
