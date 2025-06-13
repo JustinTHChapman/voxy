@@ -103,12 +103,10 @@ public class HierarchicalOcclusionTraverser {
         this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).fill(-1);
 
 
-        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glSamplerParameteri(this.hizSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-        glSamplerParameteri(this.hizSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
 
         this.traversal
                 .ubo("SCENE_UNIFORM_BINDING", this.uniformBuffer)

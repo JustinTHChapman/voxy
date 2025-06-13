@@ -12,7 +12,7 @@
 // substantually for performance (for both persistent threads and incremental)
 
 
-layout(binding = HIZ_BINDING) uniform sampler2DShadow hizDepthSampler;
+layout(binding = HIZ_BINDING) uniform sampler2D hizDepthSampler;
 
 //TODO: maybe do spher bounds aswell? cause they have different accuracies but are both over estimates (liberals (non conservative xD))
 // so can do &&
@@ -147,13 +147,23 @@ bool isCulledByHiz() {
     //the *2.0f-1.0f converts from the 0->1 range to -1->1 range that depth is in (not having this causes tighter bounds, but causes culling issues in caves)
     testAgainst = testAgainst*2.0f-1.0f;
 
-    bool culled = textureLod(hizDepthSampler, clamp(vec3(midpoint, testAgainst), vec3(0), vec3(1)), miplevel) < 0.0001f;
+
+    /*
+    ivec2 msize = textureSize(hizDepthSampler, int(miplevel));
+    ivec2 mxbb = ivec2(maxBB.xy);
+    ivec2 mnbb = ivec2(minBB.xy);*/
+
+    float pointSample = textureLod(hizDepthSampler, maxBB.xy, miplevel).x;
+    pointSample = max(pointSample, textureLod(hizDepthSampler, vec2(maxBB.x, minBB.y), miplevel).x);
+    pointSample = max(pointSample, textureLod(hizDepthSampler, vec2(minBB.x, maxBB.y), miplevel).x);
+    pointSample = max(pointSample, textureLod(hizDepthSampler, minBB.xy, miplevel).x);
+
 
     //printf("HiZ sample point: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
     //if ((culled) && node22.lodLevel == 0) {
     //    printf("HiZ sample point: (%f,%f)@%f against %f, value %f", midpoint.x, midpoint.y, miplevel, minBB.z, textureLod(hizDepthSampler, vec3(0.5f,0.5f, 0.000000001f), 9.0f));
     //}
-    return culled;
+    return pointSample<=testAgainst;
 }
 
 
