@@ -152,13 +152,16 @@ bool isCulledByHiz() {
     ivec2 mxbb = clamp(ivec2(ceil(maxBB.xy*msize)), ivec2(0), msize);
     ivec2 mnbb = clamp(ivec2(floor(minBB.xy*msize)), ivec2(0), msize);
     float pointSample = 0.0f;
+    //float pointSample2 = 0.0f;
     for (int x = mnbb.x; x<=mxbb.x; x++) {
         for (int y = mnbb.y; y<=mxbb.y; y++) {
-            float sp = texelFetch(hizDepthSampler, ivec2(x, y), ml).x;
-            //sp = mix(sp, pointSample, 1.0f<=sp);
+            float sp = texelFetch(hizDepthSampler, ivec2(x, y), ml).r;
+            //pointSample2 = max(sp, pointSample2);
+            //sp = mix(sp, pointSample, 0.9999999f<=sp);
             pointSample = max(sp, pointSample);
         }
     }
+    //pointSample = mix(pointSample, pointSample2, pointSample<=0.000001f);
     /*
     float pointSample = textureLod(hizDepthSampler, maxBB.xy, miplevel).x;
     pointSample = max(pointSample, textureLod(hizDepthSampler, vec2(maxBB.x, minBB.y), miplevel).x);
