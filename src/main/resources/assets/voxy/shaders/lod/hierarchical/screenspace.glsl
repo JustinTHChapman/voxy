@@ -134,7 +134,7 @@ bool isCulledByHiz() {
     //TODO: make a path for if the miplevel would result in the textureSampler sampling a size of 1
 
 
-    miplevel = ceil(miplevel);
+    miplevel = floor(miplevel)-1;
     miplevel = clamp(miplevel, 0, 20);
 
     if (miplevel >= 10.0f) {//Level 9 or 10// TODO: FIX THIS JANK SHIT
@@ -145,18 +145,26 @@ bool isCulledByHiz() {
 
     float testAgainst = minBB.z;
     //the *2.0f-1.0f converts from the 0->1 range to -1->1 range that depth is in (not having this causes tighter bounds, but causes culling issues in caves)
-    testAgainst = testAgainst*2.0f-1.0f;
+    //testAgainst = testAgainst*2.0f-1.0f;
 
-
+    int ml = int(miplevel);
+    ivec2 msize = textureSize(hizDepthSampler, ml);
+    ivec2 mxbb = clamp(ivec2(ceil(maxBB.xy*msize)), ivec2(0), msize);
+    ivec2 mnbb = clamp(ivec2(floor(minBB.xy*msize)), ivec2(0), msize);
+    float pointSample = 0.0f;
+    for (int x = mnbb.x; x<=mxbb.x; x++) {
+        for (int y = mnbb.y; y<=mxbb.y; y++) {
+            float sp = texelFetch(hizDepthSampler, ivec2(x, y), ml).x;
+            //sp = mix(sp, pointSample, 1.0f<=sp);
+            pointSample = max(sp, pointSample);
+        }
+    }
     /*
-    ivec2 msize = textureSize(hizDepthSampler, int(miplevel));
-    ivec2 mxbb = ivec2(maxBB.xy);
-    ivec2 mnbb = ivec2(minBB.xy);*/
-
     float pointSample = textureLod(hizDepthSampler, maxBB.xy, miplevel).x;
     pointSample = max(pointSample, textureLod(hizDepthSampler, vec2(maxBB.x, minBB.y), miplevel).x);
     pointSample = max(pointSample, textureLod(hizDepthSampler, vec2(minBB.x, maxBB.y), miplevel).x);
     pointSample = max(pointSample, textureLod(hizDepthSampler, minBB.xy, miplevel).x);
+    */
 
 
     //printf("HiZ sample point: (%f,%f)@%f against %f", midpoint.x, midpoint.y, miplevel, minBB.z);
