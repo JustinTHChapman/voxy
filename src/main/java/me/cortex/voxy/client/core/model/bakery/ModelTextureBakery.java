@@ -6,7 +6,7 @@ import net.minecraft.block.FluidBlock;
 import net.minecraft.block.LeavesBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.BlockRenderLayer;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.fluid.FluidState;
@@ -43,22 +43,22 @@ public class ModelTextureBakery {
         this.height = height;
     }
 
-    public static int getMetaFromLayer(RenderLayer layer) {
-        boolean hasDiscard = layer == RenderLayer.getCutout() ||
-                layer == RenderLayer.getCutoutMipped() ||
-                layer == RenderLayer.getTripwire();
+    public static int getMetaFromLayer(BlockRenderLayer layer) {
+        boolean hasDiscard = layer == BlockRenderLayer.CUTOUT ||
+                layer == BlockRenderLayer.CUTOUT_MIPPED ||
+                layer == BlockRenderLayer.TRIPWIRE;
 
-        boolean isMipped = layer == RenderLayer.getCutoutMipped() ||
-                layer == RenderLayer.getSolid() ||
-                layer == RenderLayer.getTranslucent() ||
-                layer == RenderLayer.getTripwire();
+        boolean isMipped = layer == BlockRenderLayer.CUTOUT_MIPPED ||
+                layer == BlockRenderLayer.SOLID ||
+                layer == BlockRenderLayer.TRANSLUCENT ||
+                layer == BlockRenderLayer.TRIPWIRE;
 
         int meta = hasDiscard?1:0;
         meta |= isMipped?2:0;
         return meta;
     }
 
-    private void bakeBlockModel(BlockState state, RenderLayer layer) {
+    private void bakeBlockModel(BlockState state, BlockRenderLayer layer) {
         var model = MinecraftClient.getInstance()
                 .getBakedModelManager()
                 .getBlockModels()
@@ -79,7 +79,7 @@ public class ModelTextureBakery {
     }
 
 
-    private void bakeFluidState(BlockState state, RenderLayer layer, int face) {
+    private void bakeFluidState(BlockState state, BlockRenderLayer layer, int face) {
         this.vc.setDefaultMeta(getMetaFromLayer(layer));//Set the meta while baking
         MinecraftClient.getInstance().getBlockRenderManager().renderFluid(BlockPos.ORIGIN, new BlockRenderView() {
             @Override
@@ -163,13 +163,13 @@ public class ModelTextureBakery {
     public void renderToStream(BlockState state, int streamBuffer, int streamOffset) {
         this.capture.clear();
         boolean isBlock = true;
-        RenderLayer layer;
+        BlockRenderLayer layer;
         if (state.getBlock() instanceof FluidBlock) {
             layer = RenderLayers.getFluidLayer(state.getFluidState());
             isBlock = false;
         } else {
             if (state.getBlock() instanceof LeavesBlock) {
-                layer = RenderLayer.getSolid();
+                layer = BlockRenderLayer.SOLID;
             } else {
                 layer = RenderLayers.getBlockLayer(state);
             }
@@ -189,7 +189,7 @@ public class ModelTextureBakery {
             glEnable(GL_STENCIL_TEST);
             glEnable(GL_DEPTH_TEST);
             glEnable(GL_CULL_FACE);
-            if (layer == RenderLayer.getTranslucent()) {
+            if (layer == BlockRenderLayer.TRANSLUCENT) {
                 glEnable(GL_BLEND);
                 glBlendFuncSeparate(GL_ONE_MINUS_DST_ALPHA, GL_DST_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             } else {
@@ -311,7 +311,7 @@ public class ModelTextureBakery {
         glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
         glClearDepth(1);
         glClear(GL_DEPTH_BUFFER_BIT);
-        if (layer == RenderLayer.getTranslucent()) {
+        if (layer == BlockRenderLayer.TRANSLUCENT) {
             //reset the blend func
             GL14.glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }

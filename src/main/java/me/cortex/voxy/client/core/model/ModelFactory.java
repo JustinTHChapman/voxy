@@ -18,6 +18,7 @@ import net.minecraft.block.LeavesBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.color.block.BlockColorProvider;
+import net.minecraft.client.render.BlockRenderLayer;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.fluid.FluidState;
@@ -256,19 +257,19 @@ public class ModelFactory {
             this.fluidStateLUT[modelId] = clientFluidStateId;
         }
 
-        RenderLayer blockRenderLayer = null;
+        BlockRenderLayer blockRenderLayer = null;
         if (blockState.getBlock() instanceof FluidBlock) {
             blockRenderLayer = RenderLayers.getFluidLayer(blockState.getFluidState());
         } else {
             if (blockState.getBlock() instanceof LeavesBlock) {
-                blockRenderLayer = RenderLayer.getSolid();
+                blockRenderLayer = BlockRenderLayer.SOLID;
             } else {
                 blockRenderLayer = RenderLayers.getBlockLayer(blockState);
             }
         }
 
 
-        int checkMode = blockRenderLayer==RenderLayer.getSolid()?TextureUtils.WRITE_CHECK_STENCIL:TextureUtils.WRITE_CHECK_ALPHA;
+        int checkMode = blockRenderLayer==BlockRenderLayer.SOLID?TextureUtils.WRITE_CHECK_STENCIL:TextureUtils.WRITE_CHECK_ALPHA;
 
         if (Capabilities.INSTANCE.isMesa) {
             //Mesa does not work with GL_DEPTH_STENCIL_TEXTURE_MODE GL_STENCIL_INDEX
@@ -339,7 +340,7 @@ public class ModelFactory {
         //Each face gets 1 byte, with the top 2 bytes being for whatever
         long metadata = 0;
         metadata |= isBiomeColourDependent?1:0;
-        metadata |= blockRenderLayer == RenderLayer.getTranslucent()?2:0;
+        metadata |= blockRenderLayer == BlockRenderLayer.TRANSLUCENT?2:0;
         metadata |= needsDoubleSidedQuads?4:0;
         metadata |= ((!isFluid) && !blockState.getFluidState().isEmpty())?8:0;//Has a fluid state accosiacted with it and is not itself a fluid
         metadata |= isFluid?16:0;//Is a fluid
@@ -373,7 +374,7 @@ public class ModelFactory {
 
             //TODO: add alot of config options for the following
             boolean occludesFace = true;
-            occludesFace &= blockRenderLayer != RenderLayer.getTranslucent();//If its translucent, it doesnt occlude
+            occludesFace &= blockRenderLayer != BlockRenderLayer.TRANSLUCENT;//If its translucent, it doesnt occlude
 
             //TODO: make this an option, basicly if the face is really close, it occludes otherwise it doesnt
             occludesFace &= offset < 0.1;//If the face is rendered far away from the other face, then it doesnt occlude
@@ -393,7 +394,7 @@ public class ModelFactory {
             metadata |= canBeOccluded?4:0;
 
             //Face uses its own lighting if its not flat against the adjacent block & isnt traslucent
-            metadata |= (offset > 0.01 || blockRenderLayer == RenderLayer.getTranslucent())?0b1000:0;
+            metadata |= (offset > 0.01 || blockRenderLayer == BlockRenderLayer.TRANSLUCENT)?0b1000:0;
 
 
 
@@ -411,11 +412,11 @@ public class ModelFactory {
             int area = (faceSize[1]-faceSize[0]+1) * (faceSize[3]-faceSize[2]+1);
             boolean needsAlphaDiscard = ((float)writeCount)/area<0.9;//If the amount of area covered by written pixels is less than a threashold, disable discard as its not needed
 
-            needsAlphaDiscard |= blockRenderLayer != RenderLayer.getSolid();
-            needsAlphaDiscard &= blockRenderLayer != RenderLayer.getTranslucent();//Translucent doesnt have alpha discard
+            needsAlphaDiscard |= blockRenderLayer != BlockRenderLayer.SOLID;
+            needsAlphaDiscard &= blockRenderLayer != BlockRenderLayer.TRANSLUCENT;//Translucent doesnt have alpha discard
             faceModelData |= needsAlphaDiscard?1<<22:0;
 
-            faceModelData |= ((!faceCoversFullBlock)&&blockRenderLayer != RenderLayer.getTranslucent())?1<<23:0;//Alpha discard override, translucency doesnt have alpha discard
+            faceModelData |= ((!faceCoversFullBlock)&&blockRenderLayer != BlockRenderLayer.TRANSLUCENT)?1<<23:0;//Alpha discard override, translucency doesnt have alpha discard
 
 
 
@@ -435,8 +436,8 @@ public class ModelFactory {
         int modelFlags = 0;
         modelFlags |= colourProvider != null?1:0;
         modelFlags |= isBiomeColourDependent?2:0;//Basicly whether to use the next int as a colour or as a base index/id into a colour buffer for biome dependent colours
-        modelFlags |= blockRenderLayer == RenderLayer.getTranslucent()?4:0;//Is translucent
-        modelFlags |= blockRenderLayer == RenderLayer.getCutout()?0:8;//Dont use mipmaps (AND ALSO FKING SPECIFIES IF IT HAS AO, WHY??? GREAT QUESTION, TODO FIXE THIS)
+        modelFlags |= blockRenderLayer == BlockRenderLayer.TRANSLUCENT?4:0;//Is translucent
+        modelFlags |= blockRenderLayer == BlockRenderLayer.CUTOUT?0:8;//Dont use mipmaps (AND ALSO FKING SPECIFIES IF IT HAS AO, WHY??? GREAT QUESTION, TODO FIXE THIS)
 
         //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
         MemoryUtil.memPutInt(uploadPtr, modelFlags);

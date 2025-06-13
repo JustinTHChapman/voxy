@@ -15,6 +15,6 @@ import static org.lwjgl.opengl.GL45.glBindTextureUnit;
 public class LightMapHelper {
     public static void bind(int lightingIndex) {
         glBindSampler(lightingIndex, 0);
-        glBindTextureUnit(lightingIndex, ((net.minecraft.client.texture.GlTexture)(MinecraftClient.getInstance().gameRenderer.getLightmapTextureManager().getGlTexture())).getGlId());
+        glBindTextureUnit(lightingIndex, ((net.minecraft.client.texture.GlTexture)(MinecraftClient.getInstance().gameRenderer.getLightmapTextureManager().getGlTextureView().texture())).getGlId());
     }
 }

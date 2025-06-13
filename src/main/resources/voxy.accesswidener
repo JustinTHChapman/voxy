@@ -6,9 +6,6 @@ accessible class net/minecraft/client/render/RenderLayer$MultiPhaseParameters
 accessible field net/minecraft/client/texture/SpriteContents image Lnet/minecraft/client/texture/NativeImage;
 accessible field net/minecraft/client/render/Frustum frustumIntersection Lorg/joml/FrustumIntersection;
 accessible field net/minecraft/client/color/block/BlockColors providers Lnet/minecraft/util/collection/IdList;
-accessible field net/minecraft/client/render/GameRenderer zoomX F
-accessible field net/minecraft/client/render/GameRenderer zoomY F
-accessible field net/minecraft/client/render/GameRenderer zoom F
 accessible field net/minecraft/client/world/ClientWorld worldRenderer Lnet/minecraft/client/render/WorldRenderer;
 accessible field net/minecraft/world/biome/source/BiomeAccess seed J
 
@@ -27,7 +24,7 @@ accessible field net/minecraft/world/chunk/PalettedContainer$Data palette Lnet/m
 
 accessible field net/minecraft/client/gl/GlGpuBuffer id I
 
-accessible field net/minecraft/client/gl/GlResourceManager currentProgram Lnet/minecraft/client/gl/ShaderProgram;
-accessible field net/minecraft/client/gl/GlResourceManager currentPipeline Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+accessible field net/minecraft/client/gl/GlCommandEncoder currentProgram Lnet/minecraft/client/gl/ShaderProgram;
+accessible field net/minecraft/client/gl/GlCommandEncoder currentPipeline Lcom/mojang/blaze3d/pipeline/RenderPipeline;
 
 accessible class net/minecraft/client/gl/GlDebug$DebugMessage

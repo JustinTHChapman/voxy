@@ -46,6 +46,21 @@ public class BakedBlockEntityModel {
         this.layers.forEach(layer->layer.consumer.free());
     }
 
+    private static int getMetaFromLayer(RenderLayer layer) {
+        boolean hasDiscard = layer == RenderLayer.getCutout() ||
+                layer == RenderLayer.getCutoutMipped() ||
+                layer == RenderLayer.getTripwire();
+
+        boolean isMipped = layer == RenderLayer.getCutoutMipped() ||
+                layer == RenderLayer.getSolid() ||
+                layer.isTranslucent() ||
+                layer == RenderLayer.getTripwire();
+
+        int meta = hasDiscard?1:0;
+        meta |= isMipped?2:0;
+        return meta;
+    }
+
     public static BakedBlockEntityModel bake(BlockState state) {
         Map<RenderLayer, LayerConsumer> map = new HashMap<>();
         var entity = ((BlockEntityProvider)state.getBlock()).createBlockEntity(BlockPos.ORIGIN, state);
@@ -56,7 +71,7 @@ public class BakedBlockEntityModel {
         entity.setWorld(MinecraftClient.getInstance().world);
         if (renderer != null) {
             try {
-                renderer.render(entity, 0.0f, new MatrixStack(), layer->map.computeIfAbsent(layer, rl -> new LayerConsumer(rl, new ReuseVertexConsumer().setDefaultMeta(ModelTextureBakery.getMetaFromLayer(rl)))).consumer, 0, 0, new Vec3d(0,0,0));
+                renderer.render(entity, 0.0f, new MatrixStack(), layer->map.computeIfAbsent(layer, rl -> new LayerConsumer(rl, new ReuseVertexConsumer().setDefaultMeta(getMetaFromLayer(rl)))).consumer, 0, 0, new Vec3d(0,0,0));
             } catch (Exception e) {
                 Logger.error("Unable to bake block entity: " + entity, e);
             }
