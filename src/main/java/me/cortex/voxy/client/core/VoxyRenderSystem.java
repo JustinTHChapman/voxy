@@ -100,40 +100,6 @@ public class VoxyRenderSystem {
     }
 
 
-    //private static final ModelTextureBakery mtb = new ModelTextureBakery(16, 16);
-    //private static final RawDownloadStream downstream = new RawDownloadStream(1<<20);
-    public void renderSetup(Frustum frustum, Camera camera) {
-        TimingStatistics.resetSamplers();
-
-        /*
-        if (false) {
-            int allocation = downstream.download(2 * 4 * 6 * 16 * 16, ptr -> {
-                ColourDepthTextureData[] textureData = new ColourDepthTextureData[6];
-                final int FACE_SIZE = 16 * 16;
-                for (int face = 0; face < 6; face++) {
-                    long faceDataPtr = ptr + (FACE_SIZE * 4) * face * 2;
-                    int[] colour = new int[FACE_SIZE];
-                    int[] depth = new int[FACE_SIZE];
-
-                    //Copy out colour
-                    for (int i = 0; i < FACE_SIZE; i++) {
-                        //De-interpolate results
-                        colour[i] = MemoryUtil.memGetInt(faceDataPtr + (i * 4 * 2));
-                        depth[i] = MemoryUtil.memGetInt(faceDataPtr + (i * 4 * 2) + 4);
-                    }
-
-                    textureData[face] = new ColourDepthTextureData(colour, depth, 16, 16);
-                }
-                if (textureData[0].colour()[0] == 0) {
-                    int a = 0;
-                }
-            });
-            mtb.renderFacesToStream(Blocks.AIR.getDefaultState(), 123456, false, downstream.getBufferId(), allocation);
-            downstream.submit();
-            downstream.tick();
-        }*/
-    }
-
     private void autoBalanceSubDivSize() {
         //only increase quality while there are very few mesh queues, this stops,
         // e.g. while flying and is rendering alot of low quality chunks
@@ -176,6 +142,9 @@ public class VoxyRenderSystem {
         if (IrisUtil.irisShadowActive()) {
             return;
         }
+        TimingStatistics.resetSamplers();
+
+
         //Do some very cheeky stuff for MiB
         if (false) {
             int sector = (((int)Math.floor(cameraX)>>4)+512)>>10;
