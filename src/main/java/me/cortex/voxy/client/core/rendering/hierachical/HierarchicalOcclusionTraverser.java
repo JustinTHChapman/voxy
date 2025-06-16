@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.util.PrintfDebugUtil;
 import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.Viewport;
@@ -30,7 +31,7 @@ import static org.lwjgl.opengl.GL45.*;
 public class HierarchicalOcclusionTraverser {
     public static final boolean HIERARCHICAL_SHADER_DEBUG = System.getProperty("voxy.hierarchicalShaderDebug", "false").equals("true");
 
-    public static final int REQUEST_QUEUE_SIZE = 50;
+    public static final int MAX_REQUEST_QUEUE_SIZE = 50;
     public static final int MAX_QUEUE_SIZE = 200_000;
 
 
@@ -39,6 +40,7 @@ public class HierarchicalOcclusionTraverser {
 
     private final AsyncNodeManager nodeManager;
     private final NodeCleaner nodeCleaner;
+    private final RenderGenerationService meshGen;
 
     private final GlBuffer requestBuffer;
 
@@ -73,7 +75,7 @@ public class HierarchicalOcclusionTraverser {
             .defineIf("DEBUG", HIERARCHICAL_SHADER_DEBUG)
             .define("MAX_ITERATIONS", MAX_ITERATIONS)
             .define("LOCAL_SIZE_BITS", LOCAL_WORK_SIZE_BITS)
-            .define("REQUEST_QUEUE_SIZE", REQUEST_QUEUE_SIZE)
+            .define("MAX_REQUEST_QUEUE_SIZE", MAX_REQUEST_QUEUE_SIZE)
 
             .define("HIZ_BINDING", 0)
 
@@ -96,10 +98,11 @@ public class HierarchicalOcclusionTraverser {
             .compile();
 
 
-    public HierarchicalOcclusionTraverser(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner) {
+    public HierarchicalOcclusionTraverser(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, RenderGenerationService meshGen) {
         this.nodeCleaner = nodeCleaner;
         this.nodeManager = nodeManager;
-        this.requestBuffer = new GlBuffer(REQUEST_QUEUE_SIZE*8L+8).zero();
+        this.meshGen = meshGen;
+        this.requestBuffer = new GlBuffer(MAX_REQUEST_QUEUE_SIZE*8L+8).zero();
         this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).fill(-1);
 
 
@@ -188,10 +191,16 @@ public class HierarchicalOcclusionTraverser {
 
         MemoryUtil.memPutInt(ptr, (int) (viewport.getRenderList().size()/4-1)); ptr += 4;
 
-
-
         //VisibilityId
         MemoryUtil.memPutInt(ptr, this.nodeCleaner.visibilityId); ptr += 4;
+
+        {
+            final double TARGET_COUNT = 4000;//TODO: make this configurable, or at least dynamically computed based on throughput rate of mesh gen
+            double iFillness = Math.max(0, (TARGET_COUNT - this.meshGen.getTaskCount()) / TARGET_COUNT);
+            iFillness = Math.pow(iFillness, 2);
+            final int requestSize = (int) Math.ceil(iFillness * MAX_REQUEST_QUEUE_SIZE);
+            MemoryUtil.memPutInt(ptr, Math.max(0, Math.min(MAX_REQUEST_QUEUE_SIZE, requestSize)));ptr += 4;
+        }
     }
 
     private void bindings(Viewport<?> viewport) {

@@ -84,7 +84,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         this.nodeManager = new AsyncNodeManager(1<<21, this.geometryData, this.renderGen);
         this.nodeCleaner = new NodeCleaner(this.nodeManager);
 
-        this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, this.nodeCleaner);
+        this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, this.nodeCleaner, this.renderGen);
 
         world.setDirtyCallback(this.nodeManager::worldEvent);
 
