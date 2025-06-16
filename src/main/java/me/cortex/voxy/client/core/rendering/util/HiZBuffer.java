@@ -69,12 +69,12 @@ public class HiZBuffer {
     }
 
     public void buildMipChain(int srcDepthTex, int width, int height) {
-        if (this.width != width || this.height != height) {
+        if (this.width != Integer.highestOneBit(width*2) || this.height != Integer.highestOneBit(height*2)) {
             if (this.texture != null) {
                 this.texture.free();
                 this.texture = null;
             }
-            this.alloc(width, height);
+            this.alloc(Integer.highestOneBit(width*2), Integer.highestOneBit(height*2));
         }
         glBindVertexArray(RenderService.STATIC_VAO);
         int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
@@ -92,7 +92,7 @@ public class HiZBuffer {
                 width, height, 1);
 
 
-        glBindTextureUnit(0, this.texture.id);
+        glBindTextureUnit(0, srcDepthTex);
         glBindSampler(0, this.sampler);
         glUniform1i(0, 0);
         int cw = this.width;
@@ -106,6 +106,9 @@ public class HiZBuffer {
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
             glTextureBarrier();
             glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+            if (i==0) {
+                glBindTextureUnit(0, this.texture.id);
+            }
         }
         glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, 0);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, 1000);//TODO: CHECK IF ITS -1 or -0
