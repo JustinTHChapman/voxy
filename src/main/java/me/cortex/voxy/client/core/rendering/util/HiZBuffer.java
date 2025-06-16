@@ -126,4 +126,8 @@ public class HiZBuffer {
     public int getHizTextureId() {
         return this.texture.id;
     }
+
+    public int getPackedLevels() {
+        return ((Integer.numberOfTrailingZeros(this.width))<<16)|(Integer.numberOfTrailingZeros(this.height));//+1
+    }
 }

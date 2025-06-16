@@ -173,20 +173,22 @@ public class HierarchicalOcclusionTraverser {
 
         viewport.section.getToAddress(ptr); ptr += 4*3;
 
-        MemoryUtil.memPutFloat(ptr, viewport.width); ptr += 4;
+        //MemoryUtil.memPutFloat(ptr, viewport.width); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.hiZBuffer.getPackedLevels()); ptr += 4;
 
         viewport.innerTranslation.getToAddress(ptr); ptr += 4*3;
 
-        MemoryUtil.memPutFloat(ptr, viewport.height); ptr += 4;
+        //MemoryUtil.memPutFloat(ptr, viewport.height); ptr += 4;
+
+        final float screenspaceAreaDecreasingSize = VoxyConfig.CONFIG.subDivisionSize*VoxyConfig.CONFIG.subDivisionSize;
+        //Screen space size for descending
+        MemoryUtil.memPutFloat(ptr, (float) (screenspaceAreaDecreasingSize) /(viewport.width*viewport.height)); ptr += 4;
 
         setFrustum(viewport, ptr); ptr += 4*4*6;
 
         MemoryUtil.memPutInt(ptr, (int) (viewport.getRenderList().size()/4-1)); ptr += 4;
 
 
-        final float screenspaceAreaDecreasingSize = VoxyConfig.CONFIG.subDivisionSize*VoxyConfig.CONFIG.subDivisionSize;
-        //Screen space size for descending
-        MemoryUtil.memPutFloat(ptr, (float) (screenspaceAreaDecreasingSize) /(viewport.width*viewport.height)); ptr += 4;
 
         //VisibilityId
         MemoryUtil.memPutInt(ptr, this.nodeCleaner.visibilityId); ptr += 4;
