@@ -136,7 +136,7 @@ bool isCulledByHiz() {
     miplevel = clamp(miplevel, 0, textureQueryLevels(hizDepthSampler)-1);
 
     int ml = int(miplevel);
-    ssize = ssize>>ml;
+    ssize = max(ivec2(1), ssize>>ml);
     ivec2 mxbb = ivec2(maxBB.xy*ssize);
     ivec2 mnbb = ivec2(minBB.xy*ssize);
 
