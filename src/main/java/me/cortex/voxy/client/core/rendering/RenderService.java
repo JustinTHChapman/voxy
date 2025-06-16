@@ -121,6 +121,13 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         this.sectionRenderer.renderOpaque(viewport, depthBoundTexture);
         TimingStatistics.G.stop();
 
+        {
+            int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+
+            //Compute the mip chain
+            viewport.hiZBuffer.buildMipChain(depthBuffer, viewport.width, viewport.height);
+        }
+
         do {
             //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
             // sections
@@ -157,13 +164,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
 
             glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT | GL_PIXEL_BUFFER_BARRIER_BIT);
 
-            int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-            //if (depthBuffer == 0) {
-            //    depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-            //}
-
             TimingStatistics.I.start();
-            this.traversal.doTraversal(viewport, depthBuffer);
+            this.traversal.doTraversal(viewport);
             TimingStatistics.I.stop();
 
 
