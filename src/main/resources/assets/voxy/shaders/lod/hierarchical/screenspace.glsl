@@ -131,7 +131,7 @@ bool outsideFrustum() {
 }
 
 bool isCulledByHiz() {
-    vec2 asize = size * vec2(screenW, screenH);
+    vec2 asize = size * vec2(1024, 512);
     float miplevel = log2(max(max(asize.x, asize.y),1));
 
     //TODO: make a path for if the miplevel would result in the textureSampler sampling a size of 1
@@ -140,14 +140,12 @@ bool isCulledByHiz() {
     miplevel = floor(miplevel)-1;
     miplevel = clamp(miplevel, 0, textureQueryLevels(hizDepthSampler)-1);
 
-    vec2 midpoint = (maxBB.xy + minBB.xy)*0.5f;
-
     float testAgainst = minBB.z;
     //the *2.0f-1.0f converts from the 0->1 range to -1->1 range that depth is in (not having this causes tighter bounds, but causes culling issues in caves)
     //testAgainst = testAgainst*2.0f-1.0f;
 
-    int ml = 4;//int(miplevel);
-    ivec2 msize = ivec2(128,64);//textureSize(hizDepthSampler, ml);//max(ivec2(1),ivec2(screenW, screenH)>>ml);
+    int ml = int(miplevel);
+    ivec2 msize = textureSize(hizDepthSampler, ml);//max(ivec2(1),ivec2(screenW, screenH)>>ml);
     ivec2 mxbb = clamp(ivec2(maxBB.xy*msize), ivec2(0), msize);
     ivec2 mnbb = clamp(ivec2(minBB.xy*msize), ivec2(0), msize);
     float pointSample = -1.0f;
@@ -173,11 +171,8 @@ bool isCulledByHiz() {
     //if ((culled) && node22.lodLevel == 0) {
     //    printf("HiZ sample point: (%f,%f)@%f against %f, value %f", midpoint.x, midpoint.y, miplevel, minBB.z, textureLod(hizDepthSampler, vec3(0.5f,0.5f, 0.000000001f), 9.0f));
     //}
-    if (pointSample==0.0f) {
-        //return false;
-    }
 
-    return pointSample<testAgainst;
+    return pointSample<=testAgainst;
 }
 
 
