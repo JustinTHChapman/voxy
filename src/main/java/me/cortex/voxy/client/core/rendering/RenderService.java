@@ -56,7 +56,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
 
             geometryCapacity = Math.min(geometryCapacity, limit);
         }
-        //geometryCapacity = 1<<24;
+        //geometryCapacity = 1<<28;
         //geometryCapacity = 1<<30;//1GB test
         return geometryCapacity;
     }

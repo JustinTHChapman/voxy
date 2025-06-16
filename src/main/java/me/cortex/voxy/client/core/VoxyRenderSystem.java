@@ -64,35 +64,40 @@ public class VoxyRenderSystem {
         //Keep the world loaded, NOTE: this is done FIRST, to keep and ensure that even if the rest of loading takes more
         // than timeout, we keep the world acquired
         world.acquireRef();
+        try {
+            //wait for opengl to be finished, this should hopefully ensure all memory allocations are free
+            glFinish();
+            glFinish();
 
-        //wait for opengl to be finished, this should hopefully ensure all memory allocations are free
-        glFinish();glFinish();
+            //Trigger the shared index buffer loading
+            SharedIndexBuffer.INSTANCE.id();
+            Capabilities.init();//Ensure clinit is called
 
-        //Trigger the shared index buffer loading
-        SharedIndexBuffer.INSTANCE.id();
-        Capabilities.init();//Ensure clinit is called
+            this.worldIn = world;
+            this.renderer = new RenderService(world, threadPool);
+            this.postProcessing = new PostProcessing();
+            int minSec = MinecraftClient.getInstance().world.getBottomSectionCoord() >> 5;
+            int maxSec = (MinecraftClient.getInstance().world.getTopSectionCoord() - 1) >> 5;
 
-        this.worldIn = world;
-        this.renderer = new RenderService(world, threadPool);
-        this.postProcessing = new PostProcessing();
-        int minSec = MinecraftClient.getInstance().world.getBottomSectionCoord()>>5;
-        int maxSec = (MinecraftClient.getInstance().world.getTopSectionCoord()-1)>>5;
+            //Do some very cheeky stuff for MiB
+            if (false) {
+                minSec = -8;
+                maxSec = 7;
+            }
 
-        //Do some very cheeky stuff for MiB
-        if (false) {
-            minSec = -8;
-            maxSec = 7;
+            this.renderDistanceTracker = new RenderDistanceTracker(20,
+                    minSec,
+                    maxSec,
+                    this.renderer::addTopLevelNode,
+                    this.renderer::removeTopLevelNode);
+
+            this.renderDistanceTracker.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
+
+            this.chunkBoundRenderer = new ChunkBoundRenderer();
+        } catch (RuntimeException e) {
+            world.releaseRef();//If something goes wrong, we must release the world first
+            throw e;
         }
-
-        this.renderDistanceTracker = new RenderDistanceTracker(20,
-                minSec,
-                maxSec,
-                this.renderer::addTopLevelNode,
-                this.renderer::removeTopLevelNode);
-
-        this.renderDistanceTracker.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
-
-        this.chunkBoundRenderer = new ChunkBoundRenderer();
     }
 
     public void setRenderDistance(int renderDistance) {
