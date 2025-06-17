@@ -56,7 +56,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
 
             geometryCapacity = Math.min(geometryCapacity, limit);
         }
-        //geometryCapacity = 1<<24;
+        //geometryCapacity = 1<<28;
         //geometryCapacity = 1<<30;//1GB test
         return geometryCapacity;
     }
@@ -84,7 +84,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         this.nodeManager = new AsyncNodeManager(1<<21, this.geometryData, this.renderGen);
         this.nodeCleaner = new NodeCleaner(this.nodeManager);
 
-        this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, this.nodeCleaner);
+        this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, this.nodeCleaner, this.renderGen);
 
         world.setDirtyCallback(this.nodeManager::worldEvent);
 
@@ -106,6 +106,18 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         this.modelService.tick(budget);
     }
 
+    private boolean frexStillHasWork() {
+        if (!VoxyClient.isFrexActive()) {
+            return false;
+        }
+        //If frex is running we must tick everything to ensure correctness
+        UploadStream.INSTANCE.tick();
+        //Done here as is allows less gl state resetup
+        this.modelService.tick(100_000_000);
+        glFinish();
+        return this.nodeManager.hasWork() || this.renderGen.getTaskCount()!=0 || !this.modelService.areQueuesEmpty();
+    }
+
     public void renderFarAwayOpaque(J viewport, GlTexture depthBoundTexture) {
         //LightMapHelper.tickLightmap();
 
@@ -120,6 +132,13 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         TimingStatistics.G.start();
         this.sectionRenderer.renderOpaque(viewport, depthBoundTexture);
         TimingStatistics.G.stop();
+
+        {
+            int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+
+            //Compute the mip chain
+            viewport.hiZBuffer.buildMipChain(depthBuffer, viewport.width, viewport.height);
+        }
 
         do {
             //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
@@ -157,23 +176,11 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
 
             glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT | GL_PIXEL_BUFFER_BARRIER_BIT);
 
-            int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-            //if (depthBuffer == 0) {
-            //    depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-            //}
-
             TimingStatistics.I.start();
-            this.traversal.doTraversal(viewport, depthBuffer);
+            this.traversal.doTraversal(viewport);
             TimingStatistics.I.stop();
 
-
-            if (VoxyClient.isFrexActive()) {//If frex is running we must tick everything to ensure correctness
-                UploadStream.INSTANCE.tick();
-                //Done here as is allows less gl state resetup
-                this.tickModelService(100_000_000);
-                glFinish();
-            }
-        } while (VoxyClient.isFrexActive() && (this.nodeManager.hasWork() || this.renderGen.getTaskCount()!=0 || !this.modelService.areQueuesEmpty()));
+        } while (this.frexStillHasWork());
 
 
         TimingStatistics.H.start();

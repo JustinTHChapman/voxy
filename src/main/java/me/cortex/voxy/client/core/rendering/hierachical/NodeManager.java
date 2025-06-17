@@ -1213,7 +1213,8 @@ public class NodeManager {
 
         if (!this.nodeData.isNodeGeometryInFlight(nodeId)) {
             if (!this.watcher.watch(pos, WorldEngine.UPDATE_TYPE_BLOCK_BIT)) {
-                Logger.info("Node: " + nodeId + " at pos: " + WorldEngine.pprintPos(pos) + " got update request, but geometry was already being watched");
+                //Logger.info("Node: " + nodeId + " at pos: " + WorldEngine.pprintPos(pos) + " got update request, but geometry was already being watched");
+                this.invalidateNode(nodeId);//Who knows why but just invalidate the data just to keep in sync
             } else {
                 this.nodeData.markNodeGeometryInFlight(nodeId);
             }

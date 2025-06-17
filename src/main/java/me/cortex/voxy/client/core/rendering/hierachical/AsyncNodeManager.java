@@ -179,6 +179,7 @@ public class AsyncNodeManager {
 
     private void run() {
         if (this.workCounter.get() <= 0) {
+            //TODO: here, instead of parking, we can do more work on other sub-tasks such as filtering the mesh build queue
             LockSupport.park();
             if (this.workCounter.get() <= 0 || !this.running) {//No work
                 return;
@@ -753,7 +754,7 @@ public class AsyncNodeManager {
     }
 
     public boolean hasWork() {
-        return this.workCounter.get()!=0 && RESULT_HANDLE.get(this) != null;
+        return this.workCounter.get()!=0 || RESULT_HANDLE.get(this) != null;
     }
 
     public void worldEvent(WorldSection section, int flags) {

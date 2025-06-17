@@ -26,13 +26,6 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
     @Shadow private @Nullable ClientWorld world;
     @Unique private VoxyRenderSystem renderer;
 
-    @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/WorldRenderer;setupTerrain(Lnet/minecraft/client/render/Camera;Lnet/minecraft/client/render/Frustum;ZZ)V", shift = At.Shift.AFTER))
-    private void injectSetup(ObjectAllocator allocator, RenderTickCounter tickCounter, boolean renderBlockOutline, Camera camera, GameRenderer gameRenderer, Matrix4f positionMatrix, Matrix4f projectionMatrix, CallbackInfo ci) {
-        if (this.renderer != null) {
-            this.renderer.renderSetup(this.frustum, camera);
-        }
-    }
-
     @Override
     public VoxyRenderSystem getVoxyRenderSystem() {
         return this.renderer;
