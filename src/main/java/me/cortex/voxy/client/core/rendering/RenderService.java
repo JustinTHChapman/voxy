@@ -106,6 +106,18 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         this.modelService.tick(budget);
     }
 
+    private boolean frexStillHasWork() {
+        if (!VoxyClient.isFrexActive()) {
+            return false;
+        }
+        //If frex is running we must tick everything to ensure correctness
+        UploadStream.INSTANCE.tick();
+        //Done here as is allows less gl state resetup
+        this.modelService.tick(100_000_000);
+        glFinish();
+        return this.nodeManager.hasWork() || this.renderGen.getTaskCount()!=0 || !this.modelService.areQueuesEmpty();
+    }
+
     public void renderFarAwayOpaque(J viewport, GlTexture depthBoundTexture) {
         //LightMapHelper.tickLightmap();
 
@@ -168,14 +180,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
             this.traversal.doTraversal(viewport);
             TimingStatistics.I.stop();
 
-
-            if (VoxyClient.isFrexActive()) {//If frex is running we must tick everything to ensure correctness
-                UploadStream.INSTANCE.tick();
-                //Done here as is allows less gl state resetup
-                this.tickModelService(100_000_000);
-                glFinish();
-            }
-        } while (VoxyClient.isFrexActive() && (this.nodeManager.hasWork() || this.renderGen.getTaskCount()!=0 || !this.modelService.areQueuesEmpty()));
+        } while (this.frexStillHasWork());
 
 
         TimingStatistics.H.start();

@@ -754,7 +754,7 @@ public class AsyncNodeManager {
     }
 
     public boolean hasWork() {
-        return this.workCounter.get()!=0 && RESULT_HANDLE.get(this) != null;
+        return this.workCounter.get()!=0 || RESULT_HANDLE.get(this) != null;
     }
 
     public void worldEvent(WorldSection section, int flags) {
