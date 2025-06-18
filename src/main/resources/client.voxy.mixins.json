@@ -6,11 +6,12 @@
     "minecraft.MixinClientCommonNetworkHandler",
     "minecraft.MixinClientLoginNetworkHandler",
     "minecraft.MixinDebugHud",
+    "minecraft.MixinFogRenderer",
+    "minecraft.MixinGlDebug",
     "minecraft.MixinMinecraftClient",
     "minecraft.MixinThreadExecutor",
     "minecraft.MixinWindow",
     "minecraft.MixinWorldRenderer",
-    "minecraft.MixinGlDebug",
     "sodium.MixinDefaultChunkRenderer",
     "sodium.MixinRenderSectionManager",
     "sodium.MixinSodiumOptionsGUI"
