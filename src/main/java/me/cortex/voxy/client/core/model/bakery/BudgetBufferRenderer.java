@@ -26,6 +26,7 @@ public class BudgetBufferRenderer {
             .compile();
 
 
+    public static void init(){}
     private static final GlBuffer indexBuffer;
     static {
         var i = RenderSystem.getSequentialBuffer(VertexFormat.DrawMode.QUADS);
