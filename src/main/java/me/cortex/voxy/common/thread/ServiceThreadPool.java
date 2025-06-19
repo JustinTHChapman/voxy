@@ -272,7 +272,7 @@ public class ServiceThreadPool {
             }
 
             //Sleep for a bit after running a job, yeild the thread
-            Thread.yield();
+            //Thread.yield();
             break;
         }
     }

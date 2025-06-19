@@ -3,15 +3,13 @@ package me.cortex.voxy.common.world;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
-import me.cortex.voxy.common.util.VolatileHolder;
-import me.cortex.voxy.common.voxelization.WorldConversionFactory;
-import me.cortex.voxy.common.world.other.Mapper;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.StampedLock;
 
 public class ActiveSectionTracker {
@@ -20,6 +18,21 @@ public class ActiveSectionTracker {
     public interface SectionLoader {int load(WorldSection section);}
 
     //Loaded section world cache, TODO: get rid of VolatileHolder and use something more sane
+    private static final class VolatileHolder <T> {
+        private static final VarHandle PRE_ACQUIRE_COUNT;
+        private static final VarHandle POST_ACQUIRE_COUNT;
+        static {
+            try {
+                PRE_ACQUIRE_COUNT = MethodHandles.lookup().findVarHandle(VolatileHolder.class, "preAcquireCount", int.class);
+                POST_ACQUIRE_COUNT = MethodHandles.lookup().findVarHandle(VolatileHolder.class, "postAcquireCount", int.class);
+            } catch (NoSuchFieldException | IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        public volatile int preAcquireCount;
+        public volatile int postAcquireCount;
+        public volatile T obj;
+    }
 
     private final AtomicInteger loadedSections = new AtomicInteger();
     private final Long2ObjectOpenHashMap<VolatileHolder<WorldSection>>[] loadedSectionCache;
@@ -102,6 +115,8 @@ public class ActiveSectionTracker {
             section = this.lruSecondaryCache.remove(key);
             this.lruLock.unlockWrite(stamp);
             lock.unlockRead(stamp2);
+        } else {
+            VolatileHolder.PRE_ACQUIRE_COUNT.getAndAdd(holder, 1);
         }
 
         //If this thread was the one to create the reference then its the thread to load the section
@@ -131,8 +146,12 @@ public class ActiveSectionTracker {
             } else {
                 section.primeForReuse();
             }
+            int preAcquireCount = (int) VolatileHolder.PRE_ACQUIRE_COUNT.getAndSet(holder, 0);
+            section.acquire(preAcquireCount+1);//pre acquire amount
+            VolatileHolder.POST_ACQUIRE_COUNT.set(holder, preAcquireCount);
 
-            section.acquire();
+            //TODO: mark if the section was loaded null
+
             VarHandle.storeStoreFence();//Do not reorder setting this object
             holder.obj = section;
             VarHandle.releaseFence();
@@ -142,6 +161,7 @@ public class ActiveSectionTracker {
             }
             return section;
         } else {
+            //TODO: mark the time the loading started in nanos, then here if it has been a while, spin lock, else jump back to the executing service and do work
             VarHandle.fullFence();
             while ((section = holder.obj) == null) {
                 VarHandle.fullFence();
@@ -149,16 +169,22 @@ public class ActiveSectionTracker {
                 Thread.yield();
             }
 
-            //lock.lock();
-            {//Dont think need to lock here
-                if (section.tryAcquire()) {
-                    return section;
+            //Try to acquire a pre lock
+            if (0<((int)VolatileHolder.POST_ACQUIRE_COUNT.getAndAdd(holder, -1))) {
+                //We managed to acquire one of the pre locks, so just return the section
+                return section;
+            } else {
+                //lock.lock();
+                {//Dont think need to lock here
+                    if (section.tryAcquire()) {
+                        return section;
+                    }
                 }
-            }
-            //lock.unlock();
+                //lock.unlock();
 
-            //We failed everything, try get it again
-            return this.acquire(key, nullOnEmpty);
+                //We failed everything, try get it again
+                return this.acquire(key, nullOnEmpty);
+            }
         }
     }
 
