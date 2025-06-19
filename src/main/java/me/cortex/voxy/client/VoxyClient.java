@@ -18,8 +18,8 @@ public class VoxyClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        BudgetBufferRenderer.init();
         ClientLifecycleEvents.CLIENT_STARTED.register(client->{
+            BudgetBufferRenderer.init();
             boolean systemSupported = Capabilities.INSTANCE.compute && Capabilities.INSTANCE.indirectParameters;
             if (systemSupported) {
                 VoxyCommon.setInstanceFactory(VoxyClientInstance::new);
