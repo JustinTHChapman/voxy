@@ -29,7 +29,7 @@ public class ServiceThreadPool {
     private final ThreadGroup threadGroup;
 
     public ServiceThreadPool(int threadCount) {
-        this(threadCount, 1);//Maybe change to 3
+        this(threadCount, 3);//Maybe change to 3
     }
 
     public ServiceThreadPool(int threadCount, int priority) {
@@ -47,7 +47,7 @@ public class ServiceThreadPool {
                     CpuLayout.setThreadAffinity(CpuLayout.CORES[2 + (threadId % (CpuLayout.CORES.length - 2))]);
                 }
                 if (threadId != 0) {
-                    ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_PRIORITY_LOWEST);
+                    ThreadUtils.SetSelfThreadPriorityWin32(-1);
                     //ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_MODE_BACKGROUND_BEGIN);
                 }
                 this.worker(threadId);
