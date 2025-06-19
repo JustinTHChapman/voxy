@@ -143,7 +143,7 @@ public class WorldConversionFactory {
         }
 
 
-
+        int nonZeroCnt = 0;
         if (blockContainer.data.storage instanceof PackedIntegerArray bStor) {
             var bDat = bStor.getData();
             int iterPerLong = (64 / bStor.getElementBits()) - 1;
@@ -168,7 +168,7 @@ public class WorldConversionFactory {
                 sample >>>= eBits;
 
                 byte light = lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF);
-
+                nonZeroCnt += (bId != 0)?1:0;
                 data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
             }
         } else {
@@ -181,12 +181,14 @@ public class WorldConversionFactory {
                     data[i] = Mapper.airWithLight(lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF));
                 }
             } else {
+                nonZeroCnt = 4096;
                 for (int i = 0; i <= 0xFFF; i++) {
                     byte light = lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF);
                     data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
                 }
             }
         }
+        section.lvl0NonAirCount = nonZeroCnt;
         return section;
     }
 

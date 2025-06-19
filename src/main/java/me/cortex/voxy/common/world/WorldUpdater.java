@@ -6,7 +6,6 @@ import me.cortex.voxy.common.world.other.Mapper;
 import static me.cortex.voxy.common.world.WorldEngine.*;
 
 public class WorldUpdater {
-    //TODO: move this to auxilery class  so that it can take into account larger than 4 mip levels
     //Executes an update to the world and automatically updates all the parent mip layers up to level 4 (e.g. where 1 chunk section is 1 block big)
 
     //NOTE: THIS RUNS ON THE THREAD IT WAS EXECUTED ON, when this method exits, the calling method may assume that VoxelizedSection is no longer needed
@@ -23,7 +22,7 @@ public class WorldUpdater {
         WorldSection previousSection = null;
         final var vdat = section.section;
 
-        for (int lvl = 0; lvl < MAX_LOD_LAYER+1; lvl++) {
+        for (int lvl = 0; lvl <= MAX_LOD_LAYER; lvl++) {
             var worldSection = into.acquire(lvl, section.x >> (lvl + 1), section.y >> (lvl + 1), section.z >> (lvl + 1));
 
             int emptinessStateChange = 0;
@@ -41,36 +40,59 @@ public class WorldUpdater {
             int by = (section.y&msk)<<(4-lvl);
             int bz = (section.z&msk)<<(4-lvl);
 
-            int nonAirCountDelta = 0;
+            int airCount = 0;
             boolean didStateChange = false;
 
 
+            //TODO: remove the nonAirCountDelta stuff if level != 0
+
             {//Do a bunch of funny math
                 var secD = worldSection.data;
-
-                int baseVIdx = VoxelizedSection.getBaseIndexForLevel(lvl);
                 int baseSec = bx | (bz << 5) | (by << 10);
+                if (lvl == 0) {
+                    final int secMsk = 0b1100|(0xf << 5) | (0xf << 10);
+                    final int iSecMsk1 = (~secMsk) + 1;
 
-                int secMsk = 0xF >> lvl;
-                secMsk |= (secMsk << 5) | (secMsk << 10);
-                int iSecMsk1 =(~secMsk)+1;
+                    int secIdx = 0;
+                    //TODO: manually unroll and do e.g. 4 iterations per loop
+                    for (int i = 0; i <= 0xFFF; i+=4) {
+                        int cSecIdx = secIdx + baseSec;
+                        secIdx = (secIdx + iSecMsk1) & secMsk;
 
-                int secIdx = 0;
-                //TODO: manually unroll and do e.g. 4 iterations per loop
-                for (int i = baseVIdx; i <= (0xFFF >> (lvl * 3)) + baseVIdx; i++) {
-                    int cSecIdx = secIdx+baseSec;
-                    secIdx = (secIdx + iSecMsk1)&secMsk;
+                        long oldId0 = secD[cSecIdx+0]; secD[cSecIdx+0] = vdat[i+0];
+                        long oldId1 = secD[cSecIdx+1]; secD[cSecIdx+1] = vdat[i+1];
+                        long oldId2 = secD[cSecIdx+2]; secD[cSecIdx+2] = vdat[i+2];
+                        long oldId3 = secD[cSecIdx+3]; secD[cSecIdx+3] = vdat[i+3];
 
-                    long newId = vdat[i];
-                    long oldId = secD[cSecIdx]; secD[cSecIdx] = newId;
-                    nonAirCountDelta += (Mapper.isAir(newId)?0:1)-(Mapper.isAir(oldId)?0:1);//its 0:1 cause its nonAir
-                    didStateChange |= newId != oldId;
+                        airCount += Mapper.isAir(oldId0)?1:0; didStateChange |= vdat[i+0] != oldId0;
+                        airCount += Mapper.isAir(oldId1)?1:0; didStateChange |= vdat[i+1] != oldId1;
+                        airCount += Mapper.isAir(oldId2)?1:0; didStateChange |= vdat[i+2] != oldId2;
+                        airCount += Mapper.isAir(oldId3)?1:0; didStateChange |= vdat[i+3] != oldId3;
+                    }
+                } else {
+                    int baseVIdx = VoxelizedSection.getBaseIndexForLevel(lvl);
+
+                    int secMsk = 0xF >> lvl;
+                    secMsk |= (secMsk << 5) | (secMsk << 10);
+                    int iSecMsk1 = (~secMsk) + 1;
+
+                    int secIdx = 0;
+                    //TODO: manually unroll and do e.g. 4 iterations per loop
+                    for (int i = baseVIdx; i <= (0xFFF >> (lvl * 3)) + baseVIdx; i++) {
+                        int cSecIdx = secIdx + baseSec;
+                        secIdx = (secIdx + iSecMsk1) & secMsk;
+                        long newId = vdat[i];
+                        long oldId = secD[cSecIdx];
+                        didStateChange |= newId != oldId;
+                        secD[cSecIdx] = newId;
+                    }
                 }
             }
 
-            if (nonAirCountDelta != 0) {
-                worldSection.addNonEmptyBlockCount(nonAirCountDelta);
-                if (lvl == 0) {
+            if (lvl == 0) {
+                int nonAirCountDelta = section.lvl0NonAirCount-(4096-airCount);
+                if (nonAirCountDelta != 0) {
+                    worldSection.addNonEmptyBlockCount(nonAirCountDelta);
                     emptinessStateChange = worldSection.updateLvl0State() ? 2 : 0;
                 }
             }

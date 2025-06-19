@@ -54,9 +54,8 @@ public class Mapper {
 
 
     public static boolean isAir(long id) {
-        int bId = getBlockId(id);
         //Note: air can mean void, cave or normal air, as the block state is remapped during ingesting
-        return bId == 0;
+        return (id&(((1L<<20)-1)<<27)) == 0;
     }
 
     public static int getBlockId(long id) {

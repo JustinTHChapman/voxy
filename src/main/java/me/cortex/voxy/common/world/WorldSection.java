@@ -51,7 +51,7 @@ public final class WorldSection {
     //Serialized states
     long metadata;
     long[] data = null;
-    volatile int nonEmptyBlockCount = 0;
+    volatile int nonEmptyBlockCount = 0;//Note: only needed for level 0 sections
     volatile byte nonEmptyChildren;
 
     final ActiveSectionTracker tracker;
@@ -120,7 +120,7 @@ public final class WorldSection {
     public int acquire(int count) {
         int state = ((int)  ATOMIC_STATE_HANDLE.getAndAdd(this, count<<1)) + (count<<1);
         if ((state & 1) == 0) {
-            throw new IllegalStateException("Tried to acquire unloaded section");
+            throw new IllegalStateException("Tried to acquire unloaded section: " + WorldEngine.pprintPos(this.key));
         }
         return state>>1;
     }

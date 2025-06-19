@@ -10,6 +10,7 @@ public class VoxelizedSection {
     public int x;
     public int y;
     public int z;
+    public int lvl0NonAirCount;
     public final long[] section;
     public VoxelizedSection(long[] section) {
         this.section = section;
@@ -51,6 +52,7 @@ public class VoxelizedSection {
     }
 
     public VoxelizedSection zero() {
+        this.lvl0NonAirCount = 0;
         Arrays.fill(this.section, 0);
         return this;
     }

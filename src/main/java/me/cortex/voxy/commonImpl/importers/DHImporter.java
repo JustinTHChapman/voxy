@@ -309,7 +309,16 @@ public class DHImporter implements IDataImporter {
             if ((x+1)%16==0) {
                 for (int sz = 0; sz < 4; sz++) {
                     for (int sy = 0; sy < this.worldHeightSections; sy++) {
-                        System.arraycopy(storage, (sz|(sy<<2))<<12, section.section, 0, 16 * 16 * 16);
+                        {
+                            int base = (sz|(sy<<2))<<12;
+                            int nonAirCount = 0;
+                            final var dat = section.section;
+                            for (int i = 0; i < 4096; i++) {
+                                nonAirCount += Mapper.isAir(dat[i] = storage[i+base])?0:1;
+                            }
+                            section.lvl0NonAirCount = nonAirCount;
+                        }
+
                         WorldConversionFactory.mipSection(section, this.engine.getMapper());
 
                         section.setPosition(X*4+(x>>4), sy+(this.bottomOfWorld>>4), (Z*4)+sz);

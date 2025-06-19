@@ -10,6 +10,8 @@ import me.cortex.voxy.commonImpl.VoxyCommon;
 import org.lwjgl.system.MemoryUtil;
 
 public class SaveLoadSystem3 {
+    public static final int STORAGE_VERSION = 0;
+
     private record SerializationCache(Long2ShortOpenHashMap lutMapCache, MemoryBuffer memoryBuffer) {
         public SerializationCache() {
             this(new Long2ShortOpenHashMap(512), ThreadLocalMemoryBuffer.create(WorldSection.SECTION_VOLUME*2+WorldSection.SECTION_VOLUME*8+1024));
@@ -60,6 +62,7 @@ public class SaveLoadSystem3 {
             throw new IllegalStateException();
         }
 
+        //TODO: note! can actually have the first (last?) byte of metadata be the storage version!
         long metadata = 0;
         metadata |= Integer.toUnsignedLong(LUT.size());//Bottom 2 bytes
         metadata |= Byte.toUnsignedLong(section.getNonEmptyChildren())<<16;//Next byte
@@ -82,21 +85,26 @@ public class SaveLoadSystem3 {
             return false;
         }
 
-        long metadata = MemoryUtil.memGetLong(ptr); ptr += 8;
+        final long metadata = MemoryUtil.memGetLong(ptr); ptr += 8;
         section.nonEmptyChildren = (byte) ((metadata>>>16)&0xFF);
-
-        int nonEmptyBlockCount = 0;
-        long lutBasePtr = ptr + WorldSection.SECTION_VOLUME*2;
-        var blockData = section.data;
-        for (int i = 0; i < WorldSection.SECTION_VOLUME; i++) {
-            short lutId = MemoryUtil.memGetShort(ptr); ptr+=2;
-            long blockId = MemoryUtil.memGetLong(lutBasePtr+Short.toUnsignedLong(lutId)*8L);
-            nonEmptyBlockCount += Mapper.isAir(blockId)?0:1;
-            blockData[i] = blockId;
+        final long lutBasePtr = ptr + WorldSection.SECTION_VOLUME * 2;
+        if (section.lvl == 0) {
+            int nonEmptyBlockCount = 0;
+            final var blockData = section.data;
+            for (int i = 0; i < WorldSection.SECTION_VOLUME; i++) {
+                final short lutId = MemoryUtil.memGetShort(ptr); ptr += 2;
+                final long blockId = MemoryUtil.memGetLong(lutBasePtr + Short.toUnsignedLong(lutId) * 8L);
+                nonEmptyBlockCount += Mapper.isAir(blockId) ? 0 : 1;
+                blockData[i] = blockId;
+            }
+            section.nonEmptyBlockCount = nonEmptyBlockCount;
+        } else {
+            final var blockData = section.data;
+            for (int i = 0; i < WorldSection.SECTION_VOLUME; i++) {
+                blockData[i] = MemoryUtil.memGetLong(lutBasePtr + Short.toUnsignedLong(MemoryUtil.memGetShort(ptr)) * 8L);ptr += 2;
+            }
         }
-        section.nonEmptyBlockCount = nonEmptyBlockCount;
-        ptr = lutBasePtr + (metadata&0xFFFF)*8L;
-
+        ptr = lutBasePtr + (metadata & 0xFFFF) * 8L;
         return true;
     }
 }
