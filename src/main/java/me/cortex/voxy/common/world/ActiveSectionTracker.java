@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.VolatileHolder;
+import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.other.Mapper;
 import org.jetbrains.annotations.Nullable;
 
@@ -96,9 +97,11 @@ public class ActiveSectionTracker {
 
         if (isLoader) {
             this.loadedSections.incrementAndGet();
+            long stamp2 = lock.readLock();
             long stamp = this.lruLock.writeLock();
             section = this.lruSecondaryCache.remove(key);
             this.lruLock.unlockWrite(stamp);
+            lock.unlockRead(stamp2);
         }
 
         //If this thread was the one to create the reference then its the thread to load the section
@@ -171,7 +174,7 @@ public class ActiveSectionTracker {
                 var cached = cache.remove(section.key);
                 var obj = cached.obj;
                 if (obj == null) {
-                    throw new IllegalStateException("This should be impossible");
+                    throw new IllegalStateException("This should be impossible: " + WorldEngine.pprintPos(section.key));
                 }
                 if (obj != section) {
                     throw new IllegalStateException("Removed section not the same as the referenced section in the cache: cached: " + obj + " got: " + section + " A: " + WorldSection.ATOMIC_STATE_HANDLE.get(obj) + " B: " +WorldSection.ATOMIC_STATE_HANDLE.get(section));
