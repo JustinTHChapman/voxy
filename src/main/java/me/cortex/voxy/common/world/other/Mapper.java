@@ -7,6 +7,7 @@ import me.cortex.voxy.common.config.section.SectionStorage;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.LeavesBlock;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
@@ -298,7 +299,12 @@ public class Mapper {
         public StateEntry(int id, BlockState state) {
             this.id = id;
             this.state = state;
-            this.opacity = state.getOpacity();
+            //Override opacity of leaves to be solid
+            if (state.getBlock() instanceof LeavesBlock) {
+                this.opacity = 15;
+            } else {
+                this.opacity = state.getOpacity();
+            }
         }
 
         public byte[] serialize() {
