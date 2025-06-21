@@ -149,6 +149,10 @@ public class WorldImporter implements IDataImporter {
             this.world.releaseRef();
             this.threadPool.shutdown();
         }
+        //Free all the remaining entries by running the lambda
+        while (!this.jobQueue.isEmpty()) {
+            this.jobQueue.poll().run();
+        }
     }
 
     private interface IImporterMethod <T> {
