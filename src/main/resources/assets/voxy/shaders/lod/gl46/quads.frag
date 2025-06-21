@@ -13,27 +13,29 @@ layout(binding = 2) uniform sampler2D depthTex;
 
 layout(location = 0) in vec2 uv;
 layout(location = 1) in flat vec2 baseUV;
-layout(location = 2) in flat vec4 tinting;
-layout(location = 3) in flat vec4 addin;
-layout(location = 4) in flat uint flags;
-layout(location = 5) in flat vec4 conditionalTinting;
-layout(location = 6) in flat vec2 quadSize;
+layout(location = 2) in flat uvec4 interData;
 
 #ifdef DEBUG_RENDER
 layout(location = 7) in flat uint quadDebug;
 #endif
 layout(location = 0) out vec4 outColour;
 
+vec4 uint2vec4RGBA(uint colour) {
+    return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255.0;
+}
+
+//conditionalTinting.yzwx
+
 vec4 computeColour(vec4 colour) {
     //Conditional tinting, TODO: FIXME: REPLACE WITH MASK OR SOMETHING, like encode data into the top bit of alpha
-    if ((flags&(1u<<2)) != 0 && abs(colour.r-colour.g) < 0.02f && abs(colour.g-colour.b) < 0.02f) {
-        colour *= conditionalTinting;
+    if ((interData.x&(1u<<2)) != 0 && abs(colour.r-colour.g) < 0.02f && abs(colour.g-colour.b) < 0.02f) {
+        colour *= uint2vec4RGBA(interData.w).yzwx;
     }
-    return (colour * tinting) + addin;
+    return (colour * uint2vec4RGBA(interData.y)) + uint2vec4RGBA(interData.z);
 }
 
 bool useMipmaps() {
-    return ((flags>>1)&1u)==0u;
+    return ((interData.x>>1)&1u)==0u;
 }
 
 void main() {
@@ -51,7 +53,7 @@ void main() {
         colour = texture(blockModelAtlas, texPos, -5.0);
     }
 
-    if (any(notEqual(clamp(tile, vec2(0), quadSize), tile))) {
+    if (any(notEqual(clamp(tile, vec2(0), vec2((interData.x>>16)&0xFFu, (interData.x>>24)&0xFFu)), tile))) {
         discard;
     }
 
@@ -62,7 +64,7 @@ void main() {
 
 
     //Also, small quad is really fking over the mipping level somehow
-    if ((flags&1u) == 1 && (texture(blockModelAtlas, texPos, -16.0).a <= 0.1f)) {
+    if ((interData.x&1u) == 1 && (texture(blockModelAtlas, texPos, -16.0).a <= 0.1f)) {
         //This is stupidly stupidly bad for divergence
         //TODO: FIXME, basicly what this do is sample the exact pixel (no lod) for discarding, this stops mipmapping fucking it over
         #ifndef DEBUG_RENDER

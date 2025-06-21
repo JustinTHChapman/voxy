@@ -16,11 +16,22 @@
 
 layout(location = 0) out vec2 uv;
 layout(location = 1) out flat vec2 baseUV;
-layout(location = 2) out flat vec4 tinting;
-layout(location = 3) out flat vec4 addin;
-layout(location = 4) out flat uint flags;
-layout(location = 5) out flat vec4 conditionalTinting;
-layout(location = 6) out flat vec2 size;
+layout(location = 2) out flat uvec4 interData;
+
+uint packVec4(vec4 vec) {
+    uvec4 vec_=uvec4(vec*255)<<uvec4(24,16,8,0);
+    return vec_.x|vec_.y|vec_.z|vec_.w;
+}
+
+void setSizeAndFlags(uint _flags, ivec2 quadSize) {
+    interData.x = _flags | (uint(quadSize.x-1)<<16) | (uint(quadSize.y-1)<<24);
+}
+
+void setTinting(vec4 _tinting, vec4 _addin, uint _conditionalTinting) {
+    interData.y = packVec4(_tinting);
+    interData.z = packVec4(_addin);
+    interData.w = _conditionalTinting;
+}
 
 #ifdef DEBUG_RENDER
 layout(location = 7) out flat uint quadDebug;
@@ -36,10 +47,6 @@ uint extractLodLevel() {
 ivec3 extractRelativeLodPos() {
     return (ivec3(gl_BaseInstance)<<ivec3(5,14,23))>>ivec3(23);
 }*/
-
-vec4 uint2vec4RGBA(uint colour) {
-    return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255.0;
-}
 
 vec4 getFaceSize(uint faceData) {
     float EPSILON = 0.00005f;
@@ -108,13 +115,11 @@ void main() {
 
     if (cornerIdx == 1) //Only if we are the provoking vertex
     {
-        size = vec2(quadSize-1);
-
         vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
         baseUV = modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
 
         //Generate tinting and flag data
-        flags = faceHasAlphaCuttout(faceData);
+        uint flags = faceHasAlphaCuttout(faceData);
 
         //We need to have a conditional override based on if the model size is < a full face + quadSize > 1
         flags |= uint(any(greaterThan(quadSize, ivec2(1)))) & faceHasAlphaCuttoutOverride(faceData);
@@ -122,7 +127,7 @@ void main() {
         flags |= uint(!modelHasMipmaps(model))<<1;
 
         //Compute lighting
-        tinting = getLighting(extractLightId(quad));
+        vec4 tinting = getLighting(extractLightId(quad));
 
         //Apply model colour tinting
         uint tintColour = model.colourTint;
@@ -130,13 +135,13 @@ void main() {
             tintColour = colourData[tintColour + extractBiomeId(quad)];
         }
 
-        conditionalTinting = vec4(0);
+        uint conditionalTinting = 0;
         if (tintColour != uint(-1)) {
             flags |= 1u<<2;
-            conditionalTinting = uint2vec4RGBA(tintColour).yzwx;
+            conditionalTinting = tintColour;
         }
 
-        addin = vec4(0.0);
+        vec4 addin = vec4(0.0);
         if (!isTranslucent) {
             tinting.w = 0.0;
             //Encode the face, the lod level and
@@ -159,6 +164,9 @@ void main() {
                 tinting.xyz *= 0.5f;
             }
         }
+
+        setSizeAndFlags(flags, quadSize);
+        setTinting(tinting, addin, conditionalTinting);
     }
 
 
