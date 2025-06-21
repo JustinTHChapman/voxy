@@ -28,8 +28,9 @@ public class SectionSavingService {
         var section = task.section;
         section.assertNotFree();
         try {
-            section.inSaveQueue.set(false);
-            task.engine.storage.saveSection(section);
+            if (section.exchangeIsInSaveQueue(false)) {
+                task.engine.storage.saveSection(section);
+            }
         } catch (Exception e) {
             Logger.error("Voxy saver had an exception while executing please check logs and report error", e);
         }
@@ -47,7 +48,7 @@ public class SectionSavingService {
 
     public void enqueueSave(WorldEngine in, WorldSection section) {
         //If its not enqueued for saving then enqueue it
-        if (!section.inSaveQueue.getAndSet(true)) {
+        if (section.exchangeIsInSaveQueue(true)) {
             //Acquire the section for use
             section.acquire();
 

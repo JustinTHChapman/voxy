@@ -118,8 +118,8 @@ public class WorldEngine {
         if (this.dirtyCallback != null) {
             this.dirtyCallback.accept(section, changeState);
         }
-        if (this.saveCallback != null) {
-            this.saveCallback.save(this, section);
+        if (!section.inSaveQueue) {
+            section.markDirty();
         }
     }
 
@@ -180,5 +180,12 @@ public class WorldEngine {
         }
         //TODO: maybe dont need to tick the last active time?
         this.lastActiveTime = System.currentTimeMillis();
+    }
+
+    public void saveSection(WorldSection section) {
+        section.setNotDirty();
+        if (this.saveCallback != null) {
+            this.saveCallback.save(this, section);
+        }
     }
 }

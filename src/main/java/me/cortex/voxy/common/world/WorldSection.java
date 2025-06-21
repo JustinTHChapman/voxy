@@ -22,12 +22,16 @@ public final class WorldSection {
     static final VarHandle ATOMIC_STATE_HANDLE;
     private static final VarHandle NON_EMPTY_CHILD_HANDLE;
     private static final VarHandle NON_EMPTY_BLOCK_HANDLE;
+    private static final VarHandle IN_SAVE_QUEUE_HANDLE;
+    private static final VarHandle IS_DIRTY_HANDLE;
 
     static {
         try {
             ATOMIC_STATE_HANDLE = MethodHandles.lookup().findVarHandle(WorldSection.class, "atomicState", int.class);
             NON_EMPTY_CHILD_HANDLE = MethodHandles.lookup().findVarHandle(WorldSection.class, "nonEmptyChildren", byte.class);
             NON_EMPTY_BLOCK_HANDLE = MethodHandles.lookup().findVarHandle(WorldSection.class, "nonEmptyBlockCount", int.class);
+            IN_SAVE_QUEUE_HANDLE = MethodHandles.lookup().findVarHandle(WorldSection.class, "inSaveQueue", boolean.class);
+            IS_DIRTY_HANDLE = MethodHandles.lookup().findVarHandle(WorldSection.class, "isDirty", boolean.class);
         } catch (NoSuchFieldException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
@@ -55,7 +59,8 @@ public final class WorldSection {
     volatile byte nonEmptyChildren;
 
     final ActiveSectionTracker tracker;
-    public final AtomicBoolean inSaveQueue = new AtomicBoolean();
+    volatile boolean inSaveQueue;
+    volatile boolean isDirty;
 
     //When the first bit is set it means its loaded
     @SuppressWarnings("all")
@@ -131,6 +136,10 @@ public final class WorldSection {
 
     //TODO: add the ability to hint to the tracker that yes the section is unloaded, try to cache it in a secondary cache since it will be reused/needed later
     public int release() {
+        return release(true);
+    }
+
+    int release(boolean unload) {
         int state = ((int) ATOMIC_STATE_HANDLE.getAndAdd(this, -2)) - 2;
         if (state < 1) {
             throw new IllegalStateException("Section got into an invalid state");
@@ -138,7 +147,7 @@ public final class WorldSection {
         if ((state & 1) == 0) {
             throw new IllegalStateException("Tried releasing a freed section");
         }
-        if ((state>>1)==0) {
+        if ((state>>1)==0 && unload) {
             if (this.tracker != null) {
                 this.tracker.tryUnload(this);
             } else {
@@ -270,5 +279,21 @@ public final class WorldSection {
 
     public static WorldSection _createRawUntrackedUnsafeSection(int lvl, int x, int y, int z) {
         return new WorldSection(lvl, x, y, z, null);
+    }
+
+    public boolean exchangeIsInSaveQueue(boolean state) {
+        return ((boolean) IN_SAVE_QUEUE_HANDLE.compareAndExchange(this, !state, state)) == !state;
+    }
+
+    public void markDirty() {
+        IS_DIRTY_HANDLE.getAndSet(this, true);
+    }
+
+    public boolean setNotDirty() {
+        return (boolean) IS_DIRTY_HANDLE.getAndSet(this, false);
+    }
+
+    public boolean isFreed() {
+        return (((int)ATOMIC_STATE_HANDLE.get(this))&1)==0;
     }
 }

@@ -190,6 +190,23 @@ public class ActiveSectionTracker {
 
     void tryUnload(WorldSection section) {
         if (this.engine != null) this.engine.lastActiveTime = System.currentTimeMillis();
+        if (section.isDirty&&this.engine!=null) {
+            if (section.tryAcquire()) {
+                if (section.setNotDirty()) {//If the section is dirty we must enqueue for saving
+                    this.engine.saveSection(section);
+                }
+                section.release(false);//Special
+            } else {
+                VarHandle.loadLoadFence();
+                if (section.isDirty) {
+                    throw new IllegalStateException("Section was dirty but is also unloaded, this is very bad");
+                }
+            }
+        }
+
+        if (section.getRefCount() != 0) {
+            return;
+        }
         int index = this.getCacheArrayIndex(section.key);
         final var cache = this.loadedSectionCache[index];
         WorldSection sec = null;
