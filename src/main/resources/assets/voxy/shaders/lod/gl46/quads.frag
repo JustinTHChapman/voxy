@@ -19,6 +19,9 @@ layout(location = 7) in flat uint quadDebug;
 #endif
 layout(location = 0) out vec4 outColour;
 
+
+#import <voxy:lod/gl46/bindings.glsl>
+
 vec4 uint2vec4RGBA(uint colour) {
     return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255.0;
 }
@@ -40,12 +43,12 @@ vec4 computeColour(vec4 colour) {
     if (useTinting() && abs(colour.r-colour.g) < 0.02f && abs(colour.g-colour.b) < 0.02f) {
         colour *= uint2vec4RGBA(interData.z).yzwx;
     }
-    return (colour * uint2vec4RGBA(interData.y)) + vec4(0,0,0,float(interData.w&0xFFu)/255);
+    return (colour * uint2vec4RGBA(interData.y)) + uint2vec4RGBA(interData.w);
 }
 
 
 uint getFace() {
-    return (interData.w>>8)&7u;
+    return (interData.w)&7u;
 }
 
 vec2 getBaseUV() {
@@ -89,7 +92,9 @@ void main() {
         #endif
     }
 
-    outColour = computeColour(colour);
+    colour = computeColour(colour);
+
+    outColour = colour;
 
 
     #ifdef DEBUG_RENDER

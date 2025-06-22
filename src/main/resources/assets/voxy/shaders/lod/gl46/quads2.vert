@@ -26,11 +26,10 @@ void setSizeAndFlags(uint modelId, uint _flags, ivec2 quadSize) {
     interData.x = (modelId<<16) | _flags | (uint(quadSize.x-1)<<8) | (uint(quadSize.y-1)<<12);
 }
 
-void setTintingAndExtra(vec4 _tinting, uint _conditionalTinting, uint alphaAddin, uint face) {
-    uint packedData = alphaAddin|(face<<8);
+void setTintingAndExtra(vec4 _tinting, uint _conditionalTinting, uint addin) {
     interData.y = packVec4(_tinting);
     interData.z = _conditionalTinting;
-    interData.w = packedData;
+    interData.w = addin;
 }
 
 #ifdef DEBUG_RENDER
@@ -113,6 +112,24 @@ void main() {
 
     ivec2 quadSize = extractSize(quad);
 
+
+
+
+    vec4 faceSize = getFaceSize(faceData);
+
+    vec2 cQuadSize = (faceSize.yw + quadSize - 1) * vec2((cornerIdx>>1)&1, cornerIdx&1);
+    uv = faceSize.xz + cQuadSize;
+
+    vec3 cornerPos = extractPos(quad);
+    float depthOffset = extractFaceIndentation(faceData);
+    cornerPos += swizzelDataAxis(face>>1, vec3(faceSize.xz, mix(depthOffset, 1-depthOffset, float(face&1u))));
+
+    vec3 origin = vec3(((extractLoDPosition(encPos)<<lodLevel) - baseSectionPos)<<5);
+    vec3 pointPos = (cornerPos+swizzelDataAxis(face>>1,vec3(cQuadSize,0)))*(1<<lodLevel)+origin;
+    gl_Position = MVP*vec4(pointPos, 1.0);
+
+
+
     if (cornerIdx == 1) //Only if we are the provoking vertex
     {
         //Generate tinting and flag data
@@ -138,7 +155,7 @@ void main() {
             conditionalTinting = tintColour;
         }
 
-        uint alphaAddin = 0;
+        uint addin = 0;
         if (!isTranslucent) {
             tinting.w = 0.0;
             //Encode the face, the lod level and
@@ -146,7 +163,7 @@ void main() {
             encodedData |= face;
             encodedData |= (lodLevel<<3);
             encodedData |= uint(hasAO)<<6;
-            alphaAddin = encodedData;
+            addin = encodedData;
         }
 
         //Apply face tint
@@ -163,21 +180,9 @@ void main() {
         }
 
         setSizeAndFlags(modelId, flags, quadSize);
-        setTintingAndExtra(tinting, conditionalTinting, alphaAddin, face);
+        setTintingAndExtra(tinting, conditionalTinting, addin);
     }
 
-    vec4 faceSize = getFaceSize(faceData);
-
-    vec2 cQuadSize = (faceSize.yw + quadSize - 1) * vec2((cornerIdx>>1)&1, cornerIdx&1);
-    uv = faceSize.xz + cQuadSize;
-
-    vec3 cornerPos = extractPos(quad);
-    float depthOffset = extractFaceIndentation(faceData);
-    cornerPos += swizzelDataAxis(face>>1, vec3(faceSize.xz, mix(depthOffset, 1-depthOffset, float(face&1u))));
-
-
-    vec3 origin = vec3(((extractLoDPosition(encPos)<<lodLevel) - baseSectionPos)<<5);
-    gl_Position = MVP*vec4((cornerPos+swizzelDataAxis(face>>1,vec3(cQuadSize,0)))*(1<<lodLevel)+origin, 1.0);
 
     #ifdef DEBUG_RENDER
     quadDebug = lodLevel;
