@@ -23,17 +23,26 @@ vec4 uint2vec4RGBA(uint colour) {
     return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255.0;
 }
 
-vec4 computeColour(vec4 colour) {
-    //Conditional tinting, TODO: FIXME: REPLACE WITH MASK OR SOMETHING, like encode data into the top bit of alpha
-    if ((interData.x&(1u<<2)) != 0 && abs(colour.r-colour.g) < 0.02f && abs(colour.g-colour.b) < 0.02f) {
-        colour *= uint2vec4RGBA(interData.z).yzwx;
-    }
-    return (colour * uint2vec4RGBA(interData.y)) + (float(interData.w&0xFFu)/255);
+bool useMipmaps() {
+    return (interData.x&2u)==0u;
 }
 
-bool useMipmaps() {
-    return ((interData.x>>1)&1u)==0u;
+bool useTinting() {
+    return (interData.x&4u)!=0u;
 }
+
+bool useCutout() {
+    return (interData.x&1u)==1u;
+}
+
+vec4 computeColour(vec4 colour) {
+    //Conditional tinting, TODO: FIXME: REPLACE WITH MASK OR SOMETHING, like encode data into the top bit of alpha
+    if (useTinting() && abs(colour.r-colour.g) < 0.02f && abs(colour.g-colour.b) < 0.02f) {
+        colour *= uint2vec4RGBA(interData.z).yzwx;
+    }
+    return (colour * uint2vec4RGBA(interData.y)) + vec4(0,0,0,float(interData.w&0xFFu)/255);
+}
+
 
 uint getFace() {
     return (interData.w>>8)&7u;
@@ -72,7 +81,7 @@ void main() {
 
 
     //Also, small quad is really fking over the mipping level somehow
-    if ((interData.x&1u) == 1 && (texture(blockModelAtlas, texPos, -16.0).a <= 0.1f)) {
+    if (useCutout() && (texture(blockModelAtlas, texPos, -16.0).a <= 0.1f)) {
         //This is stupidly stupidly bad for divergence
         //TODO: FIXME, basicly what this do is sample the exact pixel (no lod) for discarding, this stops mipmapping fucking it over
         #ifndef DEBUG_RENDER

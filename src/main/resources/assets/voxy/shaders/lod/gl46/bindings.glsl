@@ -1,5 +1,3 @@
-#line 1
-
 layout(binding = 0, std140) uniform SceneUniform {
     mat4 MVP;
     ivec3 baseSectionPos;

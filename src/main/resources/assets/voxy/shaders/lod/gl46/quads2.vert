@@ -27,10 +27,10 @@ void setSizeAndFlags(uint modelId, uint _flags, ivec2 quadSize) {
 }
 
 void setTintingAndExtra(vec4 _tinting, uint _conditionalTinting, uint alphaAddin, uint face) {
-    uint packed = alphaAddin|(face<<8);
+    uint packedData = alphaAddin|(face<<8);
     interData.y = packVec4(_tinting);
     interData.z = _conditionalTinting;
-    interData.w = packed;
+    interData.w = packedData;
 }
 
 #ifdef DEBUG_RENDER
@@ -163,7 +163,7 @@ void main() {
         }
 
         setSizeAndFlags(modelId, flags, quadSize);
-        setTinting(tinting, conditionalTinting, alphaAddin, face);
+        setTintingAndExtra(tinting, conditionalTinting, alphaAddin, face);
     }
 
     vec4 faceSize = getFaceSize(faceData);
