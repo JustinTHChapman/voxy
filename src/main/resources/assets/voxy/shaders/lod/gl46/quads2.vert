@@ -52,29 +52,17 @@ vec4 getFaceSize(uint faceData) {
 
     vec4 faceOffsetsSizes = extractFaceSizes(faceData);
 
+    //Expand the quads by a very small amount (because of the subtraction after this also becomes an implicit add)
+    faceOffsetsSizes.xz -= vec2(EPSILON);
+
     //Make the end relative to the start
     faceOffsetsSizes.yw -= faceOffsetsSizes.xz;
-
-    //Expand the quads by a very small amount
-    faceOffsetsSizes.xz -= vec2(EPSILON);
-    faceOffsetsSizes.yw += vec2(EPSILON);
 
     return faceOffsetsSizes;
 }
 
-//TODO: make branchless by using ternaries i think
 vec3 swizzelDataAxis(uint axis, vec3 data) {
-    if (axis == 0) { //Up/down
-        data = data.xzy;
-    }
-    //Not needed, here for readability
-    //if (axis == 1) {//north/south
-    //    offset = offset.xyz;
-    //}
-    if (axis == 2) { //west/east
-        data = data.zxy;
-    }
-    return data;
+    return mix(mix(data.zxy,data.xzy,axis==0),data,axis==1);
 }
 
 uint extractDetail(uvec2 encPos) {
