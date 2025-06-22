@@ -19,13 +19,13 @@ public class VoxyClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         ClientLifecycleEvents.CLIENT_STARTED.register(client->{
-            BudgetBufferRenderer.init();
             boolean systemSupported = Capabilities.INSTANCE.compute && Capabilities.INSTANCE.indirectParameters;
             if (systemSupported) {
                 VoxyCommon.setInstanceFactory(VoxyClientInstance::new);
             } else {
                 Logger.error("Voxy is unsupported on your system.");
             }
+            BudgetBufferRenderer.init();
         });
 
 

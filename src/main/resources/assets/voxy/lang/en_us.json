@@ -19,6 +19,9 @@
   "voxy.config.general.renderDistance": "Render distance",
   "voxy.config.general.renderDistance.tooltip": "Render distance of voxy in chunks",
 
+  "voxy.config.general.environmental_fog": "Enable environmental fog",
+  "voxy.config.general.environmental_fog.tooltip": "Enables or disables voxy rendering environmental fog",
+
   "voxy.config.general.vanilla_fog": "Enable vanilla fog",
   "voxy.config.general.vanilla_fog.tooltip": "Enables or disables vanilla fog effect",
 

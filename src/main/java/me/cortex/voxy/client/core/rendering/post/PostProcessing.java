@@ -1,14 +1,14 @@
 package me.cortex.voxy.client.core.rendering.post;
 
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.GlStateCapture;
-import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
-import org.lwjgl.opengl.GL11C;
 
 import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glBindImageTexture;
@@ -20,6 +20,7 @@ import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
 import static org.lwjgl.opengl.GL45C.*;
 
 public class PostProcessing {
+    private final boolean useEnvFog = VoxyConfig.CONFIG.useEnvironmentalFog;
     private final GlFramebuffer framebuffer;
     private final GlFramebuffer framebufferSSAO;
     private int width;
@@ -31,7 +32,8 @@ public class PostProcessing {
     private final FullscreenBlit setDepth0 = new FullscreenBlit("voxy:post/depth0.frag");
     private final FullscreenBlit emptyBlit = new FullscreenBlit("voxy:post/noop.frag");
     //private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_cutout.frag");
-    private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag");
+    private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag",
+            a->a.defineIf("USE_ENV_FOG", useEnvFog));
     private final Shader ssaoComp = Shader.make()
             .add(ShaderType.COMPUTE, "voxy:post/ssao.comp")
             .compile();
@@ -158,7 +160,7 @@ public class PostProcessing {
 
 
     //Executes the post processing and emits to whatever framebuffer is currently bound via a blit
-    public void renderPost(Matrix4f fromProjection, Matrix4fc tooProjection, int outputFB) {
+    public void renderPost(Viewport vp, Matrix4fc tooProjection, int outputFB) {
         glDisable(GL_STENCIL_TEST);
 
 
@@ -172,12 +174,17 @@ public class PostProcessing {
         this.blitTexture.bind();
 
         float[] data = new float[4*4];
-        var mat = new Matrix4f(fromProjection).invert();
-        mat.get(data);
+        new Matrix4f(vp.MVP).invert().get(data);
         glUniformMatrix4fv(2, false, data);//inverse fromProjection
-        tooProjection.get(data);
+        new Matrix4f(tooProjection).mul(vp.modelView).get(data);
         glUniformMatrix4fv(3, false, data);//tooProjection
-
+        if (useEnvFog) {
+            float start = vp.fogParameters.environmentalStart();
+            float end = vp.fogParameters.environmentalEnd();
+            float invEndFogDelta = 1f/(end-start);
+            glUniform3f(4, vp.fogParameters.environmentalEnd()/2f, invEndFogDelta, start*invEndFogDelta);
+            glUniform3f(5, vp.fogParameters.red(), vp.fogParameters.green(), vp.fogParameters.blue());
+        }
 
         glBindTextureUnit(0, this.didSSAO?this.colourSSAO.id:this.colour.id);
 

@@ -15,11 +15,16 @@ public class MixinFogRenderer {
     @Redirect(method = "applyFog(Lnet/minecraft/client/render/Camera;IZLnet/minecraft/client/render/RenderTickCounter;FLnet/minecraft/client/world/ClientWorld;)Lorg/joml/Vector4f;", at = @At(value = "FIELD", target = "Lnet/minecraft/client/render/fog/FogData;renderDistanceEnd:F", opcode = Opcodes.PUTFIELD), require = 0)
     private void voxy$modifyFog(FogData instance, float distance) {
         var vrs = (IGetVoxyRenderSystem) MinecraftClient.getInstance().worldRenderer;
+
         if (VoxyConfig.CONFIG.renderVanillaFog || vrs == null || vrs.getVoxyRenderSystem() == null) {
             instance.renderDistanceEnd = distance;
         } else {
+            instance.renderDistanceStart = 999999999;
             instance.renderDistanceEnd = 999999999;
-            instance.environmentalEnd = 999999999;
+            if (!VoxyConfig.CONFIG.useEnvironmentalFog) {
+                instance.environmentalStart = 99999999;
+                instance.environmentalEnd = 99999999;
+            }
         }
     }
 }

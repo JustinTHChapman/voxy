@@ -3,6 +3,8 @@ package me.cortex.voxy.client.core.rendering.post;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 
+import java.util.function.Function;
+
 import static org.lwjgl.opengl.GL11C.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11C.glDrawArrays;
 import static org.lwjgl.opengl.GL30C.glBindVertexArray;
@@ -13,9 +15,12 @@ public class FullscreenBlit {
 
     private final Shader shader;
     public FullscreenBlit(String fragId) {
-        this.shader = Shader.make()
+        this(fragId, (a)->a);
+    }
+    public <T extends Shader> FullscreenBlit(String fragId, Function<Shader.Builder<T>, Shader.Builder<T>> builder) {
+        this.shader = builder.apply((Shader.Builder<T>) Shader.make()
                 .add(ShaderType.VERTEX, "voxy:post/fullscreen.vert")
-                .add(ShaderType.FRAGMENT, fragId)
+                .add(ShaderType.FRAGMENT, fragId))
                 .compile();
     }
 

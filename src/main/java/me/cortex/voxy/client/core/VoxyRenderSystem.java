@@ -21,6 +21,7 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
@@ -127,7 +128,7 @@ public class VoxyRenderSystem {
         ).mulLocal(makeProjectionMatrix(16, 16*3000));
     }
 
-    public void renderOpaque(ChunkRenderMatrices matrices, double cameraX, double cameraY, double cameraZ) {
+    public void renderOpaque(ChunkRenderMatrices matrices, FogParameters fogParameters, double cameraX, double cameraY, double cameraZ) {
         if (IrisUtil.irisShadowActive()) {
             return;
         }
@@ -164,11 +165,13 @@ public class VoxyRenderSystem {
         int[] dims = new int[4];
         glGetIntegerv(GL_VIEWPORT, dims);
         var viewport = this.renderer.getViewport();
+
         viewport
                 .setProjection(projection)
                 .setModelView(new Matrix4f(matrices.modelView()))
                 .setCamera(cameraX, cameraY, cameraZ)
                 .setScreenSize(dims[2], dims[3])
+                .setFogParameters(fogParameters)
                 .update();
         viewport.frameId++;
 
@@ -195,7 +198,7 @@ public class VoxyRenderSystem {
 
 
         TimingStatistics.F.start();
-        this.postProcessing.renderPost(projection, matrices.projection(), boundFB);
+        this.postProcessing.renderPost(viewport, matrices.projection(), boundFB);
         TimingStatistics.F.stop();
 
         TimingStatistics.main.stop();
