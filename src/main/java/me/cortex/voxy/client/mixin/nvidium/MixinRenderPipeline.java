@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(RenderPipeline.class)
+@Mixin(value = RenderPipeline.class, remap = false)
 public class MixinRenderPipeline {
     @Inject(method = "renderFrame", at = @At("RETURN"))
     private void voxy$injectRender(TerrainRenderPass pass, Viewport frustum, FogParameters fogParameters, ChunkRenderMatrices crm, double px, double py, double pz, CallbackInfo ci) {
