@@ -70,7 +70,7 @@ void main() {
         vec2 dy = dFdy(uvSmol);//vec2(lDy, dDy);
         colour = textureGrad(blockModelAtlas, texPos, dx, dy);
     } else {
-        colour = texture(blockModelAtlas, texPos, -5.0);
+        colour = textureLod(blockModelAtlas, texPos, 0);
     }
 
     if (any(notEqual(clamp(tile, vec2(0), vec2((interData.x>>8)&0xFu, (interData.x>>12)&0xFu)), tile))) {
@@ -84,7 +84,7 @@ void main() {
 
 
     //Also, small quad is really fking over the mipping level somehow
-    if (useCutout() && (texture(blockModelAtlas, texPos, -16.0).a <= 0.1f)) {
+    if (useCutout() && (textureLod(blockModelAtlas, texPos, 0).a <= 0.1f)) {
         //This is stupidly stupidly bad for divergence
         //TODO: FIXME, basicly what this do is sample the exact pixel (no lod) for discarding, this stops mipmapping fucking it over
         #ifndef DEBUG_RENDER
