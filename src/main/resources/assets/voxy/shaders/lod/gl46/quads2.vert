@@ -15,22 +15,22 @@
 //#define DEBUG_RENDER
 
 layout(location = 0) out vec2 uv;
-layout(location = 1) out flat vec2 baseUV;
-layout(location = 2) out flat uvec4 interData;
+layout(location = 1) out flat uvec4 interData;
 
 uint packVec4(vec4 vec) {
     uvec4 vec_=uvec4(vec*255)<<uvec4(24,16,8,0);
     return vec_.x|vec_.y|vec_.z|vec_.w;
 }
 
-void setSizeAndFlags(uint _flags, ivec2 quadSize) {
-    interData.x = _flags | (uint(quadSize.x-1)<<16) | (uint(quadSize.y-1)<<24);
+void setSizeAndFlags(uint modelId, uint _flags, ivec2 quadSize) {
+    interData.x = (modelId<<16) | _flags | (uint(quadSize.x-1)<<8) | (uint(quadSize.y-1)<<12);
 }
 
-void setTinting(vec4 _tinting, vec4 _addin, uint _conditionalTinting) {
+void setTintingAndExtra(vec4 _tinting, uint _conditionalTinting, uint alphaAddin, uint face) {
+    uint packed = alphaAddin|(face<<8);
     interData.y = packVec4(_tinting);
-    interData.z = packVec4(_addin);
-    interData.w = _conditionalTinting;
+    interData.z = _conditionalTinting;
+    interData.w = packed;
 }
 
 #ifdef DEBUG_RENDER
@@ -115,9 +115,6 @@ void main() {
 
     if (cornerIdx == 1) //Only if we are the provoking vertex
     {
-        vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
-        baseUV = modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
-
         //Generate tinting and flag data
         uint flags = faceHasAlphaCuttout(faceData);
 
@@ -141,7 +138,7 @@ void main() {
             conditionalTinting = tintColour;
         }
 
-        vec4 addin = vec4(0.0);
+        uint alphaAddin = 0;
         if (!isTranslucent) {
             tinting.w = 0.0;
             //Encode the face, the lod level and
@@ -149,7 +146,7 @@ void main() {
             encodedData |= face;
             encodedData |= (lodLevel<<3);
             encodedData |= uint(hasAO)<<6;
-            addin.w = float(encodedData)/255.0;
+            alphaAddin = encodedData;
         }
 
         //Apply face tint
@@ -165,13 +162,9 @@ void main() {
             }
         }
 
-        setSizeAndFlags(flags, quadSize);
-        setTinting(tinting, addin, conditionalTinting);
+        setSizeAndFlags(modelId, flags, quadSize);
+        setTinting(tinting, conditionalTinting, alphaAddin, face);
     }
-
-
-
-
 
     vec4 faceSize = getFaceSize(faceData);
 
