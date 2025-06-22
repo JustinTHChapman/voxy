@@ -124,8 +124,8 @@ dependencies {
     //modCompileOnly("maven.modrinth:immersiveportals:v5.1.7-mc1.20.4")
 
 
-    modCompileOnly("maven.modrinth:chunky:1.4.36-fabric")
-    modRuntimeOnlyMsk("maven.modrinth:chunky:1.4.36-fabric")
+    modCompileOnly("maven.modrinth:chunky:1.4.40-fabric")
+    modRuntimeOnlyMsk("maven.modrinth:chunky:1.4.40-fabric")
 
     modRuntimeOnlyMsk("maven.modrinth:spark:1.10.139-fabric")
     modRuntimeOnlyMsk("maven.modrinth:fabric-permissions-api:0.3.3")
