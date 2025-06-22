@@ -26,6 +26,24 @@ repositories {
     }
     maven { url = "https://maven.shedaniel.me/" }
     maven { url = "https://maven.terraformersmc.com/releases/" }
+
+    exclusiveContent {
+        forRepository {
+            ivy {
+                name = "github"
+                url = "https://github.com/"
+                patternLayout {
+                    artifact '/[organisation]/[module]/releases/download/[revision]/[module]-[revision]-[classifier].[ext]'
+                }
+                metadataSources {
+                    artifact()
+                }
+            }
+        }
+        filter {
+            includeModuleByRegex("[^\\.]+", "nvidium")
+        }
+    }
 }
 
 
@@ -92,8 +110,8 @@ dependencies {
 
     modImplementation("maven.modrinth:lithium:mc1.21.6-0.17.0-fabric")
 
-    //modRuntimeOnly "maven.modrinth:nvidium:0.2.6-beta"
-    //modCompileOnly "maven.modrinth:nvidium:0.2.8-beta"
+    modRuntimeOnlyMsk "drouarb:nvidium:0.4.1-beta4:1.21.6@jar"
+    modCompileOnly "drouarb:nvidium:0.4.1-beta4:1.21.6@jar"
 
     modCompileOnly("maven.modrinth:modmenu:15.0.0-beta.1")
     modRuntimeOnlyMsk("maven.modrinth:modmenu:15.0.0-beta.1")
