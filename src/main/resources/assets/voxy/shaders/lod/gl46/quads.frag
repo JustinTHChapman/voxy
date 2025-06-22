@@ -43,12 +43,12 @@ vec4 computeColour(vec4 colour) {
     if (useTinting() && abs(colour.r-colour.g) < 0.02f && abs(colour.g-colour.b) < 0.02f) {
         colour *= uint2vec4RGBA(interData.z).yzwx;
     }
-    return (colour * uint2vec4RGBA(interData.y)) + uint2vec4RGBA(interData.w);
+    return (colour * uint2vec4RGBA(interData.y)) + vec4(0,0,0,float(interData.w&0xFFu)/255);
 }
 
 
 uint getFace() {
-    return (interData.w)&7u;
+    return (interData.w>>8)&7u;
 }
 
 vec2 getBaseUV() {

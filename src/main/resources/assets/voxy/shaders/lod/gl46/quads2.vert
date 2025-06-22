@@ -180,7 +180,7 @@ void main() {
         }
 
         setSizeAndFlags(modelId, flags, quadSize);
-        setTintingAndExtra(tinting, conditionalTinting, addin);
+        setTintingAndExtra(tinting, conditionalTinting, addin|(face<<8));
     }
 
 
