@@ -103,19 +103,22 @@ public class VoxelIngestService {
             //if (section.isEmpty()) continue;
             var pos = ChunkSectionPos.from(chunk.getPos(), i);
             var bl = blp.getLightSection(pos);
+            boolean blNull = bl == null;
             if (!(bl == null || bl.isUninitialized())) {
                 bl = bl.copy();
             } else {
                 bl = null;
             }
             var sl = slp.getLightSection(pos);
+            boolean slNull = sl == null;
             if (!(sl == null || sl.isUninitialized())) {
                 sl = sl.copy();
             } else {
                 sl = null;
             }
 
-            if ((bl == null && sl == null) && section.isEmpty()) {
+            //If its null for either, assume failure to obtain lighting and ignore section
+            if (blNull || slNull) {
                 continue;
             }
 
