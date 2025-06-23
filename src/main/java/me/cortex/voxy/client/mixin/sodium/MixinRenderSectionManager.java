@@ -1,22 +1,12 @@
 package me.cortex.voxy.client.mixin.sodium;
 
-import com.llamalad7.mixinextras.injector.ModifyReturnValue;
-import me.cortex.voxy.client.ICheekyClientChunkManager;
-import me.cortex.voxy.client.VoxyClientInstance;
-import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
-import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.common.world.service.VoxelIngestService;
-import me.cortex.voxy.commonImpl.VoxyCommon;
-import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
-import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionFlags;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
 import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -61,20 +51,6 @@ public class MixinRenderSectionManager {
             }
         }
     }*/
-
-    @Inject(method = "onChunkRemoved", at = @At("HEAD"))
-    private void injectIngest(int x, int z, CallbackInfo ci) {
-        //TODO: Am not quite sure if this is right
-        if (VoxyConfig.CONFIG.ingestEnabled) {
-            var cccm = (ICheekyClientChunkManager)this.level.getChunkManager();
-            if (cccm != null) {
-                var chunk = cccm.voxy$cheekyGetChunk(x, z);
-                if (chunk != null) {
-                    VoxelIngestService.tryAutoIngestChunk(chunk);
-                }
-            }
-        }
-    }
 
     @Redirect(method = "updateSectionInfo", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSection;setInfo(Lnet/caffeinemc/mods/sodium/client/render/chunk/data/BuiltSectionInfo;)Z"))
     private boolean voxy$updateOnUpload(RenderSection instance, BuiltSectionInfo info) {
