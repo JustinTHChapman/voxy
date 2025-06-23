@@ -16,6 +16,7 @@ import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkNibbleArray;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.chunk.light.LightStorage;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -93,8 +94,7 @@ public class VoxelIngestService {
             throw new IllegalStateException("Tried inserting chunk into WorldEngine that was not alive");
         }
         var lightingProvider = chunk.getWorld().getLightingProvider();
-        var blp = lightingProvider.get(LightType.BLOCK);
-        var slp = lightingProvider.get(LightType.SKY);
+        boolean gotLighting = false;
 
         int i = chunk.getBottomSectionCoord() - 1;
         for (var section : chunk.getSectionArray()) {
@@ -102,25 +102,40 @@ public class VoxelIngestService {
             if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
             //if (section.isEmpty()) continue;
             var pos = ChunkSectionPos.from(chunk.getPos(), i);
+            if (lightingProvider.getStatus(LightType.SKY, pos) != LightStorage.Status.LIGHT_AND_DATA || lightingProvider.getStatus(LightType.BLOCK, pos) != LightStorage.Status.LIGHT_AND_DATA)
+                continue;
+            gotLighting = true;
+        }
+
+        if (!gotLighting) {
+            return;
+        }
+
+        var blp = lightingProvider.get(LightType.BLOCK);
+        var slp = lightingProvider.get(LightType.SKY);
+
+
+        i = chunk.getBottomSectionCoord() - 1;
+        for (var section : chunk.getSectionArray()) {
+            i++;
+            if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
+            //if (section.isEmpty()) continue;
+            var pos = ChunkSectionPos.from(chunk.getPos(), i);
+
             var bl = blp.getLightSection(pos);
-            boolean blNull = bl == null;
-            if (!(bl == null || bl.isUninitialized())) {
+            if (bl != null) {
                 bl = bl.copy();
-            } else {
-                bl = null;
             }
+
             var sl = slp.getLightSection(pos);
-            boolean slNull = sl == null;
-            if (!(sl == null || sl.isUninitialized())) {
+            if (sl != null) {
                 sl = sl.copy();
-            } else {
-                sl = null;
             }
 
             //If its null for either, assume failure to obtain lighting and ignore section
-            if (blNull || slNull) {
-                continue;
-            }
+            //if (blNone && slNone) {
+            //    continue;
+            //}
 
             this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));
             try {
