@@ -210,9 +210,11 @@ remapJar {
         delete fileTree(getDestinationDirectory().get())
     }
 
-    def hash = gitCommitHash();
-    if (!hash.equals("<UnknownCommit>")) {
-        archiveClassifier.set(hash);
+    if (!isInGHA) {
+        def hash = gitCommitHash();
+        if (!hash.equals("<UnknownCommit>")) {
+            archiveClassifier.set(hash);
+        }
     }
 }
 
