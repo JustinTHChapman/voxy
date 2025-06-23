@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.mixin.sodium;
 
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
+import me.cortex.voxy.client.ICheekyClientChunkManager;
 import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
@@ -65,7 +66,13 @@ public class MixinRenderSectionManager {
     private void injectIngest(int x, int z, CallbackInfo ci) {
         //TODO: Am not quite sure if this is right
         if (VoxyConfig.CONFIG.ingestEnabled) {
-            VoxelIngestService.tryAutoIngestChunk(this.level.getChunk(x, z));
+            var cccm = (ICheekyClientChunkManager)this.level.getChunkManager();
+            if (cccm != null) {
+                var chunk = cccm.voxy$cheekyGetChunk(x, z);
+                if (chunk != null) {
+                    VoxelIngestService.tryAutoIngestChunk(chunk);
+                }
+            }
         }
     }
 
