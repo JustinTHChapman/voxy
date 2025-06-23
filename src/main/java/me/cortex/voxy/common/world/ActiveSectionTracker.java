@@ -196,11 +196,6 @@ public class ActiveSectionTracker {
                     this.engine.saveSection(section);
                 }
                 section.release(false);//Special
-            } else {
-                VarHandle.loadLoadFence();
-                if (section.isDirty) {
-                    throw new IllegalStateException("Section was dirty but is also unloaded, this is very bad");
-                }
             }
         }
 
@@ -213,7 +208,19 @@ public class ActiveSectionTracker {
         final var lock = this.locks[index];
         long stamp = lock.writeLock();
         {
-            if (section.trySetFreed()) {
+            VarHandle.loadLoadFence();
+            if (section.isDirty) {
+                if (section.tryAcquire()) {
+                    if (section.setNotDirty()) {//If the section is dirty we must enqueue for saving
+                        if (this.engine != null)
+                            this.engine.saveSection(section);
+                    }
+                    section.release(false);//Special
+                } else {
+                    throw new IllegalStateException("Section was dirty but is also unloaded, this is very bad");
+                }
+            }
+            if (section.getRefCount() == 0 && section.trySetFreed()) {
                 var cached = cache.remove(section.key);
                 var obj = cached.obj;
                 if (obj == null) {
