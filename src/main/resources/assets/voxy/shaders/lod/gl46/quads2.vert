@@ -62,7 +62,7 @@ vec4 getFaceSize(uint faceData) {
 }
 
 vec3 swizzelDataAxis(uint axis, vec3 data) {
-    return mix(mix(data.zxy,data.xzy,vec3(axis==0)),data,vec3(axis==1));
+    return mix(mix(data.zxy,data.xzy,bvec3(axis==0)),data,bvec3(axis==1));
 }
 
 uint extractDetail(uvec2 encPos) {
