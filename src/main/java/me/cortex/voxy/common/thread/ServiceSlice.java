@@ -59,7 +59,7 @@ public class ServiceSlice extends TrackedObject {
         //Check that we are still alive
         if (!this.alive) {
             if (this.activeCount.decrementAndGet() < 0) {
-                throw new IllegalStateException("Alive count negative!");
+                throw new IllegalStateException("Alive count negative!:" + this.name);
             }
             return true;
         }
@@ -77,14 +77,14 @@ public class ServiceSlice extends TrackedObject {
         try {
             ctx.run();
         } catch (Exception e) {
-            Logger.error("Unexpected error occurred while executing a service job, expect things to break badly", e);
+            Logger.error("Unexpected error occurred while executing a service job, expect things to break badly: " + this.name, e);
             MinecraftClient.getInstance().execute(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("A voxy service had an exception while executing please check logs and report error"), true));
         } finally {
             if (this.activeCount.decrementAndGet() < 0) {
-                throw new IllegalStateException("Alive count negative!");
+                throw new IllegalStateException("Alive count negative!: " + this.name);
             }
             if (this.jobCount2.decrementAndGet() < 0) {
-                throw new IllegalStateException("Job count negative!");
+                throw new IllegalStateException("Job count negative!" + this.name);
             }
         }
         return true;
@@ -145,7 +145,7 @@ public class ServiceSlice extends TrackedObject {
 
     public void blockTillEmpty() {
         while (this.activeCount.get() != 0 && this.alive) {
-            while (this.jobCount2.get() != 0 && this.alive) {
+            while ((this.jobCount2.get() != 0 || this.jobCount.availablePermits()!=0) && this.alive) {
                 Thread.onSpinWait();
                 try {
                     Thread.sleep(10);
@@ -163,7 +163,7 @@ public class ServiceSlice extends TrackedObject {
             return false;
         }
         if (this.jobCount2.decrementAndGet() < 0) {
-            throw new IllegalStateException("Job count negative!!!");
+            throw new IllegalStateException("Job count negative!!!:" + this.name);
         }
         this.threadPool.steal(this, 1);
         return true;
@@ -176,7 +176,7 @@ public class ServiceSlice extends TrackedObject {
         }
 
         if (this.jobCount2.addAndGet(-count) < 0) {
-            throw new IllegalStateException("Job count negative!!!");
+            throw new IllegalStateException("Job count negative!!!:" + this.name);
         }
         this.threadPool.steal(this, count);
         return count;
