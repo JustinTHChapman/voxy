@@ -6,6 +6,8 @@ import me.cortex.voxy.client.core.gl.GlDebug;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.TrackedObject;
 import org.lwjgl.opengl.GL20C;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -170,7 +172,13 @@ public class Shader extends TrackedObject {
 
         private static int createShader(ShaderType type, String src) {
             int shader = GL20C.glCreateShader(type.gl);
-            GL20C.glShaderSource(shader, src);
+            {//https://github.com/CaffeineMC/sodium/blob/fc42a7b19836c98a35df46e63303608de0587ab6/src/main/java/me/jellysquid/mods/sodium/client/gl/shader/ShaderWorkarounds.java
+                long ptr = MemoryUtil.memAddress(MemoryUtil.memUTF8(src, true));
+                try (var stack = MemoryStack.stackPush()) {
+                    GL20C.nglShaderSource(shader, 1, stack.pointers(ptr).address0(), 0);
+                }
+                MemoryUtil.nmemFree(ptr);
+            }
             GL20C.glCompileShader(shader);
             String log = GL20C.glGetShaderInfoLog(shader);
 
