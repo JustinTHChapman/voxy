@@ -102,7 +102,7 @@ public class VoxelIngestService {
             if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
             //if (section.isEmpty()) continue;
             var pos = ChunkSectionPos.from(chunk.getPos(), i);
-            if (lightingProvider.getStatus(LightType.SKY, pos) != LightStorage.Status.LIGHT_AND_DATA || lightingProvider.getStatus(LightType.BLOCK, pos) != LightStorage.Status.LIGHT_AND_DATA)
+            if (lightingProvider.getStatus(LightType.SKY, pos) != LightStorage.Status.LIGHT_AND_DATA && lightingProvider.getStatus(LightType.BLOCK, pos) != LightStorage.Status.LIGHT_AND_DATA)
                 continue;
             gotLighting = true;
         }
