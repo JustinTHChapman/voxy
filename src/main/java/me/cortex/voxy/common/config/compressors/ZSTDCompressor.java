@@ -7,10 +7,10 @@ import me.cortex.voxy.common.world.SaveLoadSystem;
 
 import java.lang.ref.Cleaner;
 
+import static me.cortex.voxy.common.util.GlobalCleaner.CLEANER;
 import static org.lwjgl.util.zstd.Zstd.*;
 
 public class ZSTDCompressor implements StorageCompressor {
-    private static final Cleaner CLEANER = Cleaner.create();
     private record Ref(long ptr) {}
 
     private static Ref createCleanableCompressionContext() {

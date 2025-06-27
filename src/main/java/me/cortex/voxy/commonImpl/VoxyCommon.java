@@ -31,7 +31,11 @@ public class VoxyCommon implements ModInitializer {
 
     //This is hardcoded like this because people do not understand what they are doing
     public static boolean isVerificationFlagOn(String name) {
-        return System.getProperty("voxy."+name, "false").equals("true");
+        return isVerificationFlagOn(name, false);
+    }
+
+    public static boolean isVerificationFlagOn(String name, boolean defaultOn) {
+        return System.getProperty("voxy."+name, defaultOn?"true":"false").equals("true");
     }
 
     public static void breakpoint() {
