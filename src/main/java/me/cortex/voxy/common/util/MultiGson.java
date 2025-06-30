@@ -7,13 +7,9 @@ import java.util.*;
 
 public class MultiGson {
     private final List<Class<?>> classes;
-    private final Gson GSON = new GsonBuilder()
-            .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
-            .setPrettyPrinting()
-            .excludeFieldsWithModifiers(Modifier.PRIVATE)
-            .create();
-
-    private MultiGson(List<Class<?>> classes) {
+    private final Gson gson;
+    private MultiGson(Gson gson,  List<Class<?>> classes) {
+        this.gson = gson;
         this.classes = classes;
     }
 
@@ -38,27 +34,38 @@ public class MultiGson {
 
         var json = new JsonObject();
         for (Object entry : map) {
-            GSON.toJsonTree(entry).getAsJsonObject().asMap().forEach((i,j) -> {
+            this.gson.toJsonTree(entry).getAsJsonObject().asMap().forEach((i,j) -> {
                 if (json.has(i)) {
                     throw new IllegalArgumentException("Duplicate name inside unified json: " + i);
                 }
                 json.add(i, j);
             });
         }
-        return GSON.toJson(json);
+        return this.gson.toJson(json);
     }
 
     public Map<Class<?>, Object> fromJson(String json) {
-        var obj = GSON.fromJson(json, JsonObject.class);
+        var obj = this.gson.fromJson(json, JsonObject.class);
         LinkedHashMap<Class<?>, Object> objects = new LinkedHashMap<>();
         for (var cls : this.classes) {
-            objects.put(cls, GSON.fromJson(obj, cls));
+            objects.put(cls, this.gson.fromJson(obj, cls));
         }
         return objects;
     }
 
     public static class Builder {
         private final LinkedHashSet<Class<?>> classes = new LinkedHashSet<>();
+        private final GsonBuilder gsonBuilder;
+        public Builder(GsonBuilder gsonBuilder) {
+            this.gsonBuilder = gsonBuilder;
+        }
+        public Builder() {
+            this(new GsonBuilder()
+                    .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                    .setPrettyPrinting()
+                    .excludeFieldsWithModifiers(Modifier.PRIVATE));
+        }
+
         public Builder add(Class<?> clz) {
             if (!this.classes.add(clz)) {
                 throw new IllegalArgumentException("Class has already been added");
@@ -67,7 +74,7 @@ public class MultiGson {
         }
 
         public MultiGson build() {
-            return new MultiGson(new ArrayList<>(this.classes));
+            return new MultiGson(this.gsonBuilder.create(), new ArrayList<>(this.classes));
         }
     }
 
