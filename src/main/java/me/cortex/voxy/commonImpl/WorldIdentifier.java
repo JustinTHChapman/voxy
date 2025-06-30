@@ -40,11 +40,17 @@ public class WorldIdentifier {
         if (obj instanceof WorldIdentifier other) {
             return other.hashCode == this.hashCode &&
                     other.biomeSeed == this.biomeSeed &&
-                    other.key == this.key &&//other.key.equals(this.key) &&
-                    other.dimension == this.dimension//other.dimension.equals(this.dimension)
+                    equal(other.key, this.key) &&//other.key.equals(this.key) &&
+                    equal(other.dimension, this.dimension)//other.dimension.equals(this.dimension)
                     ;
         }
         return false;
+    }
+
+    private static <T> boolean equal(RegistryKey<T> a, RegistryKey<T> b) {
+        if (a == b) return true;
+        if (a == null || b == null) return false;
+        return a.getRegistry().equals(b.getRegistry()) && a.getValue().equals(b.getValue());
     }
 
     //Quick access utility method to get or create a world object in the current instance

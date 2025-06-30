@@ -70,13 +70,10 @@ public abstract class VoxyConfigScreenPages {
 
                             if (wasEnabled) {
                                 VoxyCommon.createInstance();
-
-                                if (vrsh != null && s.enableRendering) {
-                                    vrsh.createRenderer();
-                                }
                             }
                         }, s -> s.serviceThreads)
                         .setImpact(OptionImpact.HIGH)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 ).add(OptionImpl.createBuilder(boolean.class, storage)
                         .setName(Text.translatable("voxy.config.general.ingest"))
