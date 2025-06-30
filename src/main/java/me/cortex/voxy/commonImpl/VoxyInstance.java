@@ -73,6 +73,7 @@ public abstract class VoxyInstance {
     // note, the reference count should be separate from the number of active chunks to prevent many issues
     // a world is no longer active once it has no reference counts and no active chunks associated with it
     public WorldEngine getNullable(WorldIdentifier identifier) {
+        if (!this.isRunning) return null;
         var cache = identifier.cachedEngineObject;
         WorldEngine world;
         if (cache == null) {
@@ -109,11 +110,21 @@ public abstract class VoxyInstance {
     }
 
     public WorldEngine getOrCreate(WorldIdentifier identifier) {
+        if (!this.isRunning) {
+            Logger.error("Tried getting world object on voxy instance but its not running");
+            return null;
+        }
         var world = this.getNullable(identifier);
         if (world != null) {
             return world;
         }
         long stamp = this.activeWorldLock.writeLock();
+
+        if (!this.isRunning) {
+            Logger.error("Tried getting world object on voxy instance but its not running");
+            return null;
+        }
+
         world = this.activeWorlds.get(identifier);
         if (world == null) {
             //Create world here
@@ -128,10 +139,13 @@ public abstract class VoxyInstance {
     protected abstract SectionStorage createStorage(WorldIdentifier identifier);
 
     private WorldEngine createWorld(WorldIdentifier identifier) {
+        if (!this.isRunning) {
+            throw new IllegalStateException("Cannot create world while not running");
+        }
         if (this.activeWorlds.containsKey(identifier)) {
             throw new IllegalStateException("Existing world with identifier");
         }
-        Logger.info("Creating new world engine: " + identifier.getLongHash());
+        Logger.info("Creating new world engine: " + identifier.getLongHash() + "@" + System.identityHashCode(this));
         var world = new WorldEngine(this.createStorage(identifier), this);
         world.setSaveCallback(this.savingService::enqueueSave);
         this.activeWorlds.put(identifier, world);
