@@ -485,8 +485,11 @@ public class WorldImporter implements IDataImporter {
             return;
         }
         var blockStates = blockStatesRes.getPartialOrThrow();
-        var biomes = this.biomeCodec.parse(NbtOps.INSTANCE, section.getCompound("biomes").get()).result().orElse(this.defaultBiomeProvider);
-
+        var biomes = this.defaultBiomeProvider;
+        var optBiomes = section.getCompound("biomes");
+        if (optBiomes.isPresent()) {
+            biomes = this.biomeCodec.parse(NbtOps.INSTANCE, optBiomes.get()).result().orElse(this.defaultBiomeProvider);
+        }
         VoxelizedSection csec = WorldConversionFactory.convert(
                 SECTION_CACHE.get().setPosition(x, y, z),
                 this.world.getMapper(),
