@@ -54,10 +54,6 @@ public class VoxyRenderSystem {
             glFinish();
             glFinish();
 
-            //Trigger the shared index buffer loading
-            SharedIndexBuffer.INSTANCE.id();
-            Capabilities.init();//Ensure clinit is called
-
             this.worldIn = world;
             this.renderer = new RenderService(world, threadPool);
             this.postProcessing = new PostProcessing();
