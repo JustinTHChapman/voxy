@@ -1,9 +1,6 @@
 package me.cortex.voxy.client.core.model.bakery;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.FluidBlock;
-import net.minecraft.block.LeavesBlock;
+import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.BlockRenderLayer;
@@ -59,6 +56,9 @@ public class ModelTextureBakery {
     }
 
     private void bakeBlockModel(BlockState state, BlockRenderLayer layer) {
+        if (state.getRenderType() == BlockRenderType.INVISIBLE) {
+            return;//Dont bake if invisible
+        }
         var model = MinecraftClient.getInstance()
                 .getBakedModelManager()
                 .getBlockModels()
