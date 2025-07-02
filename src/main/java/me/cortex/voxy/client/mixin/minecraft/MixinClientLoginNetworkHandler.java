@@ -18,10 +18,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.time.Duration;
 import java.util.function.Consumer;
 
-@Mixin(ClientLoginNetworkHandler.class)
+@Mixin(ClientPlayNetworkHandler.class)
 public class MixinClientLoginNetworkHandler {
-    @Inject(method = "<init>", at = @At(value = "TAIL"))
-    private void voxy$init(ClientConnection connection, MinecraftClient client, ServerInfo serverInfo, Screen parentScreen, boolean newWorld, Duration worldLoadTime, Consumer statusConsumer, CookieStorage cookieStorage, CallbackInfo ci) {
+    @Inject(method = "onGameJoin", at = @At(value = "INVOKE_ASSIGN", target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;<init>(Lnet/minecraft/client/MinecraftClient;Lnet/minecraft/client/network/ClientPlayNetworkHandler;)V", shift = At.Shift.AFTER))
+    private void voxy$init(GameJoinS2CPacket packet, CallbackInfo ci) {
         if (VoxyCommon.isAvailable()) {
             VoxyClientInstance.isInGame = true;
             if (VoxyConfig.CONFIG.enabled) {
