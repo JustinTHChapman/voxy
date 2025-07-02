@@ -25,6 +25,9 @@ public class MixinClientLoginNetworkHandler {
         if (VoxyCommon.isAvailable()) {
             VoxyClientInstance.isInGame = true;
             if (VoxyConfig.CONFIG.enabled) {
+                if (VoxyCommon.getInstance() != null) {
+                    VoxyCommon.shutdownInstance();
+                }
                 VoxyCommon.createInstance();
             }
         }
