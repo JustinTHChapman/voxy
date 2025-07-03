@@ -20,7 +20,7 @@ import java.util.function.Consumer;
 
 @Mixin(ClientPlayNetworkHandler.class)
 public class MixinClientLoginNetworkHandler {
-    @Inject(method = "onGameJoin", at = @At(value = "INVOKE_ASSIGN", target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;<init>(Lnet/minecraft/client/MinecraftClient;Lnet/minecraft/client/network/ClientPlayNetworkHandler;)V", shift = At.Shift.AFTER))
+    @Inject(method = "onGameJoin", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/ClientPlayerInteractionManager;<init>(Lnet/minecraft/client/MinecraftClient;Lnet/minecraft/client/network/ClientPlayNetworkHandler;)V", shift = At.Shift.BY, by = 2))
     private void voxy$init(GameJoinS2CPacket packet, CallbackInfo ci) {
         if (VoxyCommon.isAvailable()) {
             VoxyClientInstance.isInGame = true;
