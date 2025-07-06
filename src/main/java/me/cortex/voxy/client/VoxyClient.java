@@ -29,6 +29,11 @@ public class VoxyClient implements ClientModInitializer {
                 BudgetBufferRenderer.init();
 
                 VoxyCommon.setInstanceFactory(VoxyClientInstance::new);
+
+                if (!Capabilities.INSTANCE.subgroup) {
+                    Logger.warn("GPU does not support subgroup operations, expect some performance degradation");
+                }
+
             } else {
                 Logger.error("Voxy is unsupported on your system.");
             }

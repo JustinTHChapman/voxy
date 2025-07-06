@@ -24,10 +24,12 @@ public class Capabilities {
     public final boolean compute;
     public final boolean indirectParameters;
     public final boolean isIntel;
+    public final boolean subgroup;
 
     public Capabilities() {
         var cap = GL.getCapabilities();
         this.compute = cap.glDispatchComputeIndirect != 0;
+        this.subgroup = cap.GL_KHR_shader_subgroup;
         this.indirectParameters = cap.glMultiDrawElementsIndirectCountARB != 0;
         this.repFragTest = cap.GL_NV_representative_fragment_test;
         this.meshShaders = cap.GL_NV_mesh_shader;
