@@ -102,6 +102,4 @@ public abstract class Viewport <A extends Viewport<A>> {
 
         return (A) this;
     }
-
-    public abstract GlBuffer getRenderList();
 }

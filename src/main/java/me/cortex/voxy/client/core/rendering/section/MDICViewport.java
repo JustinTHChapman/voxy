@@ -26,7 +26,6 @@ public class MDICViewport extends Viewport<MDICViewport> {
         this.positionScratchBuffer.free();
     }
 
-    @Override
     public GlBuffer getRenderList() {
         return this.indirectLookupBuffer;
     }
