@@ -18,6 +18,8 @@ import net.minecraft.world.biome.ColorResolver;
 import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 import org.lwjgl.opengl.GL14;
 
 import static org.lwjgl.opengl.GL11.*;
@@ -335,11 +337,22 @@ public class ModelTextureBakery {
     private static void addView(int i, float pitch, float yaw, float rotation, int flip) {
         var stack = new MatrixStack();
         stack.translate(0.5f,0.5f,0.5f);
-        stack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rotation));
-        stack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(pitch));
-        stack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(yaw));
+        stack.multiply(makeQuatFromAxisExact(new Vector3f(0,0,1), rotation));
+        stack.multiply(makeQuatFromAxisExact(new Vector3f(1,0,0), pitch));
+        stack.multiply(makeQuatFromAxisExact(new Vector3f(0,1,0), yaw));
         stack.multiplyPositionMatrix(new Matrix4f().scale(1-2*(flip&1), 1-(flip&2), 1-((flip>>1)&2)));
         stack.translate(-0.5f,-0.5f,-0.5f);
         VIEWS[i] = new Matrix4f(stack.peek().getPositionMatrix());
+    }
+
+    private static Quaternionf makeQuatFromAxisExact(Vector3f vec, float angle) {
+        angle = (float) Math.toRadians(angle);
+        float hangle = angle / 2.0f;
+        float sinAngle = (float) Math.sin(hangle);
+        float invVLength = (float) (1/Math.sqrt(vec.lengthSquared()));
+        return new Quaternionf(vec.x * invVLength * sinAngle,
+                vec.y * invVLength * sinAngle,
+                vec.z * invVLength * sinAngle,
+                Math.cos(hangle));
     }
 }
