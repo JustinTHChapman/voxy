@@ -137,8 +137,11 @@ public class ServiceThreadPool {
         this.serviceSlices = newArr;
     }
 
-    void execute(ServiceSlice service) {
-        this.totalJobWeight.addAndGet(service.weightPerJob);
+    long addWeight(ServiceSlice service) {
+        return this.totalJobWeight.addAndGet(service.weightPerJob);
+    }
+
+    void execute() {
         this.jobCounter.release(1);
     }
 
@@ -268,7 +271,15 @@ public class ServiceThreadPool {
 
             //Consumed a job from the service, decrease weight by the amount
             if (this.totalJobWeight.addAndGet(-service.weightPerJob)<0) {
-                throw new IllegalStateException("Total job weight is negative");
+                Logger.error("Total job weight is negative");
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                if (this.totalJobWeight.get()<0) {
+                    throw new IllegalStateException("Total job weight still negative");
+                }
             }
 
             //Sleep for a bit after running a job, yeild the thread

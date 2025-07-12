@@ -96,9 +96,10 @@ public class ServiceSlice extends TrackedObject {
             Logger.error("Tried to do work on a dead service: " + this.name, new Throwable());
             return;
         }
+        this.threadPool.addWeight(this);
         this.jobCount2.incrementAndGet();
         this.jobCount.release();
-        this.threadPool.execute(this);
+        this.threadPool.execute();
     }
 
     public void shutdown() {
