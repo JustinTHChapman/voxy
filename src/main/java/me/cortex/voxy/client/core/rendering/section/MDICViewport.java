@@ -3,7 +3,6 @@ package me.cortex.voxy.client.core.rendering.section;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
-import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 
 public class MDICViewport extends Viewport<MDICViewport> {
     public final GlBuffer drawCountCallBuffer = new GlBuffer(1024).zero();
