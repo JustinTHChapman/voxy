@@ -103,6 +103,8 @@ public class GlTexture extends TrackedObject {
         long elemSize = switch (this.format) {
             case GL_RGBA8, GL_DEPTH24_STENCIL8 -> 4;
             case GL_DEPTH_COMPONENT24 -> 4;//TODO: check this is right????
+            case GL_DEPTH_COMPONENT32F -> 4;
+            case GL_DEPTH_COMPONENT32 -> 4;
 
             default -> throw new IllegalStateException("Unknown element size");
         };
