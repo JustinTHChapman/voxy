@@ -133,6 +133,7 @@ bool isCulledByHiz() {
     float miplevel = log2(max(max(size.x, size.y),1));
 
     miplevel = floor(miplevel)-1;
+    //miplevel = clamp(miplevel, 0, 6);
     miplevel = clamp(miplevel, 0, textureQueryLevels(hizDepthSampler)-1);
 
     int ml = int(miplevel);

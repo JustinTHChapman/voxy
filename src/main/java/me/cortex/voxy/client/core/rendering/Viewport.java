@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
+import me.cortex.voxy.client.core.rendering.util.HiZBuffer2;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.minecraft.util.math.MathHelper;
 import org.joml.*;
@@ -9,6 +10,7 @@ import org.joml.*;
 import java.lang.reflect.Field;
 
 public abstract class Viewport <A extends Viewport<A>> {
+    //public final HiZBuffer2 hiZBuffer = new HiZBuffer2();
     public final HiZBuffer hiZBuffer = new HiZBuffer();
     private static final Field planesField;
     static {
