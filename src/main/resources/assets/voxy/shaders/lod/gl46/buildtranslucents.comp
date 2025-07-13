@@ -47,5 +47,5 @@ void main() {
     dist = (TRANSLUCENT_WRITE_BASE-1)-min(dist, (TRANSLUCENT_WRITE_BASE-1));
 
     uint drawPtr = atomicAdd(translucentCommandData[dist],1)+TRANSLUCENT_OFFSET;
-    writeCmd(drawPtr, drawId, extractQuadStart(meta), meta.cntA&0xFFFF);
+    writeCmd(drawPtr, drawId, extractQuadStart(meta), meta.b.x&0xFFFF);
 }

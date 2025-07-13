@@ -32,6 +32,7 @@ void main() {
     //Write to the section id, to track temporal over time (litterally just need a single bit, 1 fking bit, but no)
     id = sid;
 
+    //Me when data race condition between visibilityData in the vert shader and frag shader
     uint previous = visibilityData[sid]&0x7fffffffu;
     bool wasVisibleLastFrame = previous==(frameId-1);
     value = (frameId&0x7fffffffu)|(uint(wasVisibleLastFrame)<<31);//Encode if it was visible last frame

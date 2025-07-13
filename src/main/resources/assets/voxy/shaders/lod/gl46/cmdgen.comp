@@ -78,18 +78,18 @@ void main() {
         ivec3 relative = ipos-(baseSectionPos>>detail);
         uint drawId = gl_GlobalInvocationID.x;
 
-        positionBuffer[drawId] = uvec2(meta.posA, meta.posB);
-
+        positionBuffer[drawId] = extractRawPos(meta);
+        uvec4 counts = meta.b;
 
         uint msk = 0;
-        msk |= uint(((meta.cntB      &0xFFFF)!=0) && (relative.y>-1))<<0;
-        msk |= uint((((meta.cntB>>16)&0xFFFF)!=0) && (relative.y<1 ))<<1;
-        msk |= uint(((meta.cntC      &0xFFFF)!=0) && (relative.z>-1))<<2;
-        msk |= uint((((meta.cntC>>16)&0xFFFF)!=0) && (relative.z<1 ))<<3;
-        msk |= uint(((meta.cntD      &0xFFFF)!=0) && (relative.x>-1))<<4;
-        msk |= uint((((meta.cntD>>16)&0xFFFF)!=0) && (relative.x<1 ))<<5;
+        msk |= uint(((counts.y      &0xFFFFu)!=0) && (relative.y>-1))<<0;
+        msk |= uint((((counts.y>>16)&0xFFFFu)!=0) && (relative.y<1 ))<<1;
+        msk |= uint(((counts.z      &0xFFFFu)!=0) && (relative.z>-1))<<2;
+        msk |= uint((((counts.z>>16)&0xFFFFu)!=0) && (relative.z<1 ))<<3;
+        msk |= uint(((counts.w      &0xFFFFu)!=0) && (relative.x>-1))<<4;
+        msk |= uint((((counts.w>>16)&0xFFFFu)!=0) && (relative.x<1 ))<<5;
 
-        msk |= uint(((meta.cntA>>16)&0xFFFF)!=0)<<6;
+        msk |= uint(((counts.x>>16)&0xFFFFu)!=0)<<6;
 
 
         uint cmdCnt = bitCount(msk);
@@ -107,7 +107,7 @@ void main() {
 
         uint count = 0;
         //Translucency
-        count = meta.cntA&0xFFFF;
+        count = counts.x&0xFFFFu;
         if (count != 0) {
             uint tp = atomicAdd(translucentDrawCount, 1)+TRANSLUCENT_WRITE_BASE;
             translucentCommandData[tp] = drawId;
@@ -123,7 +123,7 @@ void main() {
         ptr += count;
 
         //Double sided quads
-        count = (meta.cntA>>16)&0xFFFF;
+        count = (counts.x>>16)&0xFFFFu;
         if (count != 0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
             if (renderTemporally) {
@@ -136,7 +136,7 @@ void main() {
         ptr += count;
 
         //Down
-        count = (meta.cntB)&0xFFFF;
+        count = (counts.y)&0xFFFFu;
         if (((msk&(1u<<0))!=0)) {
             writeCmd(cmdPtr++, drawId, ptr, count);
             if (renderTemporally) {
@@ -149,7 +149,7 @@ void main() {
         ptr += count;
 
         //Up
-        count = (meta.cntB>>16)&0xFFFF;
+        count = (counts.y>>16)&0xFFFFu;
         if ((msk&(1u<<1))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
             if (renderTemporally) {
@@ -162,7 +162,7 @@ void main() {
         ptr += count;
 
         //North
-        count = (meta.cntC)&0xFFFF;
+        count = (counts.z)&0xFFFFu;
         if ((msk&(1u<<2))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
             if (renderTemporally) {
@@ -175,7 +175,7 @@ void main() {
         ptr += count;
 
         //South
-        count = (meta.cntC>>16)&0xFFFF;
+        count = (counts.z>>16)&0xFFFFu;
         if ((msk&(1u<<3))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
             if (renderTemporally) {
@@ -188,7 +188,7 @@ void main() {
         ptr += count;
 
         //West
-        count = (meta.cntD)&0xFFFF;
+        count = (counts.w)&0xFFFFu;
         if ((msk&(1u<<4))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
             if (renderTemporally) {
@@ -201,7 +201,7 @@ void main() {
         ptr += count;
 
         //East
-        count = (meta.cntD>>16)&0xFFFF;
+        count = (counts.w>>16)&0xFFFFu;
         if ((msk&(1u<<5))!=0) {
             writeCmd(cmdPtr++, drawId, ptr, count);
             if (renderTemporally) {
