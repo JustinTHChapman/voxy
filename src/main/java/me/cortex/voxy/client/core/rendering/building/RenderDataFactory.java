@@ -4,6 +4,7 @@ import me.cortex.voxy.client.core.model.IdNotYetComputedException;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.client.core.model.ModelQueries;
 import me.cortex.voxy.client.core.util.ScanMesher2D;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -1605,6 +1606,10 @@ public class RenderDataFactory {
         // this stops e.g. multiple layers of glass (and ocean) from having 3000 layers of quads etc
         if (this.quadCount == 0) {
             return BuiltSection.emptyWithChildren(section.key, section.getNonEmptyChildren());
+        }
+
+        if (this.quadCount >= 1<<16) {
+            Logger.warn("Large quad count for section " + WorldEngine.pprintPos(section.key) + " is " + this.quadCount);
         }
 
         if (this.minX<0 || this.minY<0 || this.minZ<0 || 32<this.maxX || 32<this.maxY || 32<this.maxZ) {
