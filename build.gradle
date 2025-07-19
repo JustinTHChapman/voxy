@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version "1.10-SNAPSHOT"
+    id 'fabric-loom' version "1.11-SNAPSHOT"
     id 'maven-publish'
 }
 
@@ -108,7 +108,7 @@ dependencies {
     modRuntimeOnlyMsk "maven.modrinth:sodium:mc1.21.6-0.6.13-fabric"
     modCompileOnly "maven.modrinth:sodium:mc1.21.6-0.6.13-fabric"
 
-    modImplementation("maven.modrinth:lithium:mc1.21.7-0.18.0-fabric")
+    modImplementation("maven.modrinth:lithium:mc1.21.8-0.18.0-fabric")
 
     //modRuntimeOnlyMsk "drouarb:nvidium:0.4.1-beta4:1.21.6@jar"
     modCompileOnly "drouarb:nvidium:0.4.1-beta4:1.21.6@jar"
