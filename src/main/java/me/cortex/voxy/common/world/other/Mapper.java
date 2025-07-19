@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 
@@ -36,9 +37,13 @@ public class Mapper {
     public static final long UNKNOWN_MAPPING = -1;
     public static final long AIR = 0;
 
-    private final Map<BlockState, StateEntry> block2stateEntry = new ConcurrentHashMap<>(2000,0.75f, 10);
+    private final ReentrantLock blockLock = new ReentrantLock();
+    private final ConcurrentHashMap<BlockState, StateEntry> block2stateEntry = new ConcurrentHashMap<>(2000,0.75f, 10);
     private final ObjectArrayList<StateEntry> blockId2stateEntry = new ObjectArrayList<>();
-    private final Map<String, BiomeEntry> biome2biomeEntry = new ConcurrentHashMap<>(2000,0.75f, 10);
+
+
+    private final ReentrantLock biomeLock = new ReentrantLock();
+    private final ConcurrentHashMap<String, BiomeEntry> biome2biomeEntry = new ConcurrentHashMap<>(2000,0.75f, 10);
     private final ObjectArrayList<BiomeEntry> biomeId2biomeEntry = new ObjectArrayList<>();
 
     private Consumer<StateEntry> newStateCallback;
@@ -151,10 +156,18 @@ public class Mapper {
 
     }
 
-    private synchronized StateEntry registerNewBlockState(BlockState state) {
-        StateEntry entry = new StateEntry(this.blockId2stateEntry.size(), state);
-        //this.block2stateEntry.put(state, entry);
+    private StateEntry registerNewBlockState(BlockState state) {
+        this.blockLock.lock();
+        var entry = this.block2stateEntry.get(state);
+        if (entry != null) {
+            this.blockLock.unlock();
+            return entry;
+        }
+
+        entry = new StateEntry(this.blockId2stateEntry.size(), state);
+        this.block2stateEntry.put(state, entry);
         this.blockId2stateEntry.add(entry);
+        this.blockLock.unlock();
 
         byte[] serialized = entry.serialize();
         ByteBuffer buffer = MemoryUtil.memAlloc(serialized.length);
@@ -167,10 +180,17 @@ public class Mapper {
         return entry;
     }
 
-    private synchronized BiomeEntry registerNewBiome(String biome) {
-        BiomeEntry entry = new BiomeEntry(this.biomeId2biomeEntry.size(), biome);
-        //this.biome2biomeEntry.put(biome, entry);
+    private BiomeEntry registerNewBiome(String biome) {
+        this.biomeLock.lock();
+        var entry = this.biome2biomeEntry.get(biome);
+        if (entry != null) {
+            this.biomeLock.unlock();
+            return entry;
+        }
+        entry = new BiomeEntry(this.biomeId2biomeEntry.size(), biome);
+        this.biome2biomeEntry.put(biome, entry);
         this.biomeId2biomeEntry.add(entry);
+        this.biomeLock.unlock();
 
         byte[] serialized = entry.serialize();
         ByteBuffer buffer = MemoryUtil.memAlloc(serialized.length);
@@ -199,7 +219,11 @@ public class Mapper {
         if (state.isAir()) {
             return 0;
         }
-        return this.block2stateEntry.computeIfAbsent(state, this::registerNewBlockState).id;
+        var mapping = this.block2stateEntry.get(state);
+        if (mapping == null) {
+            mapping = this.registerNewBlockState(state);
+        }
+        return mapping.id;
     }
 
     public int getBlockStateOpacity(long mappingId) {
@@ -210,10 +234,13 @@ public class Mapper {
         return this.blockId2stateEntry.get(blockId).opacity;
     }
 
-    //TODO: replace lambda with a class cached lambda ref (cause doing this:: still does a lambda allocation)
     public int getIdForBiome(RegistryEntry<Biome> biome) {
         String biomeId = biome.getKey().get().getValue().toString();
-        return this.biome2biomeEntry.computeIfAbsent(biomeId, this::registerNewBiome).id;
+        var entry = this.biome2biomeEntry.get(biomeId);
+        if (entry == null) {
+            entry = this.registerNewBiome(biomeId);
+        }
+        return entry.id;
     }
 
     public static long composeMappingId(byte light, int blockId, int biomeId) {
