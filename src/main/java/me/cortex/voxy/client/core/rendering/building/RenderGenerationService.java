@@ -141,6 +141,17 @@ public class RenderGenerationService {
             section = task.section;
         }
 
+
+        {//Remove the task from the map, this is done before we check for null sections as well the task map needs to be correct
+            long stamp = this.taskMapLock.writeLock();
+            var rtask = this.taskMap.remove(task.position);
+            if (rtask != task) {
+                this.taskMapLock.unlockWrite(stamp);
+                throw new IllegalStateException();
+            }
+            this.taskMapLock.unlockWrite(stamp);
+        }
+
         if (section == null) {
             if (this.resultConsumer != null) {
                 this.resultConsumer.accept(BuiltSection.empty(task.position));
@@ -150,15 +161,6 @@ public class RenderGenerationService {
         section.assertNotFree();
         BuiltSection mesh = null;
 
-        {
-            long stamp = this.taskMapLock.writeLock();
-            var rtask = this.taskMap.remove(task.position);
-            if (rtask != task) {
-                this.taskMapLock.unlockWrite(stamp);
-                throw new IllegalStateException();
-            }
-            this.taskMapLock.unlockWrite(stamp);
-        }
 
         try {
             mesh = factory.generateMesh(section);
