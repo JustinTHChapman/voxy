@@ -253,6 +253,8 @@ public class VoxyRenderSystem {
         try {this.renderer.shutdown();this.chunkBoundRenderer.free();} catch (Exception e) {Logger.error("Error shutting down renderer", e);}
         Logger.info("Shutting down post processor");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {Logger.error("Error shutting down post processor", e);}}
+        Logger.info("Flushing download stream");
+        DownloadStream.INSTANCE.flushWaitClear();
 
         //Release hold on the world
         this.worldIn.releaseRef();

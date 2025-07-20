@@ -12,6 +12,7 @@ import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.PrintfDebugUtil;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
 import org.lwjgl.system.MemoryUtil;
@@ -320,7 +321,8 @@ public class HierarchicalOcclusionTraverser {
     private void forwardDownloadResult(long ptr, long size) {
         int count = MemoryUtil.memGetInt(ptr);ptr += 8;//its 8 since we need to skip the second value (which is empty)
         if (count < 0 || count > 50000) {
-            throw new IllegalStateException("Count unexpected extreme value: " + count);
+            Logger.error(new IllegalStateException("Count unexpected extreme value: " + count));
+            return;
         }
         if (count > (this.requestBuffer.size()>>3)-1) {
             //This should not break the synchonization between gpu and cpu as in the traversal shader is
