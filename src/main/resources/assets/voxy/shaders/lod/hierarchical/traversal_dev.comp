@@ -10,7 +10,7 @@ layout(local_size_x=LOCAL_SIZE) in;//, local_size_y=1
 layout(binding = SCENE_UNIFORM_BINDING, std140) uniform SceneUniform {
     mat4 VP;
     ivec3 camSecPos;
-    int packedHizSize;
+    uint packedHizSize;
     vec3 camSubSecPos;
     float minSSS;
     Frustum frustum;

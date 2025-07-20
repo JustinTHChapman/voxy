@@ -128,6 +128,6 @@ public class HiZBuffer {
     }
 
     public int getPackedLevels() {
-        return ((Integer.numberOfTrailingZeros(this.width))<<16)|(Integer.numberOfTrailingZeros(this.height));//+1
+        return (this.width<<16)|this.height;//+1
     }
 }

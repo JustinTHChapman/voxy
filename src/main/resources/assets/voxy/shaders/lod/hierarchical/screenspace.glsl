@@ -128,7 +128,7 @@ bool outsideFrustum() {
 }
 
 bool isCulledByHiz() {
-    ivec2 ssize = ivec2(1)<<ivec2((packedHizSize>>16)&0xFFFF,packedHizSize&0xFFFF);
+    ivec2 ssize = ivec2(packedHizSize>>16,packedHizSize&0xFFFF);
     vec2 size = (maxBB.xy-minBB.xy)*ssize;
     float miplevel = log2(max(max(size.x, size.y),1));
 
