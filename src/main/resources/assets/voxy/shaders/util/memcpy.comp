@@ -22,7 +22,10 @@ void main() {
     uint dst = job.y;
     uint siz = job.z;
 
-    for (uint i = gl_LocalInvocationID.x; i < siz; i+=WORK_SIZE) {
-        outputBuffer[dst+i] = dataInBuffer[src+i];
+    uint workPerThread = (siz+255)>>8;
+    uint start = gl_LocalInvocationID.x*workPerThread+src;
+    uint diff = dst-src;
+    for (uint i = start; i < min(start+workPerThread,siz+src); i++) {
+        outputBuffer[i+diff] = dataInBuffer[i];
     }
 }
