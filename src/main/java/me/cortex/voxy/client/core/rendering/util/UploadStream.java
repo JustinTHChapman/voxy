@@ -105,12 +105,13 @@ public class UploadStream {
     }
 
     public void commit() {
-        if (this.uploadList.isEmpty()) {
-            return;
-        }
         if ((!USE_COHERENT)&&this.caddr != -1) {
             //Flush this allocation
             glFlushMappedNamedBufferRange(this.uploadBuffer.id, this.caddr, this.offset);
+        }
+
+        if (this.uploadList.isEmpty()) {
+            return;
         }
 
         glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
