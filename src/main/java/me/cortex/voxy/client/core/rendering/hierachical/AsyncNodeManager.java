@@ -17,6 +17,7 @@ import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.AllocationArena;
 import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import org.lwjgl.system.MemoryUtil;
@@ -516,8 +517,8 @@ public class AsyncNodeManager {
                 int copies = upload.dataUploadPoints.size();
                 int scratchSize = (int) upload.arena.getSize() * 8;
                 long ptr = UploadStream.INSTANCE.rawUploadAddress(scratchSize + copies * 16);
-                MemoryUtil.memCopy(upload.scratchHeaderBuffer.address, UploadStream.INSTANCE.getBaseAddress() + ptr, copies * 16L);
-                MemoryUtil.memCopy(upload.scratchDataBuffer.address, UploadStream.INSTANCE.getBaseAddress() + ptr + copies * 16L, scratchSize);
+                UnsafeUtil.memcpy(upload.scratchHeaderBuffer.address, UploadStream.INSTANCE.getBaseAddress() + ptr, copies * 16L);
+                UnsafeUtil.memcpy(upload.scratchDataBuffer.address, UploadStream.INSTANCE.getBaseAddress() + ptr + copies * 16L, scratchSize);
                 UploadStream.INSTANCE.commit();//Commit the buffer
 
                 this.multiMemcpy.bind();

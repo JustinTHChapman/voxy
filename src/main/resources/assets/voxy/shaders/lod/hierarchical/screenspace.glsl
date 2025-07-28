@@ -138,7 +138,7 @@ bool isCulledByHiz() {
 
     int ml = int(miplevel);
     ssize = max(ivec2(1), ssize>>ml);
-    ivec2 mxbb = ivec2(maxBB.xy*ssize);
+    ivec2 mxbb = min(ivec2(maxBB.xy*ssize),ssize-1);
     ivec2 mnbb = ivec2(minBB.xy*ssize);
 
     float pointSample = -1.0f;

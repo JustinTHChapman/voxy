@@ -497,7 +497,7 @@ public class ModelFactory {
 
         int i = 0;
         for (var entry : this.modelsRequiringBiomeColours) {
-            var colourProvider = MinecraftClient.getInstance().getBlockColors().providers.get(Registries.BLOCK.getRawId(entry.getRight().getBlock()));
+            var colourProvider = getColourProvider(entry.getRight().getBlock());
             if (colourProvider == null) {
                 throw new IllegalStateException();
             }
