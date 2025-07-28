@@ -94,7 +94,14 @@ public class MixinRenderSectionManager {
         if (system == null) {
             return true;
         }
-        long pos = ChunkSectionPos.asLong(instance.getChunkX(), instance.getChunkY(), instance.getChunkZ());
+        int x = instance.getChunkX(), y = instance.getChunkY(), z = instance.getChunkZ();
+        //Do some very cheeky stuff for MiB
+        if (false) {
+            int sector = (x+512)>>10;
+            x-=sector<<10;
+            y+=16+(256-32-sector*30);
+        }
+        long pos = ChunkSectionPos.asLong(x,y,z);
         if (wasBuilt) {//Remove
             system.chunkBoundRenderer.removeSection(pos);
         } else {//Add

@@ -82,6 +82,7 @@ public class ChunkBoundRenderer {
             this.depthBuffer.free();
             this.depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, viewport.width, viewport.height);
             this.frameBuffer.bind(GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
+            glClearNamedFramebufferfv(this.frameBuffer.id, GL_DEPTH, 0, new float[]{0});
         }
 
         if (this.chunk2idx.isEmpty() && this.addQueue.isEmpty()) return;
