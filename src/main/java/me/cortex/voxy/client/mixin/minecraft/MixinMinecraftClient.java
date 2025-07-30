@@ -1,12 +1,8 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
 import me.cortex.voxy.client.VoxyClientInstance;
-import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.RunArgs;
-import net.minecraft.client.gui.screen.DownloadingTerrainScreen;
-import net.minecraft.client.world.ClientWorld;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
