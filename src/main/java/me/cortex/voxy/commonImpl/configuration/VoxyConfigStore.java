@@ -4,14 +4,10 @@ import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
-import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MultiGson;
-import me.cortex.voxy.common.util.cpu.CpuLayout;
-import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.fabricmc.loader.api.FabricLoader;
 
-import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;

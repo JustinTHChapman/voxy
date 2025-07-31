@@ -1,8 +1,6 @@
 package me.cortex.voxy.commonImpl;
 
 import me.cortex.voxy.common.world.WorldEngine;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Identifier;
@@ -11,7 +9,6 @@ import net.minecraft.world.dimension.DimensionType;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
-import java.util.Objects;
 
 public class WorldIdentifier {
     private static final RegistryKey<DimensionType> NULL_DIM_KEY = RegistryKey.of(RegistryKeys.DIMENSION_TYPE, Identifier.of("voxy:null_dimension_id"));
