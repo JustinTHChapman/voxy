@@ -2,8 +2,6 @@ package me.cortex.voxy.client.core.gl;
 
 import me.cortex.voxy.common.util.TrackedObject;
 
-import static org.lwjgl.opengl.ARBFramebufferObject.glDeleteFramebuffers;
-import static org.lwjgl.opengl.ARBFramebufferObject.glGenFramebuffers;
 import static org.lwjgl.opengl.GL11.GL_RGBA8;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30.GL_DEPTH24_STENCIL8;

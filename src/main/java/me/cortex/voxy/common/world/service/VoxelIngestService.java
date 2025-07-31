@@ -1,18 +1,17 @@
 package me.cortex.voxy.common.world.service;
 
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.thread.ServiceSlice;
+import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.common.thread.ServiceSlice;
-import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
-import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkNibbleArray;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.WorldChunk;

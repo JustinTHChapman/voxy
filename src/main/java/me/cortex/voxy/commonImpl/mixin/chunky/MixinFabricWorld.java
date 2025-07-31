@@ -3,8 +3,6 @@ package me.cortex.voxy.commonImpl.mixin.chunky;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
-import me.cortex.voxy.commonImpl.VoxyCommon;
-import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.server.world.OptionalChunk;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;

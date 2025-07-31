@@ -18,7 +18,6 @@ import me.cortex.voxy.common.world.WorldEngine;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
-import java.util.function.Consumer;
 
 import static me.cortex.voxy.common.world.WorldEngine.MAX_LOD_LAYER;
 import static me.cortex.voxy.common.world.WorldEngine.UPDATE_TYPE_BLOCK_BIT;

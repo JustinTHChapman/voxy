@@ -18,7 +18,7 @@ import static org.lwjgl.opengl.GL11.glFinish;
 import static org.lwjgl.opengl.GL30C.GL_MAP_READ_BIT;
 import static org.lwjgl.opengl.GL42.GL_BUFFER_UPDATE_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42.glMemoryBarrier;
-import static org.lwjgl.opengl.GL44.*;
+import static org.lwjgl.opengl.GL44.GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.GL45.glCopyNamedBufferSubData;
 
 public class DownloadStream {

@@ -1,14 +1,8 @@
 package me.cortex.voxy.common.thread;
 
 import me.cortex.voxy.common.util.Pair;
-import me.cortex.voxy.common.util.TrackedObject;
-import me.cortex.voxy.common.world.WorldSection;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Supplier;

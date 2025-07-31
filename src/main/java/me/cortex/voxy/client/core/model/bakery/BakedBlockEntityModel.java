@@ -1,12 +1,10 @@
 package me.cortex.voxy.client.core.model.bakery;
 
-import com.mojang.blaze3d.textures.GpuTexture;
 import me.cortex.voxy.common.Logger;
 import net.minecraft.block.BlockEntityProvider;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.GlGpuBuffer;
-import net.minecraft.client.render.*;
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;

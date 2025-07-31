@@ -1,6 +1,8 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
-import it.unimi.dsi.fastutil.ints.*;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntConsumer;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.core.gl.GlBuffer;

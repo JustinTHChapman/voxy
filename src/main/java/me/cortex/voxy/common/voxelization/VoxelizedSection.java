@@ -1,8 +1,6 @@
 package me.cortex.voxy.common.voxelization;
 
 
-import me.cortex.voxy.common.world.other.Mapper;
-
 import java.util.Arrays;
 
 //16x16x16 block section

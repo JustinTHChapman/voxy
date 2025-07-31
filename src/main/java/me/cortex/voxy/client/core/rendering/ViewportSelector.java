@@ -1,6 +1,5 @@
 package me.cortex.voxy.client.core.rendering;
 
-import me.cortex.voxy.client.core.rendering.Viewport;
 import net.fabricmc.loader.api.FabricLoader;
 import org.vivecraft.client_vr.ClientDataHolderVR;
 

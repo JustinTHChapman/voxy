@@ -11,7 +11,6 @@ import static org.lwjgl.opengl.ARBDirectStateAccess.*;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_TEXTURE_FETCH_BARRIER_BIT;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30C.*;
-import static org.lwjgl.opengl.GL30C.glBindVertexArray;
 import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL33.glGenSamplers;
 import static org.lwjgl.opengl.GL33C.glDeleteSamplers;

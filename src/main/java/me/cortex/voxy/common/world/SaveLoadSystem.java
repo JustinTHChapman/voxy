@@ -8,8 +8,6 @@ import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import org.lwjgl.system.MemoryUtil;
 
-import static org.lwjgl.util.zstd.Zstd.*;
-
 public class SaveLoadSystem {
     public static final boolean VERIFY_HASH_ON_LOAD  = VoxyCommon.isVerificationFlagOn("verifySectionHash");
     public static final boolean VERIFY_MEMORY_ACCESS = VoxyCommon.isVerificationFlagOn("verifyMemoryAccess");

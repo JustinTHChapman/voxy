@@ -1,11 +1,7 @@
 package me.cortex.voxy.common.util;
 
-import org.lwjgl.system.JNI;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.system.Platform;
+import org.lwjgl.system.*;
 import org.lwjgl.system.windows.Kernel32;
-import org.lwjgl.system.APIUtil;
 
 //Platform specific code to assist in thread utilities
 public class ThreadUtils {

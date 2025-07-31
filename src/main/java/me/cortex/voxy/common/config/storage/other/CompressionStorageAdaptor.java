@@ -1,9 +1,9 @@
 package me.cortex.voxy.common.config.storage.other;
 
-import me.cortex.voxy.common.config.storage.StorageBackend;
-import me.cortex.voxy.common.config.compressors.StorageCompressor;
-import me.cortex.voxy.common.config.compressors.CompressorConfig;
 import me.cortex.voxy.common.config.ConfigBuildCtx;
+import me.cortex.voxy.common.config.compressors.CompressorConfig;
+import me.cortex.voxy.common.config.compressors.StorageCompressor;
+import me.cortex.voxy.common.config.storage.StorageBackend;
 import me.cortex.voxy.common.util.MemoryBuffer;
 
 //Compresses the section data

@@ -5,8 +5,6 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.GL_ACTIVE_TEXTURE;
 import static org.lwjgl.opengl.GL13.glActiveTexture;
-import static org.lwjgl.opengl.GL13C.GL_TEXTURE0;
-import static org.lwjgl.opengl.GL33.glBindSampler;
 
 public class GlStateCapture {
     private final int[] capabilityIds;

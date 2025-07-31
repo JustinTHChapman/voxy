@@ -15,11 +15,8 @@ import static me.cortex.voxy.common.util.AllocationArena.SIZE_LIMIT;
 import static org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData;
 import static org.lwjgl.opengl.ARBMapBufferRange.*;
 import static org.lwjgl.opengl.GL11.glFinish;
-import static org.lwjgl.opengl.GL42.GL_UNIFORM_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL42C.GL_BUFFER_UPDATE_BARRIER_BIT;
-import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BARRIER_BIT;
-import static org.lwjgl.opengl.GL44.GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.GL44.GL_MAP_COHERENT_BIT;
 import static org.lwjgl.opengl.GL45C.glFlushMappedNamedBufferRange;
 

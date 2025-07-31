@@ -2,7 +2,6 @@ package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
-import me.cortex.voxy.client.core.rendering.util.HiZBuffer2;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.minecraft.util.math.MathHelper;
 import org.joml.*;

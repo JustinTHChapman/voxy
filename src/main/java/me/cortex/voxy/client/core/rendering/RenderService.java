@@ -11,14 +11,15 @@ import me.cortex.voxy.client.core.rendering.hierachical.AsyncNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
-import me.cortex.voxy.client.core.rendering.section.geometry.*;
 import me.cortex.voxy.client.core.rendering.section.IUsesMeshlets;
 import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
+import me.cortex.voxy.client.core.rendering.section.geometry.BasicSectionGeometryData;
+import me.cortex.voxy.client.core.rendering.section.geometry.IGeometryData;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
-import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.world.WorldEngine;
 
 import java.util.Arrays;
 import java.util.List;

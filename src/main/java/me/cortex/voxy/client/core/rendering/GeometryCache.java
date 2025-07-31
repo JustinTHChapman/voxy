@@ -4,7 +4,6 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.StampedLock;
 
 //CPU side cache for section geometry, not thread safe
 public class GeometryCache {

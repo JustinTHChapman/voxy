@@ -5,8 +5,6 @@ import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.ThreadLocalMemoryBuffer;
 import me.cortex.voxy.common.world.SaveLoadSystem;
 
-import java.lang.ref.Cleaner;
-
 import static me.cortex.voxy.common.util.GlobalCleaner.CLEANER;
 import static org.lwjgl.util.zstd.Zstd.*;
 

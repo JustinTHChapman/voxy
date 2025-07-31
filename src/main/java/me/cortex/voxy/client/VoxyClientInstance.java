@@ -16,7 +16,6 @@ import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.WorldSavePath;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;

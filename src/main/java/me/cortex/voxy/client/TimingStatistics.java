@@ -1,6 +1,5 @@
 package me.cortex.voxy.client;
 
-import java.lang.invoke.VarHandle;
 import java.util.ArrayList;
 
 public class TimingStatistics {

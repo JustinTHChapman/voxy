@@ -19,7 +19,6 @@ import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.color.block.BlockColorProvider;
 import net.minecraft.client.render.BlockRenderLayer;
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.registry.Registries;
@@ -41,9 +40,6 @@ import java.util.*;
 import static me.cortex.voxy.client.core.model.ModelStore.MODEL_SIZE;
 import static org.lwjgl.opengl.ARBDirectStateAccess.nglTextureSubImage2D;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL33.glDeleteSamplers;
-import static org.lwjgl.opengl.GL33.glGenSamplers;
-import static org.lwjgl.opengl.GL45C.glTextureSubImage2D;
 
 //Manages the storage and updating of model states, textures and colours
 

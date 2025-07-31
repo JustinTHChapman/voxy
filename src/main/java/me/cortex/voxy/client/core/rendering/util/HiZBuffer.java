@@ -17,7 +17,6 @@ import static org.lwjgl.opengl.GL33C.glDeleteSamplers;
 import static org.lwjgl.opengl.GL33C.glSamplerParameteri;
 import static org.lwjgl.opengl.GL42C.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
-import static org.lwjgl.opengl.GL43C.glCopyImageSubData;
 import static org.lwjgl.opengl.GL45C.glTextureBarrier;
 
 public class HiZBuffer {

@@ -1,33 +1,21 @@
 package me.cortex.voxy.client.core.model;
 
 
-import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import me.cortex.voxy.client.TimingStatistics;
-import me.cortex.voxy.client.core.gl.GlFramebuffer;
-import me.cortex.voxy.client.core.rendering.building.BuiltSection;
-import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Identifier;
-import org.lwjgl.opengl.GL11;
 
-import java.lang.invoke.VarHandle;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.StampedLock;
 
-import static org.lwjgl.opengl.ARBFramebufferObject.GL_COLOR_ATTACHMENT0;
-import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
 import static org.lwjgl.opengl.GL11.glGetInteger;
-import static org.lwjgl.opengl.GL11C.GL_NEAREST;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_BINDING;
-import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
 import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
-import static org.lwjgl.opengl.GL45.glBlitNamedFramebuffer;
 
 public class ModelBakerySubsystem {
     //Redo to just make it request the block faces with the async texture download stream which

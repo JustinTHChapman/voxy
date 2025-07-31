@@ -2,8 +2,8 @@ package me.cortex.voxy.common.config.storage.lmdb;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
-import me.cortex.voxy.common.config.storage.StorageBackend;
 import me.cortex.voxy.common.config.ConfigBuildCtx;
+import me.cortex.voxy.common.config.storage.StorageBackend;
 import me.cortex.voxy.common.config.storage.StorageConfig;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
@@ -18,7 +18,6 @@ import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 
 import static org.lwjgl.util.lmdb.LMDB.*;
-import static org.lwjgl.util.lmdb.LMDB.MDB_NOTFOUND;
 
 public class LMDBStorageBackend extends StorageBackend {
     private static final long GROW_SIZE = 1<<25;//Grow by 33 mb each time

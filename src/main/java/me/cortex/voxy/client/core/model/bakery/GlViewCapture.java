@@ -1,6 +1,5 @@
 package me.cortex.voxy.client.core.model.bakery;
 
-import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
@@ -14,7 +13,6 @@ import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_SHADER_IMAGE_ACCESS_BA
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_TEXTURE_UPDATE_BARRIER_BIT;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glMemoryBarrier;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL11.GL_STENCIL_INDEX;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfi;

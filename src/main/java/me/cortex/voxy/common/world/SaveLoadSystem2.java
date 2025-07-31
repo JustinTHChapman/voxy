@@ -1,14 +1,10 @@
 package me.cortex.voxy.common.world;
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ShortOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2ShortOpenHashMap;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.world.other.Mapper;
-import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.util.math.MathHelper;
 import org.lwjgl.system.MemoryUtil;
 

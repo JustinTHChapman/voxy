@@ -8,11 +8,11 @@ import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.model.ModelStore;
-import me.cortex.voxy.client.core.rendering.section.geometry.BasicSectionGeometryData;
-import me.cortex.voxy.client.core.rendering.util.LightMapHelper;
 import me.cortex.voxy.client.core.rendering.RenderService;
-import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
+import me.cortex.voxy.client.core.rendering.section.geometry.BasicSectionGeometryData;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
+import me.cortex.voxy.client.core.rendering.util.LightMapHelper;
+import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -34,7 +34,6 @@ import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
 import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL45.glBindTextureUnit;
-import static org.lwjgl.opengl.GL45.glClearNamedBufferData;
 import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FRAGMENT_TEST_NV;
 
 //Uses MDIC to render the sections

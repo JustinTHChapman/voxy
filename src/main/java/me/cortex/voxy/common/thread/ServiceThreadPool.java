@@ -5,10 +5,6 @@ import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.util.ThreadUtils;
 import me.cortex.voxy.common.util.cpu.CpuLayout;
 
-import java.lang.invoke.VarHandle;
-import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadMXBean;
-import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;

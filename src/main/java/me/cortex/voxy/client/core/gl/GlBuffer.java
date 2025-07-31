@@ -5,7 +5,6 @@ import org.lwjgl.opengl.GL11;
 
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL15.glDeleteBuffers;
-import static org.lwjgl.opengl.GL44C.glBufferStorage;
 import static org.lwjgl.opengl.GL45C.*;
 
 public class GlBuffer extends TrackedObject {
