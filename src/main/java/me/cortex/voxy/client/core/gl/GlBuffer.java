@@ -2,6 +2,8 @@ package me.cortex.voxy.client.core.gl;
 
 import me.cortex.voxy.common.util.TrackedObject;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL15.glDeleteBuffers;
@@ -57,7 +59,8 @@ public class GlBuffer extends TrackedObject {
         glPixelStorei(GL11.GL_UNPACK_SKIP_ROWS, 0);
         glPixelStorei(GL11.GL_UNPACK_SKIP_PIXELS, 0);
 
-        glClearNamedBufferData(this.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[]{data});
+        MemoryUtil.memPutInt(SCRATCH, data);
+        nglClearNamedBufferData(this.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, SCRATCH);
         return this;
     }
 
@@ -72,4 +75,6 @@ public class GlBuffer extends TrackedObject {
     public GlBuffer name(String name) {
         return GlDebug.name(name, this);
     }
+
+    private static final long SCRATCH = MemoryUtil.nmemAlloc(4);
 }

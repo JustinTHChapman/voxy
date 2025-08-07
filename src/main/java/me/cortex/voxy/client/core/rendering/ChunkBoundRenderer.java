@@ -44,8 +44,6 @@ public class ChunkBoundRenderer {
             .ubo(0, this.uniformBuffer)
             .ssbo(1, this.chunkPosBuffer);
 
-    private GlTexture depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, 128, 128);
-    private final GlFramebuffer frameBuffer = new GlFramebuffer().bind(GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
     private final LongOpenHashSet addQueue = new LongOpenHashSet();
     private final LongOpenHashSet remQueue = new LongOpenHashSet();
 
@@ -72,18 +70,13 @@ public class ChunkBoundRenderer {
             this.remQueue.forEach(this::_remPos);//TODO: REPLACE WITH SCATTER COMPUTE
             this.remQueue.clear();
             if (this.chunk2idx.isEmpty()&&!wasEmpty) {//When going from stuff to nothing need to clear the depth buffer
-                glClearNamedFramebufferfv(this.frameBuffer.id, GL_DEPTH, 0, new float[]{0});
+                viewport.depthBoundingBuffer.clear(0);
             }
         }
 
-        if (this.depthBuffer.getWidth() != viewport.width || this.depthBuffer.getHeight() != viewport.height) {
-            this.depthBuffer.free();
-            this.depthBuffer = new GlTexture().store(GL_DEPTH_COMPONENT24, 1, viewport.width, viewport.height);
-            this.frameBuffer.bind(GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
-            glClearNamedFramebufferfv(this.frameBuffer.id, GL_DEPTH, 0, new float[]{0});
-        }
-
         if (this.chunk2idx.isEmpty() && this.addQueue.isEmpty()) return;
+
+        viewport.depthBoundingBuffer.clear(0);
 
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 128);
         long matPtr = ptr; ptr += 4*4*4;
@@ -115,14 +108,13 @@ public class ChunkBoundRenderer {
             glFrontFace(GL_CW);//Reverse winding order
 
             //"reverse depth buffer" it goes from 0->1 where 1 is far away
-            glClearNamedFramebufferfv(this.frameBuffer.id, GL_DEPTH, 0, new float[]{0});
             glEnable(GL_CULL_FACE);
             glEnable(GL_DEPTH_TEST);
             glDepthFunc(GL_GREATER);
         }
 
         glBindVertexArray(RenderService.STATIC_VAO);
-        glBindFramebuffer(GL_FRAMEBUFFER, this.frameBuffer.id);
+        viewport.depthBoundingBuffer.bind();
         this.rasterShader.bind();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BB_BYTE.id());
 
@@ -223,15 +215,8 @@ public class ChunkBoundRenderer {
     }
 
     public void free() {
-        this.depthBuffer.free();
-        this.frameBuffer.free();
-
         this.rasterShader.free();
         this.uniformBuffer.free();
         this.chunkPosBuffer.free();
-    }
-
-    public GlTexture getDepthBoundTexture() {
-        return this.depthBuffer;
     }
 }

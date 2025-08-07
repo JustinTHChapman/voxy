@@ -1,12 +1,15 @@
 #version 450 core
 
-layout(binding = 0) uniform sampler2D colourTex;
-layout(binding = 1) uniform sampler2D depthTex;
-layout(location = 2) uniform mat4 invProjMat;
-layout(location = 3) uniform mat4 projMat;
+layout(binding = 0) uniform sampler2D depthTex;
+layout(location = 1) uniform mat4 invProjMat;
+layout(location = 2) uniform mat4 projMat;
+
+#ifdef EMIT_COLOUR
+layout(binding = 3) uniform sampler2D colourTex;
 #ifdef USE_ENV_FOG
 layout(location = 4) uniform vec3 endParams;
 layout(location = 5) uniform vec3 fogColour;
+#endif
 #endif
 
 out vec4 colour;
@@ -22,28 +25,31 @@ float projDepth(vec3 pos) {
 }
 
 void main() {
-    colour = texture(colourTex, UV.xy);
-    if (colour.a == 0.0) {
-        discard;
-    }
-
     float depth = texture(depthTex, UV.xy).r;
     if (depth == 0.0f) {
         discard;
     }
 
     vec3 point = rev3d(vec3(UV.xy, depth));
+    depth = projDepth(point);
+    depth = min(1.0f-(2.0f/((1<<24)-1)), depth);
+    depth = depth * 0.5f + 0.5f;
+    depth = gl_DepthRange.diff * depth + gl_DepthRange.near;
+    gl_FragDepth = depth;
 
+    #ifdef EMIT_COLOUR
+    colour = texture(colourTex, UV.xy);
+    if (colour.a == 0.0) {
+        discard;
+    }
     #ifdef USE_ENV_FOG
     {
         float fogLerp = max(fma(min(length(point.xyz), endParams.x),endParams.y,endParams.z),0);//512 is 32*16 which is the render distance in blocks
         colour.rgb = mix(colour.rgb, fogColour, fogLerp);
     }
     #endif
+    #else
+    colour = vec4(0);
+    #endif
 
-    depth = projDepth(point);
-    depth = min(1.0f-(2.0f/((1<<24)-1)), depth);
-    depth = depth * 0.5f + 0.5f;
-    depth = gl_DepthRange.diff * depth + gl_DepthRange.near;
-    gl_FragDepth = depth;
 }

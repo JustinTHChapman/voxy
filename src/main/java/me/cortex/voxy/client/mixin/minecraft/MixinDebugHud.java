@@ -13,7 +13,7 @@ import java.util.List;
 
 @Mixin(DebugHud.class)
 public class MixinDebugHud {
-    @Inject(method = "getRightText", at = @At("TAIL"))
+    @Inject(method = "getRightText", at = @At("RETURN"))
     private void injectDebug(CallbackInfoReturnable<List<String>> cir) {
         var ret = cir.getReturnValue();
         var instance = VoxyCommon.getInstance();

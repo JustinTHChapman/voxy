@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.rendering.util.DepthFramebuffer;
 import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.minecraft.util.math.MathHelper;
@@ -11,6 +12,8 @@ import java.lang.reflect.Field;
 public abstract class Viewport <A extends Viewport<A>> {
     //public final HiZBuffer2 hiZBuffer = new HiZBuffer2();
     public final HiZBuffer hiZBuffer = new HiZBuffer();
+    public final DepthFramebuffer depthBoundingBuffer = new DepthFramebuffer();
+
     private static final Field planesField;
     static {
         try {
@@ -53,6 +56,7 @@ public abstract class Viewport <A extends Viewport<A>> {
 
     protected void delete0() {
         this.hiZBuffer.free();
+        this.depthBoundingBuffer.free();
     }
 
     public A setProjection(Matrix4f projection) {
@@ -100,6 +104,8 @@ public abstract class Viewport <A extends Viewport<A>> {
                 (float) (this.cameraX-(sx<<5)),
                 (float) (this.cameraY-(sy<<5)),
                 (float) (this.cameraZ-(sz<<5)));
+
+        this.depthBoundingBuffer.resize(this.width, this.height);
 
         return (A) this;
     }

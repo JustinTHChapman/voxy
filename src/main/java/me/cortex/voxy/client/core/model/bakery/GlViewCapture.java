@@ -4,9 +4,10 @@ import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferfv;
-import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri;
+import static org.lwjgl.opengl.ARBDirectStateAccess.*;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_PIXEL_BUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
@@ -64,7 +65,12 @@ public class GlViewCapture {
     }
 
     public void clear() {
-        glClearNamedFramebufferfv(this.framebuffer.id, GL_COLOR, 0, new float[]{0,0,0,0});
+        try (var stack = MemoryStack.stackPush()) {
+            long ptr = stack.nmalloc(4*4);
+            MemoryUtil.memPutLong(ptr, 0);
+            MemoryUtil.memPutLong(ptr+8, 0);
+            nglClearNamedFramebufferfv(this.framebuffer.id, GL_COLOR, 0, ptr);
+        }
         glClearNamedFramebufferfi(this.framebuffer.id, GL_DEPTH_STENCIL, 0, 1.0f, 0);
     }
 

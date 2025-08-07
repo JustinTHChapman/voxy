@@ -17,9 +17,18 @@ public class FullscreenBlit {
     public FullscreenBlit(String fragId) {
         this(fragId, (a)->a);
     }
+
+    public FullscreenBlit(String vertId, String fragId) {
+        this(vertId, fragId, (a)->a);
+    }
+
     public <T extends Shader> FullscreenBlit(String fragId, Function<Shader.Builder<T>, Shader.Builder<T>> builder) {
+        this("voxy:post/fullscreen.vert", fragId, builder);
+    }
+
+    public <T extends Shader> FullscreenBlit(String vertId, String fragId, Function<Shader.Builder<T>, Shader.Builder<T>> builder) {
         this.shader = builder.apply((Shader.Builder<T>) Shader.make()
-                .add(ShaderType.VERTEX, "voxy:post/fullscreen.vert")
+                .add(ShaderType.VERTEX, vertId)
                 .add(ShaderType.FRAGMENT, fragId))
                 .compile();
     }

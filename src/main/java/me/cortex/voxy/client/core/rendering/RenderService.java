@@ -42,42 +42,19 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
 
     private final WorldEngine world;
 
-    private static long getGeometryBufferSize() {
-        long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
-        if (Capabilities.INSTANCE.isIntel) {
-            geometryCapacity = Math.max(geometryCapacity, 1L<<30);//intel moment, force min 1gb
-        }
-
-        //Limit to available dedicated memory if possible
-        if (Capabilities.INSTANCE.canQueryGpuMemory) {
-            //512mb less than avalible,
-            long limit = Capabilities.INSTANCE.getFreeDedicatedGpuMemory() - 1024*1024*1024;
-            // Give a minimum of 512 mb requirement
-            limit = Math.max(512*1024*1024, limit);
-
-            geometryCapacity = Math.min(geometryCapacity, limit);
-        }
-        //geometryCapacity = 1<<28;
-        //geometryCapacity = 1<<30;//1GB test
-        var override = System.getProperty("voxy.geometryBufferSizeOverrideMB", "");
-        if (!override.isEmpty()) {
-            geometryCapacity = Long.parseLong(override)*1024L*1024L;
-        }
-        return geometryCapacity;
-    }
 
     @SuppressWarnings("unchecked")
     public RenderService(WorldEngine world, ServiceThreadPool serviceThreadPool) {
         this.world = world;
         this.modelService = new ModelBakerySubsystem(world.getMapper());
 
-        long geometryCapacity = getGeometryBufferSize();
+        long geometryCapacity = 0;
 
         this.geometryData = (Q) new BasicSectionGeometryData(1<<20, geometryCapacity);
 
         //Max sections: ~500k
-        this.sectionRenderer = (T) new MDICSectionRenderer(this.modelService.getStore(), (BasicSectionGeometryData) this.geometryData);
-        Logger.info("Using renderer: " + this.sectionRenderer.getClass().getSimpleName() + " with geometry buffer of: " + geometryCapacity + " bytes");
+        this.sectionRenderer = (T) new MDICSectionRenderer(null, this.modelService.getStore(), (BasicSectionGeometryData) this.geometryData);
+        //Logger.info("Using renderer: " + this.sectionRenderer.getClass().getSimpleName() + " with geometry buffer of: " + geometryCapacity + " bytes");
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
 
@@ -135,7 +112,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
 
 
         TimingStatistics.G.start();
-        this.sectionRenderer.renderOpaque(viewport, depthBoundTexture);
+        this.sectionRenderer.renderOpaque(viewport);
         TimingStatistics.G.stop();
 
         {
@@ -193,12 +170,12 @@ public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Vi
         TimingStatistics.H.stop();
 
         TimingStatistics.G.start();
-        this.sectionRenderer.renderTemporal(viewport, depthBoundTexture);
+        this.sectionRenderer.renderTemporal(viewport);
         TimingStatistics.G.stop();
     }
 
-    public void renderFarAwayTranslucent(J viewport, GlTexture depthBoundTexture) {
-        this.sectionRenderer.renderTranslucent(viewport, depthBoundTexture);
+    public void renderFarAwayTranslucent(J viewport) {
+        this.sectionRenderer.renderTranslucent(viewport);
     }
 
     public void addDebugData(List<String> debug) {

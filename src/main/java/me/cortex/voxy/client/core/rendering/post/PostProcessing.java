@@ -32,7 +32,7 @@ public class PostProcessing {
     private final FullscreenBlit emptyBlit = new FullscreenBlit("voxy:post/noop.frag");
     //private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_cutout.frag");
     private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag",
-            a->a.defineIf("USE_ENV_FOG", useEnvFog));
+            a->a.defineIf("USE_ENV_FOG", useEnvFog).define("EMIT_COLOUR"));
     private final Shader ssaoComp = Shader.make()
             .add(ShaderType.COMPUTE, "voxy:post/ssao.comp")
             .compile();
@@ -174,9 +174,9 @@ public class PostProcessing {
 
         float[] data = new float[4*4];
         new Matrix4f(vp.MVP).invert().get(data);
-        glUniformMatrix4fv(2, false, data);//inverse fromProjection
+        glUniformMatrix4fv(1, false, data);//inverse fromProjection
         new Matrix4f(tooProjection).mul(vp.modelView).get(data);
-        glUniformMatrix4fv(3, false, data);//tooProjection
+        glUniformMatrix4fv(2, false, data);//tooProjection
         if (useEnvFog) {
             float start = vp.fogParameters.environmentalStart();
             float end = vp.fogParameters.environmentalEnd();
@@ -185,9 +185,9 @@ public class PostProcessing {
             glUniform3f(5, vp.fogParameters.red(), vp.fogParameters.green(), vp.fogParameters.blue());
         }
 
-        glBindTextureUnit(0, this.didSSAO?this.colourSSAO.id:this.colour.id);
+        glBindTextureUnit(0, this.depthStencil.id);
+        glBindTextureUnit(3, this.didSSAO?this.colourSSAO.id:this.colour.id);
 
-        glBindTextureUnit(1, this.depthStencil.id);
         //glTextureParameteri(this.depthStencil.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
 
         glEnable(GL_DEPTH_TEST);

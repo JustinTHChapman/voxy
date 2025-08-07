@@ -1,0 +1,202 @@
+package me.cortex.voxy.client.core;
+
+import me.cortex.voxy.client.RenderStatistics;
+import me.cortex.voxy.client.TimingStatistics;
+import me.cortex.voxy.client.core.rendering.Viewport;
+import me.cortex.voxy.client.core.rendering.hierachical.AsyncNodeManager;
+import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
+import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
+import me.cortex.voxy.client.core.rendering.post.FullscreenBlit;
+import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
+import me.cortex.voxy.common.util.TrackedObject;
+import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
+import org.lwjgl.opengl.GL30;
+import org.lwjgl.system.MemoryUtil;
+
+import java.util.List;
+import java.util.function.BooleanSupplier;
+
+import static org.lwjgl.opengl.GL11C.GL_ALWAYS;
+import static org.lwjgl.opengl.GL11C.GL_DEPTH_TEST;
+import static org.lwjgl.opengl.GL11C.GL_EQUAL;
+import static org.lwjgl.opengl.GL11C.GL_KEEP;
+import static org.lwjgl.opengl.GL11C.GL_NEAREST;
+import static org.lwjgl.opengl.GL11C.GL_REPLACE;
+import static org.lwjgl.opengl.GL11C.GL_STENCIL_TEST;
+import static org.lwjgl.opengl.GL11C.glColorMask;
+import static org.lwjgl.opengl.GL11C.glDisable;
+import static org.lwjgl.opengl.GL11C.glEnable;
+import static org.lwjgl.opengl.GL11C.glStencilFunc;
+import static org.lwjgl.opengl.GL11C.glStencilMask;
+import static org.lwjgl.opengl.GL11C.glStencilOp;
+import static org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER;
+import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
+import static org.lwjgl.opengl.GL42.GL_DEPTH_BUFFER_BIT;
+import static org.lwjgl.opengl.GL42.GL_LEQUAL;
+import static org.lwjgl.opengl.GL42.GL_NOTEQUAL;
+import static org.lwjgl.opengl.GL42.glDepthFunc;
+import static org.lwjgl.opengl.GL42.*;
+import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfi;
+import static org.lwjgl.opengl.GL45C.glBindTextureUnit;
+import static org.lwjgl.opengl.GL45C.glBlitNamedFramebuffer;
+
+public abstract class AbstractRenderPipeline extends TrackedObject {
+    private final BooleanSupplier frexStillHasWork;
+
+    private final AsyncNodeManager nodeManager;
+    private final NodeCleaner nodeCleaner;
+    private final HierarchicalOcclusionTraverser traversal;
+
+    protected AbstractSectionRenderer<?,?> sectionRenderer;
+
+    private final FullscreenBlit depthMaskBlit = new FullscreenBlit("voxy:post/fullscreen2.vert", "voxy:post/noop.frag");
+    private final FullscreenBlit depthSetBlit = new FullscreenBlit("voxy:post/fullscreen2.vert", "voxy:post/depth0.frag");
+    protected AbstractRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
+        this.frexStillHasWork = frexSupplier;
+        this.nodeManager = nodeManager;
+        this.nodeCleaner = nodeCleaner;
+        this.traversal = traversal;
+    }
+
+    public final void setSectionRenderer(AbstractSectionRenderer<?,?> sectionRenderer) {//Stupid java ordering not allowing something pre super
+        if (this.sectionRenderer != null) throw new IllegalStateException();
+        this.sectionRenderer = sectionRenderer;
+    }
+
+    protected abstract int setup(Viewport<?> viewport, int sourceFramebuffer);
+    protected abstract void postOpaquePreTranslucent(Viewport<?> viewport);
+    protected void finish(Viewport<?> viewport, Matrix4fc mcProjection, int sourceFrameBuffer) {
+        glDisable(GL_STENCIL_TEST);
+        glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);
+    }
+
+    public void runPipeline(Viewport<?> viewport, Matrix4fc mcProjection, int sourceFrameBuffer) {
+        int depthTexture = this.setup(viewport, sourceFrameBuffer);
+
+        var rs = ((AbstractSectionRenderer)this.sectionRenderer);
+        rs.renderOpaque(viewport);
+        this.innerPrimaryWork(viewport, depthTexture);
+        rs.buildDrawCalls(viewport);
+        rs.renderTemporal(viewport);
+
+        this.postOpaquePreTranslucent(viewport);
+
+        rs.renderTranslucent(viewport);
+
+        this.finish(viewport, mcProjection, sourceFrameBuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);
+    }
+
+    protected void initDepthStencil(int sourceFrameBuffer, int targetFb, int width, int height) {
+
+        glClearNamedFramebufferfi(targetFb, GL_DEPTH_STENCIL, 0, 1.0f, 1);
+        glBlitNamedFramebuffer(sourceFrameBuffer, targetFb, 0,0, width, height, 0,0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+        glBindFramebuffer(GL30.GL_FRAMEBUFFER, targetFb);
+
+        //This whole thing is hell, we basicly want to create a mask stenicel/depth mask specificiclly
+        // in theory we could do this in a single pass by passing in the depth buffer from the sourceFrambuffer
+        // but the current implmentation does a 2 pass system
+        glEnable(GL_STENCIL_TEST);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        glStencilFunc(GL_ALWAYS, 0, 0xFF);
+        glStencilMask(0xFF);
+
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_NOTEQUAL);//If != 1 pass
+        glColorMask(false,false,false,false);
+        //We do here
+        this.depthMaskBlit.blit();
+        glDisable(GL_DEPTH_TEST);
+
+        //Blit depth 0 where stencil is 0
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        glStencilFunc(GL_EQUAL, 0, 0xFF);
+
+        this.depthSetBlit.blit();
+
+        glDepthFunc(GL_LEQUAL);
+        glColorMask(true,true,true,true);
+
+        //Make voxy terrain render only where there isnt mc terrain
+        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        glStencilFunc(GL_EQUAL, 1, 0xFF);
+    }
+
+    private static final long SCRATCH = MemoryUtil.nmemAlloc(4*4*4);
+    protected static void transformBlitDepth(FullscreenBlit blitShader, int srcDepthTex, int dstFB, Viewport<?> viewport, Matrix4f targetTransform) {
+        glBindFramebuffer(GL30.GL_FRAMEBUFFER, dstFB);
+
+        blitShader.bind();
+        glBindTextureUnit(0, srcDepthTex);
+        new Matrix4f(viewport.MVP).invert().getToAddress(SCRATCH);
+        nglUniformMatrix4fv(1, 1, false, SCRATCH);//inverse fromProjection
+        targetTransform.getToAddress(SCRATCH);//new Matrix4f(tooProjection).mul(vp.modelView).get(data);
+        nglUniformMatrix4fv(2, 1, false, SCRATCH);//tooProjection
+
+        glEnable(GL_DEPTH_TEST);
+        //We keep the stencil test on with the emitting, only to where non terrain is rendered
+        blitShader.blit();
+        glDisable(GL_STENCIL_TEST);
+        glDisable(GL_DEPTH_TEST);
+    }
+
+    protected void innerPrimaryWork(Viewport<?> viewport, int depthBuffer) {
+
+        //Compute the mip chain
+        viewport.hiZBuffer.buildMipChain(depthBuffer, viewport.width, viewport.height);
+
+        do {
+            TimingStatistics.main.stop();
+            TimingStatistics.dynamic.start();
+
+            TimingStatistics.D.start();
+            //Tick download stream
+            DownloadStream.INSTANCE.tick();
+            TimingStatistics.D.stop();
+
+            this.nodeManager.tick(this.traversal.getNodeBuffer(), this.nodeCleaner);
+            //glFlush();
+
+            this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
+
+            TimingStatistics.dynamic.stop();
+            TimingStatistics.main.start();
+
+            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT | GL_PIXEL_BUFFER_BARRIER_BIT);
+
+            TimingStatistics.I.start();
+            this.traversal.doTraversal(viewport);
+            TimingStatistics.I.stop();
+        } while (this.frexStillHasWork.getAsBoolean());
+    }
+
+    @Override
+    protected void free0() {
+        this.sectionRenderer.free();
+        this.depthMaskBlit.delete();
+        this.depthSetBlit.delete();
+        super.free0();
+    }
+
+    public void addDebug(List<String> debug) {
+        this.sectionRenderer.addDebug(debug);
+        RenderStatistics.addDebug(debug);
+    }
+
+    public abstract void bindOpaqueFramebuffer();
+    public abstract void bindTranslucentFramebuffer();
+
+
+    //null means dont transform the shader
+    public String patchOpaqueShader(AbstractSectionRenderer<?,?> renderer, String input) {
+        return null;
+    }
+
+    //Returning null means apply the same patch as the opaque
+    public String patchTranslucentShader(AbstractSectionRenderer<?,?> renderer, String input) {
+        return null;
+    }
+}
