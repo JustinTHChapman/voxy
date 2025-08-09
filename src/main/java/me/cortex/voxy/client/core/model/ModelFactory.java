@@ -436,17 +436,18 @@ public class ModelFactory {
         modelFlags |= blockRenderLayer == BlockRenderLayer.CUTOUT?0:8;//Dont use mipmaps (AND ALSO FKING SPECIFIES IF IT HAS AO, WHY??? GREAT QUESTION, TODO FIXE THIS)
 
         //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
-        MemoryUtil.memPutInt(uploadPtr, modelFlags);
+        MemoryUtil.memPutInt(uploadPtr, modelFlags); uploadPtr += 4;
+
 
         //Temporary override to always be non biome specific
         if (colourProvider == null) {
-            MemoryUtil.memPutInt(uploadPtr + 4, -1);//Set the default to nothing so that its faster on the gpu
+            MemoryUtil.memPutInt(uploadPtr, -1);//Set the default to nothing so that its faster on the gpu
         } else if (!isBiomeColourDependent) {
-            MemoryUtil.memPutInt(uploadPtr + 4, captureColourConstant(colourProvider, blockState, DEFAULT_BIOME)|0xFF000000);
+            MemoryUtil.memPutInt(uploadPtr, captureColourConstant(colourProvider, blockState, DEFAULT_BIOME)|0xFF000000);
         } else if (!this.biomes.isEmpty()) {
             //Populate the list of biomes for the model state
             int biomeIndex = this.modelsRequiringBiomeColours.size() * this.biomes.size();
-            MemoryUtil.memPutInt(uploadPtr + 4, biomeIndex);
+            MemoryUtil.memPutInt(uploadPtr, biomeIndex);
             this.modelsRequiringBiomeColours.add(new Pair<>(modelId, blockState));
             //NOTE: UploadStream.INSTANCE is called _after_ uploadPtr is finished being used, this is cause the upload pointer
             // may be invalidated as soon as another upload stream is invoked
@@ -459,7 +460,8 @@ public class ModelFactory {
 
         //Note: if the layer isSolid then need to fill all the points in the texture where alpha == 0 with the average colour
         // of the surrounding blocks but only within the computed face size bounds
-        //TODO
+
+        //TODO callback to inject extra data into the model data
 
 
         this.putTextures(modelId, textureData);
