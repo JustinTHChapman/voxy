@@ -242,6 +242,7 @@ public class ModelTextureBakery {
             }
             glBindVertexArray(0);
         } else {//Is fluid, slow path :(
+
             if (!(state.getBlock() instanceof FluidBlock)) throw new IllegalStateException();
 
             var mat = new Matrix4f();
@@ -298,6 +299,7 @@ public class ModelTextureBakery {
 
             bbem.release();
         }
+
 
 
         //"Restore" gl state

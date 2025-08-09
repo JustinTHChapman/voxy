@@ -61,7 +61,7 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
     @Override
     public void createRenderer() {
         if (this.renderer != null) throw new IllegalStateException("Cannot have multiple renderers");
-        if ((!VoxyConfig.CONFIG.enableRendering)||(!VoxyConfig.CONFIG.enabled)) {
+        if (!VoxyConfig.CONFIG.isRenderingEnabled()) {
             Logger.info("Not creating renderer due to disabled");
             return;
         }

@@ -62,6 +62,7 @@ public class GlViewCapture {
         glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 3, buffer, offset, (this.width*3L)*(this.height*2L)*4L*2);//its 2*4 because colour + depth stencil
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_UPDATE_BARRIER_BIT|GL_PIXEL_BUFFER_BARRIER_BIT|GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);//Am not sure if barriers are right
         glDispatchCompute(3, 2, 1);
+        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 3, 0, 0, 4);//WHY DOES THIS FIX FUCKING BINDING ISSUES HERE WHEN DOING THIS IN THE RENDER SYSTEM DOESNT
     }
 
     public void clear() {

@@ -26,7 +26,7 @@ float projDepth(vec3 pos) {
 
 void main() {
     float depth = texture(depthTex, UV.xy).r;
-    if (depth == 0.0f) {
+    if (depth == 0.0f || depth == 1.0) {
         discard;
     }
 
