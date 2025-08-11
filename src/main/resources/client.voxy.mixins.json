@@ -3,6 +3,14 @@
   "package": "me.cortex.voxy.client.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "iris.CustomUniformsAccessor",
+    "iris.IrisRenderingPipelineAccessor",
+    "iris.MixinIrisRenderingPipeline",
+    "iris.MixinIrisSamplers",
+    "iris.MixinMatrixUniforms",
+    "iris.MixinProgramSet",
+    "iris.MixinShaderPackSourceNames",
+    "iris.MixinStandardMacros",
     "minecraft.MixinClientChunkManager",
     "minecraft.MixinClientCommonNetworkHandler",
     "minecraft.MixinClientLoginNetworkHandler",
@@ -10,6 +18,7 @@
     "minecraft.MixinFogRenderer",
     "minecraft.MixinGlDebug",
     "minecraft.MixinMinecraftClient",
+    "minecraft.MixinRenderSystem",
     "minecraft.MixinThreadExecutor",
     "minecraft.MixinWindow",
     "minecraft.MixinWorldRenderer",
@@ -20,7 +29,5 @@
   ],
   "injectors": {
     "defaultRequire": 1
-  },
-  "mixins": [
-  ]
+  }
 }

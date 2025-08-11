@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core;
 
 import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.TimingStatistics;
+import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.hierachical.AsyncNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
@@ -60,6 +61,9 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         this.traversal = traversal;
     }
 
+    //Allows pipelines to configure model baking system
+    public void setupExtraModelBakeryData(ModelBakerySubsystem modelService) {}
+
     public final void setSectionRenderer(AbstractSectionRenderer<?,?> sectionRenderer) {//Stupid java ordering not allowing something pre super
         if (this.sectionRenderer != null) throw new IllegalStateException();
         this.sectionRenderer = sectionRenderer;
@@ -67,12 +71,12 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
     protected abstract int setup(Viewport<?> viewport, int sourceFramebuffer);
     protected abstract void postOpaquePreTranslucent(Viewport<?> viewport);
-    protected void finish(Viewport<?> viewport, Matrix4fc mcProjection, int sourceFrameBuffer) {
+    protected void finish(Viewport<?> viewport, int sourceFrameBuffer) {
         glDisable(GL_STENCIL_TEST);
         glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);
     }
 
-    public void runPipeline(Viewport<?> viewport, Matrix4fc mcProjection, int sourceFrameBuffer) {
+    public void runPipeline(Viewport<?> viewport, int sourceFrameBuffer) {
         int depthTexture = this.setup(viewport, sourceFrameBuffer);
 
         var rs = ((AbstractSectionRenderer)this.sectionRenderer);
@@ -85,7 +89,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
         rs.renderTranslucent(viewport);
 
-        this.finish(viewport, mcProjection, sourceFrameBuffer);
+        this.finish(viewport, sourceFrameBuffer);
         glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);
     }
 
@@ -186,8 +190,9 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         RenderStatistics.addDebug(debug);
     }
 
-    public abstract void bindOpaqueFramebuffer();
-    public abstract void bindTranslucentFramebuffer();
+    //Binds the framebuffer and any other bindings needed for rendering
+    public abstract void setupAndBindOpaque(Viewport<?> viewport);
+    public abstract void setupAndBindTranslucent(Viewport<?> viewport);
 
 
     //null means dont transform the shader
@@ -199,4 +204,5 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     public String patchTranslucentShader(AbstractSectionRenderer<?,?> renderer, String input) {
         return null;
     }
+
 }

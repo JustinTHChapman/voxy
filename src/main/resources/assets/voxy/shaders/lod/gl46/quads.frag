@@ -17,8 +17,17 @@ layout(location = 1) in flat uvec4 interData;
 #ifdef DEBUG_RENDER
 layout(location = 7) in flat uint quadDebug;
 #endif
-layout(location = 0) out vec4 outColour;
 
+
+#ifndef PATCHED_SHADER
+layout(location = 0) out vec4 outColour;
+#else
+
+//Bind the model buffer and import the model system as we need it
+#define MODEL_BUFFER_BINDING 3
+#import <voxy:lod/block_model.glsl>
+
+#endif
 
 #import <voxy:lod/gl46/bindings.glsl>
 
@@ -38,17 +47,23 @@ bool useCutout() {
     return (interData.x&1u)==1u;
 }
 
-vec4 computeColour(vec4 colour) {
-    //Conditional tinting, TODO: FIXME: REPLACE WITH MASK OR SOMETHING, like encode data into the top bit of alpha
-    if (useTinting() && abs(colour.r-colour.g) < 0.02f && abs(colour.g-colour.b) < 0.02f) {
-        colour *= uint2vec4RGBA(interData.z).yzwx;
-    }
-    return (colour * uint2vec4RGBA(interData.y)) + vec4(0,0,0,float(interData.w&0xFFu)/255);
+uint getFace() {
+    #ifndef PATCHED_SHADER
+    return (interData.w>>8)&7u;
+    #else
+    return (interData.y>>8)&7u;
+    #endif
 }
 
+#ifdef PATCHED_SHADER
+vec2 getLightmap() {
+    //return clamp(vec2(interData.y&0xFu, (interData.y>>4)&0xFu)/16, vec2(4.0f/255), vec2(252.0f/255));
+    return vec2(interData.y&0xFu, (interData.y>>4)&0xFu)/15;
+}
+#endif
 
-uint getFace() {
-    return (interData.w>>8)&7u;
+uint getModelId() {
+    return interData.x>>16;
 }
 
 vec2 getBaseUV() {
@@ -57,6 +72,37 @@ vec2 getBaseUV() {
     vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
     return modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
 }
+
+
+#ifdef PATCHED_SHADER
+struct VoxyFragmentParameters {
+    //TODO: pass in derivative data
+    vec4 sampledColour;
+    vec2 tile;
+    vec2 uv;
+    uint face;
+    uint modelId;
+    vec2 lightMap;
+    vec4 tinting;
+    uint customId;//Same as iris's modelId
+};
+
+void voxy_emitFragment(VoxyFragmentParameters parameters);
+#else
+
+vec4 computeColour(vec2 texturePos, vec4 colour) {
+    //Conditional tinting, TODO: FIXME: REPLACE WITH MASK OR SOMETHING, like encode data into the top bit of alpha
+    if (useTinting()) {
+        vec4 tintTest = texture(blockModelAtlas, texturePos, -2);
+        if (abs(tintTest.r-tintTest.g) < 0.02f && abs(tintTest.g-tintTest.b) < 0.02f) {
+            colour *= uint2vec4RGBA(interData.z).yzwx;
+        }
+    }
+    return (colour * uint2vec4RGBA(interData.y)) + vec4(0,0,0,float(interData.w&0xFFu)/255);
+}
+
+#endif
+
 
 void main() {
     //Tile is the tile we are in
@@ -92,10 +138,9 @@ void main() {
         #endif
     }
 
-    colour = computeColour(colour);
-
+    #ifndef PATCHED_SHADER
+    colour = computeColour(texPos, colour);
     outColour = colour;
-
 
     #ifdef DEBUG_RENDER
     uint hash = quadDebug*1231421+123141;
@@ -104,6 +149,21 @@ void main() {
     hash ^= hash>>16;
     hash = hash * 1827364925 + 123325621;
     outColour = vec4(float(hash&15u)/15, float((hash>>4)&15u)/15, float((hash>>8)&15u)/15, 1);
+    #endif
+
+    #else
+    uint modelId = getModelId();
+    BlockModel model = modelData[modelId];
+    vec4 tint = vec4(1);
+    if (useTinting()) {
+        vec4 tintTest = texture(blockModelAtlas, texPos, -2);
+        if (abs(tintTest.r-tintTest.g) < 0.02f && abs(tintTest.g-tintTest.b) < 0.02f) {
+            tint = uint2vec4RGBA(interData.z).yzwx;
+        }
+    }
+
+    voxy_emitFragment(VoxyFragmentParameters(colour, tile, texPos, getFace(), modelId, getLightmap().yx, tint, model.customId));
+
     #endif
 }
 
@@ -132,3 +192,4 @@ colour = textureGrad(blockModelAtlas, texPos, dx, dy);
 //#else
 //colour = texture(blockModelAtlas, texPos);
 //#endif
+

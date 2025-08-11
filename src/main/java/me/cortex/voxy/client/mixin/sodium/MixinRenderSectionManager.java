@@ -5,6 +5,7 @@ import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
@@ -94,7 +95,7 @@ public class MixinRenderSectionManager {
         }
         int x = instance.getChunkX(), y = instance.getChunkY(), z = instance.getChunkZ();
         //Do some very cheeky stuff for MiB
-        if (false) {
+        if (VoxyCommon.IS_MINE_IN_ABYSS) {
             int sector = (x+512)>>10;
             x-=sector<<10;
             y+=16+(256-32-sector*30);

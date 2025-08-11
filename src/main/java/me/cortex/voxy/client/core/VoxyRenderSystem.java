@@ -26,12 +26,17 @@ import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.pipeline.programs.SodiumShader;
 import net.minecraft.client.MinecraftClient;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL30;
 
 import java.util.Arrays;
 import java.util.List;
@@ -39,9 +44,12 @@ import java.util.List;
 import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
 import static org.lwjgl.opengl.GL11.glGetIntegerv;
 import static org.lwjgl.opengl.GL11C.*;
-import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
-import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
+import static org.lwjgl.opengl.GL30.glBindBufferRange;
+import static org.lwjgl.opengl.GL30C.*;
+import static org.lwjgl.opengl.GL32.glGetInteger64i;
 import static org.lwjgl.opengl.GL33.glBindSampler;
+import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
+import static org.lwjgl.opengl.GL43C.*;
 
 public class VoxyRenderSystem {
     private final WorldEngine worldIn;
@@ -71,6 +79,13 @@ public class VoxyRenderSystem {
         //Keep the world loaded, NOTE: this is done FIRST, to keep and ensure that even if the rest of loading takes more
         // than timeout, we keep the world acquired
         world.acquireRef();
+
+        //Fking HATE EVERYTHING AAAAAAAAAAAAAAAA
+        int[] oldBufferBindings = new int[10];
+        for (int i = 0; i < oldBufferBindings.length; i++) {
+            oldBufferBindings[i] = glGetIntegeri(GL_SHADER_STORAGE_BUFFER_BINDING, i);
+        }
+
         try {
             //wait for opengl to be finished, this should hopefully ensure all memory allocations are free
             glFinish();
@@ -100,6 +115,7 @@ public class VoxyRenderSystem {
             }
 
             this.pipeline = RenderPipelineFactory.createPipeline(this.nodeManager, this.nodeCleaner, this.traversal, this::frexStillHasWork);
+            this.pipeline.setupExtraModelBakeryData(this.modelService);//Configure the model service
             var sectionRenderer = createSectionRenderer(this.pipeline, this.modelService.getStore(), this.geometryData);
             this.pipeline.setSectionRenderer(sectionRenderer);
             this.viewportSelector = new ViewportSelector<>(sectionRenderer::createViewport);
@@ -109,7 +125,7 @@ public class VoxyRenderSystem {
                 int maxSec = (MinecraftClient.getInstance().world.getTopSectionCoord() - 1) >> 5;
 
                 //Do some very cheeky stuff for MiB
-                if (false) {
+                if (VoxyCommon.IS_MINE_IN_ABYSS) {//TODO: make this somehow configurable
                     minSec = -8;
                     maxSec = 7;
                 }
@@ -125,31 +141,62 @@ public class VoxyRenderSystem {
 
             this.chunkBoundRenderer = new ChunkBoundRenderer();
 
-
             Logger.info("Voxy render system created with " + geometryCapacity + " geometry capacity, using pipeline '" + this.pipeline.getClass().getSimpleName() + "' with renderer '" + sectionRenderer.getClass().getSimpleName() + "'");
         } catch (RuntimeException e) {
             world.releaseRef();//If something goes wrong, we must release the world first
             throw e;
         }
+
+        for (int i = 0; i < oldBufferBindings.length; i++) {
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, oldBufferBindings[i]);
+        }
     }
 
-    public void renderOpaque(ChunkRenderMatrices matrices, FogParameters fogParameters, double cameraX, double cameraY, double cameraZ) {
-        if (IrisUtil.irisShadowActive()) {
-            return;
-        }
-        TimingStatistics.resetSamplers();
 
-
+    public Viewport<?> setupViewport(ChunkRenderMatrices matrices, FogParameters fogParameters, double cameraX, double cameraY, double cameraZ) {
         //Do some very cheeky stuff for MiB
-        if (false) {
+        if (VoxyCommon.IS_MINE_IN_ABYSS) {
             int sector = (((int)Math.floor(cameraX)>>4)+512)>>10;
             cameraX -= sector<<14;//10+4
             cameraY += (16+(256-32-sector*30))*16;
         }
 
+        var projection = computeProjectionMat(matrices.projection());//RenderSystem.getProjectionMatrix();
+        //var projection = new Matrix4f(matrices.projection());
+
+        int[] dims = new int[4];
+        glGetIntegerv(GL_VIEWPORT, dims);
+
+        var viewport = this.getViewport();
+        viewport
+                .setVanillaProjection(matrices.projection())
+                .setProjection(projection)
+                .setModelView(new Matrix4f(matrices.modelView()))
+                .setCamera(cameraX, cameraY, cameraZ)
+                .setScreenSize(dims[2], dims[3])
+                .setFogParameters(fogParameters)
+                .update();
+        viewport.frameId++;
+
+        return viewport;
+    }
+
+    public void renderOpaque(Viewport<?> viewport) {
+        if (IrisUtil.irisShadowActive()) {
+            return;
+        }
+        TimingStatistics.resetSamplers();
+
         long startTime = System.nanoTime();
         TimingStatistics.all.start();
         TimingStatistics.main.start();
+
+        //TODO: optimize
+        int[] oldBufferBindings = new int[10];
+        for (int i = 0; i < oldBufferBindings.length; i++) {
+            oldBufferBindings[i] = glGetIntegeri(GL_SHADER_STORAGE_BUFFER_BINDING, i);
+        }
+
 
         int oldFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         int boundFB = oldFB;
@@ -162,21 +209,6 @@ public class VoxyRenderSystem {
 
         //this.autoBalanceSubDivSize();
 
-        var projection = computeProjectionMat(matrices.projection());//RenderSystem.getProjectionMatrix();
-        //var projection = new Matrix4f(matrices.projection());
-
-        int[] dims = new int[4];
-        glGetIntegerv(GL_VIEWPORT, dims);
-
-        var viewport = this.getViewport();
-        viewport
-                .setProjection(projection)
-                .setModelView(new Matrix4f(matrices.modelView()))
-                .setCamera(cameraX, cameraY, cameraZ)
-                .setScreenSize(dims[2], dims[3])
-                .setFogParameters(fogParameters)
-                .update();
-        viewport.frameId++;
 
         TimingStatistics.E.start();
         this.chunkBoundRenderer.render(viewport);
@@ -184,7 +216,7 @@ public class VoxyRenderSystem {
 
 
         //The entire rendering pipeline (excluding the chunkbound thing)
-        this.pipeline.runPipeline(viewport, matrices.projection(), boundFB);
+        this.pipeline.runPipeline(viewport, boundFB);
 
 
         TimingStatistics.main.stop();
@@ -197,7 +229,7 @@ public class VoxyRenderSystem {
             //Tick upload stream (this is ok to do here as upload ticking is just memory management)
             UploadStream.INSTANCE.tick();
 
-            while (this.renderDistanceTracker.setCenterAndProcess(cameraX, cameraZ) && VoxyClient.isFrexActive());//While FF is active, run until everything is processed
+            while (this.renderDistanceTracker.setCenterAndProcess(viewport.cameraX, viewport.cameraZ) && VoxyClient.isFrexActive());//While FF is active, run until everything is processed
 
             //Done here as is allows less gl state resetup
             this.modelService.tick(Math.max(3_000_000-(System.nanoTime()-startTime), 500_000));
@@ -207,22 +239,29 @@ public class VoxyRenderSystem {
         glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
 
         {//Reset state manager stuffs
+            glUseProgram(0);
             glEnable(GL_DEPTH_TEST);
 
             GlStateManager._glBindVertexArray(0);//Clear binding
 
-            GlStateManager._activeTexture(GlConst.GL_TEXTURE0);
-            GlStateManager._bindTexture(0);
-            glBindSampler(0, 0);
-
             GlStateManager._activeTexture(GlConst.GL_TEXTURE1);
-            GlStateManager._bindTexture(0);
-            glBindSampler(1, 0);
+            for (int i = 0; i < 16; i++) {
+                GlStateManager._activeTexture(GlConst.GL_TEXTURE0+i);
+                GlStateManager._bindTexture(0);
+                glBindSampler(i, 0);
+            }
 
-            GlStateManager._activeTexture(GlConst.GL_TEXTURE2);
-            GlStateManager._bindTexture(0);
-            glBindSampler(2, 0);
+            IrisUtil.clearIrisSamplers();//Thanks iris (sigh)
+
+            //TODO: should/needto actually restore all of these, not just clear them
+            //Clear all the bindings
+            for (int i = 0; i < oldBufferBindings.length; i++) {
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, oldBufferBindings[i]);
+            }
+
+            //((SodiumShader) Iris.getPipelineManager().getPipelineNullable().getSodiumPrograms().getProgram(DefaultTerrainRenderPasses.CUTOUT).getInterface()).setupState(DefaultTerrainRenderPasses.CUTOUT, fogParameters);
         }
+
         TimingStatistics.all.stop();
 
         /*
@@ -375,7 +414,7 @@ public class VoxyRenderSystem {
         //Limit to available dedicated memory if possible
         if (Capabilities.INSTANCE.canQueryGpuMemory) {
             //512mb less than avalible,
-            long limit = Capabilities.INSTANCE.getFreeDedicatedGpuMemory() - 1024*1024*1024;
+            long limit = Capabilities.INSTANCE.getFreeDedicatedGpuMemory() - (long)(1.5*1024*1024*1024);//1.5gb vram buffer
             // Give a minimum of 512 mb requirement
             limit = Math.max(512*1024*1024, limit);
 

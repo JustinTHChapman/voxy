@@ -27,6 +27,7 @@ public abstract class Viewport <A extends Viewport<A>> {
     public int width;
     public int height;
     public int frameId;
+    public Matrix4f vanillaProjection = new Matrix4f();
     public Matrix4f projection;
     public Matrix4f modelView;
     public final FrustumIntersection frustum = new FrustumIntersection();
@@ -57,6 +58,11 @@ public abstract class Viewport <A extends Viewport<A>> {
     protected void delete0() {
         this.hiZBuffer.free();
         this.depthBoundingBuffer.free();
+    }
+
+    public A setVanillaProjection(Matrix4fc projection) {
+        this.vanillaProjection.set(projection);
+        return (A) this;
     }
 
     public A setProjection(Matrix4f projection) {

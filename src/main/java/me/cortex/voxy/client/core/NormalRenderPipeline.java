@@ -102,7 +102,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
     }
 
     @Override
-    protected void finish(Viewport<?> viewport, Matrix4fc mcProjection, int sourceFrameBuffer) {
+    protected void finish(Viewport<?> viewport, int sourceFrameBuffer) {
         this.finalBlit.bind();
         if (this.useEnvFog) {
             float start = viewport.fogParameters.environmentalStart();
@@ -113,18 +113,18 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
         }
 
         glBindTextureUnit(3, this.colourSSAOTex.id);
-        AbstractRenderPipeline.transformBlitDepth(this.finalBlit, this.fb.getDepthTex().id, sourceFrameBuffer, viewport, new Matrix4f(mcProjection).mul(viewport.modelView));
+        AbstractRenderPipeline.transformBlitDepth(this.finalBlit, this.fb.getDepthTex().id, sourceFrameBuffer, viewport, new Matrix4f(viewport.vanillaProjection).mul(viewport.modelView));
 
         //glBlitNamedFramebuffer(this.fbSSAO.id, sourceFrameBuffer, 0,0, viewport.width, viewport.height, 0,0, viewport.width, viewport.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
 
     @Override
-    public void bindOpaqueFramebuffer() {
+    public void setupAndBindOpaque(Viewport<?> viewport) {
         this.fb.bind();
     }
 
     @Override
-    public void bindTranslucentFramebuffer() {
+    public void setupAndBindTranslucent(Viewport<?> viewport) {
         glBindFramebuffer(GL_FRAMEBUFFER, this.fbSSAO.id);
     }
 

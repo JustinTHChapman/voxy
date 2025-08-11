@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.model;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
@@ -118,6 +119,7 @@ public class ModelFactory {
 
     public final Deque<Runnable> resultJobs = new ArrayDeque<>();
 
+    private Object2IntMap<BlockState> customBlockStateIdMapping;
 
     //TODO: NOTE!!! is it worth even uploading as a 16x16 texture, since automatic lod selection... doing 8x8 textures might be perfectly ok!!!
     // this _quarters_ the memory requirements for the texture atlas!!! WHICH IS HUGE saving
@@ -139,6 +141,10 @@ public class ModelFactory {
 
     public void tick() {
         this.downstream.tick();
+    }
+
+    public void setCustomBlockStateMapping(Object2IntMap<BlockState> mapping) {
+        this.customBlockStateIdMapping = mapping;
     }
 
     public boolean addEntry(int blockId) {
@@ -456,6 +462,16 @@ public class ModelFactory {
                 MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(colourProvider, blockState, biome)|0xFF000000); clrUploadPtr += 4;
             }
         }
+        uploadPtr += 4;
+
+        //have 32 bytes of free space after here
+
+        //install the custom mapping id if it exists
+        if (this.customBlockStateIdMapping != null && this.customBlockStateIdMapping.containsKey(blockState)) {
+            MemoryUtil.memPutInt(uploadPtr, this.customBlockStateIdMapping.getInt(blockState));
+        } else {
+            MemoryUtil.memPutInt(uploadPtr, 0);
+        } uploadPtr += 4;
 
 
         //Note: if the layer isSolid then need to fill all the points in the texture where alpha == 0 with the average colour

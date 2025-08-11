@@ -23,7 +23,7 @@ public class MixinDefaultChunkRenderer {
         if (renderPass == DefaultTerrainRenderPasses.CUTOUT) {
             var renderer = ((IGetVoxyRenderSystem) MinecraftClient.getInstance().worldRenderer).getVoxyRenderSystem();
             if (renderer != null) {
-                renderer.renderOpaque(matrices, fogParameters, camera.x, camera.y, camera.z);
+                renderer.renderOpaque(renderer.setupViewport(matrices, fogParameters, camera.x, camera.y, camera.z));
             }
         }
     }

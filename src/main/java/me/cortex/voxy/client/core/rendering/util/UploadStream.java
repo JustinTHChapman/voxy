@@ -41,6 +41,10 @@ public class UploadStream {
         data.cpyTo(this.upload(buffer, destOffset, data.size));
     }
 
+    public long uploadTo(GlBuffer buffer) {
+        return this.upload(buffer, 0, buffer.size());
+    }
+
     public long upload(GlBuffer buffer, long destOffset, long size) {
         long addr = this.rawUploadAddress((int) size);
 

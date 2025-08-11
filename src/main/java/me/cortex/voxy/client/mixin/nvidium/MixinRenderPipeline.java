@@ -18,7 +18,7 @@ public class MixinRenderPipeline {
     private void voxy$injectRender(TerrainRenderPass pass, Viewport frustum, FogParameters fogParameters, ChunkRenderMatrices crm, double px, double py, double pz, CallbackInfo ci) {
         var renderer = ((IGetVoxyRenderSystem) MinecraftClient.getInstance().worldRenderer).getVoxyRenderSystem();
         if (renderer != null) {
-            renderer.renderOpaque(crm, fogParameters, px, py, pz);
+            renderer.renderOpaque(renderer.setupViewport(crm, fogParameters, px, py, pz));
         }
     }
 }

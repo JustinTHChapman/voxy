@@ -17,29 +17,29 @@ import java.util.function.Function;
 public class VoxyClient implements ClientModInitializer {
     private static final HashSet<String> FREX = new HashSet<>();
 
+
+    public static void initVoxyClient() {
+        Capabilities.init();//Ensure clinit is called
+
+        boolean systemSupported = Capabilities.INSTANCE.compute && Capabilities.INSTANCE.indirectParameters;
+        if (systemSupported) {
+
+            SharedIndexBuffer.INSTANCE.id();
+            BudgetBufferRenderer.init();
+
+            VoxyCommon.setInstanceFactory(VoxyClientInstance::new);
+
+            if (!Capabilities.INSTANCE.subgroup) {
+                Logger.warn("GPU does not support subgroup operations, expect some performance degradation");
+            }
+
+        } else {
+            Logger.error("Voxy is unsupported on your system.");
+        }
+    }
+
     @Override
     public void onInitializeClient() {
-        ClientLifecycleEvents.CLIENT_STARTED.register(client->{
-            Capabilities.init();//Ensure clinit is called
-
-            boolean systemSupported = Capabilities.INSTANCE.compute && Capabilities.INSTANCE.indirectParameters;
-            if (systemSupported) {
-                
-                SharedIndexBuffer.INSTANCE.id();
-                BudgetBufferRenderer.init();
-
-                VoxyCommon.setInstanceFactory(VoxyClientInstance::new);
-
-                if (!Capabilities.INSTANCE.subgroup) {
-                    Logger.warn("GPU does not support subgroup operations, expect some performance degradation");
-                }
-
-            } else {
-                Logger.error("Voxy is unsupported on your system.");
-            }
-        });
-
-
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             if (VoxyCommon.isAvailable()) {
                 dispatcher.register(VoxyCommands.register());

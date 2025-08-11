@@ -102,17 +102,31 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         String opaqueFrag = pipeline.patchOpaqueShader(this, frag);
         opaqueFrag = opaqueFrag==null?frag:opaqueFrag;
 
-        this.terrainShader = builder.clone()
-                .addSource(ShaderType.FRAGMENT, opaqueFrag)
-                .compile();
+        //TODO: find a more robust/nicer way todo this
+        this.terrainShader = tryCompilePatchedOrNormal(builder, opaqueFrag, frag);
 
         String translucentFrag = pipeline.patchTranslucentShader(this, frag);
-        if (translucentFrag == null) {
-            this.translucentTerrainShader = builder.clone()
-                    .addSource(ShaderType.FRAGMENT, opaqueFrag)
-                    .compile();
+        if (translucentFrag != null) {
+            this.translucentTerrainShader = tryCompilePatchedOrNormal(builder, translucentFrag, frag);
         } else {
             this.translucentTerrainShader = this.terrainShader;
+        }
+    }
+
+    private static Shader tryCompilePatchedOrNormal(Shader.Builder<?> builder, String shader, String original) {
+        boolean patched = shader != original;//This is the correct comparison type (reference)
+        try {
+            return builder.clone()
+                    .defineIf("PATCHED_SHADER", patched)
+                    .addSource(ShaderType.FRAGMENT, shader)
+                    .compile();
+        } catch (RuntimeException e) {
+            if (patched) {
+                Logger.error("Failed to compile shader patch, using normal pipeline to prevent errors", e);
+                return tryCompilePatchedOrNormal(builder, original, original);
+            } else {
+                throw e;
+            }
         }
     }
 
@@ -153,12 +167,12 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private void renderTerrain(MDICViewport viewport, long indirectOffset, long drawCountOffset, int maxDrawCount) {
         //RenderLayer.getCutoutMipped().startDrawing();
 
-        this.pipeline.bindOpaqueFramebuffer();
 
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
         this.terrainShader.bind();
         glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
+        this.pipeline.setupAndBindOpaque(viewport);
         this.bindRenderingBuffers(viewport);
 
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);//Barrier everything is needed
@@ -187,7 +201,6 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     @Override
     public void renderTranslucent(MDICViewport viewport) {
         if (this.geometryManager.getSectionCount() == 0) return;
-        this.pipeline.bindTranslucentFramebuffer();
 
         glEnable(GL_BLEND);
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -196,6 +209,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glEnable(GL_DEPTH_TEST);
         this.translucentTerrainShader.bind();
         glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
+        this.pipeline.setupAndBindTranslucent(viewport);
         this.bindRenderingBuffers(viewport);
 
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);//Barrier everything is needed

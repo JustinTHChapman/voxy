@@ -129,6 +129,7 @@ void main() {
         flags |= uint(!modelHasMipmaps(model))<<1;
 
         //Compute lighting
+        uint lighting = extractLightId(quad);
         vec4 tinting = getLighting(extractLightId(quad));
 
         //Apply model colour tinting
@@ -143,6 +144,9 @@ void main() {
             conditionalTinting = tintColour;
         }
 
+        setSizeAndFlags(modelId, flags, quadSize);
+
+        #ifndef PATCHED_SHADER
         uint addin = 0;
         if (!isTranslucent) {
             tinting.w = 0.0;
@@ -167,8 +171,11 @@ void main() {
             }
         }
 
-        setSizeAndFlags(modelId, flags, quadSize);
         setTintingAndExtra(tinting, conditionalTinting, addin|(face<<8));
+        #else
+        interData.y = lighting|(face<<8);
+        interData.z = tintColour;
+        #endif
     }
 
 
