@@ -2,13 +2,9 @@ package me.cortex.voxy.client.core.rendering.util;
 
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
-import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL14C;
 import org.lwjgl.system.MemoryStack;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.glClearNamedFramebufferfv;
 import static org.lwjgl.opengl.ARBDirectStateAccess.nglClearNamedFramebufferfv;
-import static org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT;
 import static org.lwjgl.opengl.GL11C.GL_DEPTH;
 import static org.lwjgl.opengl.GL14.GL_DEPTH_COMPONENT24;
 import static org.lwjgl.opengl.GL30C.*;

@@ -18,8 +18,6 @@ import net.minecraft.util.WorldSavePath;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 public class VoxyClientInstance extends VoxyInstance {
     public static boolean isInGame = false;

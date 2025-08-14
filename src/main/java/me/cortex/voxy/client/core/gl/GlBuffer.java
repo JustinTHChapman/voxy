@@ -2,7 +2,6 @@ package me.cortex.voxy.client.core.gl;
 
 import me.cortex.voxy.common.util.TrackedObject;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;

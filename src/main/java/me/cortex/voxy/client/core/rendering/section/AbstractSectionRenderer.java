@@ -1,7 +1,6 @@
 package me.cortex.voxy.client.core.rendering.section;
 
 
-import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.section.geometry.IGeometryData;

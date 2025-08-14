@@ -12,7 +12,6 @@ import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.common.util.TrackedObject;
 import org.joml.Matrix4f;
-import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
 
