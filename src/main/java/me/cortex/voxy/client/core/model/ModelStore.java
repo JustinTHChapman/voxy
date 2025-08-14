@@ -2,7 +2,11 @@ package me.cortex.voxy.client.core.model;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.texture.SpriteAtlasTexture;
+import net.minecraft.util.Identifier;
 
+import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameterf;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL11C.GL_NEAREST;
 import static org.lwjgl.opengl.GL11C.GL_NEAREST_MIPMAP_LINEAR;
@@ -27,11 +31,15 @@ public class ModelStore {
         this.textures = new GlTexture().store(GL_RGBA8, Integer.numberOfTrailingZeros(ModelFactory.MODEL_TEXTURE_SIZE), ModelFactory.MODEL_TEXTURE_SIZE*3*256,ModelFactory.MODEL_TEXTURE_SIZE*2*256).name("ModelTextures");
 
 
+        //Limit the mips of the texture to match that of the terrain atlas
+        int mipLvl = ((SpriteAtlasTexture) MinecraftClient.getInstance().getTextureManager()
+                .getTexture(Identifier.of("minecraft", "textures/atlas/blocks.png")))
+                .mipLevel;
 
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_LOD, 0);
-        glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAX_LOD, Integer.numberOfTrailingZeros(ModelFactory.MODEL_TEXTURE_SIZE));
+        glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAX_LOD, mipLvl);//Integer.numberOfTrailingZeros(ModelFactory.MODEL_TEXTURE_SIZE)
     }
 
 

@@ -10,7 +10,10 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
-import me.cortex.voxy.client.core.rendering.*;
+import me.cortex.voxy.client.core.rendering.ChunkBoundRenderer;
+import me.cortex.voxy.client.core.rendering.RenderDistanceTracker;
+import me.cortex.voxy.client.core.rendering.Viewport;
+import me.cortex.voxy.client.core.rendering.ViewportSelector;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.hierachical.AsyncNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
@@ -28,15 +31,11 @@ import me.cortex.voxy.common.thread.ServiceThreadPool;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
-import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.pipeline.programs.SodiumShader;
 import net.minecraft.client.MinecraftClient;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL30;
 
 import java.util.Arrays;
 import java.util.List;
@@ -44,12 +43,10 @@ import java.util.List;
 import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
 import static org.lwjgl.opengl.GL11.glGetIntegerv;
 import static org.lwjgl.opengl.GL11C.*;
-import static org.lwjgl.opengl.GL30.glBindBufferRange;
 import static org.lwjgl.opengl.GL30C.*;
-import static org.lwjgl.opengl.GL32.glGetInteger64i;
 import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
-import static org.lwjgl.opengl.GL43C.*;
+import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER_BINDING;
 
 public class VoxyRenderSystem {
     private final WorldEngine worldIn;
@@ -154,6 +151,10 @@ public class VoxyRenderSystem {
 
 
     public Viewport<?> setupViewport(ChunkRenderMatrices matrices, FogParameters fogParameters, double cameraX, double cameraY, double cameraZ) {
+        if (IrisUtil.irisShadowActive()) {
+            return null;
+        }
+
         //Do some very cheeky stuff for MiB
         if (VoxyCommon.IS_MINE_IN_ABYSS) {
             int sector = (((int)Math.floor(cameraX)>>4)+512)>>10;
@@ -161,7 +162,9 @@ public class VoxyRenderSystem {
             cameraY += (16+(256-32-sector*30))*16;
         }
 
+        //cameraY += 100;
         var projection = computeProjectionMat(matrices.projection());//RenderSystem.getProjectionMatrix();
+        //var projection = ShadowMatrices.createOrthoMatrix(160, -16*300, 16*300);
         //var projection = new Matrix4f(matrices.projection());
 
         int[] dims = new int[4];
@@ -182,9 +185,10 @@ public class VoxyRenderSystem {
     }
 
     public void renderOpaque(Viewport<?> viewport) {
-        if (IrisUtil.irisShadowActive()) {
+        if (viewport == null) {
             return;
         }
+
         TimingStatistics.resetSamplers();
 
         long startTime = System.nanoTime();
@@ -211,7 +215,11 @@ public class VoxyRenderSystem {
 
 
         TimingStatistics.E.start();
-        this.chunkBoundRenderer.render(viewport);
+        if (!IrisUtil.irisShadowActive()) {
+            this.chunkBoundRenderer.render(viewport);
+        } else {
+            viewport.depthBoundingBuffer.clear(0);
+        }
         TimingStatistics.E.stop();
 
 

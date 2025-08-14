@@ -254,6 +254,7 @@ public class Mapper {
 
     //TODO: fixme: synchronize access to this.blockId2stateEntry
     public StateEntry[] getStateEntries() {
+        this.blockLock.lock();
         var set = new ArrayList<>(this.blockId2stateEntry);
         StateEntry[] out = new StateEntry[set.size()];
         int i = 0;
@@ -263,11 +264,13 @@ public class Mapper {
             }
             out[i-1] = entry;
         }
+        this.blockLock.unlock();
         return out;
     }
 
     //TODO: fixme: synchronize access to this.biomeId2biomeEntry
     public BiomeEntry[] getBiomeEntries() {
+        this.biomeLock.lock();
         var set = new ArrayList<>(this.biomeId2biomeEntry);
         BiomeEntry[] out = new BiomeEntry[set.size()];
         int i = 0;
@@ -277,6 +280,7 @@ public class Mapper {
             }
             out[i-1] = entry;
         }
+        this.biomeLock.unlock();
         return out;
     }
 

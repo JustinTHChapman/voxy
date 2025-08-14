@@ -45,31 +45,9 @@ public class VoxyClientInstance extends VoxyInstance {
     protected SectionStorage createStorage(WorldIdentifier identifier) {
         var ctx = new ConfigBuildCtx();
         ctx.setProperty(ConfigBuildCtx.BASE_SAVE_PATH, this.basePath.toString());
-        ctx.setProperty(ConfigBuildCtx.WORLD_IDENTIFIER, getWorldId(identifier));
+        ctx.setProperty(ConfigBuildCtx.WORLD_IDENTIFIER, identifier.getWorldId());
         ctx.pushPath(ConfigBuildCtx.DEFAULT_STORAGE_PATH);
         return this.storageConfig.build(ctx);
-    }
-
-    private static String bytesToHex(byte[] hash) {
-        StringBuilder hexString = new StringBuilder(2 * hash.length);
-        for (byte b : hash) {
-            String hex = Integer.toHexString(0xff & b);
-            if (hex.length() == 1) {
-                hexString.append('0');
-            }
-            hexString.append(hex);
-        }
-        return hexString.toString();
-    }
-
-    private static String getWorldId(WorldIdentifier identifier) {
-        String data = identifier.biomeSeed + identifier.key.toString();
-        try {
-            return bytesToHex(MessageDigest.getInstance("SHA-256").digest(data.getBytes())).substring(0, 32);
-        } catch (
-                NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private static SectionStorageConfig getCreateStorageConfig(Path path) {

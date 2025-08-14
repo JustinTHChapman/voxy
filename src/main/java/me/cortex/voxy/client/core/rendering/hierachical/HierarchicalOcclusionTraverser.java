@@ -326,7 +326,7 @@ public class HierarchicalOcclusionTraverser {
     private void forwardDownloadResult(long ptr, long size) {
         int count = MemoryUtil.memGetInt(ptr);ptr += 8;//its 8 since we need to skip the second value (which is empty)
         if (count < 0 || count > 50000) {
-            Logger.error(new IllegalStateException("Count unexpected extreme value: " + count));
+            Logger.error(new IllegalStateException("Count unexpected extreme value: " + count + " things may get weird"));
             return;
         }
         if (count > (this.requestBuffer.size()>>3)-1) {

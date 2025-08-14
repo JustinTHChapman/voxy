@@ -32,3 +32,5 @@ accessible class net/minecraft/client/gl/GlDebug$DebugMessage
 accessible class net/minecraft/client/world/ClientChunkManager$ClientChunkMap
 accessible method net/minecraft/client/world/ClientChunkManager$ClientChunkMap getChunk (I)Lnet/minecraft/world/chunk/WorldChunk;
 accessible method net/minecraft/client/world/ClientChunkManager$ClientChunkMap getIndex (II)I
+
+accessible field net/minecraft/client/texture/SpriteAtlasTexture mipLevel I

@@ -93,7 +93,7 @@ void voxy_emitFragment(VoxyFragmentParameters parameters);
 vec4 computeColour(vec2 texturePos, vec4 colour) {
     //Conditional tinting, TODO: FIXME: REPLACE WITH MASK OR SOMETHING, like encode data into the top bit of alpha
     if (useTinting()) {
-        vec4 tintTest = texture(blockModelAtlas, texturePos, -2);
+        vec4 tintTest = textureLod(blockModelAtlas, texturePos, 0);
         if (abs(tintTest.r-tintTest.g) < 0.02f && abs(tintTest.g-tintTest.b) < 0.02f) {
             colour *= uint2vec4RGBA(interData.z).yzwx;
         }

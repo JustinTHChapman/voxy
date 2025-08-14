@@ -1,9 +1,9 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
-import me.cortex.voxy.client.core.rendering.RenderService;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
@@ -67,7 +67,7 @@ public class DebugRenderer {
 
         glEnable(GL_DEPTH_TEST);
         this.debugShader.bind();
-        glBindVertexArray(RenderService.STATIC_VAO);
+        glBindVertexArray(GlVertexArray.STATIC_VAO);
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawBuffer.id);
         GL15.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BYTE.id());
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
