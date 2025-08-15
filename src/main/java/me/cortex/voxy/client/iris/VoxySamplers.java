@@ -1,0 +1,45 @@
+package me.cortex.voxy.client.iris;
+
+import net.irisshaders.iris.gl.sampler.SamplerHolder;
+import net.irisshaders.iris.gl.texture.TextureType;
+import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
+
+public class VoxySamplers {
+    public static void addSamplers(IrisRenderingPipeline pipeline, SamplerHolder samplers) {
+        var patchData = ((IGetVoxyPatchData)pipeline).voxy$getPatchData();
+        if (patchData != null) {
+            //TODO replace ()->0 with the actual depth texture id
+            samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> {
+                var pipeData = ((IGetIrisVoxyPipelineData)pipeline).voxy$getPipelineData();
+                if (pipeData == null) {
+                    return 0;
+                }
+                if (pipeData.thePipeline == null) {
+                    return 0;
+                }
+
+                //In theory the first frame could be null
+                var dt = pipeData.thePipeline.fb.getDepthTex();
+                if (dt == null) {
+                    return 0;
+                }
+                return dt.id;
+            }, null, "vxDepthTexOpaque");
+            samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> {
+                var pipeData = ((IGetIrisVoxyPipelineData)pipeline).voxy$getPipelineData();
+                if (pipeData == null) {
+                    return 0;
+                }
+                if (pipeData.thePipeline == null) {
+                    return 0;
+                }
+                //In theory the first frame could be null
+                var dt = pipeData.thePipeline.fbTranslucent.getDepthTex();
+                if (dt == null) {
+                    return 0;
+                }
+                return dt.id;
+            }, null, "vxDepthTexTrans");
+        }
+    }
+}
