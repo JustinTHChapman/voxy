@@ -67,7 +67,8 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             .compile();
 
     private final Shader prefixSumShader = Shader.make()
-            .add(ShaderType.COMPUTE, "voxy:util/prefixsum/inital3.comp")
+            //Use subgroup prefix sum if possible otherwise use dodgy... slow prefix sum
+            .add(ShaderType.COMPUTE, Capabilities.INSTANCE.subgroup?"voxy:util/prefixsum/inital3.comp":"voxy:util/prefixsum/simple.comp")
             .define("IO_BUFFER", 0)
             .compile();
 
