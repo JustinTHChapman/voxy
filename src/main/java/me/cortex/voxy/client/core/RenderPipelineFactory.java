@@ -14,7 +14,7 @@ public class RenderPipelineFactory {
     public static AbstractRenderPipeline createPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
         //Note this is where will choose/create e.g. IrisRenderPipeline or normal pipeline
         AbstractRenderPipeline pipeline = null;
-        if (IrisUtil.IRIS_INSTALLED && System.getProperty("voxy.enableExperimentalIrisPipeline", "false").equalsIgnoreCase("true")) {
+        if (IrisUtil.IRIS_INSTALLED && IrisUtil.SHADER_SUPPORT) {
             pipeline = createIrisPipeline(nodeManager, nodeCleaner, traversal, frexSupplier);
         }
         if (pipeline == null) {

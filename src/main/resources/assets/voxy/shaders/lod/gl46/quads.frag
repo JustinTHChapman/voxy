@@ -119,6 +119,17 @@ void main() {
         colour = textureLod(blockModelAtlas, texPos, 0);
     }
 
+    //If we are in shaders and are a helper invocation, just exit, as it enables extra performance gains for small sized
+    // fragments, we do this here after derivative computation
+    //Trying it with all shaders
+    //#ifdef PATCHED_SHADER
+    #ifndef PATCHED_SHADER_ALLOW_DERIVATIVES
+    if (gl_HelperInvocation) {
+        return;
+    }
+    #endif
+    //#endif
+
     if (any(notEqual(clamp(tile, vec2(0), vec2((interData.x>>8)&0xFu, (interData.x>>12)&0xFu)), tile))) {
         discard;
     }

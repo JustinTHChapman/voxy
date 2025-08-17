@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering;
 
+import me.cortex.voxy.client.core.util.IrisUtil;
 import net.fabricmc.loader.api.FabricLoader;
 import org.vivecraft.client_vr.ClientDataHolderVR;
 
@@ -19,18 +20,27 @@ public class ViewportSelector <T extends Viewport<?>> {
         this.defaultViewport = viewportCreator.get();
     }
 
+    private T getOrCreate(Object holder) {
+        return this.extraViewports.computeIfAbsent(holder, a->this.creator.get());
+    }
+
     private T getVivecraftViewport() {
         var cdh = ClientDataHolderVR.getInstance();
         var pass = cdh.currentPass;
         if (pass == null) {
             return this.defaultViewport;
         }
-        return this.extraViewports.computeIfAbsent(pass, a->this.creator.get());
+        return this.getOrCreate(pass);
     }
 
+    private static final Object IRIS_SHADOW_OBJECT = new Object();
     public T getViewport() {
         if (VIVECRAFT_INSTALLED) {
             return getVivecraftViewport();
+        }
+
+        if (IrisUtil.irisShadowActive()) {
+            return this.getOrCreate(IRIS_SHADOW_OBJECT);
         }
         return this.defaultViewport;
     }

@@ -1,5 +1,7 @@
 package me.cortex.voxy.client.mixin.iris;
 
+import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.iris.VoxyUniforms;
 import net.irisshaders.iris.gl.uniform.UniformHolder;
 import net.irisshaders.iris.shaderpack.IdMap;
@@ -15,6 +17,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinMatrixUniforms {
     @Inject(method = "addNonDynamicUniforms", at = @At("TAIL"))
     private static void voxy$InjectMatrixUniforms(UniformHolder uniforms, IdMap idMap, PackDirectives directives, FrameUpdateNotifier updateNotifier, CallbackInfo ci) {
-        VoxyUniforms.addUniforms(uniforms);
+        if (VoxyConfig.CONFIG.isRenderingEnabled() && IrisUtil.SHADER_SUPPORT) {
+            VoxyUniforms.addUniforms(uniforms);
+        }
     }
 }

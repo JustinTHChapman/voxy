@@ -2,12 +2,14 @@ package me.cortex.voxy.client.iris;
 
 import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import kroppeb.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.Type;
 import me.cortex.voxy.client.core.IrisVoxyRenderPipeline;
 import me.cortex.voxy.client.mixin.iris.CustomUniformsAccessor;
 import me.cortex.voxy.client.mixin.iris.IrisRenderingPipelineAccessor;
 import me.cortex.voxy.common.Logger;
+import net.irisshaders.iris.gl.buffer.ShaderStorageBufferHolder;
 import net.irisshaders.iris.gl.image.ImageHolder;
 import net.irisshaders.iris.gl.sampler.GlSampler;
 import net.irisshaders.iris.gl.sampler.SamplerHolder;
@@ -26,6 +28,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.util.*;
 import java.util.function.IntSupplier;
 import java.util.function.LongConsumer;
+import java.util.stream.Collectors;
 
 public class IrisVoxyRenderPipelineData {
     public IrisVoxyRenderPipeline thePipeline;
@@ -57,10 +60,12 @@ public class IrisVoxyRenderPipelineData {
         return this.translucentPatch;
     }
 
-    public static IrisVoxyRenderPipelineData buildPipeline(IrisRenderingPipeline ipipe, IrisShaderPatch patch, CustomUniforms cu) {
+    public static IrisVoxyRenderPipelineData buildPipeline(IrisRenderingPipeline ipipe, IrisShaderPatch patch, CustomUniforms cu, ShaderStorageBufferHolder ssboHolder) {
         var uniforms = createUniformLayoutStructAndUpdater(createUniformSet(cu, patch));
 
         createImageSet(ipipe, patch);
+
+        createSSBOLayouts(patch.getSSBOs(), ssboHolder);
 
         var opaqueDrawTargets = getDrawBuffers(patch.getOpqaueTargets(), ipipe.getFlippedAfterPrepare(), ((IrisRenderingPipelineAccessor)ipipe).getRenderTargets());
         var translucentDrawTargets = getDrawBuffers(patch.getTranslucentTargets(), ipipe.getFlippedAfterPrepare(), ((IrisRenderingPipelineAccessor)ipipe).getRenderTargets());
@@ -272,8 +277,12 @@ public class IrisVoxyRenderPipelineData {
         return uniforms;
     }
 
+    private record TextureWSampler(String name, IntSupplier texture, int sampler) {
+
+    }
     private static void createImageSet(IrisRenderingPipeline ipipe, IrisShaderPatch patch) {
-        Set<String> samplerNameSet = new HashSet<>(List.of(patch.getSamplerList()));
+        Set<String> samplerNameSet = new LinkedHashSet<>(List.of(patch.getSamplerList()));
+        Set<TextureWSampler> samplerSet = new LinkedHashSet<>();
         SamplerHolder samplerBuilder = new SamplerHolder() {
             @Override
             public boolean hasSampler(String s) {
@@ -285,6 +294,13 @@ public class IrisVoxyRenderPipelineData {
                     if (samplerNameSet.contains(name)) return true;
                 }
                 return false;
+            }
+
+            private String name(String... names) {
+                for (var name : names) {
+                    if (samplerNameSet.contains(name)) return name;
+                }
+                return null;
             }
 
             @Override
@@ -301,14 +317,14 @@ public class IrisVoxyRenderPipelineData {
             @Override
             public boolean addDynamicSampler(TextureType type, IntSupplier texture, ValueUpdateNotifier notifier, GlSampler sampler, String... names) {
                 if (!this.hasSampler(names)) return false;
-                Logger.info(Arrays.toString(names));
-                return false;
+                samplerSet.add(new TextureWSampler(this.name(names), texture, sampler!=null?sampler.getId():-1));
+                return true;
             }
 
             @Override
             public void addExternalSampler(int texture, String... names) {
                 if (!this.hasSampler(names)) return;
-                Logger.info(Arrays.toString(names));
+                samplerSet.add(new TextureWSampler(this.name(names), ()->texture, -1));
             }
         };
 
@@ -326,6 +342,18 @@ public class IrisVoxyRenderPipelineData {
         };
 
         ipipe.addGbufferOrShadowSamplers(samplerBuilder, imageBuilder, ipipe::getFlippedAfterPrepare, false, true, true, false);
+
+        //samplerSet contains our samplers
+        if (samplerSet.size() != samplerNameSet.size()) {
+            Logger.error("Did not find all requested samplers. Found [" + samplerSet.stream().map(a->a.name).collect(Collectors.joining()) + "] expected " + samplerNameSet);
+        }
+
+        //TODO: generate a layout (defines) for all the samplers with the correct types
+
     }
 
+
+    private static void createSSBOLayouts(Int2ObjectMap<String> ssbos, ShaderStorageBufferHolder ssboStore) {
+        //ssboStore.getBufferIndex()
+    }
 }

@@ -1,19 +1,106 @@
 package me.cortex.voxy.client.iris;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.Strictness;
+import com.google.gson.*;
+import com.google.gson.annotations.JsonAdapter;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
 
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Type;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
+
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL33.*;
 
 public class IrisShaderPatch {
     public static final int VERSION = ((IntSupplier)()->1).getAsInt();
 
+
+    private static final class SSBODeserializer implements JsonDeserializer<Int2ObjectOpenHashMap<String>> {
+        @Override
+        public Int2ObjectOpenHashMap<String> deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+            Int2ObjectOpenHashMap<String> ret = new Int2ObjectOpenHashMap<>();
+            if (json==null) return null;
+            try {
+                for (var entry : json.getAsJsonObject().entrySet()) {
+                    ret.put(Integer.parseInt(entry.getKey()), entry.getValue().getAsString());
+                }
+            } catch (Exception e) {
+                Logger.error(e);
+            }
+            return ret;
+        }
+    }
+
+    public record BlendState(int buffer, boolean off, int sRBG, int dRGb, int sA, int dA) {
+        public static BlendState ALL_OFF = new BlendState(-1, true, 0,0,0,0);
+    }
+
+
+    private static final class BlendStateDeserializer implements JsonDeserializer<Int2ObjectMap<BlendState>> {
+        private static int parseType(String type) {
+            type = type.toUpperCase();
+            return switch (type) {
+                case "GL_ZERO" -> GL_ZERO;
+                case "GL_ONE" -> GL_ONE;
+                case "GL_SRC_COLOR" -> GL_SRC_COLOR;
+                case "GL_ONE_MINUS_SRC_COLOR" -> GL_ONE_MINUS_SRC_COLOR;
+                case "GL_SRC_ALPHA" -> GL_SRC_ALPHA;
+                case "GL_ONE_MINUS_SRC_ALPHA" -> GL_ONE_MINUS_SRC_ALPHA;
+                case "GL_DST_ALPHA" -> GL_DST_ALPHA;
+                case "GL_ONE_MINUS_DST_ALPHA" -> GL_ONE_MINUS_DST_ALPHA;
+                case "GL_DST_COLOR" -> GL_DST_COLOR;
+                case "GL_ONE_MINUS_DST_COLOR" -> GL_ONE_MINUS_DST_COLOR;
+                case "GL_SRC_ALPHA_SATURATE" -> GL_SRC_ALPHA_SATURATE;
+                case "GL_SRC1_COLOR" -> GL_SRC1_COLOR;
+                case "GL_ONE_MINUS_SRC1_COLOR" -> GL_ONE_MINUS_SRC1_COLOR;
+                case "GL_ONE_MINUS_SRC1_ALPHA" -> GL_ONE_MINUS_SRC1_ALPHA;
+                default -> -1;
+            };
+        }
+        @Override
+        public Int2ObjectMap<BlendState> deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+            if (json==null) return null;
+            Int2ObjectMap<BlendState> ret = new Int2ObjectOpenHashMap<>();
+            try {
+                if (json.isJsonPrimitive()) {
+                    if (json.getAsString().equalsIgnoreCase("off")) {
+                        ret.put(-1, BlendState.ALL_OFF);
+                        return ret;
+                    }
+                } else if (json.isJsonObject()) {
+                    for (var entry : json.getAsJsonObject().entrySet()) {
+                        int buffer = Integer.parseInt(entry.getKey());
+                        BlendState state;
+                        var val = entry.getValue();
+                        if (val.isJsonArray()) {
+                            int[] v = val.getAsJsonArray().asList().stream().mapToInt(a->parseType(a.getAsString())).toArray();
+                            state = new BlendState(buffer, false, v[0], v[1], v[2], v[3]);
+                        } else if (val.isJsonPrimitive()) {
+                            if (val.getAsString().equalsIgnoreCase("off")) {
+                                state = new BlendState(buffer, true, 0,0,0,0);
+                            } else {
+                                state = new BlendState(buffer, true, -1,-1,-1,-1);
+                            }
+                        } else {
+                            state = null;
+                        }
+                        ret.put(buffer, state);
+                    }
+                    return ret;
+                }
+            } catch (Exception e) {
+                Logger.error(e);
+            }
+            Logger.error("Failed to parse blend state: " + json);
+            return ret;
+        }
+    }
 
     private static class PatchGson {
         public int version;//TODO maybe replace with semver?
@@ -23,19 +110,35 @@ public class IrisShaderPatch {
         public String[] samplers;
         public String[] opaquePatchData;
         public String[] translucentPatchData;
+        @JsonAdapter(SSBODeserializer.class)
+        public Int2ObjectOpenHashMap<String> ssbos;
+        @JsonAdapter(BlendStateDeserializer.class)
+        public Int2ObjectOpenHashMap<BlendState> blending;
 
         public boolean checkValid() {
             return this.opaqueDrawBuffers != null && this.translucentDrawBuffers != null && this.uniforms != null && this.opaquePatchData != null;
         }
     }
 
+
+
     private final PatchGson patchData;
     private final ShaderPack pack;
+    private final Int2ObjectMap<String> ssbos;
     private IrisShaderPatch(PatchGson patchData, ShaderPack pack) {
         this.patchData = patchData;
         this.pack = pack;
+
+        if (patchData.ssbos == null) {
+            this.ssbos = new Int2ObjectOpenHashMap<>();
+        } else {
+            this.ssbos = patchData.ssbos;
+        }
     }
 
+    public Int2ObjectMap<String> getSSBOs() {
+        return this.ssbos;
+    }
     public String getPatchOpaqueSource() {
         return String.join("\n", this.patchData.opaquePatchData);
     }

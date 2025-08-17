@@ -253,7 +253,7 @@ public class VoxyRenderSystem {
             GlStateManager._glBindVertexArray(0);//Clear binding
 
             GlStateManager._activeTexture(GlConst.GL_TEXTURE1);
-            for (int i = 0; i < 16; i++) {
+            for (int i = 0; i < 12; i++) {
                 GlStateManager._activeTexture(GlConst.GL_TEXTURE0+i);
                 GlStateManager._bindTexture(0);
                 glBindSampler(i, 0);

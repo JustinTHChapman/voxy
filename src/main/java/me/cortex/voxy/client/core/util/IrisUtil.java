@@ -6,6 +6,7 @@ import net.irisshaders.iris.shadows.ShadowRenderer;
 
 public class IrisUtil {
     public static final boolean IRIS_INSTALLED = FabricLoader.getInstance().isModLoaded("iris");
+    public static final boolean SHADER_SUPPORT = System.getProperty("voxy.enableExperimentalIrisPipeline", "false").equalsIgnoreCase("true");
 
 
     private static boolean irisShadowActive0() {
