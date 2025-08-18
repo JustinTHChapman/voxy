@@ -73,7 +73,7 @@ public class IrisVoxyRenderPipelineData {
 
 
         //TODO: need to transform the string patch with the uniform decleration aswell as sampler declerations
-        return new IrisVoxyRenderPipelineData(patch, opaqueDrawTargets, translucentDrawTargets, uniforms, null);
+        return new IrisVoxyRenderPipelineData(patch, opaqueDrawTargets, translucentDrawTargets, uniforms, patch.createBlendSetup());
     }
 
     private static int[] getDrawBuffers(int[] targets, ImmutableSet<Integer> stageWritesToAlt, RenderTargets rt) {

@@ -15,6 +15,7 @@ import java.util.function.IntSupplier;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL33.*;
+import static org.lwjgl.opengl.GL40.glBlendFuncSeparatei;
 
 public class IrisShaderPatch {
     public static final int VERSION = ((IntSupplier)()->1).getAsInt();
@@ -158,6 +159,35 @@ public class IrisShaderPatch {
 
     public int[] getTranslucentTargets() {
         return this.patchData.translucentDrawBuffers;
+    }
+
+    public Runnable createBlendSetup() {
+        if (this.patchData.blending == null || this.patchData.blending.isEmpty()) {
+            return ()->{};//No blending change
+        }
+        return ()->{
+            final var BS = this.patchData.blending;
+            //Set inital state
+            var init = BS.getOrDefault(-1, null);
+            if (init != null) {
+                if (init.off) {
+                    glDisable(GL_BLEND);
+                } else {
+                    glEnable(GL_BLEND);
+                    glBlendFuncSeparate(init.sRBG, init.dRGb, init.sA, init.dA);
+                }
+            }
+            for (var entry:BS.int2ObjectEntrySet()) {
+                if (entry.getIntKey() == -1) continue;
+                final var s = entry.getValue();
+                if (s.off) {
+                    glDisablei(GL_BLEND, s.buffer);
+                } else {
+                    glEnablei(GL_BLEND, s.buffer);
+                    glBlendFuncSeparatei(s.buffer, s.sRBG, s.dRGb, s.sA, s.dA);
+                }
+            }
+        };
     }
 
     private static final Gson GSON = new GsonBuilder()
