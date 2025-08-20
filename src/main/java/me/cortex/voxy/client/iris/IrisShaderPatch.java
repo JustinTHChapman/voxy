@@ -2,6 +2,7 @@ package me.cortex.voxy.client.iris;
 
 import com.google.gson.*;
 import com.google.gson.annotations.JsonAdapter;
+import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
@@ -137,7 +138,7 @@ public class IrisShaderPatch {
     }
 
     public Int2ObjectMap<String> getSSBOs() {
-        return this.ssbos;
+        return new Int2ObjectLinkedOpenHashMap<>(this.ssbos);
     }
     public String getPatchOpaqueSource() {
         return String.join("\n", this.patchData.opaquePatchData);

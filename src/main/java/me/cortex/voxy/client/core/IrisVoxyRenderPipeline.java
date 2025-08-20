@@ -137,20 +137,28 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         glColorMask(true, true, true, true);
     }
 
-    @Override
-    public void setupAndBindOpaque(Viewport<?> viewport) {
-        this.fb.bind();
+
+    private void doBindings() {
         if (this.shaderUniforms != null) {
             GL30.glBindBufferBase(GL_UNIFORM_BUFFER, 5, this.shaderUniforms.id);// todo: dont randomly select this to 5
         }
+        if (this.data.getSsboSet() != null) {
+            this.data.getSsboSet().bindingFunction().accept(10);
+        }
+        if (this.data.getImageSet() != null) {
+            this.data.getImageSet().bindingFunction().accept(6);
+        }
+    }
+    @Override
+    public void setupAndBindOpaque(Viewport<?> viewport) {
+        this.fb.bind();
+        this.doBindings();
     }
 
     @Override
     public void setupAndBindTranslucent(Viewport<?> viewport) {
         this.fbTranslucent.bind();
-        if (this.shaderUniforms != null) {
-            GL30.glBindBufferBase(GL_UNIFORM_BUFFER, 5, this.shaderUniforms.id);// todo: dont randomly select this to 5
-        }
+        this.doBindings();
         if (this.data.getBlender() != null) {
             this.data.getBlender().run();
         }
@@ -162,16 +170,32 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         super.addDebug(debug);
     }
 
-    @Override
-    public String patchOpaqueShader(AbstractSectionRenderer<?, ?> renderer, String input) {
+    private StringBuilder buildGenericShaderHeader(AbstractSectionRenderer<?, ?> renderer, String input) {
         StringBuilder builder = new StringBuilder(input).append("\n\n\n");
 
         if (this.data.getUniforms() != null) {
             //TODO make ths binding point... not randomly 5
             builder.append("layout(binding = 5, std140) uniform ShaderUniformBindings ")
                     .append(this.data.getUniforms().layout())
-                    .append(";\n\n\n");
+                    .append(";\n\n");
         }
+
+        if (this.data.getSsboSet() != null) {
+            builder.append("#define BUFFER_BINDING_INDEX_BASE 10\n");//TODO: DONT RANDOMLY MAKE THIS 10
+            builder.append(this.data.getSsboSet().layout()).append("\n\n");
+        }
+
+        if (this.data.getImageSet() != null) {
+            builder.append("#define BASE_SAMPLER_BINDING_INDEX 6\n");//TODO: DONT RANDOMLY MAKE THIS 6
+            builder.append(this.data.getImageSet().layout()).append("\n\n");
+        }
+
+        return builder.append("\n\n");
+    }
+
+    @Override
+    public String patchOpaqueShader(AbstractSectionRenderer<?, ?> renderer, String input) {
+        var builder = this.buildGenericShaderHeader(renderer, input);
 
         builder.append(this.data.opaqueFragPatch());
 
@@ -182,17 +206,8 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     public String patchTranslucentShader(AbstractSectionRenderer<?, ?> renderer, String input) {
         if (this.data.translucentFragPatch() == null) return null;
 
-        StringBuilder builder = new StringBuilder(input).append("\n\n\n");
-
-        if (this.data.getUniforms() != null) {
-            //TODO make ths binding point... not randomly 5
-            builder.append("layout(binding = 5, std140) uniform ShaderUniformBindings ")
-                    .append(this.data.getUniforms().layout())
-                    .append(";\n\n\n");
-        }
-
+        var builder = this.buildGenericShaderHeader(renderer, input);
         builder.append(this.data.translucentFragPatch());
-
         return builder.toString();
     }
 }
