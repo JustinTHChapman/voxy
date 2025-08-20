@@ -292,8 +292,18 @@ public class IrisVoxyRenderPipelineData {
 
         CachedUniform[] uniforms = new CachedUniform[patch.getUniformList().length];
         ((CustomUniformsAccessor)cu).getLocationMap().get(patch).object2IntEntrySet().forEach(entry->uniforms[entry.getIntValue()] = entry.getKey());
+        int i = 0;
+        int j = 0;
+        for (var uniform : uniforms) {
+            if (uniform == null) {
+                Logger.error("Unknown uniform at location "+j + " skipping");
+            } else {
+                uniforms[i++] = uniform;//This shuffles the uniforms down till its compacted
+            }
+            j++;
+        }
         //In _theory_ this should work?
-        return uniforms;
+        return Arrays.copyOf(uniforms, i);
     }
 
     private record TextureWSampler(String name, IntSupplier texture, int sampler) { }

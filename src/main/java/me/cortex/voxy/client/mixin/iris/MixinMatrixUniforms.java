@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = CommonUniforms.class, remap = false)
 public class MixinMatrixUniforms {
-    @Inject(method = "addNonDynamicUniforms", at = @At("TAIL"))
+    @Inject(method = "addNonDynamicUniforms", at = @At("HEAD"))//Am so angry ims this is what IS REQUIRED TODO, because we need to override the uniforms of dh
     private static void voxy$InjectMatrixUniforms(UniformHolder uniforms, IdMap idMap, PackDirectives directives, FrameUpdateNotifier updateNotifier, CallbackInfo ci) {
         if (VoxyConfig.CONFIG.isRenderingEnabled() && IrisUtil.SHADER_SUPPORT) {
             VoxyUniforms.addUniforms(uniforms);
