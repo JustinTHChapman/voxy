@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinMinecraftClient {
     @Inject(method = "disconnect(Lnet/minecraft/client/gui/screen/Screen;Z)V", at = @At("TAIL"))
     private void voxy$injectWorldClose(CallbackInfo ci) {
-        if (VoxyCommon.isAvailable()) {
+        if (VoxyCommon.isAvailable() && VoxyClientInstance.isInGame) {
             VoxyCommon.shutdownInstance();
             VoxyClientInstance.isInGame = false;
         }
