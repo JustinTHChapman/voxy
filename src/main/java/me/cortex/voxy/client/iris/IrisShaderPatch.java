@@ -214,6 +214,21 @@ public class IrisShaderPatch {
         PatchGson patchData = null;
         try {
             //TODO: basicly find any "commented out" quotation marks and escape them (if the line, when stripped starts with a // or /* then escape all quotation marks in that line)
+            {
+                StringBuilder builder = new StringBuilder(voxyPatchData.length());
+                //Rebuild the patch, replacing commented out " with \"
+                for (var line : voxyPatchData.split("\n")) {
+                    int idx = line.indexOf("//");
+                    if (idx != -1) {
+                        builder.append(line, 0, idx);
+                        builder.append(line.substring(idx).replace("\"","\\\""));
+                    } else {
+                        builder.append(line);
+                    }
+                    builder.append("\n");
+                }
+                voxyPatchData = builder.toString();
+            }
             patchData = GSON.fromJson(voxyPatchData, PatchGson.class);
             if (patchData != null && !patchData.checkValid()) {
                 throw new IllegalStateException("voxy json patch not valid: " + voxyPatchData);

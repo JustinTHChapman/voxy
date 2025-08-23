@@ -386,7 +386,13 @@ public class IrisVoxyRenderPipelineData {
         int i = 0;
         for (var entry : samplerSet) {
             samplers[i]=entry;
-            builder.append("layout(binding=(BASE_SAMPLER_BINDING_INDEX+").append(i).append(")) uniform sampler2D ").append(entry.name).append(";\n");
+
+            String samplerType = "sampler2D";
+            if (entry.name.startsWith("shadowtex")) {
+                samplerType = "sampler2DShadow";
+            }
+
+            builder.append("layout(binding=(BASE_SAMPLER_BINDING_INDEX+").append(i).append(")) uniform ").append(samplerType).append(" ").append(entry.name).append(";\n");
             i++;
         }
 

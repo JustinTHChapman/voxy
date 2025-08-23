@@ -81,6 +81,7 @@ void main() {
         positionBuffer[drawId] = extractRawPos(meta);
         uvec4 counts = meta.b;
 
+        //TODO implicit command merging
         uint msk = 0;
         msk |= uint(((counts.y      &0xFFFFu)!=0) && (relative.y>-1))<<0;
         msk |= uint((((counts.y>>16)&0xFFFFu)!=0) && (relative.y<1 ))<<1;

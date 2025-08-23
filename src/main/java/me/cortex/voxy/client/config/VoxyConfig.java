@@ -34,7 +34,7 @@ public class VoxyConfig implements OptionStorage<VoxyConfig> {
     public boolean useEnvironmentalFog = false;
     public boolean renderStatistics = false;
 
-    public static VoxyConfig loadOrCreate() {
+    private static VoxyConfig loadOrCreate() {
         if (VoxyCommon.isAvailable()) {
             var path = getConfigPath();
             if (Files.exists(path)) {
