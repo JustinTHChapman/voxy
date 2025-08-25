@@ -1,8 +1,4 @@
 #version 460
-
-#extension GL_KHR_shader_subgroup_basic : require
-#extension GL_KHR_shader_subgroup_arithmetic: require
-
 #define WORK_SIZE 256
 
 //Does inital parralel prefix sum on batches of WORK_SIZE

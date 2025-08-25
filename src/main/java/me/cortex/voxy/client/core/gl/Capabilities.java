@@ -47,9 +47,10 @@ public class Capabilities {
             this.subgroup = testShaderCompilesOk(ShaderType.COMPUTE, """
                 #version 430
                 #extension GL_KHR_shader_subgroup_basic : require
+                #extension GL_KHR_shader_subgroup_arithmetic : require
                 layout(local_size_x=32) in;
                 void main() {
-                    uint64_t a = 1234;
+                    uint a = subgroupExclusiveAdd(gl_LocalInvocationIndex);
                 }
                 """);
         } else {
