@@ -22,6 +22,15 @@ public class VoxyUniforms {
         return new Matrix4f(vrs.getViewport().MVP);
     }
 
+    public static Matrix4f getModelView() {//This is 1 frame late ;-; cries, since the update occurs _before_ the voxy render pipeline
+        var getVrs = (IGetVoxyRenderSystem) MinecraftClient.getInstance().worldRenderer;
+        if (getVrs == null || getVrs.getVoxyRenderSystem() == null) {
+            return new Matrix4f();
+        }
+        var vrs = getVrs.getVoxyRenderSystem();
+        return new Matrix4f(vrs.getViewport().modelView);
+    }
+
     public static Matrix4f getProjection() {//This is 1 frame late ;-; cries, since the update occurs _before_ the voxy render pipeline
         var getVrs = (IGetVoxyRenderSystem) MinecraftClient.getInstance().worldRenderer;
         if (getVrs == null || getVrs.getVoxyRenderSystem() == null) {
@@ -41,6 +50,9 @@ public class VoxyUniforms {
                 .uniformMatrix(PER_FRAME, "vxViewProj", VoxyUniforms::getViewProjection)
                 .uniformMatrix(PER_FRAME, "vxViewProjInv", new Inverted(VoxyUniforms::getViewProjection))
                 .uniformMatrix(PER_FRAME, "vxViewProjPrev", new PreviousMat(VoxyUniforms::getViewProjection))
+                .uniformMatrix(PER_FRAME, "vxModelView", VoxyUniforms::getModelView)
+                .uniformMatrix(PER_FRAME, "vxModelViewInv", new Inverted(VoxyUniforms::getModelView))
+                .uniformMatrix(PER_FRAME, "vxModelViewPrev", new PreviousMat(VoxyUniforms::getModelView))
                 .uniformMatrix(PER_FRAME, "vxProj", VoxyUniforms::getProjection)
                 .uniformMatrix(PER_FRAME, "vxProjInv", new Inverted(VoxyUniforms::getProjection))
                 .uniformMatrix(PER_FRAME, "vxProjPrev", new PreviousMat(VoxyUniforms::getProjection));

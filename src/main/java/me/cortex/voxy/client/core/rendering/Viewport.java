@@ -28,8 +28,8 @@ public abstract class Viewport <A extends Viewport<A>> {
     public int height;
     public int frameId;
     public Matrix4f vanillaProjection = new Matrix4f();
-    public Matrix4f projection;
-    public Matrix4f modelView;
+    public Matrix4f projection = new Matrix4f();
+    public Matrix4f modelView = new Matrix4f();
     public final FrustumIntersection frustum = new FrustumIntersection();
     public final Vector4f[] frustumPlanes;
     public double cameraX;

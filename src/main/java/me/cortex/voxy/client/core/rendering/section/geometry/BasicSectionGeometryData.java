@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering.section.geometry;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.common.Logger;
 
 public class BasicSectionGeometryData implements IGeometryData {
     public static final int SECTION_METADATA_SIZE = 32;
@@ -17,7 +18,12 @@ public class BasicSectionGeometryData implements IGeometryData {
         if ((geometryCapacity%8)!=0) {
             throw new IllegalStateException();
         }
+        long start = System.currentTimeMillis();
+        Logger.info("Creating and zeroing " + (geometryCapacity/(1024*1024)) + "MB geometry buffer");
+        Logger.info("if your game crashes/exits here without any other log message, try manually decreasing the geometry capacity");
         this.geometryBuffer = new GlBuffer(geometryCapacity);
+        long delta = System.currentTimeMillis() - start;
+        Logger.info("Successfully allocated and zeroed the geometry buffer in " + delta + "ms");
     }
 
     public GlBuffer getGeometryBuffer() {
