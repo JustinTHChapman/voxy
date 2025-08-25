@@ -29,7 +29,6 @@ public class Capabilities {
     public Capabilities() {
         var cap = GL.getCapabilities();
         this.compute = cap.glDispatchComputeIndirect != 0;
-        this.subgroup = cap.GL_KHR_shader_subgroup;
         this.indirectParameters = cap.glMultiDrawElementsIndirectCountARB != 0;
         this.repFragTest = cap.GL_NV_representative_fragment_test;
         this.meshShaders = cap.GL_NV_mesh_shader;
@@ -44,6 +43,18 @@ public class Capabilities {
                     uint64_t a = 1234;
                 }
                 """);
+        if (cap.GL_KHR_shader_subgroup) {
+            this.subgroup = testShaderCompilesOk(ShaderType.COMPUTE, """
+                #version 430
+                #extension GL_KHR_shader_subgroup_basic : require
+                layout(local_size_x=32) in;
+                void main() {
+                    uint64_t a = 1234;
+                }
+                """);
+        } else {
+            this.subgroup = false;
+        }
 
         this.ssboMaxSize = glGetInteger64(GL_MAX_SHADER_STORAGE_BLOCK_SIZE);
 
