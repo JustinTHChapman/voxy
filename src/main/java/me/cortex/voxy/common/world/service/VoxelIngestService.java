@@ -187,4 +187,21 @@ public class VoxelIngestService {
     public static boolean tryAutoIngestChunk(WorldChunk chunk) {
         return tryIngestChunk(WorldIdentifier.of(chunk.getWorld()), chunk);
     }
+
+    private boolean rawIngest0(WorldEngine engine, ChunkSection section, int x, int y, int z, ChunkNibbleArray bl, ChunkNibbleArray sl) {
+        this.ingestQueue.add(new IngestSection(x, y, z, engine, section, bl, sl));
+        try {
+            this.threads.execute();
+            return true;
+        } catch (Exception e) {
+            Logger.error("Executing had an error: assume shutting down, aborting",e);
+            return false;
+        }
+    }
+
+    public static boolean rawIngest(WorldEngine engine, ChunkSection section, int x, int y, int z, ChunkNibbleArray bl, ChunkNibbleArray sl) {
+        if (!shouldIngestSection(section, x, y, z)) return false;
+        if (engine.instanceIn == null) return false;
+        return engine.instanceIn.getIngestService().rawIngest0(engine, section, x, y, z, bl, sl);
+    }
 }

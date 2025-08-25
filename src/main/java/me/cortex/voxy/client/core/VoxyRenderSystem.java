@@ -436,4 +436,8 @@ public class VoxyRenderSystem {
         }
         return geometryCapacity;
     }
+
+    public WorldEngine getEngine() {
+        return this.worldIn;
+    }
 }

@@ -6,13 +6,17 @@ import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
 import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionInfo;
+import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkTrackerHolder;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.world.LightType;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -37,6 +41,7 @@ public class MixinRenderSectionManager {
                 system.chunkBoundRenderer.reset();
             }
         }
+        this.bottomSectionY = this.level.getBottomY()>>4;
     }
 
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
@@ -75,16 +80,21 @@ public class MixinRenderSectionManager {
         }
     }*/
 
+    @Unique private long cachedChunkPos = -1;
+    @Unique private int cachedChunkStatus;
+    @Unique private int bottomSectionY;
+
     @Redirect(method = "updateSectionInfo", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSection;setInfo(Lnet/caffeinemc/mods/sodium/client/render/chunk/data/BuiltSectionInfo;)Z"))
     private boolean voxy$updateOnUpload(RenderSection instance, BuiltSectionInfo info) {
-        boolean wasBuilt = instance.isBuilt();
+        boolean wasBuilt = instance.getFlags()!=0;
         int flags = instance.getFlags();
         if (!instance.setInfo(info)) {
             return false;
         }
-        if (wasBuilt == instance.isBuilt()) {//Only want to do stuff on change
+        if (wasBuilt == (instance.getFlags()!=0)) {//Only want to do stuff on change
             return true;
         }
+
         flags |= instance.getFlags();
         if (flags == 0)//Only process things with stuff
             return true;
@@ -94,6 +104,30 @@ public class MixinRenderSectionManager {
             return true;
         }
         int x = instance.getChunkX(), y = instance.getChunkY(), z = instance.getChunkZ();
+
+        if (wasBuilt) {
+            var tracker = ((AccessorChunkTracker)ChunkTrackerHolder.get(this.level)).getChunkStatus();
+            //in theory the cache value could be wrong but is so soso unlikely and at worst means we either duplicate ingest a chunk
+            // which... could be bad ;-; or we dont ingest atall which is ok!
+            long key = ChunkPos.toLong(x, z);
+            if (key != this.cachedChunkPos) {
+                this.cachedChunkPos = key;
+                this.cachedChunkStatus = tracker.getOrDefault(key, 0);
+            }
+            if (this.cachedChunkStatus == 3) {//If this chunk still has surrounding chunks
+                var section = this.level.getChunk(x,z).getSection(y-this.bottomSectionY);
+                var lp = this.level.getLightingProvider();
+
+                var csp = ChunkSectionPos.from(x,y,z);
+                var blp = lp.get(LightType.BLOCK).getLightSection(csp);
+                var slp = lp.get(LightType.SKY).getLightSection(csp);
+
+                //Note: we dont do this check and just blindly ingest, it shouldbe ok :tm:
+                //if (blp != null || slp != null)
+                    VoxelIngestService.rawIngest(system.getEngine(), section, x,y,z, blp==null?null:blp.copy(), slp==null?null:slp.copy());
+            }
+        }
+
         //Do some very cheeky stuff for MiB
         if (VoxyCommon.IS_MINE_IN_ABYSS) {
             int sector = (x+512)>>10;
@@ -102,6 +136,8 @@ public class MixinRenderSectionManager {
         }
         long pos = ChunkSectionPos.asLong(x,y,z);
         if (wasBuilt) {//Remove
+            //TODO: on chunk remove do ingest if is surrounded by built chunks (or when the tracker says is ok)
+
             system.chunkBoundRenderer.removeSection(pos);
         } else {//Add
             system.chunkBoundRenderer.addSection(pos);
