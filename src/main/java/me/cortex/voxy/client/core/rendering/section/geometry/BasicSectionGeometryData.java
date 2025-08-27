@@ -22,10 +22,11 @@ public class BasicSectionGeometryData implements IGeometryData {
             throw new IllegalStateException();
         }
         long start = System.currentTimeMillis();
-        Logger.info("Creating and zeroing " + (geometryCapacity/(1024*1024)) + "MB geometry buffer");
+        String msg = "Creating and zeroing " + (geometryCapacity/(1024*1024)) + "MB geometry buffer";
         if (Capabilities.INSTANCE.canQueryGpuMemory) {
-            Logger.info("driver states " + (Capabilities.INSTANCE.getFreeDedicatedGpuMemory()/(1024*1024)) + "MB of free memory");
+            msg += " driver states " + (Capabilities.INSTANCE.getFreeDedicatedGpuMemory()/(1024*1024)) + "MB of free memory";
         }
+        Logger.info(msg);
         Logger.info("if your game crashes/exits here without any other log message, try manually decreasing the geometry capacity");
         this.geometryBuffer = new GlBuffer(geometryCapacity);
         long delta = System.currentTimeMillis() - start;
