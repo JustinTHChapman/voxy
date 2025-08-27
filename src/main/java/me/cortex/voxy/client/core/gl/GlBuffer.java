@@ -4,6 +4,7 @@ import me.cortex.voxy.common.util.TrackedObject;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.system.MemoryUtil;
 
+import static org.lwjgl.opengl.ARBSparseBuffer.GL_SPARSE_STORAGE_BIT_ARB;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL15.glDeleteBuffers;
 import static org.lwjgl.opengl.GL45C.*;
@@ -23,7 +24,9 @@ public class GlBuffer extends TrackedObject {
         this.id = glCreateBuffers();
         this.size = size;
         glNamedBufferStorage(this.id, size, flags);
-        this.zero();
+        if ((flags&GL_SPARSE_STORAGE_BIT_ARB)==0) {
+            this.zero();
+        }
 
         COUNT++;
         TOTAL_SIZE += size;

@@ -4,7 +4,9 @@ import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.common.Logger;
 
-import static org.lwjgl.opengl.GL11C.glFinish;
+import static org.lwjgl.opengl.ARBSparseBuffer.GL_SPARSE_STORAGE_BIT_ARB;
+import static org.lwjgl.opengl.ARBSparseBuffer.glNamedBufferPageCommitmentARB;
+import static org.lwjgl.opengl.GL11C.*;
 
 public class BasicSectionGeometryData implements IGeometryData {
     public static final int SECTION_METADATA_SIZE = 32;
@@ -28,7 +30,26 @@ public class BasicSectionGeometryData implements IGeometryData {
         }
         Logger.info(msg);
         Logger.info("if your game crashes/exits here without any other log message, try manually decreasing the geometry capacity");
-        this.geometryBuffer = new GlBuffer(geometryCapacity);
+        glGetError();//Clear any errors
+        var buffer = new GlBuffer(geometryCapacity);
+        int error = glGetError();
+        if (error != GL_NO_ERROR) {
+            if (error == GL_OUT_OF_MEMORY && Capabilities.INSTANCE.sparseBuffer) {
+                Logger.error("Failed to allocate geometry buffer, attempting workaround with sparse buffers");
+                buffer.free();
+                buffer = new GlBuffer(geometryCapacity, GL_SPARSE_STORAGE_BIT_ARB);
+                glNamedBufferPageCommitmentARB(buffer.id, 0, geometryCapacity, true);
+                buffer.zero();
+                error = glGetError();
+                if (error != GL_NO_ERROR) {
+                    buffer.free();
+                    throw new IllegalStateException("Unable to allocate geometry buffer using workaround, got gl error " + error);
+                }
+            } else {
+                throw new IllegalStateException("Unable to allocate geometry buffer, got gl error " + error);
+            }
+        }
+        this.geometryBuffer = buffer;
         long delta = System.currentTimeMillis() - start;
         Logger.info("Successfully allocated and zeroed the geometry buffer in " + delta + "ms");
     }

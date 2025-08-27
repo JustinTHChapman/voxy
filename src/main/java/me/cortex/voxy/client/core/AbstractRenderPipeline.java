@@ -98,6 +98,8 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         glBlitNamedFramebuffer(sourceFrameBuffer, targetFb, 0,0, width, height, 0,0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
         glBindFramebuffer(GL30.GL_FRAMEBUFFER, targetFb);
+        //GL11C.glClearStencil(1);
+        //GL11C.glClear(GL_STENCIL_BUFFER_BIT);
 
         //This whole thing is hell, we basicly want to create a mask stenicel/depth mask specificiclly
         // in theory we could do this in a single pass by passing in the depth buffer from the sourceFrambuffer

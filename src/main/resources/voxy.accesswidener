@@ -34,3 +34,5 @@ accessible method net/minecraft/client/world/ClientChunkManager$ClientChunkMap g
 accessible method net/minecraft/client/world/ClientChunkManager$ClientChunkMap getIndex (II)I
 
 accessible field net/minecraft/client/texture/SpriteAtlasTexture mipLevel I
+
+accessible method net/minecraft/client/texture/MipmapHelper blend (IIIIZ)I

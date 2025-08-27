@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.model;
 
 import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
+import net.minecraft.client.texture.MipmapHelper;
 
 //Texturing utils to manipulate data from the model bakery
 public class TextureUtils {
@@ -177,7 +178,11 @@ public class TextureUtils {
 
 
     public static int mipColours(int one, int two, int three, int four) {
-        return weightedAverageColor(weightedAverageColor(one, two), weightedAverageColor(three, four));
+        if (true) {
+            return MipmapHelper.blend(one, two, three, four, false);
+        } else {
+            return weightedAverageColor(weightedAverageColor(one, two), weightedAverageColor(three, four));
+        }
     }
 
     //TODO: FIXME!!! ITS READING IT AS ABGR??? isnt the format RGBA??

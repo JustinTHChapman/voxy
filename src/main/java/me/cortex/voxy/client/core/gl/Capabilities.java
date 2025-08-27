@@ -25,9 +25,11 @@ public class Capabilities {
     public final boolean indirectParameters;
     public final boolean isIntel;
     public final boolean subgroup;
+    public final boolean sparseBuffer;
 
     public Capabilities() {
         var cap = GL.getCapabilities();
+        this.sparseBuffer = cap.GL_ARB_sparse_buffer;
         this.compute = cap.glDispatchComputeIndirect != 0;
         this.indirectParameters = cap.glMultiDrawElementsIndirectCountARB != 0;
         this.repFragTest = cap.GL_NV_representative_fragment_test;
