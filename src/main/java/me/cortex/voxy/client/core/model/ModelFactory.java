@@ -273,12 +273,6 @@ public class ModelFactory {
 
         int checkMode = blockRenderLayer==BlockRenderLayer.SOLID?TextureUtils.WRITE_CHECK_STENCIL:TextureUtils.WRITE_CHECK_ALPHA;
 
-        if (Capabilities.INSTANCE.isMesa) {
-            //Mesa does not work with GL_DEPTH_STENCIL_TEXTURE_MODE GL_STENCIL_INDEX
-            // the sampler in the compute shader always reads zero even when stencil is guarenteed not to be zero
-            // (e.g. clearing with stencil 10)
-            checkMode = TextureUtils.WRITE_CHECK_ALPHA;
-        }
 
         var colourProvider = getColourProvider(blockState.getBlock());
 

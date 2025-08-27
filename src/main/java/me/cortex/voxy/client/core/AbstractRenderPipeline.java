@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core;
 
 import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.TimingStatistics;
+import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.hierachical.AsyncNodeManager;
@@ -93,13 +94,16 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     }
 
     protected void initDepthStencil(int sourceFrameBuffer, int targetFb, int width, int height) {
-
         glClearNamedFramebufferfi(targetFb, GL_DEPTH_STENCIL, 0, 1.0f, 1);
         glBlitNamedFramebuffer(sourceFrameBuffer, targetFb, 0,0, width, height, 0,0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
         glBindFramebuffer(GL30.GL_FRAMEBUFFER, targetFb);
-        //GL11C.glClearStencil(1);
-        //GL11C.glClear(GL_STENCIL_BUFFER_BIT);
+
+        /*
+        if (Capabilities.INSTANCE.isMesa){
+            glClearStencil(1);
+            glClear(GL_STENCIL_BUFFER_BIT);
+        }*/
 
         //This whole thing is hell, we basicly want to create a mask stenicel/depth mask specificiclly
         // in theory we could do this in a single pass by passing in the depth buffer from the sourceFrambuffer

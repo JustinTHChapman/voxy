@@ -42,6 +42,8 @@ public class GlViewCapture {
         this.framebuffer = new GlFramebuffer().bind(GL_COLOR_ATTACHMENT0, this.colourTex).bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthTex).verify().name("ModelFramebuffer");
 
         glTextureParameteri(this.stencilTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
+        glTextureParameteri(this.stencilTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTextureParameteri(this.stencilTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
         this.copyOutShader = Shader.makeAuto()
                 .define("WIDTH", width)

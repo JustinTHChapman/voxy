@@ -18,6 +18,7 @@ import java.util.Arrays;
 
 public class RenderDataFactory {
     private static final boolean CHECK_NEIGHBOR_FACE_OCCLUSION = true;
+    private static final boolean DISABLE_CULL_SAME_OCCLUDES = true;
 
     private static final boolean VERIFY_MESHING = VoxyCommon.isVerificationFlagOn("verifyMeshing");
 
@@ -340,7 +341,7 @@ public class RenderDataFactory {
     private static final long LM = (0xFFL<<55);
 
     private static boolean shouldMeshNonOpaqueBlockFace(int face, long quad, long meta, long neighborQuad, long neighborMeta) {
-        if (((quad^neighborQuad)&(0xFFFFL<<26))==0) return false;//This is a hack, if the neigbor and this are the same, dont mesh the face
+        if (((quad^neighborQuad)&(0xFFFFL<<26))==0 && ((!DISABLE_CULL_SAME_OCCLUDES) || ModelQueries.faceOccludes(meta, face))) return false;//This is a hack, if the neigbor and this are the same, dont mesh the face// TODO: FIXME
         if (!ModelQueries.faceExists(meta, face)) return false;//Dont mesh if no face
         //if (ModelQueries.faceCanBeOccluded(meta, face)) //TODO: maybe enable this
             if (ModelQueries.faceOccludes(neighborMeta, face^1)) return false;
@@ -752,7 +753,7 @@ public class RenderDataFactory {
                         //Check and test if can cull W.R.T neighbor
                         if (Mapper.getBlockId(neighborId) != 0) {//Not air
                             int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
-                            if (modelId == ((A>>26)&0xFFFF)) {
+                            if (modelId == ((A>>26)&0xFFFF)) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
                                 fail = true;
                             } else {
                                 long meta = this.modelMan.getModelMetadataFromClientId(modelId);
@@ -766,7 +767,7 @@ public class RenderDataFactory {
                         long nA = this.sectionData[(idx+skipAmount) * 2];
                         long nB = this.sectionData[(idx+skipAmount) * 2 + 1];
                         boolean failB = false;
-                        if ((nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {
+                        if ((nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
                             failB = true;
                         } else {
                             if (ModelQueries.faceOccludes(nB, (axis << 1) | (side))) {
