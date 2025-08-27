@@ -29,7 +29,11 @@ public class MixinWorld implements IWorldGetIdentifier {
                                        long seed,
                                        int maxChainedNeighborUpdates,
                                        CallbackInfo ci) {
-        this.identifier = new WorldIdentifier(key, seed, dimensionEntry.getKey().orElse(null));
+        if (key != null) {
+            this.identifier = new WorldIdentifier(key, seed, dimensionEntry == null?null:dimensionEntry.getKey().orElse(null));
+        } else {
+            this.identifier = null;
+        }
     }
 
     @Override

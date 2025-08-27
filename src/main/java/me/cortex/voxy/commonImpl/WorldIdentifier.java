@@ -6,6 +6,7 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import net.minecraft.world.dimension.DimensionType;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
@@ -21,7 +22,10 @@ public class WorldIdentifier {
     private final transient long hashCode;
     @Nullable transient WeakReference<WorldEngine> cachedEngineObject;
 
-    public WorldIdentifier(RegistryKey<World> key, long biomeSeed, @Nullable RegistryKey<DimensionType> dimension) {
+    public WorldIdentifier(@NotNull RegistryKey<World> key, long biomeSeed, @Nullable RegistryKey<DimensionType> dimension) {
+        if (key == null) {
+            throw new IllegalStateException("Key cannot be null");
+        }
         dimension = dimension==null?NULL_DIM_KEY:dimension;
         this.key = key;
         this.biomeSeed = biomeSeed;
