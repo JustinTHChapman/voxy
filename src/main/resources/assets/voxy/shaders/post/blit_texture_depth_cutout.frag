@@ -44,7 +44,7 @@ void main() {
     }
     #ifdef USE_ENV_FOG
     {
-        float fogLerp = max(fma(min(length(point.xyz), endParams.x),endParams.y,endParams.z),0);//512 is 32*16 which is the render distance in blocks
+        float fogLerp = clamp(fma(min(length(point.xyz), endParams.x),endParams.y,endParams.z),0,1);//512 is 32*16 which is the render distance in blocks
         colour.rgb = mix(colour.rgb, fogColour, fogLerp);
     }
     #endif
