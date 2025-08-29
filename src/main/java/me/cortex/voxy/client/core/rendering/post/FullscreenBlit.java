@@ -2,11 +2,13 @@ package me.cortex.voxy.client.core.rendering.post;
 
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 
 import java.util.function.Function;
 
-import static org.lwjgl.opengl.GL11C.GL_TRIANGLES;
-import static org.lwjgl.opengl.GL11C.glDrawArrays;
+import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL15C.GL_ELEMENT_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15C.glBindBuffer;
 import static org.lwjgl.opengl.GL30C.glBindVertexArray;
 import static org.lwjgl.opengl.GL45C.glCreateVertexArrays;
 
@@ -40,7 +42,8 @@ public class FullscreenBlit {
     public void blit() {
         glBindVertexArray(EMPTY_VAO);
         this.shader.bind();
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BYTE.id());
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
         glBindVertexArray(0);
     }
 
