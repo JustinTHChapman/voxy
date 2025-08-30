@@ -26,6 +26,7 @@ public class Capabilities {
     public final boolean isIntel;
     public final boolean subgroup;
     public final boolean sparseBuffer;
+    public final boolean isNvidia;
 
     public Capabilities() {
         var cap = GL.getCapabilities();
@@ -63,6 +64,7 @@ public class Capabilities {
 
         this.isMesa = glGetString(GL_VERSION).toLowerCase().contains("mesa");
         this.isIntel = glGetString(GL_VENDOR).toLowerCase().contains("intel");
+        this.isNvidia = glGetString(GL_VENDOR).toLowerCase().contains("nvidia");
 
         if (this.canQueryGpuMemory) {
             this.totalDedicatedMemory = glGetInteger64(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX)*1024;//Since its in Kb

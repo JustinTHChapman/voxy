@@ -3,10 +3,12 @@ package me.cortex.voxy.client.core.rendering.section.geometry;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.util.ThreadUtils;
 
-import static org.lwjgl.opengl.ARBSparseBuffer.GL_SPARSE_STORAGE_BIT_ARB;
-import static org.lwjgl.opengl.ARBSparseBuffer.glNamedBufferPageCommitmentARB;
+import static org.lwjgl.opengl.ARBSparseBuffer.*;
 import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL15C.GL_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15C.glBindBuffer;
 
 public class BasicSectionGeometryData implements IGeometryData {
     public static final int SECTION_METADATA_SIZE = 32;
@@ -31,14 +33,23 @@ public class BasicSectionGeometryData implements IGeometryData {
         Logger.info(msg);
         Logger.info("if your game crashes/exits here without any other log message, try manually decreasing the geometry capacity");
         glGetError();//Clear any errors
-        var buffer = new GlBuffer(geometryCapacity);
+        GlBuffer buffer = null;
+        if (!(Capabilities.INSTANCE.isNvidia && ThreadUtils.isWindows)) {
+            buffer = new GlBuffer(geometryCapacity);//Only do this if we are not on nvidia
+        } else {
+            Logger.info("Running on windows nvidia, using workaround sparse buffer allocation");
+        }
         int error = glGetError();
-        if (error != GL_NO_ERROR) {
-            if (error == GL_OUT_OF_MEMORY && Capabilities.INSTANCE.sparseBuffer) {
-                Logger.error("Failed to allocate geometry buffer, attempting workaround with sparse buffers");
-                buffer.free();
+        if (error != GL_NO_ERROR || buffer == null) {
+            if ((buffer == null || error == GL_OUT_OF_MEMORY) && Capabilities.INSTANCE.sparseBuffer) {
+                if (buffer != null) {
+                    Logger.error("Failed to allocate geometry buffer, attempting workaround with sparse buffers");
+                    buffer.free();
+                }
                 buffer = new GlBuffer(geometryCapacity, GL_SPARSE_STORAGE_BIT_ARB);
-                glNamedBufferPageCommitmentARB(buffer.id, 0, geometryCapacity, true);
+                glBindBuffer(GL_ARRAY_BUFFER, buffer.id);
+                glBufferPageCommitmentARB(GL_ARRAY_BUFFER, 0, geometryCapacity, true);
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
                 buffer.zero();
                 error = glGetError();
                 if (error != GL_NO_ERROR) {
