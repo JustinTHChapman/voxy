@@ -36,6 +36,8 @@ public class BasicSectionGeometryData implements IGeometryData {
         GlBuffer buffer = null;
         if (!(Capabilities.INSTANCE.isNvidia && ThreadUtils.isWindows)) {
             buffer = new GlBuffer(geometryCapacity);//Only do this if we are not on nvidia
+            //TODO: FIXME: TEST, see if the issue is that we are trying to zero the entire buffer, try only zeroing increments
+            // or dont zero it at all
         } else {
             Logger.info("Running on windows nvidia, using workaround sparse buffer allocation");
         }
