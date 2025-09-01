@@ -130,11 +130,13 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
 
     @Override
     protected void finish(Viewport<?> viewport, int sourceFrameBuffer) {
-        glColorMask(false, false, false, false);
-        AbstractRenderPipeline.transformBlitDepth(this.depthBlit,
-                this.fbTranslucent.getDepthTex().id, sourceFrameBuffer,
-                viewport, new Matrix4f(viewport.vanillaProjection).mul(viewport.modelView));
-        glColorMask(true, true, true, true);
+        if (this.data.renderToVanillaDepth) {
+            glColorMask(false, false, false, false);
+            AbstractRenderPipeline.transformBlitDepth(this.depthBlit,
+                    this.fbTranslucent.getDepthTex().id, sourceFrameBuffer,
+                    viewport, new Matrix4f(viewport.vanillaProjection).mul(viewport.modelView));
+            glColorMask(true, true, true, true);
+        }
     }
 
 
