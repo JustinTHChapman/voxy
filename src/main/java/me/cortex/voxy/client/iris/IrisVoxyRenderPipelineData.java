@@ -313,7 +313,8 @@ public class IrisVoxyRenderPipelineData {
 
     }
     private static ImageSet createImageSet(IrisRenderingPipeline ipipe, IrisShaderPatch patch) {
-        Set<String> samplerNameSet = new LinkedHashSet<>(List.of(patch.getSamplerList()));
+        var samplerDataSet = patch.getSamplerSet();
+        Set<String> samplerNameSet = new LinkedHashSet<>(samplerDataSet.keySet());
         if (samplerNameSet.isEmpty()) return null;
         Set<TextureWSampler> samplerSet = new LinkedHashSet<>();
         SamplerHolder samplerBuilder = new SamplerHolder() {
@@ -389,11 +390,7 @@ public class IrisVoxyRenderPipelineData {
         for (var entry : samplerSet) {
             samplers[i]=entry;
 
-            String samplerType = "sampler2D";
-            if (entry.name.startsWith("shadowtex")) {
-                samplerType = "sampler2DShadow";
-            }
-
+            String samplerType = samplerDataSet.get(entry.name);
             builder.append("layout(binding=(BASE_SAMPLER_BINDING_INDEX+").append(i).append(")) uniform ").append(samplerType).append(" ").append(entry.name).append(";\n");
             i++;
         }

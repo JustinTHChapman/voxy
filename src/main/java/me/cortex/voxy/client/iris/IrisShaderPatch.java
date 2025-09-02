@@ -5,6 +5,8 @@ import com.google.gson.annotations.JsonAdapter;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
@@ -32,6 +34,40 @@ public class IrisShaderPatch {
             try {
                 for (var entry : json.getAsJsonObject().entrySet()) {
                     ret.put(Integer.parseInt(entry.getKey()), entry.getValue().getAsString());
+                }
+            } catch (Exception e) {
+                Logger.error(e);
+            }
+            return ret;
+        }
+    }
+    private static final class SamplerDeserializer implements JsonDeserializer<Object2ObjectLinkedOpenHashMap<String, String>> {
+        @Override
+        public Object2ObjectLinkedOpenHashMap<String, String> deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+            Object2ObjectLinkedOpenHashMap<String, String> ret = new Object2ObjectLinkedOpenHashMap<>();
+            if (json==null) return null;
+            try {
+                if (json.isJsonArray()) {
+                    for (var entry : json.getAsJsonArray()) {
+                        var name = entry.getAsString();
+                        var type = "sampler2D";
+                        if (name.matches("shadowtex")) {
+                            type = "sampler2DShadow";
+                        }
+                        ret.put(name, type);
+                    }
+                } else {
+                    for (var entry : json.getAsJsonObject().entrySet()) {
+                        String type = "sampler2D";
+                        if (entry.getValue().isJsonNull()) {
+                            if (entry.getKey().matches("shadowtex")) {
+                                type = "sampler2DShadow";
+                            }
+                        } else {
+                            type = entry.getValue().getAsString();
+                        }
+                        ret.put(entry.getKey(), type);
+                    }
                 }
             } catch (Exception e) {
                 Logger.error(e);
@@ -110,7 +146,8 @@ public class IrisShaderPatch {
         public int[] opaqueDrawBuffers;
         public int[] translucentDrawBuffers;
         public String[] uniforms;
-        public String[] samplers;
+        @JsonAdapter(SamplerDeserializer.class)
+        public Object2ObjectLinkedOpenHashMap<String, String> samplers;
         public String[] opaquePatchData;
         public String[] translucentPatchData;
         @JsonAdapter(SSBODeserializer.class)
@@ -151,7 +188,7 @@ public class IrisShaderPatch {
     public String[] getUniformList() {
         return this.patchData.uniforms;
     }
-    public String[] getSamplerList() {
+    public Object2ObjectLinkedOpenHashMap<String, String> getSamplerSet() {
         return this.patchData.samplers;
     }
 
