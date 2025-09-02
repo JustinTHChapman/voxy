@@ -119,7 +119,7 @@ void main() {
     gl_Position = MVP*vec4(pointPos, 1.0);
 
     //Apply taa shift
-    gl_Position.xy *= taaShift()*gl_Position.w;
+    gl_Position.xy += taaShift()*gl_Position.w;
 
 
 
