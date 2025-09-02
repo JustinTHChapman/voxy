@@ -158,6 +158,10 @@ public class Mapper {
 
     }
 
+    public final int getBlockStateCount() {
+        return this.blockId2stateEntry.size();
+    }
+
     private StateEntry registerNewBlockState(BlockState state) {
         this.blockLock.lock();
         var entry = this.block2stateEntry.get(state);

@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.model;
 
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.registry.RegistryKeys;
@@ -23,11 +24,13 @@ public class ModelBakerySubsystem {
 
     private final ModelStore storage = new ModelStore();
     public final ModelFactory factory;
+    private final Mapper mapper;
     private final AtomicInteger blockIdCount = new AtomicInteger();
     private final ConcurrentLinkedDeque<Integer> blockIdQueue = new ConcurrentLinkedDeque<>();//TODO: replace with custom DS
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeQueue = new ConcurrentLinkedDeque<>();
 
     public ModelBakerySubsystem(Mapper mapper) {
+        this.mapper = mapper;
         this.factory = new ModelFactory(mapper, this.storage);
     }
 
@@ -102,8 +105,12 @@ public class ModelBakerySubsystem {
 
     //This is on this side only and done like this as only worker threads call this code
     private final ReentrantLock seenIdsLock = new ReentrantLock();
-    private final IntOpenHashSet seenIds = new IntOpenHashSet(6000);
+    private final IntOpenHashSet seenIds = new IntOpenHashSet(6000);//TODO: move to a lock free concurrent hashmap
     public void requestBlockBake(int blockId) {
+        if (this.mapper.getBlockStateCount() < blockId) {
+            Logger.error("Error, got bakeing request for out of range state id. StateId: " + blockId + " max id: " + this.mapper.getBlockStateCount(), new Exception());
+            return;
+        }
         this.seenIdsLock.lock();
         if (!this.seenIds.add(blockId)) {
             this.seenIdsLock.unlock();
