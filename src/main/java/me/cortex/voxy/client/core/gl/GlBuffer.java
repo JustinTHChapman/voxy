@@ -19,12 +19,19 @@ public class GlBuffer extends TrackedObject {
     public GlBuffer(long size) {
         this(size, 0);
     }
+    public GlBuffer(long size, boolean zero) {
+        this(size, 0, zero);
+    }
 
     public GlBuffer(long size, int flags) {
+        this(size, flags, true);
+    }
+
+    public GlBuffer(long size, int flags, boolean zero) {
         this.id = glCreateBuffers();
         this.size = size;
         glNamedBufferStorage(this.id, size, flags);
-        if ((flags&GL_SPARSE_STORAGE_BIT_ARB)==0) {
+        if ((flags&GL_SPARSE_STORAGE_BIT_ARB)==0 && zero) {
             this.zero();
         }
 
