@@ -47,6 +47,7 @@ public class IrisVoxyRenderPipelineData {
     private final ImageSet imageSet;
     private final SSBOSet ssboSet;
     public final boolean renderToVanillaDepth;
+    private final String TAA;
     private IrisVoxyRenderPipelineData(IrisShaderPatch patch, int[] opaqueDrawTargets, int[] translucentDrawTargets, StructLayout uniformSet, Runnable blendingSetup, ImageSet imageSet, SSBOSet ssboSet) {
         this.opaqueDrawTargets = opaqueDrawTargets;
         this.translucentDrawTargets = translucentDrawTargets;
@@ -57,6 +58,7 @@ public class IrisVoxyRenderPipelineData {
         this.imageSet = imageSet;
         this.ssboSet = ssboSet;
         this.renderToVanillaDepth = patch.emitToVanillaDepth();
+        this.TAA = patch.getTAAShift();
     }
 
     public SSBOSet getSsboSet() {
@@ -105,6 +107,10 @@ public class IrisVoxyRenderPipelineData {
             targetTextures[i] = textureId;
         }
         return targetTextures;
+    }
+
+    public String getTAAOffset() {
+        return this.TAA;
     }
 
     public record StructLayout(int size, String layout, LongConsumer updater) {}

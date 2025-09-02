@@ -80,6 +80,8 @@ ivec3 extractLoDPosition(uvec2 encPos) {
 }
 
 
+vec2 taaShift();
+
 //TODO: add a mechanism so that some quads can ignore backface culling
 // this would help alot with stuff like crops as they would look kinda weird i think,
 // same with flowers etc
@@ -115,6 +117,9 @@ void main() {
     vec3 origin = vec3(((extractLoDPosition(encPos)<<lodLevel) - baseSectionPos)<<5);
     vec3 pointPos = (cornerPos+swizzelDataAxis(face>>1,vec3(cQuadSize,0)))*(1<<lodLevel)+origin;
     gl_Position = MVP*vec4(pointPos, 1.0);
+
+    //Apply taa shift
+    gl_Position.xy *= taaShift()*gl_Position.w;
 
 
 
@@ -183,3 +188,7 @@ void main() {
     quadDebug = lodLevel;
     #endif
 }
+
+#ifndef TAA_PATCH
+vec2 taaShift() {return vec2(0.0);}
+#endif

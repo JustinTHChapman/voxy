@@ -200,6 +200,11 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     public abstract void setupAndBindTranslucent(Viewport<?> viewport);
 
 
+    //null means no function, otherwise return the taa injection function
+    public String taaFunction(AbstractSectionRenderer<?,?> renderer, String functionName) {
+        return null;
+    }
+
     //null means dont transform the shader
     public String patchOpaqueShader(AbstractSectionRenderer<?,?> renderer, String input) {
         return null;

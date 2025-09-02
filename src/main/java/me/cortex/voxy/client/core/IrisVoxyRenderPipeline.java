@@ -172,12 +172,13 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         super.addDebug(debug);
     }
 
+    private static final int UNIFORM_BINDING_POINT = 5;//TODO make ths binding point... not randomly 5
+
     private StringBuilder buildGenericShaderHeader(AbstractSectionRenderer<?, ?> renderer, String input) {
         StringBuilder builder = new StringBuilder(input).append("\n\n\n");
 
         if (this.data.getUniforms() != null) {
-            //TODO make ths binding point... not randomly 5
-            builder.append("layout(binding = 5, std140) uniform ShaderUniformBindings ")
+            builder.append("layout(binding = "+UNIFORM_BINDING_POINT+", std140) uniform ShaderUniformBindings ")
                     .append(this.data.getUniforms().layout())
                     .append(";\n\n");
         }
@@ -195,6 +196,8 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         return builder.append("\n\n");
     }
 
+
+
     @Override
     public String patchOpaqueShader(AbstractSectionRenderer<?, ?> renderer, String input) {
         var builder = this.buildGenericShaderHeader(renderer, input);
@@ -210,6 +213,22 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
 
         var builder = this.buildGenericShaderHeader(renderer, input);
         builder.append(this.data.translucentFragPatch());
+        return builder.toString();
+    }
+
+    @Override
+    public String taaFunction(AbstractSectionRenderer<?, ?> renderer, String functionName) {
+        var builder = new StringBuilder();
+
+        if (this.data.getUniforms() != null) {
+            builder.append("layout(binding = "+UNIFORM_BINDING_POINT+", std140) uniform ShaderUniformBindings ")
+                    .append(this.data.getUniforms().layout())
+                    .append(";\n\n");
+        }
+
+        builder.append("vec2 ").append(functionName).append("()\n");
+        builder.append(this.data.getTAAOffset());
+        builder.append("\n");
         return builder.toString();
     }
 }

@@ -72,7 +72,7 @@ public class ModelTextureBakery {
                 var quads = part.getQuads(direction);
                 for (var quad : quads) {
                     //TODO: add meta specifiying quad has a tint
-
+                    //quad.hasTint()
                     this.vc.quad(quad, meta);
                 }
             }
@@ -145,7 +145,7 @@ public class ModelTextureBakery {
             public int getBottomY() {
                 return 0;
             }
-        }, this.vc, state, state.getFluidState());
+        }, this.    vc, state, state.getFluidState());
         this.vc.setDefaultMeta(0);//Reset default meta
     }
 

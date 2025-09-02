@@ -154,6 +154,7 @@ public class IrisShaderPatch {
         public Int2ObjectOpenHashMap<String> ssbos;
         @JsonAdapter(BlendStateDeserializer.class)
         public Int2ObjectOpenHashMap<BlendState> blending;
+        public String taaOffset;
         public boolean excludeLodsFromVanillaDepth;
         public boolean checkValid() {
             return this.opaqueDrawBuffers != null && this.translucentDrawBuffers != null && this.uniforms != null && this.opaquePatchData != null;
@@ -184,6 +185,9 @@ public class IrisShaderPatch {
     }
     public String getPatchTranslucentSource() {
         return this.patchData.translucentPatchData!=null?String.join("\n", this.patchData.translucentPatchData):null;
+    }
+    public String getTAAShift() {
+        return this.patchData.taaOffset == null?"{return vec2(0.0);}":this.patchData.taaOffset;
     }
     public String[] getUniformList() {
         return this.patchData.uniforms;
