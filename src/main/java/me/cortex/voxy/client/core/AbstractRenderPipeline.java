@@ -69,15 +69,15 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         this.sectionRenderer = sectionRenderer;
     }
 
-    protected abstract int setup(Viewport<?> viewport, int sourceFramebuffer);
+    protected abstract int setup(Viewport<?> viewport, int sourceFramebuffer, int srcWidth, int srcHeight);
     protected abstract void postOpaquePreTranslucent(Viewport<?> viewport);
-    protected void finish(Viewport<?> viewport, int sourceFrameBuffer) {
+    protected void finish(Viewport<?> viewport, int sourceFrameBuffer, int srcWidth, int srcHeight) {
         glDisable(GL_STENCIL_TEST);
         glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);
     }
 
-    public void runPipeline(Viewport<?> viewport, int sourceFrameBuffer) {
-        int depthTexture = this.setup(viewport, sourceFrameBuffer);
+    public void runPipeline(Viewport<?> viewport, int sourceFrameBuffer, int srcWidth, int srcHeight) {
+        int depthTexture = this.setup(viewport, sourceFrameBuffer, srcWidth, srcHeight);
 
         var rs = ((AbstractSectionRenderer)this.sectionRenderer);
         rs.renderOpaque(viewport);
@@ -89,13 +89,13 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
         rs.renderTranslucent(viewport);
 
-        this.finish(viewport, sourceFrameBuffer);
+        this.finish(viewport, sourceFrameBuffer, srcWidth, srcHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);
     }
 
-    protected void initDepthStencil(int sourceFrameBuffer, int targetFb, int width, int height) {
+    protected void initDepthStencil(int sourceFrameBuffer, int targetFb, int srcWidth, int srcHeight, int width, int height) {
         glClearNamedFramebufferfi(targetFb, GL_DEPTH_STENCIL, 0, 1.0f, 1);
-        glBlitNamedFramebuffer(sourceFrameBuffer, targetFb, 0,0, width, height, 0,0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        glBlitNamedFramebuffer(sourceFrameBuffer, targetFb, 0,0, srcWidth, srcHeight, 0,0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
         glBindFramebuffer(GL30.GL_FRAMEBUFFER, targetFb);
 

@@ -90,7 +90,7 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     }
 
     @Override
-    protected int setup(Viewport<?> viewport, int sourceFramebuffer) {
+    protected int setup(Viewport<?> viewport, int sourceFramebuffer, int srcWidth, int srcHeight) {
         if (this.shaderUniforms != null) {
             //Update the uniforms
             long ptr = UploadStream.INSTANCE.uploadTo(this.shaderUniforms);
@@ -109,7 +109,7 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
             glClear(GL_COLOR_BUFFER_BIT);
         }
 
-        this.initDepthStencil(sourceFramebuffer, this.fb.framebuffer.id, viewport.width, viewport.height);
+        this.initDepthStencil(sourceFramebuffer, this.fb.framebuffer.id, srcWidth, srcHeight, viewport.width, viewport.height);
         return this.fb.getDepthTex().id;
     }
 
@@ -129,8 +129,8 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     }
 
     @Override
-    protected void finish(Viewport<?> viewport, int sourceFrameBuffer) {
-        if (this.data.renderToVanillaDepth) {
+    protected void finish(Viewport<?> viewport, int sourceFrameBuffer, int srcWidth, int srcHeight) {
+        if (this.data.renderToVanillaDepth && srcWidth == viewport.width  && srcHeight == viewport.height) {//We can only depthblit out if destination size is the same
             glColorMask(false, false, false, false);
             AbstractRenderPipeline.transformBlitDepth(this.depthBlit,
                     this.fbTranslucent.getDepthTex().id, sourceFrameBuffer,

@@ -205,6 +205,9 @@ public class VoxyRenderSystem {
         int oldFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         int boundFB = oldFB;
 
+        int[] dims = new int[4];
+        glGetIntegerv(GL_VIEWPORT, dims);
+
         //var target = DefaultTerrainRenderPasses.CUTOUT.getTarget();
         //boundFB = ((net.minecraft.client.texture.GlTexture) target.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getFramebufferManager(), target.getDepthAttachment());
         if (boundFB == 0) {
@@ -224,7 +227,7 @@ public class VoxyRenderSystem {
 
 
         //The entire rendering pipeline (excluding the chunkbound thing)
-        this.pipeline.runPipeline(viewport, boundFB);
+        this.pipeline.runPipeline(viewport, boundFB, dims[2], dims[3]);
 
 
         TimingStatistics.main.stop();
