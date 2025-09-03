@@ -418,6 +418,7 @@ public class IrisVoxyRenderPipelineData {
     public record SSBOSet(String layout, IntConsumer bindingFunction){}
     private record SSBOBinding(int irisIndex, int bindingOffset) {}
     private static SSBOSet createSSBOLayouts(Int2ObjectMap<String> ssbos, ShaderStorageBufferHolder ssboStore) {
+        if (ssboStore == null) return null;//If there is no store, there cannot be any ssbos
         if (ssbos.isEmpty()) return null;
         String header = "";
         if (ssbos.containsKey(-1)) header = ssbos.remove(-1);
