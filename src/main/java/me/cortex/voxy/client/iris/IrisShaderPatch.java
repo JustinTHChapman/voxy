@@ -156,6 +156,7 @@ public class IrisShaderPatch {
         public Int2ObjectOpenHashMap<BlendState> blending;
         public String taaOffset;
         public boolean excludeLodsFromVanillaDepth;
+        public float[] renderScale;
         public boolean checkValid() {
             return this.opaqueDrawBuffers != null && this.translucentDrawBuffers != null && this.uniforms != null && this.opaquePatchData != null;
         }
@@ -207,6 +208,16 @@ public class IrisShaderPatch {
 
     public boolean emitToVanillaDepth() {
         return !this.patchData.excludeLodsFromVanillaDepth;
+    }
+
+    public float[] getRenderScale() {
+        if (this.patchData.renderScale == null || this.patchData.renderScale.length==0) {
+            return new float[]{1,1};
+        }
+        if (this.patchData.renderScale.length == 1) {
+            return new float[]{this.patchData.renderScale[0],this.patchData.renderScale[0]};
+        }
+        return new float[]{Math.max(0.01f,this.patchData.renderScale[0]),Math.max(0.01f,this.patchData.renderScale[1])};
     }
 
     public Runnable createBlendSetup() {

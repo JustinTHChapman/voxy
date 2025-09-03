@@ -174,6 +174,14 @@ public class VoxyRenderSystem {
         int width = dims[2];
         int height = dims[3];
 
+        {//Apply render scaling factor
+            var factor = this.pipeline.getRenderScalingFactor();
+            if (factor != null) {
+                width = (int) (width*factor[0]);
+                height = (int) (height*factor[1]);
+            }
+        }
+
         viewport
                 .setVanillaProjection(matrices.projection())
                 .setProjection(projection)

@@ -215,4 +215,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         return null;
     }
 
+    //Null means no scaling factor
+    public float[] getRenderScalingFactor() {return null;}
+
 }

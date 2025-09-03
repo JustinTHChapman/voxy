@@ -227,8 +227,13 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         }
 
         builder.append("vec2 ").append(functionName).append("()\n");
-        builder.append(this.data.getTAAOffset());
+        builder.append(this.data.TAA);
         builder.append("\n");
         return builder.toString();
+    }
+
+    @Override
+    public float[] getRenderScalingFactor() {
+        return this.data.resolutionScale;
     }
 }
