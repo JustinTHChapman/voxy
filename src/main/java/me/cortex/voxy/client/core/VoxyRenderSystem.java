@@ -151,7 +151,8 @@ public class VoxyRenderSystem {
 
 
     public Viewport<?> setupViewport(ChunkRenderMatrices matrices, FogParameters fogParameters, double cameraX, double cameraY, double cameraZ) {
-        if (IrisUtil.irisShadowActive()) {
+        var viewport = this.getViewport();
+        if (viewport == null) {
             return null;
         }
 
@@ -170,7 +171,6 @@ public class VoxyRenderSystem {
         int[] dims = new int[4];
         glGetIntegerv(GL_VIEWPORT, dims);
 
-        var viewport = this.getViewport();
         viewport
                 .setVanillaProjection(matrices.projection())
                 .setProjection(projection)
@@ -354,6 +354,9 @@ public class VoxyRenderSystem {
     }
 
     public Viewport<?> getViewport() {
+        if (IrisUtil.irisShadowActive()) {
+            return null;
+        }
         return this.viewportSelector.getViewport();
     }
 

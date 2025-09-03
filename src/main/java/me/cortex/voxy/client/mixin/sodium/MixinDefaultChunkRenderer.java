@@ -1,6 +1,8 @@
 package me.cortex.voxy.client.mixin.sodium;
 
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
+import me.cortex.voxy.client.core.rendering.Viewport;
+import me.cortex.voxy.client.core.util.IrisUtil;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.caffeinemc.mods.sodium.client.render.chunk.DefaultChunkRenderer;
@@ -23,7 +25,13 @@ public class MixinDefaultChunkRenderer {
         if (renderPass == DefaultTerrainRenderPasses.CUTOUT) {
             var renderer = ((IGetVoxyRenderSystem) MinecraftClient.getInstance().worldRenderer).getVoxyRenderSystem();
             if (renderer != null) {
-                renderer.renderOpaque(renderer.setupViewport(matrices, fogParameters, camera.x, camera.y, camera.z));
+                Viewport<?> viewport = null;
+                if (IrisUtil.irisShaderPackEnabled()) {
+                    viewport = renderer.getViewport();
+                } else {
+                    viewport = renderer.setupViewport(matrices, fogParameters, camera.x, camera.y, camera.z);
+                }
+                renderer.renderOpaque(viewport);
             }
         }
     }
