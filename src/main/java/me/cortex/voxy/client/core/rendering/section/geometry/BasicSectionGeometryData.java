@@ -64,7 +64,7 @@ public class BasicSectionGeometryData implements IGeometryData {
         }
         this.geometryBuffer = buffer;
         long delta = System.currentTimeMillis() - start;
-        Logger.info("Successfully allocated and zeroed the geometry buffer in " + delta + "ms");
+        Logger.info("Successfully allocated the geometry buffer in " + delta + "ms");
     }
 
     public GlBuffer getGeometryBuffer() {
