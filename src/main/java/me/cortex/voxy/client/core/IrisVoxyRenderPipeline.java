@@ -109,6 +109,10 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
             glClear(GL_COLOR_BUFFER_BIT);
         }
 
+        if (this.data.useViewportDims) {
+            srcWidth = viewport.width;
+            srcHeight = viewport.height;
+        }
         this.initDepthStencil(sourceFramebuffer, this.fb.framebuffer.id, srcWidth, srcHeight, viewport.width, viewport.height);
         return this.fb.getDepthTex().id;
     }
