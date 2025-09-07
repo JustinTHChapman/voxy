@@ -293,7 +293,7 @@ public class IrisShaderPatch {
                 voxyPatchData = builder.toString();
             }
             patchData = GSON.fromJson(voxyPatchData, PatchGson.class);
-            if (patchData != null) {
+            if (patchData == null) {
                 throw new IllegalStateException("voxy json patch not valid: " + voxyPatchData);
             }
 
