@@ -149,8 +149,8 @@ public class IrisShaderPatch {
         public String[] uniforms;
         @JsonAdapter(SamplerDeserializer.class)
         public Object2ObjectLinkedOpenHashMap<String, String> samplers;
-        public String[] opaquePatchData;
-        public String[] translucentPatchData;
+        public String opaquePatchData;
+        public String translucentPatchData;
         @JsonAdapter(SSBODeserializer.class)
         public Int2ObjectOpenHashMap<String> ssbos;
         @JsonAdapter(BlendStateDeserializer.class)
@@ -188,10 +188,10 @@ public class IrisShaderPatch {
         return new Int2ObjectLinkedOpenHashMap<>(this.ssbos);
     }
     public String getPatchOpaqueSource() {
-        return String.join("\n", this.patchData.opaquePatchData);
+        return this.patchData.opaquePatchData;
     }
     public String getPatchTranslucentSource() {
-        return this.patchData.translucentPatchData!=null?String.join("\n", this.patchData.translucentPatchData):null;
+        return this.patchData.translucentPatchData;
     }
     public String getTAAShift() {
         return this.patchData.taaOffset == null?"{return vec2(0.0);}":this.patchData.taaOffset;
@@ -293,7 +293,22 @@ public class IrisShaderPatch {
                 voxyPatchData = builder.toString();
             }
             patchData = GSON.fromJson(voxyPatchData, PatchGson.class);
-            if (patchData != null && !patchData.checkValid()) {
+            if (patchData != null) {
+                throw new IllegalStateException("voxy json patch not valid: " + voxyPatchData);
+            }
+
+            {//Inject data from the auxilery files if they are present
+                var opaque = sourceProvider.apply(directory.resolve("voxy_opaque.glsl"));
+                if (opaque != null) {
+                    patchData.opaquePatchData = opaque;
+                }
+                var translucent = sourceProvider.apply(directory.resolve("voxy_translucent.glsl"));
+                if (translucent != null) {
+                    patchData.translucentPatchData = translucent;
+                }
+            }
+
+            if (!patchData.checkValid()) {
                 throw new IllegalStateException("voxy json patch not valid: " + voxyPatchData);
             }
         } catch (Exception e) {

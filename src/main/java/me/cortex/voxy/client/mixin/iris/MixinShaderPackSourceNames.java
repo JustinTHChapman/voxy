@@ -13,6 +13,8 @@ public class MixinShaderPackSourceNames {
     private static ImmutableList.Builder<String> voxy$injectVoxyShaderPatch(Operation<ImmutableList.Builder<String>> original){
         var builder = original.call();
         builder.add("voxy.json");
+        builder.add("voxy_opaque.glsl");
+        builder.add("voxy_translucent.glsl");
         return builder;
     }
 }
