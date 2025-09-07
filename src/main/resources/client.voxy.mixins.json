@@ -3,6 +3,8 @@
   "package": "me.cortex.voxy.client.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "flashback.MixinFlashbackMeta",
+    "flashback.MixinFlashbackRecorder",
     "iris.MixinWorldRenderer",
     "iris.MixinPackRenderTargetDirectives",
     "iris.CustomUniformsAccessor",

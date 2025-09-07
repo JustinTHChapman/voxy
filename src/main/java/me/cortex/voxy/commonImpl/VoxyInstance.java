@@ -243,4 +243,8 @@ public abstract class VoxyInstance {
         Logger.info("Instance shutdown");
         this.activeWorldLock.unlockWrite(stamp);
     }
+
+    public boolean isIngestEnabled(WorldIdentifier worldId) {
+        return true;
+    }
 }
