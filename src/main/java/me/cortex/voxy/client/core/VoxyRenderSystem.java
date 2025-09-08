@@ -319,15 +319,18 @@ public class VoxyRenderSystem {
     private void autoBalanceSubDivSize() {
         //only increase quality while there are very few mesh queues, this stops,
         // e.g. while flying and is rendering alot of low quality chunks
-        boolean canDecreaseSize = this.renderGen.getTaskCount() < 5000;
-        float CHANGE_PER_SECOND = 30;
+        boolean canDecreaseSize = this.renderGen.getTaskCount() < 300;
+        int MIN_FPS = 55;
+        int MAX_FPS = 65;
+        float INCREASE_PER_SECOND = 60;
+        float DECREASE_PER_SECOND = 30;
         //Auto fps targeting
-        if (MinecraftClient.getInstance().getCurrentFps() < 45) {
-            VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 256);
+        if (MinecraftClient.getInstance().getCurrentFps() < MIN_FPS) {
+            VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + INCREASE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 256);
         }
 
-        if (55 < MinecraftClient.getInstance().getCurrentFps() && canDecreaseSize) {
-            VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - CHANGE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 30);
+        if (MAX_FPS < MinecraftClient.getInstance().getCurrentFps() && canDecreaseSize) {
+            VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - DECREASE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 28);
         }
     }
 
