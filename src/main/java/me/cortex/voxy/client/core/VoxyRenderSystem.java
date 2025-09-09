@@ -25,6 +25,7 @@ import me.cortex.voxy.client.core.rendering.section.geometry.IGeometryData;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.PrintfDebugUtil;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.client.core.util.GPUTiming;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
@@ -204,6 +205,7 @@ public class VoxyRenderSystem {
 
         long startTime = System.nanoTime();
         TimingStatistics.all.start();
+        GPUTiming.INSTANCE.marker();//Start marker
         TimingStatistics.main.start();
 
         //TODO: optimize
@@ -258,7 +260,10 @@ public class VoxyRenderSystem {
             //Done here as is allows less gl state resetup
             this.modelService.tick(Math.max(3_000_000-(System.nanoTime()-startTime), 500_000));
         }
+        GPUTiming.INSTANCE.marker();
         TimingStatistics.postDynamic.stop();
+
+        GPUTiming.INSTANCE.tick();
 
         glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
         glViewport(dims[0], dims[1], dims[2], dims[3]);
