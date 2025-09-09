@@ -18,7 +18,7 @@ import java.util.Arrays;
 
 public class RenderDataFactory {
     private static final boolean CHECK_NEIGHBOR_FACE_OCCLUSION = true;
-    private static final boolean DISABLE_CULL_SAME_OCCLUDES = true;
+    private static final boolean DISABLE_CULL_SAME_OCCLUDES = false;
 
     private static final boolean VERIFY_MESHING = VoxyCommon.isVerificationFlagOn("verifyMeshing");
 
