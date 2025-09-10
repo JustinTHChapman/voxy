@@ -113,6 +113,10 @@ public class ActiveSectionTracker {
             long stamp = this.lruLock.writeLock();
             section = this.lruSecondaryCache.remove(key);
             this.lruLock.unlockWrite(stamp);
+            if (section != null) {
+                section.primeForReuse();
+                section.acquire(1);
+            }
             lock.unlockRead(stamp2);
         } else {
             VolatileHolder.PRE_ACQUIRE_COUNT.getAndAdd(holder, 1);
@@ -142,11 +146,10 @@ public class ActiveSectionTracker {
                     //We need to set the data to air as it is undefined state
                     Arrays.fill(section.data, 0);
                 }
-            } else {
-                section.primeForReuse();
+                section.acquire(1);
             }
             int preAcquireCount = (int) VolatileHolder.PRE_ACQUIRE_COUNT.getAndSet(holder, 0);
-            section.acquire(preAcquireCount+1);//pre acquire amount
+            section.acquire(preAcquireCount);//pre acquire amount
             VolatileHolder.POST_ACQUIRE_COUNT.set(holder, preAcquireCount);
 
             //TODO: mark if the section was loaded null
@@ -223,7 +226,7 @@ public class ActiveSectionTracker {
                 var cached = cache.remove(section.key);
                 var obj = cached.obj;
                 if (obj == null) {
-                    throw new IllegalStateException("This should be impossible: " + WorldEngine.pprintPos(section.key));
+                    throw new IllegalStateException("This should be impossible: " + WorldEngine.pprintPos(section.key) + " secObj: " + System.identityHashCode(section));
                 }
                 if (obj != section) {
                     throw new IllegalStateException("Removed section not the same as the referenced section in the cache: cached: " + obj + " got: " + section + " A: " + WorldSection.ATOMIC_STATE_HANDLE.get(obj) + " B: " +WorldSection.ATOMIC_STATE_HANDLE.get(section));
@@ -235,6 +238,7 @@ public class ActiveSectionTracker {
         WorldSection aa = null;
         if (sec != null) {
             long stamp2 = this.lruLock.writeLock();
+            lock.unlockWrite(stamp);
             WorldSection a = this.lruSecondaryCache.put(section.key, section);
             if (a != null) {
                 throw new IllegalStateException("duplicate sections in cache is impossible");
@@ -245,9 +249,10 @@ public class ActiveSectionTracker {
             }
             this.lruLock.unlockWrite(stamp2);
 
+        } else {
+            lock.unlockWrite(stamp);
         }
 
-        lock.unlockWrite(stamp);
 
         if (aa != null) {
             aa._releaseArray();
@@ -276,16 +281,45 @@ public class ActiveSectionTracker {
         return this.lruSecondaryCache.size();
     }
 
-    public static void main(String[] args) {
-        var tracker = new ActiveSectionTracker(1, a->0, 1<<10);
+    public static void main(String[] args) throws InterruptedException {
+        var tracker = new ActiveSectionTracker(6, a->0, 2<<10);
+        var bean = tracker.acquire(0, 0, 0, 9, false);
+        var bean2 = tracker.acquire(1, 0, 0, 0, false);
+        System.out.println("Target obj:" + System.identityHashCode(bean2));
+        bean2.release();
+        Thread[] ts = new Thread[10];
+        for (int i = 0; i < ts.length;i++) {
+            int tid = i;
+            ts[i] = new Thread(()->{
+                try {
+                    for (int j = 0; j < 5000; j++) {
+                        if (true) {
+                            var section = tracker.acquire(0, 0, 0, 0, false);
+                            section.acquire();
+                            var section2 = tracker.acquire(1, 0, 0, 0, false);
+                            section.release();
+                            section.release();
+                            section2.release();
+                        }
+                        if (true) {
 
-        var section = tracker.acquire(0,0,0,0, false);
-        section.acquire();
-        var section2 = tracker.acquire(0,0,0,0, false);
-        section.release();
-        section.release();
-        section = tracker.acquire(0,0,0,0, false);
-        section.release();
-
+                            var section = tracker.acquire(0, 0, 0, 0, false);
+                            var section2 = tracker.acquire(1, 0, 0, 0, false);
+                            section2.release();
+                            section.release();
+                        }
+                        if (true) {
+                            tracker.acquire(1, 0, 0, 0, false).release();
+                        }
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException("Thread " + tid, e);
+                }
+            });
+            ts[i].start();
+        }
+        for (var t : ts) {
+            t.join();
+        }
     }
 }
