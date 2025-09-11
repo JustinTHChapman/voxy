@@ -137,7 +137,7 @@ public class VoxyRenderSystem {
                 this.renderDistanceTracker.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
             }
 
-            this.chunkBoundRenderer = new ChunkBoundRenderer();
+            this.chunkBoundRenderer = new ChunkBoundRenderer(this.pipeline);
 
             Logger.info("Voxy render system created with " + geometryCapacity + " geometry capacity, using pipeline '" + this.pipeline.getClass().getSimpleName() + "' with renderer '" + sectionRenderer.getClass().getSimpleName() + "'");
         } catch (RuntimeException e) {
@@ -231,6 +231,7 @@ public class VoxyRenderSystem {
 
         //this.autoBalanceSubDivSize();
 
+        this.pipeline.preSetup(viewport);
 
         TimingStatistics.E.start();
         if (!IrisUtil.irisShadowActive()) {

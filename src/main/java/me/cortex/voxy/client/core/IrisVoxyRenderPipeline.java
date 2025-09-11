@@ -90,14 +90,18 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     }
 
     @Override
-    protected int setup(Viewport<?> viewport, int sourceFramebuffer, int srcWidth, int srcHeight) {
+    public void preSetup(Viewport<?> viewport) {
+        super.preSetup(viewport);
         if (this.shaderUniforms != null) {
             //Update the uniforms
             long ptr = UploadStream.INSTANCE.uploadTo(this.shaderUniforms);
             this.data.getUniforms().updater().accept(ptr);
             UploadStream.INSTANCE.commit();
         }
+    }
 
+    @Override
+    protected int setup(Viewport<?> viewport, int sourceFramebuffer, int srcWidth, int srcHeight) {
 
         this.fb.resize(viewport.width, viewport.height);
         this.fbTranslucent.resize(viewport.width, viewport.height);

@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering;
 
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import me.cortex.voxy.client.core.AbstractRenderPipeline;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
@@ -45,7 +46,7 @@ public class ChunkBoundRenderer {
     private final LongOpenHashSet addQueue = new LongOpenHashSet();
     private final LongOpenHashSet remQueue = new LongOpenHashSet();
 
-    public ChunkBoundRenderer() {
+    public ChunkBoundRenderer(AbstractRenderPipeline pipeline) {
         this.chunk2idx.defaultReturnValue(-1);
     }
 
