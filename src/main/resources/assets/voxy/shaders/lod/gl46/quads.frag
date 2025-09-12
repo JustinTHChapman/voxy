@@ -105,6 +105,7 @@ vec4 computeColour(vec2 texturePos, vec4 colour) {
 
 
 void main() {
+    //vec2 uv = vec2(0);
     //Tile is the tile we are in
     vec2 tile;
     vec2 uv2 = modf(uv, tile)*(1.0/(vec2(3.0,2.0)*256.0));
