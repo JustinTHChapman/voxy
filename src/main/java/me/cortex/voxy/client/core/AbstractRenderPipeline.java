@@ -208,6 +208,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     public void bindUniforms() {
         this.bindUniforms(-1);
     }
+
     public void bindUniforms(int index) {
     }
 
