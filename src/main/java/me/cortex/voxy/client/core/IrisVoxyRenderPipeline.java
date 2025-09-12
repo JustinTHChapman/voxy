@@ -148,10 +148,20 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     }
 
 
-    private void doBindings() {
+    @Override
+    public void bindUniforms() {
+        this.bindUniforms(UNIFORM_BINDING_POINT);
+    }
+
+    @Override
+    public void bindUniforms(int bindingPoint) {
         if (this.shaderUniforms != null) {
-            GL30.glBindBufferBase(GL_UNIFORM_BUFFER, 5, this.shaderUniforms.id);// todo: dont randomly select this to 5
+            GL30.glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, this.shaderUniforms.id);// todo: dont randomly select this to 5
         }
+    }
+
+    private void doBindings() {
+        this.bindUniforms();
         if (this.data.getSsboSet() != null) {
             this.data.getSsboSet().bindingFunction().accept(10);
         }
@@ -225,11 +235,16 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     }
 
     @Override
-    public String taaFunction(AbstractSectionRenderer<?, ?> renderer, String functionName) {
+    public String taaFunction(String functionName) {
+        return this.taaFunction(UNIFORM_BINDING_POINT, functionName);
+    }
+
+    @Override
+    public String taaFunction(int uboBindingPoint, String functionName) {
         var builder = new StringBuilder();
 
         if (this.data.getUniforms() != null) {
-            builder.append("layout(binding = "+UNIFORM_BINDING_POINT+", std140) uniform ShaderUniformBindings ")
+            builder.append("layout(binding = "+uboBindingPoint+", std140) uniform ShaderUniformBindings ")
                     .append(this.data.getUniforms().layout())
                     .append(";\n\n");
         }

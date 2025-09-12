@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.Shader;
+import me.cortex.voxy.client.core.gl.shader.ShaderLoader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
@@ -36,18 +37,28 @@ public class ChunkBoundRenderer {
     private final GlBuffer uniformBuffer = new GlBuffer(128);
     private final Long2IntOpenHashMap chunk2idx = new Long2IntOpenHashMap(INIT_MAX_CHUNK_COUNT);
     private long[] idx2chunk = new long[INIT_MAX_CHUNK_COUNT];
-    private final Shader rasterShader = Shader.makeAuto()
-            .add(ShaderType.VERTEX, "voxy:chunkoutline/outline.vsh")
-            .add(ShaderType.FRAGMENT, "voxy:chunkoutline/outline.fsh")
-            .compile()
-            .ubo(0, this.uniformBuffer)
-            .ssbo(1, this.chunkPosBuffer);
+    private final Shader rasterShader;
 
     private final LongOpenHashSet addQueue = new LongOpenHashSet();
     private final LongOpenHashSet remQueue = new LongOpenHashSet();
 
+    private final AbstractRenderPipeline pipeline;
     public ChunkBoundRenderer(AbstractRenderPipeline pipeline) {
         this.chunk2idx.defaultReturnValue(-1);
+        this.pipeline = pipeline;
+
+        String vert = ShaderLoader.parse("voxy:chunkoutline/outline.vsh");
+        String taa = pipeline.taaFunction("getTAA");
+        if (taa != null) {
+            vert = vert+"\n\n\n"+taa;
+        }
+        this.rasterShader = Shader.makeAuto()
+                .addSource(ShaderType.VERTEX, vert)
+                .defineIf("TAA", taa != null)
+                .add(ShaderType.FRAGMENT, "voxy:chunkoutline/outline.fsh")
+                .compile()
+                .ubo(0, this.uniformBuffer)
+                .ssbo(1, this.chunkPosBuffer);
     }
 
     public void addSection(long pos) {
@@ -116,6 +127,7 @@ public class ChunkBoundRenderer {
         viewport.depthBoundingBuffer.bind();
         this.rasterShader.bind();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BB_BYTE.id());
+        this.pipeline.bindUniforms();
 
         //Batch the draws into groups of size 32
         int count = this.chunk2idx.size();

@@ -21,6 +21,10 @@ bool shouldRender(ivec3 icorner) {
     return (corner.x*corner.x + corner.z*corner.z < negInnerSec.w*negInnerSec.w) && abs(corner.y) < negInnerSec.w;
 }
 
+#ifdef TAA
+vec2 getTAA();
+#endif
+
 void main() {
     uint id = (gl_InstanceID<<5)+gl_BaseInstance+(gl_VertexID>>3);
 
@@ -38,4 +42,8 @@ void main() {
     //cubeCornerI.y = cubeCornerI.y*1024-512;
     gl_Position = MVP * vec4(vec3(cubeCornerI+origin)*16, 1);
     gl_Position.z -= 0.0005f;
+
+    #ifdef TAA
+    gl_Position.xy += getTAA()*gl_Position.w;//Apply TAA if we have it
+    #endif
 }

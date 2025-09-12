@@ -205,8 +205,18 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     public abstract void setupAndBindTranslucent(Viewport<?> viewport);
 
 
+    public void bindUniforms() {
+        this.bindUniforms(-1);
+    }
+    public void bindUniforms(int index) {
+    }
+
     //null means no function, otherwise return the taa injection function
-    public String taaFunction(AbstractSectionRenderer<?,?> renderer, String functionName) {
+    public String taaFunction(String functionName) {
+        return this.taaFunction(-1, functionName);
+    }
+
+    public String taaFunction(int uboBindingPoint, String functionName) {
         return null;
     }
 
