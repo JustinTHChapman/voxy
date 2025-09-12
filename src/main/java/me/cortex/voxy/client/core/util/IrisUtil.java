@@ -19,7 +19,7 @@ public class IrisUtil {
     public static CapturedViewportParameters CAPTURED_VIEWPORT_PARAMETERS;
 
     public static final boolean IRIS_INSTALLED = FabricLoader.getInstance().isModLoaded("iris");
-    public static final boolean SHADER_SUPPORT = System.getProperty("voxy.enableExperimentalIrisPipeline", "false").equalsIgnoreCase("true");
+    public static final boolean SHADER_SUPPORT = true;//System.getProperty("voxy.enableExperimentalIrisPipeline", "false").equalsIgnoreCase("true");
 
 
     private static boolean irisShadowActive0() {
