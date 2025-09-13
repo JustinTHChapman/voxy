@@ -190,4 +190,8 @@ public class AllocationArena {
             throw new IllegalStateException("Size set smaller than current size");
         }
     }
+
+    public long getLimit() {
+        return this.sizeLimit;
+    }
 }

@@ -107,12 +107,14 @@ public class BasicAsyncGeometryManager implements IGeometryManager {
     private SectionMeta createMeta(BuiltSection section) {
         if ((section.geometryBuffer.size%GEOMETRY_ELEMENT_SIZE)!=0) throw new IllegalStateException();
         int size = (int) (section.geometryBuffer.size/GEOMETRY_ELEMENT_SIZE);
+        //clamp size upwards
+        int upsized = (size+511)&~511;
         //Address
-        int addr = (int)this.allocationHeap.alloc(size);
+        int addr = (int)this.allocationHeap.alloc(upsized);
         if (addr == -1) {
-            throw new IllegalStateException("Geometry OOM");
+            throw new IllegalStateException("Geometry OOM. requested allocation size (in elements): " + size + ", Heap size at top remaining: " + (this.allocationHeap.getLimit()-this.allocationHeap.getSize()) + ", used elements: " + this.usedCapacity);
         }
-        this.usedCapacity += size;
+        this.usedCapacity += upsized;
         //Create upload
         if (this.heapUploads.put(addr, section.geometryBuffer) != null) {
             throw new IllegalStateException("Addr: " + addr);
