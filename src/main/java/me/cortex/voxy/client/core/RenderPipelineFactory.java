@@ -39,7 +39,7 @@ public class RenderPipelineFactory {
                 return new IrisVoxyRenderPipeline(pipeData, nodeManager, nodeCleaner, traversal, frexSupplier);
             } catch (Exception e) {
                 Logger.error("Failed to create iris render pipeline", e);
-                IrisApi.getInstance().getConfig().setShadersEnabledAndApply(false);
+                IrisUtil.disableIrisShaders();
                 return null;
             }
         }

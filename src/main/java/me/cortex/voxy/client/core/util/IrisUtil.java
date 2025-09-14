@@ -6,6 +6,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.fabricmc.loader.api.FabricLoader;
 import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.api.v0.IrisApi;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.shadows.ShadowRenderer;
 
@@ -46,5 +47,11 @@ public class IrisUtil {
 
     public static boolean irisShaderPackEnabled() {
         return IRIS_INSTALLED && irisShaderPackEnabled0();
+    }
+    public static void disableIrisShaders() {
+        if(IRIS_INSTALLED) disableIrisShaders0();
+    }
+    private static void disableIrisShaders0() {
+        IrisApi.getInstance().getConfig().setShadersEnabledAndApply(false);//Disable shaders
     }
 }
