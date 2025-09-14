@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.iris.IGetIrisVoxyPipelineData;
 import me.cortex.voxy.common.Logger;
 import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.api.v0.IrisApi;
 
 import java.util.function.BooleanSupplier;
 
@@ -34,7 +35,13 @@ public class RenderPipelineFactory {
                 return null;
             }
             Logger.info("Creating voxy iris render pipeline");
-            return new IrisVoxyRenderPipeline(pipeData, nodeManager, nodeCleaner, traversal, frexSupplier);
+            try {
+                return new IrisVoxyRenderPipeline(pipeData, nodeManager, nodeCleaner, traversal, frexSupplier);
+            } catch (Exception e) {
+                Logger.error("Failed to create iris render pipeline", e);
+                IrisApi.getInstance().getConfig().setShadersEnabledAndApply(false);
+                return null;
+            }
         }
         return null;
     }

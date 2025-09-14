@@ -8,6 +8,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
+import net.irisshaders.iris.api.v0.IrisApi;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
 
@@ -314,12 +315,14 @@ public class IrisShaderPatch {
         } catch (Exception e) {
             patchData = null;
             Logger.error("Failed to parse patch data gson",e);
+            IrisApi.getInstance().getConfig().setShadersEnabledAndApply(false);//Disable shaders
         }
         if (patchData == null) {
             return null;
         }
         if (patchData.version != VERSION) {
             Logger.error("Shader has voxy patch data, but patch version is incorrect. expected " + VERSION + " got "+patchData.version);
+            IrisApi.getInstance().getConfig().setShadersEnabledAndApply(false);//Disable shaders
             return null;
         }
         return new IrisShaderPatch(patchData, ipack);
