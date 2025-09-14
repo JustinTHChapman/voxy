@@ -316,15 +316,14 @@ public class IrisShaderPatch {
         } catch (Exception e) {
             patchData = null;
             Logger.error("Failed to parse patch data gson",e);
-            IrisUtil.disableIrisShaders();
+            throw new ShaderLoadError("Failed to parse patch data gson",e);
         }
         if (patchData == null) {
             return null;
         }
         if (patchData.version != VERSION) {
             Logger.error("Shader has voxy patch data, but patch version is incorrect. expected " + VERSION + " got "+patchData.version);
-            IrisUtil.disableIrisShaders();
-            return null;
+            throw new IllegalStateException("Shader version mismatch expected " + VERSION + " got "+patchData.version);
         }
         return new IrisShaderPatch(patchData, ipack);
     }

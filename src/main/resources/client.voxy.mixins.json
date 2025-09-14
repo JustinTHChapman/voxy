@@ -9,6 +9,7 @@
     "iris.MixinPackRenderTargetDirectives",
     "iris.CustomUniformsAccessor",
     "iris.IrisRenderingPipelineAccessor",
+    "iris.MixinIris",
     "iris.MixinIrisRenderingPipeline",
     "iris.MixinIrisSamplers",
     "iris.MixinMatrixUniforms",

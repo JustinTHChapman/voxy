@@ -4,6 +4,7 @@ import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
+import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.VoxyCommon;
@@ -79,6 +80,14 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             Logger.error("Null world selected");
             return;
         }
-        this.renderer = new VoxyRenderSystem(world, instance.getThreadPool());
+        try {
+            this.renderer = new VoxyRenderSystem(world, instance.getThreadPool());
+        } catch (RuntimeException e) {
+            if (IrisUtil.irisShaderPackEnabled()) {
+                IrisUtil.disableIrisShaders();
+            } else {
+                throw e;
+            }
+        }
     }
 }
