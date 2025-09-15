@@ -49,9 +49,6 @@ public class BasicSectionGeometryData implements IGeometryData {
                     buffer.free();
                 }
                 buffer = new GlBuffer(geometryCapacity, GL_SPARSE_STORAGE_BIT_ARB);
-                glBindBuffer(GL_ARRAY_BUFFER, buffer.id);
-                glBufferPageCommitmentARB(GL_ARRAY_BUFFER, 0, geometryCapacity, true);
-                glBindBuffer(GL_ARRAY_BUFFER, 0);
                 //buffer.zero();
                 error = glGetError();
                 if (error != GL_NO_ERROR) {
@@ -65,6 +62,20 @@ public class BasicSectionGeometryData implements IGeometryData {
         this.geometryBuffer = buffer;
         long delta = System.currentTimeMillis() - start;
         Logger.info("Successfully allocated the geometry buffer in " + delta + "ms");
+    }
+
+    private long sparseCommitment = 0;//Tracks the current range of the allocated sparse buffer
+    public void ensureAccessable(int maxElementAccess) {
+        long size = (Integer.toUnsignedLong(maxElementAccess)*8L+65535L)&~65535L;
+        //If we are a sparse buffer, ensure the memory upto the requested size is allocated
+        if (this.geometryBuffer.isSparse()) {
+            if (this.sparseCommitment < size) {//if we try to access memory outside the allocation range, allocate it
+                glBindBuffer(GL_ARRAY_BUFFER, this.geometryBuffer.id);
+                glBufferPageCommitmentARB(GL_ARRAY_BUFFER, this.sparseCommitment, size-this.sparseCommitment, true);
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+                this.sparseCommitment = size;
+            }
+        }
     }
 
     public GlBuffer getGeometryBuffer() {

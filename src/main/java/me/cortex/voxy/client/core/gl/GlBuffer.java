@@ -12,6 +12,7 @@ import static org.lwjgl.opengl.GL45C.*;
 public class GlBuffer extends TrackedObject {
     public final int id;
     private final long size;
+    private final int flags;
 
     private static int COUNT;
     private static long TOTAL_SIZE;
@@ -28,6 +29,7 @@ public class GlBuffer extends TrackedObject {
     }
 
     public GlBuffer(long size, int flags, boolean zero) {
+        this.flags = flags;
         this.id = glCreateBuffers();
         this.size = size;
         glNamedBufferStorage(this.id, size, flags);
@@ -46,6 +48,10 @@ public class GlBuffer extends TrackedObject {
 
         COUNT--;
         TOTAL_SIZE -= this.size;
+    }
+
+    public boolean isSparse() {
+        return (this.flags&GL_SPARSE_STORAGE_BIT_ARB)!=0;
     }
 
     public long size() {
