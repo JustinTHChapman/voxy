@@ -103,7 +103,10 @@ public class IrisShaderPatch {
                 case "GL_SRC1_COLOR" -> GL_SRC1_COLOR;
                 case "GL_ONE_MINUS_SRC1_COLOR" -> GL_ONE_MINUS_SRC1_COLOR;
                 case "GL_ONE_MINUS_SRC1_ALPHA" -> GL_ONE_MINUS_SRC1_ALPHA;
-                default -> -1;
+                default -> {
+                    Logger.error("Unknown blend option " + type);
+                    yield -1;
+                }
             };
         }
         @Override
