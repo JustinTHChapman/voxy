@@ -6,21 +6,19 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.Logger;
-import net.irisshaders.iris.api.v0.IrisApi;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
+import org.lwjgl.opengl.ARBDrawBuffersBlend;
 
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL33.*;
-import static org.lwjgl.opengl.GL40.glBlendFuncSeparatei;
 
 public class IrisShaderPatch {
     public static final int VERSION = ((IntSupplier)()->1).getAsInt();
@@ -79,7 +77,7 @@ public class IrisShaderPatch {
         }
     }
 
-    public record BlendState(int buffer, boolean off, int sRBG, int dRGb, int sA, int dA) {
+    public record BlendState(int buffer, boolean off, int sRGB, int dRGB, int sA, int dA) {
         public static BlendState ALL_OFF = new BlendState(-1, true, 0,0,0,0);
     }
 
@@ -87,6 +85,9 @@ public class IrisShaderPatch {
     private static final class BlendStateDeserializer implements JsonDeserializer<Int2ObjectMap<BlendState>> {
         private static int parseType(String type) {
             type = type.toUpperCase();
+            if (!type.startsWith("GL_")) {
+                type = "GL_"+type;
+            }
             return switch (type) {
                 case "GL_ZERO" -> GL_ZERO;
                 case "GL_ONE" -> GL_ONE;
@@ -118,19 +119,29 @@ public class IrisShaderPatch {
                 } else if (json.isJsonObject()) {
                     for (var entry : json.getAsJsonObject().entrySet()) {
                         int buffer = Integer.parseInt(entry.getKey());
-                        BlendState state;
+                        BlendState state = null;
                         var val = entry.getValue();
+                        List<String> bs = null;
                         if (val.isJsonArray()) {
-                            int[] v = val.getAsJsonArray().asList().stream().mapToInt(a->parseType(a.getAsString())).toArray();
-                            state = new BlendState(buffer, false, v[0], v[1], v[2], v[3]);
+                            bs = val.getAsJsonArray().asList().stream().map(JsonElement::getAsString).toList();
                         } else if (val.isJsonPrimitive()) {
-                            if (val.getAsString().equalsIgnoreCase("off")) {
+                            var str = val.getAsString();
+                            if (str.equalsIgnoreCase("off")) {
                                 state = new BlendState(buffer, true, 0,0,0,0);
                             } else {
-                                state = new BlendState(buffer, true, -1,-1,-1,-1);
+                                var parts = str.split(" ");
+                                if (parts.length < 4) {
+                                    state = new BlendState(buffer, true, -1, -1, -1, -1);
+                                } else {
+                                    bs = List.of(parts);
+                                }
                             }
                         } else {
                             state = null;
+                        }
+                        if (bs != null) {
+                            int[] v = bs.stream().mapToInt(BlendStateDeserializer::parseType).toArray();
+                            state = new BlendState(buffer, false, v[0], v[1], v[2], v[3]);
                         }
                         ret.put(buffer, state);
                     }
@@ -241,7 +252,7 @@ public class IrisShaderPatch {
                     glDisable(GL_BLEND);
                 } else {
                     glEnable(GL_BLEND);
-                    glBlendFuncSeparate(init.sRBG, init.dRGb, init.sA, init.dA);
+                    glBlendFuncSeparate(init.sRGB, init.dRGB, init.sA, init.dA);
                 }
             }
             for (var entry:BS.int2ObjectEntrySet()) {
@@ -251,7 +262,8 @@ public class IrisShaderPatch {
                     glDisablei(GL_BLEND, s.buffer);
                 } else {
                     glEnablei(GL_BLEND, s.buffer);
-                    glBlendFuncSeparatei(s.buffer, s.sRBG, s.dRGb, s.sA, s.dA);
+                    //_sigh_ thanks nvidia
+                    ARBDrawBuffersBlend.glBlendFuncSeparateiARB(s.buffer, s.sRGB, s.dRGB, s.sA, s.dA);
                 }
             }
         };
