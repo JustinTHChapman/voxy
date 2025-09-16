@@ -111,7 +111,9 @@ public abstract class Viewport <A extends Viewport<A>> {
                 (float) (this.cameraY-(sy<<5)),
                 (float) (this.cameraZ-(sz<<5)));
 
-        this.depthBoundingBuffer.resize(this.width, this.height);
+        if (this.depthBoundingBuffer.resize(this.width, this.height)) {
+            this.depthBoundingBuffer.clear(0.0f);
+        }
 
         return (A) this;
     }

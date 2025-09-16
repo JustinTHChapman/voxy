@@ -34,12 +34,12 @@ public class BasicSectionGeometryData implements IGeometryData {
         Logger.info("if your game crashes/exits here without any other log message, try manually decreasing the geometry capacity");
         glGetError();//Clear any errors
         GlBuffer buffer = null;
-        if (!(Capabilities.INSTANCE.isNvidia && ThreadUtils.isWindows)) {
+        if (!(Capabilities.INSTANCE.isNvidia)) {// && ThreadUtils.isWindows
             buffer = new GlBuffer(geometryCapacity, false);//Only do this if we are not on nvidia
             //TODO: FIXME: TEST, see if the issue is that we are trying to zero the entire buffer, try only zeroing increments
             // or dont zero it at all
         } else {
-            Logger.info("Running on windows nvidia, using workaround sparse buffer allocation");
+            Logger.info("Running on nvidia, using workaround sparse buffer allocation");
         }
         int error = glGetError();
         if (error != GL_NO_ERROR || buffer == null) {
@@ -116,6 +116,9 @@ public class BasicSectionGeometryData implements IGeometryData {
         glFinish();
         if (Capabilities.INSTANCE.canQueryGpuMemory) {
             long releaseSize = (long) (this.geometryBuffer.size()*0.75);//if gpu memory usage drops by 75% of the expected value assume we freed it
+            if (this.geometryBuffer.isSparse()) {//If we are using sparse buffers, use the commited size instead
+                releaseSize = (long)(this.sparseCommitment*0.75);
+            }
             if (Capabilities.INSTANCE.getFreeDedicatedGpuMemory()-gpuMemory<=releaseSize) {
                 Logger.info("Attempting to wait for gpu memory to release");
                 long start = System.currentTimeMillis();

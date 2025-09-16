@@ -22,14 +22,16 @@ public class DepthFramebuffer {
         this.depthType = depthType;
     }
 
-    public void resize(int width, int height) {
+    public boolean resize(int width, int height) {
         if (this.depthBuffer == null || this.depthBuffer.getWidth() != width || this.depthBuffer.getHeight() != height) {
             if (this.depthBuffer != null) {
                 this.depthBuffer.free();
             }
             this.depthBuffer = new GlTexture().store(this.depthType, 1, width, height);
             this.framebuffer.bind(this.depthType == GL_DEPTH24_STENCIL8?GL_DEPTH_STENCIL_ATTACHMENT: GL_DEPTH_ATTACHMENT, this.depthBuffer).verify();
+            return true;
         }
+        return false;
     }
 
     public void clear() {
