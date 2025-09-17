@@ -150,6 +150,12 @@ void main() {
         #endif
     }
 
+    #ifndef PATCHED_SHADER_ALLOW_DERIVATIVES
+    if (gl_HelperInvocation) {
+        return;
+    }
+    #endif
+
     #ifndef PATCHED_SHADER
     colour = computeColour(texPos, colour);
     outColour = colour;
