@@ -133,11 +133,13 @@ void main() {
 
     if (any(notEqual(clamp(tile, vec2(0), vec2((interData.x>>8)&0xFu, (interData.x>>12)&0xFu)), tile))) {
         discard;
+        return;
     }
 
     //Check the minimum bounding texture and ensure we are greater than it
     if (gl_FragCoord.z < texelFetch(depthTex, ivec2(gl_FragCoord.xy), 0).r) {
         discard;
+        return;
     }
 
 
@@ -147,6 +149,7 @@ void main() {
         //TODO: FIXME, basicly what this do is sample the exact pixel (no lod) for discarding, this stops mipmapping fucking it over
         #ifndef DEBUG_RENDER
         discard;
+        return;
         #endif
     }
 
