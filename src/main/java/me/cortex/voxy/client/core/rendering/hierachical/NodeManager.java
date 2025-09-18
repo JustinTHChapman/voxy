@@ -1072,7 +1072,8 @@ public class NodeManager {
     public void processRequest(long pos) {
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
-            Logger.warn("Got request for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, ignoring!");
+            //TODO: make into timing thing
+            //Logger.warn("Got request for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, ignoring!");
             return;
         }
         int nodeType = nodeId&NODE_TYPE_MSK;
@@ -1237,7 +1238,8 @@ public class NodeManager {
         int nodeType = nodeId&NODE_TYPE_MSK;
         nodeId &= NODE_ID_MSK;
         if (nodeType == NODE_TYPE_REQUEST) {
-            Logger.warn("Tried removing geometry for pos: " + WorldEngine.pprintPos(pos) + " but its type was a request, ignoring!");
+            //TODO: only log a specific number of times
+            //Logger.warn("Tried removing geometry for pos: " + WorldEngine.pprintPos(pos) + " but its type was a request, ignoring!");
             return;
         }
         //this.clearId(nodeId);
