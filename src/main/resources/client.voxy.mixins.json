@@ -16,6 +16,7 @@
     "iris.MixinProgramSet",
     "iris.MixinShaderPackSourceNames",
     "iris.MixinStandardMacros",
+    "minecraft.MixinClientWorld",
     "minecraft.MixinClientChunkManager",
     "minecraft.MixinClientCommonNetworkHandler",
     "minecraft.MixinClientLoginNetworkHandler",
