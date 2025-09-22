@@ -53,6 +53,10 @@ public abstract class MixinClientWorld {
     private void voxy$injectIngestOnStateChange(BlockPos pos, BlockState old, BlockState updated, CallbackInfo cir) {
         if (old == updated) return;
 
+        //TODO: is this _really_ needed, we should have enough processing power to not need todo it if its only a
+        // block removal
+        if (!updated.isAir()) return;
+
         var system = ((IGetVoxyRenderSystem)(this.worldRenderer)).getVoxyRenderSystem();
         if (system == null) {
             return;
