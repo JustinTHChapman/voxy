@@ -331,6 +331,11 @@ public class IrisShaderPatch {
                 if (translucent != null) {
                     patchData.translucentPatchData = translucent;
                 }
+                //This might be ok? not.. sure if is nice or not
+                var taa = sourceProvider.apply(directory.resolve("voxy_taa.glsl"));
+                if (taa != null) {
+                    patchData.taaOffset = taa;
+                }
             }
 
             if (!patchData.checkValid()) {
