@@ -176,6 +176,14 @@ public class IrisShaderPatch {
         public float[] renderScale;
         public boolean useViewportDims;
         public boolean checkValid() {
+            if (this.blending != null) {
+                for (BlendState state : this.blending.values()) {
+                    if (state.buffer != -1 && (state.buffer<0||this.translucentDrawBuffers.length<=state.buffer)) {
+                        return false;
+                    }
+                }
+            }
+
             return this.opaqueDrawBuffers != null && this.translucentDrawBuffers != null && this.uniforms != null && this.opaquePatchData != null;
         }
     }
@@ -311,7 +319,7 @@ public class IrisShaderPatch {
             }
             patchData = GSON.fromJson(voxyPatchData, PatchGson.class);
             if (patchData == null) {
-                return null;
+                throw new IllegalStateException("Voxy patch json returned null");
             }
 
             {//Inject data from the auxilery files if they are present
