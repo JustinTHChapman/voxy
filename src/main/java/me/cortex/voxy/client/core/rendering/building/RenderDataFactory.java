@@ -1137,7 +1137,7 @@ public class RenderDataFactory {
                         if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
                             if (ModelQueries.faceOccludes(this.sectionData[bi + 1], (2 << 1) | (1 - facingForward))) {
                                 //TODO check self occlsion
-                                this.blockMesher.skip(1);
+                                mesher.skip(1);
                                 continue;
                             }
                         }
