@@ -38,6 +38,37 @@ public class TextureUtils {
         throw new IllegalArgumentException();
     }
 
+
+    //0: nothing written
+    //1: none tinted
+    //2: some tinted
+    //3: all tinted
+    public static int computeFaceTint(ColourDepthTextureData texture, int checkMode) {
+        boolean allTinted = true;
+        boolean someTinted = false;
+        boolean wasWriten = false;
+
+        final var colourData = texture.colour();
+        final var depthData = texture.depth();
+        for (int i = 0; i < colourData.length; i++) {
+            if (!wasPixelWritten(texture, checkMode, i)) {
+                continue;
+            }
+            if ((colourData[i]&0xFFFFFF) == 0 || (colourData[i]>>>24)==0) {//If the pixel is fully black (or translucent)
+                continue;
+            }
+            boolean pixelTinited = (depthData[i]&(1<<7))!=0;
+            wasWriten |= true;
+            allTinted &= pixelTinited;
+            someTinted |= pixelTinited;
+
+        }
+        if (!wasWriten) {
+            return 0;
+        }
+        return someTinted?(allTinted?3:2):1;
+    }
+
     public static final int DEPTH_MODE_AVG = 1;
     public static final int DEPTH_MODE_MAX = 2;
     public static final int DEPTH_MODE_MIN = 3;

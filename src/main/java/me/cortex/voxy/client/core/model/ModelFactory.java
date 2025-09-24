@@ -414,7 +414,15 @@ public class ModelFactory {
 
             faceModelData |= ((!faceCoversFullBlock)&&blockRenderLayer != BlockRenderLayer.TRANSLUCENT)?1<<23:0;//Alpha discard override, translucency doesnt have alpha discard
 
-
+            //Bits 24,25 are tint metadata
+            if (colourProvider!=null) {//We have a tint
+                int tintState = TextureUtils.computeFaceTint(textureData[face], checkMode);
+                if (tintState == 2) {//Partial tint
+                    faceModelData |= 1<<24;
+                } else if (tintState == 3) {//Full tint
+                    faceModelData |= 2<<24;
+                }
+            }
 
             MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
         }

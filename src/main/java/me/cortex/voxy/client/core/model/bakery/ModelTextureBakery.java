@@ -71,9 +71,7 @@ public class ModelTextureBakery {
             for (var part : model.getParts(new LocalRandom(42L))) {
                 var quads = part.getQuads(direction);
                 for (var quad : quads) {
-                    //TODO: add meta specifiying quad has a tint
-                    //quad.hasTint()
-                    this.vc.quad(quad, meta);
+                    this.vc.quad(quad, meta|(quad.hasTint()?4:0));
                 }
             }
         }
@@ -81,6 +79,7 @@ public class ModelTextureBakery {
 
 
     private void bakeFluidState(BlockState state, BlockRenderLayer layer, int face) {
+        //TODO: somehow set the tint flag aswell
         this.vc.setDefaultMeta(getMetaFromLayer(layer));//Set the meta while baking
         MinecraftClient.getInstance().getBlockRenderManager().renderFluid(BlockPos.ORIGIN, new BlockRenderView() {
             @Override

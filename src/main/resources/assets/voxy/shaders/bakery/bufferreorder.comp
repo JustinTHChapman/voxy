@@ -2,6 +2,7 @@
 
 layout(local_size_x = WIDTH, local_size_y = HEIGHT) in;
 
+layout(binding = META_IN_BINDING) uniform usampler2D metaTexIn;
 layout(binding = COLOUR_IN_BINDING) uniform sampler2D colourTexIn;
 layout(binding = DEPTH_IN_BINDING) uniform sampler2D depthTexIn;
 layout(binding = STENCIL_IN_BINDING) uniform usampler2D stencilTexIn;
@@ -24,8 +25,11 @@ void main() {
 
     float depth = clamp(texelFetch(depthTexIn, samplePoint, 0).r, 0, 1);//Opengl grumble grumble
     uint stencil = texelFetch(stencilTexIn, samplePoint, 0).r;
+    uint metadata = texelFetch(metaTexIn, samplePoint, 0).r;
     uint value = uint(depth*((1<<24)-1))<<8;
-    value |= stencil;
+    value |= stencil&0xFFu;
+    //Use the very top bit of the stencil to mask if its tinted
+    value |= (metadata&1u)<<7;
     outPoint.y = value;
 
     outBuffer[globalOutIndex] = outPoint;
