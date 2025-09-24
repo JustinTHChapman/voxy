@@ -79,8 +79,14 @@ public class ModelTextureBakery {
 
 
     private void bakeFluidState(BlockState state, BlockRenderLayer layer, int face) {
-        //TODO: somehow set the tint flag aswell
-        this.vc.setDefaultMeta(getMetaFromLayer(layer));//Set the meta while baking
+        {
+            //TODO: somehow set the tint flag per quad or something?
+            int metadata = getMetaFromLayer(layer);
+            //Just assume all fluids are tinted, if they arnt it should be implicitly culled in the model baking phase
+            // since it wont have the colour provider
+            metadata |= 4;//Has tint
+            this.vc.setDefaultMeta(metadata);//Set the meta while baking
+        }
         MinecraftClient.getInstance().getBlockRenderManager().renderFluid(BlockPos.ORIGIN, new BlockRenderView() {
             @Override
             public float getBrightness(Direction direction, boolean shaded) {
