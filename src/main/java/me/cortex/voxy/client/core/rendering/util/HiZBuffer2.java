@@ -45,7 +45,7 @@ public class HiZBuffer2 {
     }
 
     private void alloc(int width, int height) {
-        this.levels = (int)Math.ceil(Math.log(Math.max(width, height))/Math.log(2));
+        this.levels = Math.min(7,(int)Math.ceil(Math.log(Math.max(width, height))/Math.log(2)));
         //We dont care about e.g. 1x1 size texture since you dont get meshlets that big to cover such a large area
         //this.levels -= 1;//Arbitrary size, shinks the max level by alot and saves a significant amount of processing time
         // (could probably increase it to be defined by a max meshlet coverage computation thing)
