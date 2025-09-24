@@ -139,13 +139,16 @@ void main() {
 
         //Apply model colour tinting
         uint tintColour = model.colourTint;
+
         if (modelHasBiomeLUT(model)) {
             tintColour = colourData[tintColour + extractBiomeId(quad)];
         }
 
+        uint tintState = faceTintState(faceData);
+
         uint conditionalTinting = 0;
         if (tintColour != uint(-1)) {
-            flags |= 1u<<2;
+            flags |= tintState<<2;
             conditionalTinting = tintColour;
         }
 

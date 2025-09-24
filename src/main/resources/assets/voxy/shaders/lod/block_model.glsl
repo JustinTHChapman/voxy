@@ -25,6 +25,10 @@ uint faceHasAlphaCuttoutOverride(uint faceData) {
     return (faceData>>23)&1u;
 }
 
+uint faceTintState(uint faceData) {
+    return (faceData>>24)&3u;
+}
+
 bool modelHasBiomeLUT(BlockModel model) {
     return ((model.flagsA)&2u) != 0;
 }
