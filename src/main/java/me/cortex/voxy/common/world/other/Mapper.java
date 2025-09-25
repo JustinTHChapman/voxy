@@ -363,8 +363,13 @@ public class Mapper {
                 if (compound.getInt("id", -1) != id) {
                     throw new IllegalStateException("Encoded id != expected id");
                 }
-                BlockState state = BlockState.CODEC.parse(NbtOps.INSTANCE, compound.getCompound("block_state").orElseThrow()).getOrThrow();
-                return new StateEntry(id, state);
+                var state = BlockState.CODEC.parse(NbtOps.INSTANCE, compound.getCompound("block_state").orElseThrow());
+                if (state.isError()) {
+                    Logger.error("Could not decode blockstate setting to air. id:" + id + " error: " + state.error().get().message());
+                    return new StateEntry(id, Blocks.AIR.getDefaultState());
+                } else {
+                    return new StateEntry(id, state.getOrThrow());
+                }
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
