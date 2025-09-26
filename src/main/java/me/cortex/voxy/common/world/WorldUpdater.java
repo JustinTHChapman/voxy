@@ -99,6 +99,20 @@ public class WorldUpdater {
             }
 
             if (didStateChange||(emptinessStateChange!=0)) {
+                //TODO: somehow foward the neighbors that are facing the updated area, this allows forwarding to the dirty consumer
+                // which can decide wether to dispatch mesh rebuilds to the surounding sections
+                //Bitmask of neighboring sections
+                //Note, this may be zero (this is more likely to occure at higher lod levels) if it doesnt face any neighbors
+                int neighbors = 0;
+                {
+                    neighbors |= ((section.y^(section.y-1))>>(lvl+1))==0?0:1<<0;//Down
+                    neighbors |= ((section.y^(section.y+1))>>(lvl+1))==0?0:1<<1;//Up
+                    neighbors |= ((section.x^(section.x-1))>>(lvl+1))==0?0:1<<2;//-x
+                    neighbors |= ((section.x^(section.x+1))>>(lvl+1))==0?0:1<<3;//+x
+                    neighbors |= ((section.z^(section.z-1))>>(lvl+1))==0?0:1<<4;//-z
+                    neighbors |= ((section.z^(section.z+1))>>(lvl+1))==0?0:1<<5;//+z
+                }
+
                 into.markDirty(worldSection, (didStateChange?UPDATE_TYPE_BLOCK_BIT:0)|(emptinessStateChange!=0?UPDATE_TYPE_CHILD_EXISTENCE_BIT:0));
             }
 
