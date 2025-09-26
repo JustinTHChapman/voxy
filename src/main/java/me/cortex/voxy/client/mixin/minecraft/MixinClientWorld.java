@@ -1,8 +1,10 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.render.WorldRenderer;
@@ -57,8 +59,11 @@ public abstract class MixinClientWorld {
         // block removal
         if (!updated.isAir()) return;
 
-        var system = ((IGetVoxyRenderSystem)(this.worldRenderer)).getVoxyRenderSystem();
-        if (system == null) {
+        if (!VoxyConfig.CONFIG.ingestEnabled) return;//Only ingest if setting enabled
+
+        var self = (World)(Object)this;
+        var wi = WorldIdentifier.of(self);
+        if (wi == null) {
             return;
         }
 
@@ -66,17 +71,15 @@ public abstract class MixinClientWorld {
         int y = pos.getY()&15;
         int z = pos.getZ()&15;
         if (x == 0 || x==15 || y==0 || y==15 || z==0||z==15) {//Update if there is a statechange on the boarder
-            var world = (World)(Object)this;
-
             var csp = ChunkSectionPos.from(pos);
 
-            var section = world.getChunk(pos).getSection(csp.getSectionY()-this.bottomSectionY);
-            var lp = world.getLightingProvider();
+            var section = self.getChunk(pos).getSection(csp.getSectionY()-this.bottomSectionY);
+            var lp = self.getLightingProvider();
 
             var blp = lp.get(LightType.BLOCK).getLightSection(csp);
             var slp = lp.get(LightType.SKY).getLightSection(csp);
 
-            VoxelIngestService.rawIngest(system.getEngine(), section, csp.getSectionX(), csp.getSectionY(), csp.getSectionZ(), blp==null?null:blp.copy(), slp==null?null:slp.copy());
+            VoxelIngestService.rawIngest(wi, section, csp.getSectionX(), csp.getSectionY(), csp.getSectionZ(), blp==null?null:blp.copy(), slp==null?null:slp.copy());
         }
     }
 }

@@ -17,7 +17,7 @@ public class WorldEngine {
     public static final int UPDATE_TYPE_BLOCK_BIT = 1;
     public static final int UPDATE_TYPE_CHILD_EXISTENCE_BIT = 2;
     public static final int UPDATE_TYPE_DONT_SAVE = 4;
-    public static final int UPDATE_FLAGS = UPDATE_TYPE_BLOCK_BIT | UPDATE_TYPE_CHILD_EXISTENCE_BIT;
+    public static final int DEFAULT_UPDATE_FLAGS = UPDATE_TYPE_BLOCK_BIT | UPDATE_TYPE_CHILD_EXISTENCE_BIT;
 
     public interface ISectionChangeCallback {void accept(WorldSection section, int updateFlags);}
     public interface ISectionSaveCallback {void save(WorldEngine engine, WorldSection section);}
@@ -113,7 +113,7 @@ public class WorldEngine {
 
     //Marks a section as dirty, enqueuing it for saving and or render data rebuilding
     public void markDirty(WorldSection section) {
-        this.markDirty(section, UPDATE_FLAGS);
+        this.markDirty(section, DEFAULT_UPDATE_FLAGS);
     }
 
     public void markDirty(WorldSection section, int changeState) {

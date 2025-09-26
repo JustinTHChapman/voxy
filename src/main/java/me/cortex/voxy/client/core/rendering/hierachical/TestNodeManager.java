@@ -139,7 +139,7 @@ public class TestNodeManager {
         }
 
         private static String[] getPrettyTypes(int msk) {
-            if ((msk&~UPDATE_FLAGS)!=0) {
+            if ((msk&~(DEFAULT_UPDATE_FLAGS|UPDATE_TYPE_DONT_SAVE))!=0) {
                 throw new IllegalStateException();
             }
             String[] types = new String[Integer.bitCount(msk)];
@@ -149,6 +149,9 @@ public class TestNodeManager {
             }
             if ((msk&UPDATE_TYPE_CHILD_EXISTENCE_BIT)!=0) {
                 types[i++] = "CHILD";
+            }
+            if ((msk&UPDATE_TYPE_DONT_SAVE)!=0) {
+                types[i++] = "DONT_SAVE";
             }
             return types;
         }

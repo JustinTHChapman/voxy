@@ -200,6 +200,13 @@ public class VoxelIngestService {
         }
     }
 
+    public static boolean rawIngest(WorldIdentifier id, ChunkSection section, int x, int y, int z, ChunkNibbleArray bl, ChunkNibbleArray sl) {
+        if (id == null) return false;
+        var engine = id.getOrCreateEngine();
+        if (engine == null) return false;
+        return rawIngest(engine, section, x, y, z, bl, sl);
+    }
+
     public static boolean rawIngest(WorldEngine engine, ChunkSection section, int x, int y, int z, ChunkNibbleArray bl, ChunkNibbleArray sl) {
         if (!shouldIngestSection(section, x, y, z)) return false;
         if (engine.instanceIn == null) return false;

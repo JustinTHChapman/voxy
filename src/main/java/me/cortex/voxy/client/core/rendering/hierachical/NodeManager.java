@@ -154,7 +154,7 @@ public class NodeManager {
 
         var request = new SingleNodeRequest(pos);
         int id = this.singleRequests.put(request);
-        this.watcher.watch(pos, WorldEngine.UPDATE_FLAGS);
+        this.watcher.watch(pos, WorldEngine.DEFAULT_UPDATE_FLAGS);
         this.activeSectionMap.put(pos, id|NODE_TYPE_REQUEST|REQUEST_TYPE_SINGLE);
         this.topLevelNodes.add(pos);
     }
@@ -353,7 +353,7 @@ public class NodeManager {
                                 throw new IllegalStateException("Child pos was in a request but not in active section map");
                             }
 
-                            if (!this.watcher.unwatch(cPos, WorldEngine.UPDATE_FLAGS)) {
+                            if (!this.watcher.unwatch(cPos, WorldEngine.DEFAULT_UPDATE_FLAGS)) {
                                 throw new IllegalStateException("Child pos was not being watched");
                             }
                         }
@@ -371,7 +371,7 @@ public class NodeManager {
                             if (this.activeSectionMap.put(cPos, requestId|NODE_TYPE_REQUEST|REQUEST_TYPE_CHILD) != -1) {
                                 throw new IllegalStateException("Child pos was already in active section tracker but was part of a request");
                             }
-                            if (!this.watcher.watch(cPos, WorldEngine.UPDATE_FLAGS)) {
+                            if (!this.watcher.watch(cPos, WorldEngine.DEFAULT_UPDATE_FLAGS)) {
                                 throw new IllegalStateException("Child pos update router issue");
                             }
                         }
@@ -428,7 +428,7 @@ public class NodeManager {
                 if (this.activeSectionMap.put(cPos, requestId|NODE_TYPE_REQUEST|REQUEST_TYPE_CHILD) != -1) {
                     throw new IllegalStateException("Child pos was already in active section tracker but was part of a request");
                 }
-                if (!this.watcher.watch(cPos, WorldEngine.UPDATE_FLAGS)) {
+                if (!this.watcher.watch(cPos, WorldEngine.DEFAULT_UPDATE_FLAGS)) {
                     throw new IllegalStateException("Child pos update router issue");
                 }
             }
@@ -467,7 +467,7 @@ public class NodeManager {
                         if (cnid == -1 || (cnid&NODE_TYPE_MSK) != NODE_TYPE_REQUEST) {//TODO: verify the removed section is a request type of child and the request id matches this
                             throw new IllegalStateException("Child pos was in a request but not in active section map");
                         }
-                        if (!this.watcher.unwatch(cPos, WorldEngine.UPDATE_FLAGS)) {
+                        if (!this.watcher.unwatch(cPos, WorldEngine.DEFAULT_UPDATE_FLAGS)) {
                             throw new IllegalStateException("Child pos was not being watched");
                         }
                     }
@@ -663,7 +663,7 @@ public class NodeManager {
             if ((cId&NODE_TYPE_MSK) != NODE_TYPE_REQUEST || (cId&REQUEST_TYPE_MSK) != REQUEST_TYPE_CHILD || (cId&NODE_ID_MSK) != reqId) {
                 throw new IllegalStateException("Invalid child active state map: " + cId);
             }
-            if (!this.watcher.unwatch(childPos, WorldEngine.UPDATE_FLAGS)) {
+            if (!this.watcher.unwatch(childPos, WorldEngine.DEFAULT_UPDATE_FLAGS)) {
                 throw new IllegalStateException("Pos was not being watched");
             }
         }
@@ -785,7 +785,7 @@ public class NodeManager {
                 this.invalidateNode(nodeId);
 
                 //Unwatch position
-                if (!this.watcher.unwatch(pos, WorldEngine.UPDATE_FLAGS)) {
+                if (!this.watcher.unwatch(pos, WorldEngine.DEFAULT_UPDATE_FLAGS)) {
                     throw new IllegalStateException("Pos was not being watched");
                 }
             } else {
@@ -795,7 +795,7 @@ public class NodeManager {
                 this.invalidateNode(nodeId);
             }
         } else if (type == NODE_TYPE_REQUEST) {
-            if (!this.watcher.unwatch(pos, WorldEngine.UPDATE_FLAGS)) {
+            if (!this.watcher.unwatch(pos, WorldEngine.DEFAULT_UPDATE_FLAGS)) {
                 throw new IllegalStateException("Pos was not being watched");
             }
             if ((nodeId&REQUEST_TYPE_MSK) == REQUEST_TYPE_SINGLE) {
@@ -1184,7 +1184,7 @@ public class NodeManager {
             }
 
             //Watch and request the child node at the given position
-            if (!this.watcher.watch(childPos, WorldEngine.UPDATE_FLAGS)) {
+            if (!this.watcher.watch(childPos, WorldEngine.DEFAULT_UPDATE_FLAGS)) {
                 throw new IllegalStateException("Failed to watch childPos");
             }
         }

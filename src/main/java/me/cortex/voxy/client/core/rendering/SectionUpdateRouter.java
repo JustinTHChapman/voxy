@@ -145,7 +145,7 @@ public class SectionUpdateRouter implements ISectionWatcher {
             if ((type&WorldEngine.UPDATE_TYPE_CHILD_EXISTENCE_BIT)!=0) {
                 this.childUpdateCallback.accept(section);
             }
-            if ((type& UPDATE_TYPE_BLOCK_BIT)!=0) {
+            if ((type&UPDATE_TYPE_BLOCK_BIT)!=0) {
                 this.renderMeshGen.accept(section.key);
             }
         }
