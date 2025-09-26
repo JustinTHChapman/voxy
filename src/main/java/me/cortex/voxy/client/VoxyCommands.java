@@ -14,6 +14,8 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.command.CommandSource;
+import net.minecraft.text.PlainTextContent;
+import net.minecraft.text.Text;
 
 import java.io.File;
 import java.io.IOException;
@@ -52,7 +54,7 @@ public class VoxyCommands {
                             .executes(VoxyCommands::importDistantHorizons)));
         }
 
-        return ClientCommandManager.literal("voxy").requires((ctx)-> VoxyCommon.getInstance() != null)
+        return ClientCommandManager.literal("voxy")//.requires((ctx)-> VoxyCommon.getInstance() != null)
                 .then(ClientCommandManager.literal("reload")
                         .executes(VoxyCommands::reloadInstance))
                 .then(imports);
@@ -61,6 +63,7 @@ public class VoxyCommands {
     private static int reloadInstance(CommandContext<FabricClientCommandSource> ctx) {
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
         var wr = MinecraftClient.getInstance().worldRenderer;
@@ -82,6 +85,7 @@ public class VoxyCommands {
     private static int importDistantHorizons(CommandContext<FabricClientCommandSource> ctx) {
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
         var dbFile = new File(ctx.getArgument("sqlDbPath", String.class));
@@ -118,10 +122,20 @@ public class VoxyCommands {
     }
 
     private static int importRaw(CommandContext<FabricClientCommandSource> ctx) {
+        if (VoxyCommon.getInstance() == null) {
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
+            return 1;
+        }
+
         return fileBasedImporter(new File(ctx.getArgument("path", String.class)))?0:1;
     }
 
     private static int importBobby(CommandContext<FabricClientCommandSource> ctx) {
+        if (VoxyCommon.getInstance() == null) {
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
+            return 1;
+        }
+
         var file = new File(".bobby").toPath().resolve(ctx.getArgument("world_name", String.class)).toFile();
         return fileBasedImporter(file)?0:1;
     }
@@ -176,6 +190,11 @@ public class VoxyCommands {
     }
 
     private static int importWorld(CommandContext<FabricClientCommandSource> ctx) {
+        if (VoxyCommon.getInstance() == null) {
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
+            return 1;
+        }
+
         var name = ctx.getArgument("world_name", String.class);
         var file = new File("saves").toPath().resolve(name);
         name = name.toLowerCase();
@@ -197,6 +216,7 @@ public class VoxyCommands {
 
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
         String finalInnerDir = innerDir;
@@ -212,9 +232,10 @@ public class VoxyCommands {
         return 1;
     }
 
-    private static int cancelImport(CommandContext<FabricClientCommandSource> fabricClientCommandSourceCommandContext) {
+    private static int cancelImport(CommandContext<FabricClientCommandSource> ctx) {
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
         var world = WorldIdentifier.ofEngineNullable(MinecraftClient.getInstance().player.clientWorld);
