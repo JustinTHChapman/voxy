@@ -1606,7 +1606,9 @@ public class RenderDataFactory {
         if (neighborMsk>>31!=0) {//We failed to get everything so throw exception
             throw new IdNotYetComputedException(neighborMsk&(~(1<<31)), true);
         }
-        this.acquireNeighborData(section, neighborMsk);
+        if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
+            this.acquireNeighborData(section, neighborMsk);
+        }
 
         try {
             this.generateYZFaces();
