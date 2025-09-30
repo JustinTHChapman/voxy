@@ -345,6 +345,8 @@ public class ModelFactory {
 
         boolean fullyOpaque = true;
 
+        //TODO: FIXME faces that have the same "alignment depth" e.g. (sizes[0]+sizes[1])~=1 can be merged into a double faced single quad
+
         //TODO: add a bunch of control config options for overriding/setting options of metadata for each face of each type
         for (int face = 5; face != -1; face--) {//In reverse order to make indexing into the metadata long easier
             long faceUploadPtr = uploadPtr + 4L * face;//Each face gets 4 bytes worth of data
@@ -394,14 +396,19 @@ public class ModelFactory {
 
 
 
-            //Scale face size from 0->this.modelTextureSize-1 to 0->15
-            for (int i = 0; i < 4; i++) {
-                faceSize[i] = Math.round((((float)faceSize[i])/(MODEL_TEXTURE_SIZE-1))*15);
+            if (MODEL_TEXTURE_SIZE-1 != 15) {
+                //Scale face size from 0->this.modelTextureSize-1 to 0->15
+                for (int i = 0; i < 4; i++) {
+                    faceSize[i] = Math.round((((float) faceSize[i]) / (MODEL_TEXTURE_SIZE - 1)) * 15);
+                }
             }
 
             int faceModelData = 0;
             faceModelData |= faceSize[0] | (faceSize[1]<<4) | (faceSize[2]<<8) | (faceSize[3]<<12);
-            faceModelData |= Math.round(offset*63)<<16;//Change the scale from 0->1 (ends inclusive) float to 0->63 (6 bits) NOTE! that 63 == 1.0f meaning its shifted all the way to the other side of the model
+            //Change the scale from 0->1 (ends inclusive)
+            // this is cursed also warning stuff at 63 (i.e half a pixel from the end will be clamped to the end)
+            int enc = Math.round(offset*64);
+            faceModelData |= Math.min(enc,63)<<16;
             //Still have 11 bits free
 
             //Stuff like fences are solid, however they have extra side piece that mean it needs to have discard on

@@ -67,8 +67,8 @@ public class ModelTextureBakery {
 
         int meta = getMetaFromLayer(layer);
 
-        for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
-            for (var part : model.getParts(new LocalRandom(42L))) {
+        for (var part : model.getParts(new LocalRandom(42L))) {
+            for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
                 var quads = part.getQuads(direction);
                 for (var quad : quads) {
                     this.vc.quad(quad, meta|(quad.hasTint()?4:0));

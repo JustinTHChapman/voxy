@@ -111,6 +111,12 @@ public class BasicSectionGeometryData implements IGeometryData {
             glFinish();
             gpuMemory = Capabilities.INSTANCE.getFreeDedicatedGpuMemory();
         }
+        if (this.geometryBuffer.isSparse()) {
+            glBindBuffer(GL_ARRAY_BUFFER, this.geometryBuffer.id);
+            glBufferPageCommitmentARB(GL_ARRAY_BUFFER, 0, this.sparseCommitment, false);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+
         glFinish();
         this.geometryBuffer.free();
         glFinish();
