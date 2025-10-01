@@ -33,10 +33,11 @@ public class MixinWorldRenderer {
             boolean renderBlockOutline,
             Camera camera,
             Matrix4f positionMatrix,
+            Matrix4f basicProjectionMatrix,
             Matrix4f projectionMatrix,
-            GpuBufferSlice fog,
+            GpuBufferSlice fogBuffer,
             Vector4f fogColor,
-            boolean shouldRenderSky,
+            boolean renderSky,
             CallbackInfo ci) {
         if (IrisUtil.irisShaderPackEnabled()) {
             var renderer = ((IGetVoxyRenderSystem) this).getVoxyRenderSystem();

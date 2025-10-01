@@ -100,10 +100,10 @@ public class VoxyCommands {
         }
 
         File dbFile_ = dbFile;
-        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().player.clientWorld);
+        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().world);
         if (engine==null)return 1;
         return instance.getImportManager().makeAndRunIfNone(engine, ()->
-                new DHImporter(dbFile_, engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.savingServiceRateLimiter))?0:1;
+                new DHImporter(dbFile_, engine, MinecraftClient.getInstance().world, instance.getThreadPool(), instance.savingServiceRateLimiter))?0:1;
     }
 
     private static boolean fileBasedImporter(File directory) {
@@ -112,10 +112,10 @@ public class VoxyCommands {
             return false;
         }
 
-        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().player.clientWorld);
+        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().world);
         if (engine==null) return false;
         return instance.getImportManager().makeAndRunIfNone(engine, ()->{
-            var importer = new WorldImporter(engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.savingServiceRateLimiter);
+            var importer = new WorldImporter(engine, MinecraftClient.getInstance().world, instance.getThreadPool(), instance.savingServiceRateLimiter);
             importer.importRegionDirectoryAsync(directory);
             return importer;
         });
@@ -221,10 +221,10 @@ public class VoxyCommands {
         }
         String finalInnerDir = innerDir;
 
-        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().player.clientWorld);
+        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().world);
         if (engine != null) {
             return instance.getImportManager().makeAndRunIfNone(engine, () -> {
-                var importer = new WorldImporter(engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.savingServiceRateLimiter);
+                var importer = new WorldImporter(engine, MinecraftClient.getInstance().world, instance.getThreadPool(), instance.savingServiceRateLimiter);
                 importer.importZippedRegionDirectoryAsync(zip, finalInnerDir);
                 return importer;
             }) ? 0 : 1;
@@ -238,7 +238,7 @@ public class VoxyCommands {
             ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
-        var world = WorldIdentifier.ofEngineNullable(MinecraftClient.getInstance().player.clientWorld);
+        var world = WorldIdentifier.ofEngineNullable(MinecraftClient.getInstance().world);
         if (world != null) {
             return instance.getImportManager().cancelImport(world)?0:1;
         }

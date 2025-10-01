@@ -22,7 +22,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(WorldRenderer.class)
 public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
-    @Shadow private Frustum frustum;
     @Shadow private @Nullable ClientWorld world;
     @Unique private VoxyRenderSystem renderer;
 

@@ -23,10 +23,7 @@ import net.minecraft.util.collection.IndexedIterable;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeKeys;
-import net.minecraft.world.chunk.ChunkNibbleArray;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.PalettedContainer;
-import net.minecraft.world.chunk.ReadableContainer;
+import net.minecraft.world.chunk.*;
 import net.minecraft.world.storage.ChunkCompressionFormat;
 import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
 import org.apache.commons.compress.archivers.zip.ZipFile;
@@ -51,6 +48,7 @@ public class WorldImporter implements IDataImporter {
     private final WorldEngine world;
     private final ReadableContainer<RegistryEntry<Biome>> defaultBiomeProvider;
     private final Codec<ReadableContainer<RegistryEntry<Biome>>> biomeCodec;
+    private final Codec<PalettedContainer<BlockState>> blockStateCodec;
     private final AtomicInteger estimatedTotalChunks = new AtomicInteger();//Slowly converges to the true value
     private final AtomicInteger totalChunks = new AtomicInteger();
     private final AtomicInteger chunksProcessed = new AtomicInteger();
@@ -88,6 +86,11 @@ public class WorldImporter implements IDataImporter {
             }
 
             @Override
+            public int getElementBits() {
+                return 0;
+            }
+
+            @Override
             public boolean hasAny(Predicate<RegistryEntry<Biome>> predicate) {
                 return false;
             }
@@ -108,14 +111,14 @@ public class WorldImporter implements IDataImporter {
             }
 
             @Override
-            public Serialized<RegistryEntry<Biome>> serialize(IndexedIterable<RegistryEntry<Biome>> idList, PalettedContainer.PaletteProvider paletteProvider) {
+            public Serialized<RegistryEntry<Biome>> serialize(PaletteProvider<RegistryEntry<Biome>> provider) {
                 return null;
             }
         };
 
-        this.biomeCodec = PalettedContainer.createReadableContainerCodec(
-                biomeRegistry.getIndexedEntries(), biomeRegistry.getEntryCodec(), PalettedContainer.PaletteProvider.BIOME, biomeRegistry.getOrThrow(BiomeKeys.PLAINS)
-        );
+        var factory = PalettesFactory.fromRegistryManager(mcWorld.getRegistryManager());
+        this.biomeCodec = factory.biomeContainerCodec();
+        this.blockStateCodec = factory.blockStatesContainerCodec();
     }
 
 
@@ -460,7 +463,6 @@ public class WorldImporter implements IDataImporter {
 
     private static final byte[] EMPTY = new byte[0];
     private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
-    private static final Codec<PalettedContainer<BlockState>> BLOCK_STATE_CODEC = PalettedContainer.createPalettedContainerCodec(Block.STATE_IDS, BlockState.CODEC, PalettedContainer.PaletteProvider.BLOCK_STATE, Blocks.AIR.getDefaultState());
     private void importSectionNBT(int x, int y, int z, NbtCompound section) {
         if (section.getCompound("block_states").isEmpty()) {
             return;
@@ -483,7 +485,7 @@ public class WorldImporter implements IDataImporter {
             skyLight = null;
         }
 
-        var blockStatesRes = BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states").get());
+        var blockStatesRes = blockStateCodec.parse(NbtOps.INSTANCE, section.getCompound("block_states").get());
         if (!blockStatesRes.hasResultOrPartial()) {
             //TODO: if its only partial, it means should try to upgrade the nbt format with datafixerupper probably
             return;

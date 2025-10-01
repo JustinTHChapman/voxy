@@ -13,6 +13,8 @@ import java.util.List;
 
 @Mixin(DebugHud.class)
 public class MixinDebugHud {
+    //TODO: Fix this
+    /*
     @Inject(method = "getRightText", at = @At("RETURN"))
     private void injectDebug(CallbackInfoReturnable<List<String>> cir) {
         var ret = cir.getReturnValue();
@@ -26,5 +28,5 @@ public class MixinDebugHud {
         if (renderer != null) {
             renderer.addDebugInfo(ret);
         }
-    }
+    }*/
 }
