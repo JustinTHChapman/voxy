@@ -86,6 +86,5 @@ public class VoxyCommon implements ModInitializer {
         return FACTORY != null;
     }
 
-
     public static final boolean IS_MINE_IN_ABYSS = false;
 }
