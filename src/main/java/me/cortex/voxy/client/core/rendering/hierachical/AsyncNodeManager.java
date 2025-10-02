@@ -760,7 +760,7 @@ public class AsyncNodeManager {
         return this.workCounter.get()!=0 || RESULT_HANDLE.get(this) != null;
     }
 
-    public void worldEvent(WorldSection section, int flags) {
+    public void worldEvent(WorldSection section, int flags, int neighborMask) {
         //If there is any change, we need to clear the geometry cache before emitting update
         this.geometryCache.clear(section.key);
 
