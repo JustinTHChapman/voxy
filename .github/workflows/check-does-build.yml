@@ -26,6 +26,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: false
+          cache-cleanup: never
 
       - name: Gradle build
         run: ./gradlew build
