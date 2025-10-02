@@ -148,6 +148,12 @@ public class VoxyRenderSystem {
         for (int i = 0; i < oldBufferBindings.length; i++) {
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, oldBufferBindings[i]);
         }
+
+        for (int i = 0; i < 12; i++) {
+            GlStateManager._activeTexture(GlConst.GL_TEXTURE0+i);
+            GlStateManager._bindTexture(0);
+            glBindSampler(i, 0);
+        }
     }
 
 

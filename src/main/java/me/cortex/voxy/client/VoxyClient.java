@@ -8,6 +8,8 @@ import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.gui.hud.debug.DebugHudEntries;
+import net.minecraft.util.Identifier;
 
 import java.util.HashSet;
 import java.util.function.Consumer;
@@ -15,7 +17,6 @@ import java.util.function.Function;
 
 public class VoxyClient implements ClientModInitializer {
     private static final HashSet<String> FREX = new HashSet<>();
-
 
     public static void initVoxyClient() {
         Capabilities.init();//Ensure clinit is called
@@ -39,6 +40,7 @@ public class VoxyClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        DebugHudEntries.register(Identifier.of("voxy","debug"), new VoxyDebugScreenEntry());
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             if (VoxyCommon.isAvailable()) {
                 dispatcher.register(VoxyCommands.register());

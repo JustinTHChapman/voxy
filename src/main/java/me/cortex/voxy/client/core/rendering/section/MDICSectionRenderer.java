@@ -17,6 +17,7 @@ import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
+import net.minecraft.client.MinecraftClient;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
@@ -102,6 +103,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         var builder = Shader.make()
                 .defineIf("TAA_PATCH", taa != null)
                 .defineIf("DEBUG_RENDER", false)
+
+                .defineIf("DARKENED_TINTING", MinecraftClient.getInstance().world.getDimensionEffects().isDarkened())//TODO: FIXME: this is really jank atm
+
                 .addSource(ShaderType.VERTEX, vertex);
 
         String frag = ShaderLoader.parse("voxy:lod/gl46/quads.frag");

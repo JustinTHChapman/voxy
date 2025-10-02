@@ -1,12 +1,16 @@
 package me.cortex.voxy.common.world.other;
 
+import com.mojang.serialization.Dynamic;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.IMappingStorage;
+import net.minecraft.SharedConstants;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.LeavesBlock;
+import net.minecraft.datafixer.Schemas;
+import net.minecraft.datafixer.TypeReferences;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
@@ -95,26 +99,31 @@ public class Mapper {
     }
 
     private void loadFromStorage() {
+        //TODO: FIXME: have/store the minecraft version the mappings are from (the data version)
+        // SharedConstants.getGameVersion().dataVersion().id()
+        // then use this to create an update path instead
+
         var mappings = this.storage.getIdMappingsData();
         List<StateEntry> sentries = new ArrayList<>();
         List<BiomeEntry> bentries = new ArrayList<>();
         List<Pair<byte[], Integer>> sentryErrors = new ArrayList<>();
 
-
+        boolean[] forceResave = new boolean[1];
         for (var entry : mappings.int2ObjectEntrySet()) {
             int entryType = entry.getIntKey()>>>30;
             int id = entry.getIntKey() & ((1<<30)-1);
             if (entryType == BLOCK_STATE_TYPE) {
-                var sentry = StateEntry.deserialize(id, entry.getValue());
+                var sentry = StateEntry.deserialize(id, entry.getValue(), forceResave);
                 if (sentry.state.isAir()) {
                     Logger.error("Deserialization was air, removed block");
                     sentryErrors.add(new Pair<>(entry.getValue(), id));
                     continue;
                 }
                 sentries.add(sentry);
-                var oldEntry = this.block2stateEntry.put(sentry.state, sentry);
+                var oldEntry = this.block2stateEntry.putIfAbsent(sentry.state, sentry);
                 if (oldEntry != null) {
-                    throw new IllegalStateException("Multiple mappings for blockstate");
+                    //forceResave[0] |= true;
+                    Logger.warn("Multiple mappings for blockstate, using old state, expect things to possibly go really badly. " + oldEntry.id + ":" + sentry.id + ":" + sentry.state );
                 }
             } else if (entryType == BIOME_TYPE) {
                 var bentry = BiomeEntry.deserialize(id, entry.getValue());
@@ -127,7 +136,8 @@ public class Mapper {
             }
         }
 
-        {
+        if (!sentryErrors.isEmpty()) {
+            forceResave[0] |= true;
             //Insert garbage types into the mapping for those blocks, TODO:FIXME: Need to upgrade the type or have a solution to error blocks
             var rand = new Random();
             for (var error : sentryErrors) {
@@ -156,6 +166,10 @@ public class Mapper {
             this.biomeId2biomeEntry.add(entry);
         });
 
+        if (forceResave[0]) {
+            Logger.warn("Forced state resave triggered");
+            this.forceResaveStates();
+        }
     }
 
     public final int getBlockStateCount() {
@@ -357,16 +371,26 @@ public class Mapper {
             }
         }
 
-        public static StateEntry deserialize(int id, byte[] data) {
+        public static StateEntry deserialize(int id, byte[] data, boolean[] forceResave) {
             try {
                 var compound = NbtIo.readCompressed(new ByteArrayInputStream(data), NbtSizeTracker.ofUnlimitedBytes());
                 if (compound.getInt("id", -1) != id) {
                     throw new IllegalStateException("Encoded id != expected id");
                 }
-                var state = BlockState.CODEC.parse(NbtOps.INSTANCE, compound.getCompound("block_state").orElseThrow());
+                var bsc = compound.getCompound("block_state").orElseThrow();
+                var state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
                 if (state.isError()) {
-                    Logger.error("Could not decode blockstate setting to air. id:" + id + " error: " + state.error().get().message());
-                    return new StateEntry(id, Blocks.AIR.getDefaultState());
+                    Logger.info("Could not decode blockstate, attempting fixes, error: "+ state.error().get().message());
+                    bsc = (NbtCompound) Schemas.getFixer().update(TypeReferences.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc),0, SharedConstants.getGameVersion().dataVersion().id()).getValue();
+                    state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
+                    if (state.isError()) {
+                        Logger.error("Could not decode blockstate setting to air. id:" + id + " error: " + state.error().get().message());
+                        return new StateEntry(id, Blocks.AIR.getDefaultState());
+                    } else {
+                        Logger.info("Fixed blockstate to: " + state.getOrThrow());
+                        forceResave[0] |= true;
+                        return new StateEntry(id, state.getOrThrow());
+                    }
                 } else {
                     return new StateEntry(id, state.getOrThrow());
                 }
