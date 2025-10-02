@@ -69,7 +69,7 @@ public class SectionUpdateRouter implements ISectionWatcher {
             }
             lock.unlock(stamp);
         }
-        if ((delta&UPDATE_TYPE_BLOCK_BIT)!=0) {
+        if (((delta&types)&UPDATE_TYPE_BLOCK_BIT)!=0) {
             //If we added it, immediately invoke for an update
             this.initialRenderMeshGen.accept(position);
         }
