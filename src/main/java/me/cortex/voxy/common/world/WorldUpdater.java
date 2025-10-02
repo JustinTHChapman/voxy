@@ -104,7 +104,7 @@ public class WorldUpdater {
                 //Bitmask of neighboring sections
                 //Note, this may be zero (this is more likely to occure at higher lod levels) if it doesnt face any neighbors
                 int neighbors = 0;
-                {
+                if (didStateChange) {
                     neighbors |= ((section.y^(section.y-1))>>(lvl+1))==0?0:1<<0;//Down
                     neighbors |= ((section.y^(section.y+1))>>(lvl+1))==0?0:1<<1;//Up
                     neighbors |= ((section.x^(section.x-1))>>(lvl+1))==0?0:1<<2;//-x
