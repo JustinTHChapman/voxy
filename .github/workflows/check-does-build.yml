@@ -29,4 +29,4 @@ jobs:
           cache-cleanup: never
 
       - name: Gradle build
-        run: ./gradlew build
+        run: ./gradlew -I init.gradle build
