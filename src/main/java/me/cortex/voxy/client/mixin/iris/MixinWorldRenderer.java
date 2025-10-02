@@ -4,6 +4,7 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.client.core.util.IrisUtil;
+import me.cortex.voxy.common.Logger;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.caffeinemc.mods.sodium.client.util.FogStorage;
 import net.minecraft.client.MinecraftClient;
@@ -33,8 +34,8 @@ public class MixinWorldRenderer {
             boolean renderBlockOutline,
             Camera camera,
             Matrix4f positionMatrix,
-            Matrix4f basicProjectionMatrix,
             Matrix4f projectionMatrix,
+            Matrix4f basicProjectionMatrix,
             GpuBufferSlice fogBuffer,
             Vector4f fogColor,
             boolean renderSky,
