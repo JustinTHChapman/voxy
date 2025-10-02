@@ -138,16 +138,29 @@ public class SectionUpdateRouter implements ISectionWatcher {
         var lock = this.locks[idx];
 
         long stamp = lock.readLock();
-        byte types = set.getOrDefault(position, (byte) 0);
+        byte types = (byte) (set.getOrDefault(position, (byte) 0)&type);
         lock.unlockRead(stamp);
 
         if (types!=0) {
-            if ((type&WorldEngine.UPDATE_TYPE_CHILD_EXISTENCE_BIT)!=0) {
+            if ((types&WorldEngine.UPDATE_TYPE_CHILD_EXISTENCE_BIT)!=0) {
                 this.childUpdateCallback.accept(section);
             }
-            if ((type&UPDATE_TYPE_BLOCK_BIT)!=0) {
+            if ((types&UPDATE_TYPE_BLOCK_BIT)!=0) {
                 this.renderMeshGen.accept(section.key);
             }
+        }
+    }
+
+    public void triggerRemesh(long position) {
+        int idx = getSliceIndex(position);
+        var set = this.slices[idx];
+        var lock = this.locks[idx];
+
+        long stamp = lock.readLock();
+        byte types = set.getOrDefault(position, (byte) 0);
+        lock.unlockRead(stamp);
+        if ((types&UPDATE_TYPE_BLOCK_BIT)!=0) {
+            this.renderMeshGen.accept(position);
         }
     }
 
