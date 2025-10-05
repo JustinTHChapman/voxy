@@ -133,7 +133,7 @@ dependencies {
 
     //modImplementation('io.github.douira:glsl-transformer:2.0.1')
 
-    modCompileOnly("maven.modrinth:vivecraft:1.21.1-1.1.14-b2-fabric")
+    modCompileOnly("maven.modrinth:vivecraft:1.21.8-1.2.5-b6-fabric")
 
     modCompileOnly("maven.modrinth:flashback:rNCr1Rbs")
 }

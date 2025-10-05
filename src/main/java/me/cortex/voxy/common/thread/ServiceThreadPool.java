@@ -29,7 +29,7 @@ public class ServiceThreadPool {
     }
 
     public ServiceThreadPool(int threadCount, int priority) {
-        if (CpuLayout.CORES.length-2 < threadCount) {
+        if (CpuLayout.getCoreCount()-2 < threadCount) {
             Logger.warn("The thread count over core count -2, performance degradation possible");
         }
 
@@ -38,7 +38,7 @@ public class ServiceThreadPool {
         for (int i = 0; i < threadCount; i++) {
             int threadId = i;
             var worker = new Thread(this.threadGroup, ()->{
-                if (CpuLayout.CORES.length>3) {
+                if (CpuLayout.CORES!=null && CpuLayout.CORES.length>3) {
                     //Set worker affinity if possible
                     CpuLayout.setThreadAffinity(CpuLayout.CORES[2 + (threadId % (CpuLayout.CORES.length - 2))]);
                 }

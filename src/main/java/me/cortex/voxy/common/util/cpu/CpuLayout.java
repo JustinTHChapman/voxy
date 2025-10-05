@@ -156,4 +156,12 @@ public class CpuLayout {
             Thread.sleep(100);
         }
     }
+
+    public static int getCoreCount() {
+        if (CORES==null) {
+            return Runtime.getRuntime().availableProcessors();
+        } else {
+            return CORES.length;
+        }
+    }
 }
