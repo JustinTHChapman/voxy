@@ -2,7 +2,7 @@ package me.cortex.voxy.client.core;
 
 import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.TimingStatistics;
-import me.cortex.voxy.client.core.gl.Capabilities;
+import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.hierachical.AsyncNodeManager;
@@ -12,6 +12,7 @@ import me.cortex.voxy.client.core.rendering.post.FullscreenBlit;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.common.util.TrackedObject;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
@@ -86,8 +87,13 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
         var rs = ((AbstractSectionRenderer)this.sectionRenderer);
         rs.renderOpaque(viewport);
-        this.innerPrimaryWork(viewport, depthTexture);
-        rs.buildDrawCalls(viewport);
+        var occlusionDebug = VoxyClient.getOcclusionDebugState();
+        if (occlusionDebug==0) {
+            this.innerPrimaryWork(viewport, depthTexture);
+        }
+        if (occlusionDebug<=1) {
+            rs.buildDrawCalls(viewport);
+        }
         rs.renderTemporal(viewport);
 
         this.postOpaquePreTranslucent(viewport);

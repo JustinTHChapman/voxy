@@ -59,4 +59,12 @@ public class VoxyClient implements ClientModInitializer {
     public static boolean isFrexActive() {
         return !FREX.isEmpty();
     }
+
+    public static int getOcclusionDebugState() {
+        return 0;
+    }
+
+    public static boolean disableSodiumChunkRender() {
+        return getOcclusionDebugState() != 0;
+    }
 }

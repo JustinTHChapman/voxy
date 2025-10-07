@@ -197,7 +197,10 @@ public class VoxyRenderSystem {
                 .setScreenSize(width, height)
                 .setFogParameters(fogParameters)
                 .update();
-        viewport.frameId++;
+
+        if (VoxyClient.getOcclusionDebugState()==0) {
+            viewport.frameId++;
+        }
 
         return viewport;
     }
@@ -240,7 +243,7 @@ public class VoxyRenderSystem {
         this.pipeline.preSetup(viewport);
 
         TimingStatistics.E.start();
-        if (!IrisUtil.irisShadowActive()) {
+        if ((!VoxyClient.disableSodiumChunkRender())&&!IrisUtil.irisShadowActive()) {
             this.chunkBoundRenderer.render(viewport);
         } else {
             viewport.depthBoundingBuffer.clear(0);
