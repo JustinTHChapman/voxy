@@ -15,10 +15,8 @@ ivec3 unpackPos(ivec2 pos) {
 }
 
 bool shouldRender(ivec3 icorner) {
-    vec3 corner = vec3(icorner*16)+negInnerSec.xyz;
-    //closest point TODO: OPTIMIZE
-    corner = mix(mix(vec3(0), corner, lessThan(vec3(0), corner)), corner+16, lessThan(corner+16, vec3(0)));
-    return (corner.x*corner.x + corner.z*corner.z < negInnerSec.w*negInnerSec.w) && abs(corner.y) < negInnerSec.w;
+    vec3 corner = vec3(mix(mix(ivec3(0), icorner-1, lessThan(ivec3(0), icorner-1)), icorner+17, lessThan(icorner+17, ivec3(0))))-negInnerSec.xyz;
+    return (corner.x*corner.x + corner.z*corner.z <= negInnerSec.w*negInnerSec.w) && abs(corner.y) <= negInnerSec.w;
 }
 
 #ifdef TAA
@@ -28,7 +26,7 @@ vec2 getTAA();
 void main() {
     uint id = (gl_InstanceID<<5)+gl_BaseInstance+(gl_VertexID>>3);
 
-    ivec3 origin = unpackPos(chunkPos[id]);
+    ivec3 origin = unpackPos(chunkPos[id])*16;
     origin -= section.xyz;
 
     if (!shouldRender(origin)) {
@@ -36,11 +34,11 @@ void main() {
         return;
     }
 
-    ivec3 cubeCornerI = ivec3(gl_VertexID&1, (gl_VertexID>>2)&1, (gl_VertexID>>1)&1);
+    ivec3 cubeCornerI = ivec3(gl_VertexID&1, (gl_VertexID>>2)&1, (gl_VertexID>>1)&1)*16;
     //Expand the y height to be big (will be +- 8192)
     //TODO: make it W.R.T world height and offsets
     //cubeCornerI.y = cubeCornerI.y*1024-512;
-    gl_Position = MVP * vec4(vec3(cubeCornerI+origin)*16, 1);
+    gl_Position = MVP * vec4(vec3(cubeCornerI+origin), 1);
     gl_Position.z -= 0.0005f;
 
     #ifdef TAA
