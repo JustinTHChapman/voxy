@@ -137,7 +137,6 @@ public class TextureUtils {
 
     //NOTE: data goes from bottom left to top right (x first then y)
     public static int[] computeBounds(ColourDepthTextureData data, int checkMode) {
-        final var depth = data.depth();
         //Compute x bounds first
         int minX = 0;
         minXCheck:

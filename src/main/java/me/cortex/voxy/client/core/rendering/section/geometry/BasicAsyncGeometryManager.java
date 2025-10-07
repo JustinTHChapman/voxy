@@ -11,11 +11,12 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.util.function.Consumer;
 
-import static me.cortex.voxy.client.core.rendering.section.geometry.BasicSectionGeometryManager.SECTION_METADATA_SIZE;
 
 //Is basicly the manager for an "undefined" data store, the underlying store is irrelevant
 // this manager serves as an overlay, that is, it allows an implementation to do "async management" of the data store
 public class BasicAsyncGeometryManager implements IGeometryManager {
+    public static final int SECTION_METADATA_SIZE = 32;
+
     private static final long GEOMETRY_ELEMENT_SIZE = 8;
     private final HierarchicalBitSet allocationSet;
     private final AllocationArena allocationHeap = new AllocationArena();
