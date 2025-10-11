@@ -152,7 +152,7 @@ void main() {
             conditionalTinting = tintColour;
         }
 
-        setSizeAndFlags(modelId, flags, quadSize);
+        setSizeAndFlags(modelId, flags|(face<<4), quadSize);
 
         #ifndef PATCHED_SHADER
         uint addin = 0;
