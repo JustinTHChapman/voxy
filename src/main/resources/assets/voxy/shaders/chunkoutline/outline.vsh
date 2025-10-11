@@ -15,7 +15,7 @@ ivec3 unpackPos(ivec2 pos) {
 }
 
 bool shouldRender(ivec3 icorner) {
-    vec3 corner = vec3(mix(mix(ivec3(0), icorner-1, lessThan(ivec3(0), icorner-1)), icorner+17, lessThan(icorner+17, ivec3(0))))-negInnerSec.xyz;
+    vec3 corner = vec3(mix(mix(ivec3(0), icorner-1, lessThan(ivec3(0), icorner-1)), icorner+17, lessThan(icorner+17, ivec3(0))))+negInnerSec.xyz;
     return (corner.x*corner.x + corner.z*corner.z <= negInnerSec.w*negInnerSec.w) && abs(corner.y) <= negInnerSec.w;
 }
 
