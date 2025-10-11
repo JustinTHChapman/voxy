@@ -11,8 +11,8 @@ layout(binding = 2) uniform sampler2D depthTex;
 //TODO: need to fix when merged quads have discardAlpha set to false but they span multiple tiles
 // however they are not a full block
 
-layout(location = 0) in vec2 uv;
-layout(location = 1) in flat uvec4 interData;
+layout(location = 0) in flat uvec4 interData;
+layout(location = 1) in vec2 uv;
 
 #ifdef DEBUG_RENDER
 layout(location = 7) in flat uint quadDebug;
@@ -48,11 +48,7 @@ bool useCutout() {
 }
 
 uint getFace() {
-    #ifndef PATCHED_SHADER
-    return (interData.w>>8)&7u;
-    #else
-    return (interData.y>>8)&7u;
-    #endif
+    return (interData.x>>4)&7u;
 }
 
 #ifdef PATCHED_SHADER

@@ -14,8 +14,8 @@
 
 //#define DEBUG_RENDER
 
-layout(location = 0) out vec2 uv;
-layout(location = 1) out flat uvec4 interData;
+layout(location = 0) out flat uvec4 interData;
+layout(location = 1) out vec2 uv;
 
 uint packVec4(vec4 vec) {
     uvec4 vec_=uvec4(vec*255)<<uvec4(24,16,8,0);

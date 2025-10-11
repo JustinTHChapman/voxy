@@ -95,7 +95,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.pipeline = pipeline;
         //The pipeline can be used to transform the renderer in abstract ways
 
-        String vertex = ShaderLoader.parse("voxy:lod/gl46/quads2.vert");
+        String vertex = ShaderLoader.parse("voxy:lod/gl46/quads3.vert");
         String taa = pipeline.taaFunction("taaShift");
         if (taa != null) {
             vertex += "\n"+taa;//inject it at the end
