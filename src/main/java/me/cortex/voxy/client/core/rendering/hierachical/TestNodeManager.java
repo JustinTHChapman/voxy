@@ -592,10 +592,9 @@ public class TestNodeManager {
         test.printNodeChanges();
         Logger.info("\n\n");
 
-        var positions = new ArrayList<>(aa.keySet().stream().filter(k->{
+        var positions = new ArrayList<>(aa.keySet().longStream().filter(k->{
             return WorldEngine.getLevel(k)!=0;
-        }).toList());
-        positions.sort(Long::compareTo);
+        }).sorted().mapToObj(Long::new).toList());
         Collections.shuffle(positions, r);
 
         Logger.info("Removing", WorldEngine.pprintPos(positions.get(0)));
