@@ -257,14 +257,14 @@ public class RenderDataFactory {
 
                 int neighborMsk = 0;
                 //-+x
-                neighborMsk |= packedEmpty&1;//-x
-                neighborMsk |= (packedEmpty>>>30)&0b10;//+x
+                neighborMsk += packedEmpty&1;//-x
+                neighborMsk += (packedEmpty>>>30)&0b10;//+x
 
                 //notEmpty = (notEmpty != 0)?1:0;
-                neighborMsk |= ((((i - 1) >> 10) == 0) ? 0b100 : 0)*(packedEmpty!=0?1:0);//-y
-                neighborMsk |= ((((i - 1) >> 10) == 31) ? 0b1000 : 0)*(packedEmpty!=0?1:0);//+y
-                neighborMsk |= (((((i - 33) >> 5) & 0x1F) == 0) ? 0b10000 : 0)*(((int)notEmpty)!=0?1:0);//-z
-                neighborMsk |= (((((i - 1) >> 5) & 0x1F) == 31) ? 0b100000 : 0)*((notEmpty>>>32)!=0?1:0);//+z
+                neighborMsk += ((((i - 1) >> 10) == 0) ? 0b100 : 0)*(packedEmpty!=0?1:0);//-y
+                neighborMsk += ((((i - 1) >> 10) == 31) ? 0b1000 : 0)*(packedEmpty!=0?1:0);//+y
+                neighborMsk += (((((i - 33) >> 5) & 0x1F) == 0) ? 0b10000 : 0)*(((int)notEmpty)!=0?1:0);//-z
+                neighborMsk += (((((i - 1) >> 5) & 0x1F) == 31) ? 0b100000 : 0)*((notEmpty>>>32)!=0?1:0);//+z
 
                 neighborAcquireMsk |= neighborMsk;
 
