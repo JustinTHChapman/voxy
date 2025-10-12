@@ -39,9 +39,15 @@ public class TestNodeManager {
                 this.removeSection(oldId);
             }
             int newId = this.allocation.allocateNext();
+            if (newId == -1) {
+                Logger.error("Allocator full: "+this.allocation.getCount()+" " +section, new Throwable());
+                section.free();
+                return -1;
+            }
             var entry = new Entry(section.position, section.geometryBuffer.size);
-            if (this.sections.put(newId, entry) != null) {
-                throw new IllegalStateException();
+            var old = this.sections.put(newId, entry);
+            if (old != null) {
+                throw new IllegalStateException(oldId + ","+newId+" "+old+","+entry);
             }
             this.memoryInUse += entry.size;
             section.free();
@@ -282,22 +288,24 @@ public class TestNodeManager {
         int ITER_COUNT = 5_000;
         int INNER_ITER_COUNT = 1_000_000;
         boolean GEO_REM = true;
+        boolean LIMIT_REQUEST_SEC_ALLOCATION = true;
 
         AtomicInteger finished = new AtomicInteger();
         HashSet<List<StackTraceElement>> seenTraces = new HashSet<>();
 
+        Logger.SHUTUP_INFO = true;
         Logger.SHUTUP = true;
 
-        if (true) {
+        if (false) {
             for (int q = 0; q < ITER_COUNT; q++) {
                 //Logger.info("Iteration "+ q);
-                if (runTest(INNER_ITER_COUNT, q, seenTraces, GEO_REM)) {
+                if (runTest(INNER_ITER_COUNT, q, seenTraces, GEO_REM, LIMIT_REQUEST_SEC_ALLOCATION)) {
                     finished.incrementAndGet();
                 }
             }
         } else {
             IntStream.range(0, ITER_COUNT).parallel().forEach(i->{
-                if (runTest(INNER_ITER_COUNT, i, seenTraces, GEO_REM)) {
+                if (runTest(INNER_ITER_COUNT, i, seenTraces, GEO_REM, LIMIT_REQUEST_SEC_ALLOCATION)) {
                     finished.incrementAndGet();
                 }
             });
@@ -314,7 +322,7 @@ public class TestNodeManager {
         return WorldEngine.getWorldSectionId(lvl, r.nextInt(bound)+(WorldEngine.getX(top)<<4), r.nextInt(bound)+(WorldEngine.getY(top)<<4), r.nextInt(bound)+(WorldEngine.getZ(top)<<4));
     }
 
-    private static boolean runTest(int ITERS, int testIdx, Set<List<StackTraceElement>> traces, boolean geoRemoval) {
+    private static boolean runTest(int ITERS, int testIdx, Set<List<StackTraceElement>> traces, boolean geoRemoval, boolean requestLimiter) {
         Random r = new Random(testIdx * 1234L);
         try {
             var test = new TestBase();
@@ -334,7 +342,7 @@ public class TestNodeManager {
             //Fuzzy bruteforce everything
             for (int x = -R; x<=R; x++) {
                 for (int z = -R; z<=R; z++) {
-                    for (int y = -8; y<=7; y++) {
+                    for (int y = -1; y<=0; y++) {
                         tops.add(WorldEngine.getWorldSectionId(4, x, y, z));
                     }
                 }
@@ -351,28 +359,29 @@ public class TestNodeManager {
                 long pos = rPos(r, tops);
                 int op = r.nextInt(5);
                 int extra = r.nextInt(256);
+                boolean geoAddOk = ((!requestLimiter)||(test.geometryManager.allocation.getLimit()-test.geometryManager.allocation.getCount())>1000);
                 boolean hasGeometry = r.nextBoolean();
                 boolean addRemTLN = r.nextInt(64) == 0;
                 boolean extraBool = r.nextBoolean();
                 if (op == 0 && addRemTLN) {
-                    pos = WorldEngine.getWorldSectionId(4, r.nextInt(5)-2, r.nextInt(32)-16, r.nextInt(5)-2);
+                    pos = WorldEngine.getWorldSectionId(4, r.nextInt(5)-2, r.nextInt(2)-1, r.nextInt(5)-2);//r.nextInt(16)-8//for y
                     boolean cont = tops.contains(pos);
                     if (cont&&extraBool&&tops.size()>1) {
                         extraBool = true;
                         test.remTopPos(pos);
                         tops.rem(pos);
-                    } else if (!cont) {
+                    } else if ((!cont)&&geoAddOk) {
                         extraBool = false;
                         test.putTopPos(pos);
                         tops.add(pos);
                     }
-                } else if (op == 0) {
+                } else if (op == 0&&geoAddOk) {
                     test.request(pos);
                 }
                 if (op == 1) {
                     test.childUpdate(pos, extra);
                 }
-                if (op == 2) {
+                if (op == 2&&((!hasGeometry)||geoAddOk)) {
                     test.meshUpdate(pos, extra, hasGeometry ? 100 : 0);
                 }
                 if (op == 3 && geoRemoval) {

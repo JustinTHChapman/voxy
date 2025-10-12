@@ -136,7 +136,7 @@ public class NodeManager {
         z <<= lvl;
         long p2 = WorldEngine.getWorldSectionId(0, x, y, z);
         if (WorldEngine.getLevel(p2) != 0 || WorldEngine.getX(p2) != x || WorldEngine.getY(p2) != y || WorldEngine.getZ(p2) != z) {
-            throw new IllegalStateException("Position not valid at all levels");
+            throw new IllegalStateException("Position not valid at all levels: " + pos + "-"+WorldEngine.pprintPos(pos) + ":"+WorldEngine.pprintPos(p2));
         }
     }
 

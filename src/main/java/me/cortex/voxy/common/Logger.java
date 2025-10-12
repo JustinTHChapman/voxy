@@ -12,6 +12,7 @@ import java.util.stream.Stream;
 public class Logger {
     public static boolean INSERT_CLASS = true;
     public static boolean SHUTUP = false;
+    public static boolean SHUTUP_INFO = false;
     private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger("Voxy");
 
 
@@ -76,7 +77,7 @@ public class Logger {
     }
 
     public static void info(Object... args) {
-        if (SHUTUP) {
+        if (SHUTUP||SHUTUP_INFO) {
             return;
         }
         Throwable throwable = null;
