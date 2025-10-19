@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
+import static org.vivecraft.api.client.data.RenderPass.VANILLA;
+
 public class ViewportSelector <T extends Viewport<?>> {
     public static final boolean VIVECRAFT_INSTALLED = FabricLoader.getInstance().isModLoaded("vivecraft");
 
@@ -25,27 +27,28 @@ public class ViewportSelector <T extends Viewport<?>> {
     }
 
     private T getVivecraftViewport() {
-        var rApi = VRRenderingAPI.instance();
-        if (rApi == null) {
-            return this.defaultViewport;
-        }
-        var pass = rApi.getCurrentRenderPass();
-        if (pass == null) {
-            return this.defaultViewport;
+        var pass = VRRenderingAPI.instance().getCurrentRenderPass();
+        if (pass == null || pass == VANILLA) {
+            return null;
         }
         return this.getOrCreate(pass);
     }
 
     private static final Object IRIS_SHADOW_OBJECT = new Object();
     public T getViewport() {
-        if (VIVECRAFT_INSTALLED) {
-            return getVivecraftViewport();
+        T viewport = null;
+        if (viewport == null && VIVECRAFT_INSTALLED) {
+            viewport = getVivecraftViewport();
         }
 
-        if (IrisUtil.irisShadowActive()) {
-            return this.getOrCreate(IRIS_SHADOW_OBJECT);
+        if (viewport == null && IrisUtil.irisShadowActive()) {
+            viewport = this.getOrCreate(IRIS_SHADOW_OBJECT);
         }
-        return this.defaultViewport;
+        
+        if (viewport == null) {
+            viewport = this.defaultViewport;
+        }
+        return viewport;
     }
 
     public void free() {
