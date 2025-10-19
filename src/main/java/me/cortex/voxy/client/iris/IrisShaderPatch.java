@@ -9,6 +9,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import me.cortex.voxy.common.Logger;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
+import org.apache.commons.logging.Log;
 import org.lwjgl.opengl.ARBDrawBuffersBlend;
 
 import java.lang.reflect.Modifier;
@@ -140,6 +141,7 @@ public class IrisShaderPatch {
                                 }
                             }
                         } else {
+                            Logger.error("Unknown blend state "+val);
                             state = null;
                         }
                         if (bs != null) {
@@ -175,16 +177,33 @@ public class IrisShaderPatch {
         public boolean excludeLodsFromVanillaDepth;
         public float[] renderScale;
         public boolean useViewportDims;
-        public boolean checkValid() {
+        public String checkValid() {
             if (this.blending != null) {
+                int i = 0;
                 for (BlendState state : this.blending.values()) {
                     if (state.buffer != -1 && (state.buffer<0||this.translucentDrawBuffers.length<=state.buffer)) {
-                        return false;
+                        if (state.buffer<0) {
+                            return "Blending buffer is <0 at index: " + i;
+                        } else {
+                            return "Blending buffer index out of bounds at "+i+" was "+state.buffer+" maximum is " +(this.translucentDrawBuffers.length-1);
+                        }
                     }
+                    i++;
                 }
             }
-
-            return this.opaqueDrawBuffers != null && this.translucentDrawBuffers != null && this.uniforms != null && this.opaquePatchData != null;
+            if (this.opaquePatchData == null) {
+                return "Opaque patch data is null";
+            }
+            if (this.uniforms == null) {
+                return "Uniforms are null";
+            }
+            if (this.opaqueDrawBuffers == null) {
+                return "Opaque draw buffers are null";
+            }
+            if (this.translucentDrawBuffers == null) {
+                return "Translucent draw buffers are null";
+            }
+            return null;
         }
     }
 
@@ -319,27 +338,31 @@ public class IrisShaderPatch {
             }
             patchData = GSON.fromJson(voxyPatchData, PatchGson.class);
             if (patchData == null) {
-                throw new IllegalStateException("Voxy patch json returned null");
+                throw new IllegalStateException("Voxy patch json returned null, this is most likely due to malformed json file");
             }
 
             {//Inject data from the auxilery files if they are present
                 var opaque = sourceProvider.apply(directory.resolve("voxy_opaque.glsl"));
                 if (opaque != null) {
+                    Logger.info("External opaque shader patch applied");
                     patchData.opaquePatchData = opaque;
                 }
                 var translucent = sourceProvider.apply(directory.resolve("voxy_translucent.glsl"));
                 if (translucent != null) {
+                    Logger.info("External translucent shader patch applied");
                     patchData.translucentPatchData = translucent;
                 }
                 //This might be ok? not.. sure if is nice or not
                 var taa = sourceProvider.apply(directory.resolve("voxy_taa.glsl"));
                 if (taa != null) {
+                    Logger.info("External taa shader patch applied");
                     patchData.taaOffset = taa;
                 }
             }
 
-            if (!patchData.checkValid()) {
-                throw new IllegalStateException("voxy json patch not valid: " + voxyPatchData);
+            var invalidPatchDataReason = patchData.checkValid();
+            if (invalidPatchDataReason!=null) {
+                throw new IllegalStateException("voxy json patch not valid: " + invalidPatchDataReason);
             }
         } catch (Exception e) {
             patchData = null;
