@@ -603,7 +603,7 @@ public class TestNodeManager {
 
         var positions = new ArrayList<>(aa.keySet().longStream().filter(k->{
             return WorldEngine.getLevel(k)!=0;
-        }).sorted().mapToObj(Long::new).toList());
+        }).sorted().mapToObj(Long::valueOf).toList());
         Collections.shuffle(positions, r);
 
         Logger.info("Removing", WorldEngine.pprintPos(positions.get(0)));
