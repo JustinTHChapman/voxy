@@ -2,7 +2,7 @@ package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.util.IrisUtil;
 import net.fabricmc.loader.api.FabricLoader;
-import org.vivecraft.client_vr.ClientDataHolderVR;
+import org.vivecraft.api.client.VRRenderingAPI;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,7 +13,7 @@ public class ViewportSelector <T extends Viewport<?>> {
 
     private final Supplier<T> creator;
     private final T defaultViewport;
-    private final Map<Object, T> extraViewports = new HashMap<>();
+    private final Map<Object, T> extraViewports = new HashMap<>();//TODO should maybe be a weak hashmap with value cleanup queue thing?
 
     public ViewportSelector(Supplier<T> viewportCreator) {
         this.creator = viewportCreator;
@@ -25,8 +25,11 @@ public class ViewportSelector <T extends Viewport<?>> {
     }
 
     private T getVivecraftViewport() {
-        var cdh = ClientDataHolderVR.getInstance();
-        var pass = cdh.currentPass;
+        var rApi = VRRenderingAPI.instance();
+        if (rApi == null) {
+            return this.defaultViewport;
+        }
+        var pass = rApi.getCurrentRenderPass();
         if (pass == null) {
             return this.defaultViewport;
         }
