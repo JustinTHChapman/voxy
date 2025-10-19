@@ -220,7 +220,11 @@ public class DHImporter implements IDataImporter {
                         bStateStr = encEntry.substring(sIdx + STATE_STRING_SEPARATOR.length());
                     }
                     var bId = Identifier.of(encEntry.substring(b, sIdx != -1 ? sIdx : encEntry.length()));
-                    var block = this.blockRegistry.getEntry(bId).orElse(Blocks.AIR.getRegistryEntry()).value();
+                    var maybeBlock = this.blockRegistry.getEntry(bId);
+                    Block block = Blocks.AIR;
+                    if (maybeBlock.isPresent()) {
+                        block = maybeBlock.get().value();
+                    }
                     var state = block.getDefaultState();
                     if (bStateStr != null && block != Blocks.AIR) {
                         boolean found = false;
