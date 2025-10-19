@@ -44,7 +44,7 @@ public class ViewportSelector <T extends Viewport<?>> {
         if (viewport == null && IrisUtil.irisShadowActive()) {
             viewport = this.getOrCreate(IRIS_SHADOW_OBJECT);
         }
-        
+
         if (viewport == null) {
             viewport = this.defaultViewport;
         }
