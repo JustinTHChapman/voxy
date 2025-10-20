@@ -235,6 +235,8 @@ public class ModelFactory {
             throw new IllegalStateException("processing a texture bake result but the block state was not in flight!!");
         }
 
+        //TODO: add thing for `blockState.hasEmissiveLighting()` and `blockState.getLuminance()`
+
         boolean isFluid = blockState.getBlock() instanceof FluidBlock;
         int modelId = -1;
 
