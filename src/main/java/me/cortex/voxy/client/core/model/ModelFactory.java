@@ -117,7 +117,7 @@ public class ModelFactory {
     private final ModelStore storage;
     private final RawDownloadStream downstream = new RawDownloadStream(8*1024*1024);//8mb downstream
 
-    public final Deque<Runnable> resultJobs = new ArrayDeque<>();
+    private final Deque<RawBakeResult> rawBakeResults = new ArrayDeque<>();
 
     private Object2IntMap<BlockState> customBlockStateIdMapping;
 
@@ -145,6 +145,17 @@ public class ModelFactory {
 
     public void setCustomBlockStateMapping(Object2IntMap<BlockState> mapping) {
         this.customBlockStateIdMapping = mapping;
+    }
+
+    private record RawBakeResult(int blockId, BlockState blockState, MemoryBuffer rawData) {
+        public RawBakeResult(int blockId, BlockState blockState) {
+            this(blockId, blockState, new MemoryBuffer(MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*2*4*6));
+        }
+
+        public RawBakeResult cpyBuf(long ptr) {
+            this.rawData.cpyFrom(ptr);
+            return this;
+        }
     }
 
     public boolean addEntry(int blockId) {
@@ -179,30 +190,38 @@ public class ModelFactory {
             }
         }
 
-        int TOTAL_FACES_TEXTURE_SIZE = MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*2*4*6;// since both depth and colour are packed together, 6 faces, 4 bytes per pixel
-        int allocation = this.downstream.download(TOTAL_FACES_TEXTURE_SIZE, ptr -> {
-            ColourDepthTextureData[] textureData = new ColourDepthTextureData[6];
-            final int FACE_SIZE = MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE;
+        RawBakeResult result = new RawBakeResult(blockId, blockState);
+        int allocation = this.downstream.download(MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*2*4*6, ptr -> this.rawBakeResults.add(result.cpyBuf(ptr)));
+        this.bakery.renderToStream(blockState, this.downstream.getBufferId(), allocation);
+        return true;
+    }
+
+    public boolean processResult() {
+        if (this.rawBakeResults.isEmpty())
+            return false;
+        var result = this.rawBakeResults.poll();
+        ColourDepthTextureData[] textureData = new ColourDepthTextureData[6];
+        {//Create texture data
+            long ptr = result.rawData.address;
+            final int FACE_SIZE = MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE;
             for (int face = 0; face < 6; face++) {
-                long faceDataPtr = ptr + (FACE_SIZE*4)*face*2;
+                long faceDataPtr = ptr + (FACE_SIZE * 4) * face * 2;
                 int[] colour = new int[FACE_SIZE];
                 int[] depth = new int[FACE_SIZE];
 
                 //Copy out colour
                 for (int i = 0; i < FACE_SIZE; i++) {
                     //De-interpolate results
-                    colour[i] = MemoryUtil.memGetInt(faceDataPtr+ (i*4*2));
-                    depth[i] = MemoryUtil.memGetInt(faceDataPtr+ (i*4*2)+4);
+                    colour[i] = MemoryUtil.memGetInt(faceDataPtr + (i * 4 * 2));
+                    depth[i] = MemoryUtil.memGetInt(faceDataPtr + (i * 4 * 2) + 4);
                 }
-
                 textureData[face] = new ColourDepthTextureData(colour, depth, MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
             }
-            this.resultJobs.add(()->processTextureBakeResult(blockId, blockState, textureData));
-        });
-        this.bakery.renderToStream(blockState, this.downstream.getBufferId(), allocation);
-        return true;
+        }
+        result.rawData.free();
+        this.processTextureBakeResult(result.blockId, result.blockState, textureData);
+        return !this.rawBakeResults.isEmpty();
     }
-
 
 
     //This is
@@ -759,6 +778,9 @@ public class ModelFactory {
     }
 
     public void free() {
+        while (!this.rawBakeResults.isEmpty()) {
+            this.rawBakeResults.poll().rawData.free();
+        }
         this.downstream.free();
         this.bakery.free();
     }
