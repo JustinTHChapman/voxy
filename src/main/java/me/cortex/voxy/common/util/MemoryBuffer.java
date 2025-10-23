@@ -87,6 +87,11 @@ public class MemoryBuffer extends TrackedObject {
         return new MemoryBuffer(this.tracked, this.address, size, this.freeable);
     }
 
+    public MemoryBuffer zero() {
+        MemoryUtil.memSet(this.address, 0, this.size);
+        return this;
+    }
+
     public ByteBuffer asByteBuffer() {
         return MemoryUtil.memByteBuffer(this.address, (int) this.size);
     }

@@ -6,6 +6,8 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import me.cortex.voxy.client.core.gl.Capabilities;
+import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.bakery.ModelTextureBakery;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
@@ -36,6 +38,7 @@ import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
+import java.lang.invoke.VarHandle;
 import java.util.*;
 
 import static me.cortex.voxy.client.core.model.ModelStore.MODEL_SIZE;
@@ -118,6 +121,7 @@ public class ModelFactory {
     private final RawDownloadStream downstream = new RawDownloadStream(8*1024*1024);//8mb downstream
 
     private final Deque<RawBakeResult> rawBakeResults = new ArrayDeque<>();
+    private final Deque<ModelBakeResultUpload> uploadResults = new ArrayDeque<>();
 
     private Object2IntMap<BlockState> customBlockStateIdMapping;
 
@@ -170,6 +174,13 @@ public class ModelFactory {
             return false;
         }
 
+        VarHandle.loadLoadFence();
+
+        //We need to get it twice cause of threading
+        if (this.idMappings[blockId] != -1) {
+            return false;
+        }
+
         var blockState = this.mapper.getBlockStateFromBlockId(blockId);
 
         //Before we enqueue the baking of this blockstate, we must check if it has a fluid state associated with it
@@ -219,13 +230,69 @@ public class ModelFactory {
             }
         }
         result.rawData.free();
-        this.processTextureBakeResult(result.blockId, result.blockState, textureData);
+        var bakeResult = this.processTextureBakeResult(result.blockId, result.blockState, textureData);
+        if (bakeResult!=null) {
+            this.uploadResults.add(bakeResult);
+        }
         return !this.rawBakeResults.isEmpty();
     }
 
+    public void processUploads() {
+        if (this.uploadResults.isEmpty()) return;
 
-    //This is
-    private void processTextureBakeResult(int blockId, BlockState blockState, ColourDepthTextureData[] textureData) {
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+        glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        while (!this.uploadResults.isEmpty()) {
+            var bakeResult = this.uploadResults.pop();
+            bakeResult.upload(this.storage.modelBuffer, this.storage.modelColourBuffer, this.storage.textures);
+            bakeResult.free();
+        }
+        UploadStream.INSTANCE.commit();
+    }
+
+
+    private static final class ModelBakeResultUpload {
+        private final MemoryBuffer model = new MemoryBuffer(MODEL_SIZE).zero();
+        private final MemoryBuffer texture = new MemoryBuffer((2L*3*computeSizeWithMips(MODEL_TEXTURE_SIZE))*4);
+
+        public int modelId = -1;
+
+        public int biomeUploadIndex = -1;
+        public @Nullable MemoryBuffer biomeUpload;
+
+        public void upload(GlBuffer modelBuffer, GlBuffer colourBuffer, GlTexture atlas) {//Uploads and resets for reuse
+            this.model.cpyTo(UploadStream.INSTANCE.upload(modelBuffer, (long) this.modelId * MODEL_SIZE, MODEL_SIZE));
+            if (this.biomeUploadIndex != -1) {
+                this.biomeUpload.cpyTo(UploadStream.INSTANCE.upload(colourBuffer, this.biomeUploadIndex * 4L, this.biomeUpload.size));
+                this.biomeUploadIndex = -1;
+                this.biomeUpload.free();
+                this.biomeUpload = null;
+            }
+
+            int X = (this.modelId&0xFF) * MODEL_TEXTURE_SIZE*3;
+            int Y = ((this.modelId>>8)&0xFF) * MODEL_TEXTURE_SIZE*2;
+
+            long cAddr = this.texture.address;
+            for (int lvl = 0; lvl < LAYERS; lvl++) {
+                nglTextureSubImage2D(atlas.id, lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, GL_RGBA, GL_UNSIGNED_BYTE, cAddr);
+                cAddr += (MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*3*2*4)>>(lvl<<1);
+            }
+
+            this.modelId = -1;
+        }
+
+        public void free() {
+            this.model.free();
+            this.texture.free();
+            if (this.biomeUpload != null) {
+                this.biomeUpload.free();
+            }
+        }
+    }
+
+    private ModelBakeResultUpload processTextureBakeResult(int blockId, BlockState blockState, ColourDepthTextureData[] textureData) {
         if (this.idMappings[blockId] != -1) {
             //This should be impossible to reach as it means that multiple bakes for the same blockId happened and where inflight at the same time!
             throw new IllegalStateException("Block id already added: " + blockId + " for state: " + blockState);
@@ -265,7 +332,7 @@ public class ModelFactory {
                 if (!this.blockStatesInFlight.remove(blockId)) {
                     throw new IllegalStateException();
                 }
-                return;
+                return null;
             } else {//Not a duplicate so create a new entry
                 modelId = this.modelTexture2id.size();
                 //NOTE: we set the mapping at the very end so that race conditions with this and getMetadata dont occur
@@ -298,8 +365,9 @@ public class ModelFactory {
         var colourProvider = getColourProvider(blockState.getBlock());
 
 
-        long uploadPtr = UploadStream.INSTANCE.upload(this.storage.modelBuffer, (long) modelId * MODEL_SIZE, MODEL_SIZE);
-
+        ModelBakeResultUpload uploadResult = new ModelBakeResultUpload();
+        uploadResult.modelId = modelId;
+        long uploadPtr = uploadResult.model.address;
 
         //TODO: implement;
         // TODO: if it has a constant colour instead... idk why (apparently for things like spruce leaves)?? but premultiply the texture data by the constant colour
@@ -485,9 +553,9 @@ public class ModelFactory {
             int biomeIndex = this.modelsRequiringBiomeColours.size() * this.biomes.size();
             MemoryUtil.memPutInt(uploadPtr, biomeIndex);
             this.modelsRequiringBiomeColours.add(new Pair<>(modelId, blockState));
-            //NOTE: UploadStream.INSTANCE is called _after_ uploadPtr is finished being used, this is cause the upload pointer
-            // may be invalidated as soon as another upload stream is invoked
-            long clrUploadPtr = UploadStream.INSTANCE.upload(this.storage.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
+
+            uploadResult.biomeUploadIndex = biomeIndex;
+            long clrUploadPtr = (uploadResult.biomeUpload = new MemoryBuffer(4L * this.biomes.size())).address;
             for (var biome : this.biomes) {
                 MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(colourProvider, blockState, biome)|0xFF000000); clrUploadPtr += 4;
             }
@@ -510,7 +578,7 @@ public class ModelFactory {
         //TODO callback to inject extra data into the model data
 
 
-        this.putTextures(modelId, textureData);
+        this.putTextures(textureData, uploadResult.texture);
 
         //glGenerateTextureMipmap(this.textures.id);
 
@@ -521,9 +589,7 @@ public class ModelFactory {
             throw new IllegalStateException("processing a texture bake result but the block state was not in flight!!");
         }
 
-        //Upload/commit stream
-        //TODO maybe dont do it for every uploaded block?? try to batch it
-        UploadStream.INSTANCE.commit();
+        return uploadResult;
     }
 
     public void addBiome(int id, Biome biome) {
@@ -723,14 +789,13 @@ public class ModelFactory {
     private static final MemoryBuffer SCRATCH_TEX = new MemoryBuffer((2L*3*computeSizeWithMips(MODEL_TEXTURE_SIZE))*4);
     private static final int LAYERS = Integer.numberOfTrailingZeros(MODEL_TEXTURE_SIZE);
     //TODO: redo to batch blit, instead of 6 seperate blits, and also fix mipping
-    private void putTextures(int id, ColourDepthTextureData[] textures) {
+    private void putTextures(ColourDepthTextureData[] textures, MemoryBuffer into) {
         //if (MODEL_TEXTURE_SIZE != 16) {throw new IllegalStateException("THIS METHOD MUST BE REDONE IF THIS CONST CHANGES");}
 
         //TODO: need to use a write mask to see what pixels must be used to contribute to mipping
         // as in, using the depth/stencil info, check if pixel was written to, if so, use that pixel when blending, else dont
 
-        //Copy all textures into scratch
-        final long addr = SCRATCH_TEX.address;
+        final long addr = into.address;
         final int LENGTH_B = MODEL_TEXTURE_SIZE*3;
         for (int i = 0; i < 6; i++) {
             int x = (i>>1)*MODEL_TEXTURE_SIZE;
@@ -763,25 +828,16 @@ public class ModelFactory {
             }
         }
 
-
-        int X = (id&0xFF) * MODEL_TEXTURE_SIZE*3;
-        int Y = ((id>>8)&0xFF) * MODEL_TEXTURE_SIZE*2;
-
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
-        glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-
-        long cAddr = addr;
-        for (int lvl = 0; lvl < LAYERS; lvl++) {
-            nglTextureSubImage2D(this.storage.textures.id, lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, GL_RGBA, GL_UNSIGNED_BYTE, cAddr);
-            cAddr += (MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*3*2*4)>>(lvl<<1);
-        }
+        /*
+        */
     }
 
     public void free() {
         while (!this.rawBakeResults.isEmpty()) {
             this.rawBakeResults.poll().rawData.free();
+        }
+        while (!this.uploadResults.isEmpty()) {
+            this.uploadResults.poll().free();
         }
         this.downstream.free();
         this.bakery.free();

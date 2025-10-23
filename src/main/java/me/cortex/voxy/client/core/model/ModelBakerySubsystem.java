@@ -92,6 +92,7 @@ public class ModelBakerySubsystem {
             if (totalBudget<(System.nanoTime()-start))
                 break;
         }
+        this.factory.processUploads();
         //TimingStatistics.modelProcess.stop();
     }
 
