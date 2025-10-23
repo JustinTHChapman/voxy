@@ -13,6 +13,7 @@ import net.irisshaders.iris.gl.buffer.ShaderStorageBufferHolder;
 import net.irisshaders.iris.gl.image.ImageHolder;
 import net.irisshaders.iris.gl.sampler.GlSampler;
 import net.irisshaders.iris.gl.sampler.SamplerHolder;
+import net.irisshaders.iris.gl.state.FogMode;
 import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
 import net.irisshaders.iris.gl.texture.TextureType;
@@ -20,6 +21,7 @@ import net.irisshaders.iris.gl.uniform.*;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.targets.RenderTarget;
 import net.irisshaders.iris.targets.RenderTargets;
+import net.irisshaders.iris.uniforms.CommonUniforms;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
 import net.irisshaders.iris.uniforms.custom.cached.*;
 import org.joml.*;
@@ -273,7 +275,12 @@ public class IrisVoxyRenderPipelineData {
 
     private static CachedUniform[] createUniformSet(CustomUniforms cu, IrisShaderPatch patch) {
         //This is a fking awful hack... but it works thinks
-        LocationalUniformHolder uniformBuilder = new LocationalUniformHolder() {
+        DynamicLocationalUniformHolder uniformBuilder = new DynamicLocationalUniformHolder() {
+            @Override
+            public DynamicLocationalUniformHolder addDynamicUniform(Uniform uniform, ValueUpdateNotifier valueUpdateNotifier) {
+                return this;
+            }
+
             @Override
             public LocationalUniformHolder addUniform(UniformUpdateFrequency uniformUpdateFrequency, Uniform uniform) {
                 return this;
@@ -296,6 +303,7 @@ public class IrisVoxyRenderPipelineData {
                 return null;
             }
         };
+        //CommonUniforms.addDynamicUniforms(uniformBuilder, FogMode.PER_FRAGMENT);
         cu.assignTo(uniformBuilder);
         cu.mapholderToPass(uniformBuilder, patch);
 
@@ -305,7 +313,7 @@ public class IrisVoxyRenderPipelineData {
         int j = 0;
         for (var uniform : uniforms) {
             if (uniform == null) {
-                Logger.error("Unknown uniform at location "+j + " skipping");
+                Logger.error("Unknown uniform at location "+j + " skipping, uniform name: " + patch.getUniformList()[j]);
             } else {
                 uniforms[i++] = uniform;//This shuffles the uniforms down till its compacted
             }
