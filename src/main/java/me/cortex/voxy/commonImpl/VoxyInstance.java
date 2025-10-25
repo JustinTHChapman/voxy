@@ -1,5 +1,6 @@
 package me.cortex.voxy.commonImpl;
 
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.section.SectionStorage;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
@@ -58,12 +59,19 @@ public abstract class VoxyInstance {
         this.worldCleaner.start();
     }
 
+    public void setNumThreads(int threads) {
+        this.threadPool.setNumThreads(threads);
+    }
+
     protected ImportManager createImportManager() {
         return new ImportManager();
     }
 
     public ServiceManager getServiceManager() {
         return this.threadPool.serviceManager;
+    }
+    public UnifiedServiceThreadPool getThreadPool() {
+        return this.threadPool;
     }
     public VoxelIngestService getIngestService() {
         return this.ingestService;

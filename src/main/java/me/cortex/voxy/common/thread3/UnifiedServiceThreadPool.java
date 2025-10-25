@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class UnifiedServiceThreadPool {
     public final ServiceManager serviceManager;
-    private final MultiThreadPrioritySemaphore groupSemaphore;
+    public final MultiThreadPrioritySemaphore groupSemaphore;
 
     private final MultiThreadPrioritySemaphore.Block selfBlock;
     private final ThreadGroup dedicatedPool;

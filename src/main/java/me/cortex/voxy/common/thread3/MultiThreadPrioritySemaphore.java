@@ -42,6 +42,23 @@ public class MultiThreadPrioritySemaphore {
             this.man.freeBlock(this);
             this.free0();
         }
+
+        public int availablePermits() {
+            return this.localSemaphore.availablePermits();
+        }
+
+        public boolean tryAcquire() {
+            if (this.localSemaphore.availablePermits()==0) return false;//Quick exit
+            if (!this.blockSemaphore.tryAcquire()) return false;//There is definatly none
+            if (this.localSemaphore.tryAcquire()) {
+                //we acquired a proper permit
+                return true;
+            } else {
+                //We must release the other permit as we dont do processing here
+                this.blockSemaphore.release(1);
+                return false;
+            }
+        }
     }
 
     private final Semaphore pooledSemaphore = new Semaphore(0);

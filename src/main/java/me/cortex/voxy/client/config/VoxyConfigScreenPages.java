@@ -57,23 +57,13 @@ public abstract class VoxyConfigScreenPages {
                                 //Runtime.getRuntime().availableProcessors(),//Note: this is threads not cores, the default value is half the core count, is fine as this should technically be the limit but CpuLayout.CORES.length is more realistic
                                 1, v->Text.literal(Integer.toString(v))))
                         .setBinding((s, v)->{
-                            boolean wasEnabled = VoxyCommon.getInstance() != null;
-                            var vrsh = (IGetVoxyRenderSystem) MinecraftClient.getInstance().worldRenderer;
-                            if (wasEnabled) {
-                                if (vrsh != null) {
-                                    vrsh.shutdownRenderer();
-                                }
-                                VoxyCommon.shutdownInstance();
-                            }
-
                             s.serviceThreads = v;
-
-                            if (wasEnabled) {
-                                VoxyCommon.createInstance();
+                            var instance = VoxyCommon.getInstance();
+                            if (instance != null) {
+                                instance.setNumThreads(v);
                             }
                         }, s -> s.serviceThreads)
                         .setImpact(OptionImpact.HIGH)
-                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 ).add(OptionImpl.createBuilder(boolean.class, storage)
                         .setName(Text.translatable("voxy.config.general.ingest"))
