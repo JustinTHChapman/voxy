@@ -52,7 +52,11 @@ public abstract class VoxyConfigScreenPages {
                         }, s -> s.enabled)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
-                ).add(OptionImpl.createBuilder(int.class, storage)
+                ).build()
+        );
+
+        groups.add(OptionGroup.createBuilder()
+                .add(OptionImpl.createBuilder(int.class, storage)
                         .setName(Text.translatable("voxy.config.general.serviceThreads"))
                         .setTooltip(Text.translatable("voxy.config.general.serviceThreads.tooltip"))
                         .setControl(opt->new SliderControl(opt, 1,
