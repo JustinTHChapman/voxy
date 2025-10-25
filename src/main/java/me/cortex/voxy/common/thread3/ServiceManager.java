@@ -60,7 +60,7 @@ public class ServiceManager {
 
     public boolean runAJob() {//Executes a single job on the current thread
         while (true) {
-            if (this.services.length == 0) return false;
+            if (this.services.length == 0 || this.totalJobs.get() == 0) return false;
             if (this.runAJob0()) return true;
             try {
                 Thread.sleep(10);
@@ -169,6 +169,9 @@ public class ServiceManager {
     }
 
     void remJobs(int remaining) {
+        //TODO:FIXME: THIS NEEDS TO BUBBLE UP TO THE jobRelease thing
+        // AFAK! if this is zero inside the runAJob loop, it must return
+
         if (this.totalJobs.addAndGet(-remaining)<0) {
             throw new IllegalStateException("total jobs <0");
         }
