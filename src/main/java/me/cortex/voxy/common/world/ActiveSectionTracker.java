@@ -113,12 +113,22 @@ public class ActiveSectionTracker {
             long stamp2 = lock.readLock();
             long stamp = this.lruLock.writeLock();
             section = this.lruSecondaryCache.remove(key);
+
+            WorldSection removal = null;
+            if (section == null && this.lruSize+100<this.lruSecondaryCache.size()+this.getLoadedCacheCount()) {//Add a self clamping lru case for when there are alot of loaded sections
+                removal = this.lruSecondaryCache.removeFirst();
+            }
+
             this.lruLock.unlockWrite(stamp);
             if (section != null) {
                 section.primeForReuse();
                 section.acquire(1);
             }
             lock.unlockRead(stamp2);
+
+            if (removal != null) {
+                removal._releaseArray();
+            }
         } else {
             VolatileHolder.PRE_ACQUIRE_COUNT.getAndAdd(holder, 1);
         }
