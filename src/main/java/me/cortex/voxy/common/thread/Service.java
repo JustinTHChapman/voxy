@@ -1,10 +1,9 @@
-package me.cortex.voxy.common.thread3;
+package me.cortex.voxy.common.thread;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
 
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 

@@ -1,11 +1,9 @@
 package me.cortex.voxy.commonImpl;
 
-import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.section.SectionStorage;
-import me.cortex.voxy.common.thread.ServiceThreadPool;
-import me.cortex.voxy.common.thread3.ServiceManager;
-import me.cortex.voxy.common.thread3.UnifiedServiceThreadPool;
+import me.cortex.voxy.common.thread.ServiceManager;
+import me.cortex.voxy.common.thread.UnifiedServiceThreadPool;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.service.SectionSavingService;

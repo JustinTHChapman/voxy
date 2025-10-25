@@ -1,4 +1,4 @@
-package me.cortex.voxy.common.thread3;
+package me.cortex.voxy.common.thread;
 
 import me.cortex.voxy.common.util.Pair;
 

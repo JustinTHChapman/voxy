@@ -1,4 +1,4 @@
-package me.cortex.voxy.common.thread3;
+package me.cortex.voxy.common.thread;
 
 import it.unimi.dsi.fastutil.HashCommon;
 import me.cortex.voxy.common.Logger;

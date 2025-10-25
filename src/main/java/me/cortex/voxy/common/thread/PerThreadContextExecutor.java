@@ -1,4 +1,4 @@
-package me.cortex.voxy.common.thread3;
+package me.cortex.voxy.common.thread;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
@@ -8,7 +8,6 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.function.Supplier;

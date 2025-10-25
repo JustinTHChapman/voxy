@@ -1,8 +1,8 @@
 package me.cortex.voxy.common.world.service;
 
 import me.cortex.voxy.common.Logger;
-import me.cortex.voxy.common.thread3.Service;
-import me.cortex.voxy.common.thread3.ServiceManager;
+import me.cortex.voxy.common.thread.Service;
+import me.cortex.voxy.common.thread.ServiceManager;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;

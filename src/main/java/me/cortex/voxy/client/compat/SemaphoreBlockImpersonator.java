@@ -1,6 +1,6 @@
 package me.cortex.voxy.client.compat;
 
-import me.cortex.voxy.common.thread3.MultiThreadPrioritySemaphore;
+import me.cortex.voxy.common.thread.MultiThreadPrioritySemaphore;
 
 import java.util.concurrent.Semaphore;
 

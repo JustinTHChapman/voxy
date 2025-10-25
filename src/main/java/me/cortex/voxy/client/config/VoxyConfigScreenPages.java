@@ -50,6 +50,7 @@ public abstract class VoxyConfigScreenPages {
                                 VoxyCommon.shutdownInstance();
                             }
                         }, s -> s.enabled)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 ).add(OptionImpl.createBuilder(int.class, storage)
                         .setName(Text.translatable("voxy.config.general.serviceThreads"))

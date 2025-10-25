@@ -1,11 +1,9 @@
-package me.cortex.voxy.common.thread3;
+package me.cortex.voxy.common.thread;
 
 import me.cortex.voxy.common.util.TrackedObject;
 
-import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
 
 //Basiclly acts as a priority based mutlti semaphore
 // allows the pooling of multiple threadpools together while prioritizing the work the original was ment for
