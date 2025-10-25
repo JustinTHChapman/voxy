@@ -32,6 +32,8 @@ public class VoxelIngestService {
 
     private void processJob() {
         var task = this.ingestQueue.pop();
+        task.world.markActive();
+
         var section = task.section;
         var vs = SECTION_CACHE.get().setPosition(task.cx, task.cy, task.cz);
 
@@ -92,6 +94,9 @@ public class VoxelIngestService {
         if (!engine.isLive()) {
             throw new IllegalStateException("Tried inserting chunk into WorldEngine that was not alive");
         }
+
+        engine.markActive();
+
         var lightingProvider = chunk.getWorld().getLightingProvider();
         boolean gotLighting = false;
 
