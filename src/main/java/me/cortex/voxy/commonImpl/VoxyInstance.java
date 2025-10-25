@@ -60,7 +60,10 @@ public abstract class VoxyInstance {
     }
 
     public void setNumThreads(int threads) {
-        this.threadPool.setNumThreads(threads);
+        if (threads<0) throw new IllegalArgumentException("Num threads <0");
+        if (this.threadPool.setNumThreads(threads)) {
+            Logger.info("Dedicated voxy thread pool size: " + threads);
+        }
     }
 
     protected ImportManager createImportManager() {

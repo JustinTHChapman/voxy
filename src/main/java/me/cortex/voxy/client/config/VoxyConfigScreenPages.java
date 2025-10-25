@@ -4,11 +4,13 @@ import com.google.common.collect.ImmutableList;
 import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
+import me.cortex.voxy.client.mixin.sodium.AccessorSodiumWorldRenderer;
 import me.cortex.voxy.common.util.cpu.CpuLayout;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.client.gui.options.*;
 import net.caffeinemc.mods.sodium.client.gui.options.control.SliderControl;
 import net.caffeinemc.mods.sodium.client.gui.options.control.TickBoxControl;
+import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 
@@ -60,7 +62,17 @@ public abstract class VoxyConfigScreenPages {
                             s.serviceThreads = v;
                             var instance = VoxyCommon.getInstance();
                             if (instance != null) {
-                                instance.setNumThreads(v);
+                                var swr = SodiumWorldRenderer.instanceNullable();
+                                if (swr != null) {
+                                    var rsm = ((AccessorSodiumWorldRenderer)swr).getRenderSectionManager();
+                                    if (rsm!=null) {
+                                        instance.setNumThreads(Math.max(1, v-rsm.getBuilder().getTotalThreadCount()));
+                                    } else {
+                                        instance.setNumThreads(v);
+                                    }
+                                } else {
+                                    instance.setNumThreads(v);
+                                }
                             }
                         }, s -> s.serviceThreads)
                         .setImpact(OptionImpact.HIGH)

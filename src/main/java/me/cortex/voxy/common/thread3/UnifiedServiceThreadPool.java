@@ -25,15 +25,16 @@ public class UnifiedServiceThreadPool {
 
     private final void release(int i) {this.groupSemaphore.pooledRelease(i);}
 
-    public void setNumThreads(int threads) {
+    public boolean setNumThreads(int threads) {
         synchronized (this.threads) {
             int diff = threads - this.threads.size();
-            if (diff==0) return;//Already correct
+            if (diff==0) return false;//Already correct
             if (diff<0) {//Remove threads
                 this.selfBlock.release(-diff);
             } else {//Add threads
                 for (int i = 0; i < diff; i++) {
                     var t = new Thread(this.dedicatedPool, this::workerThread);
+                    t.setPriority(3);
                     t.setDaemon(true);
                     this.threads.add(t);
                     t.start();
@@ -42,7 +43,7 @@ public class UnifiedServiceThreadPool {
         }
         while (true) {
             synchronized (this.threads) {
-                if (this.threads.size() == threads) return;
+                if (this.threads.size() == threads) return true;
             }
             try {
                 Thread.sleep(50);

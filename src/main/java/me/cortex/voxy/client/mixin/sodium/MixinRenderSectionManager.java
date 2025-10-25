@@ -10,6 +10,7 @@ import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.executor.ChunkBuilder;
 import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkTrackerHolder;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortBehavior;
@@ -35,6 +36,8 @@ public class MixinRenderSectionManager {
 
     @Shadow @Final private ClientWorld level;
 
+    @Shadow @Final private ChunkBuilder builder;
+
     @Inject(method = "<init>", at = @At("TAIL"))
     private void voxy$resetChunkTracker(ClientWorld level, int renderDistance, SortBehavior sortBehavior, CommandList commandList, CallbackInfo ci) {
         if (level.worldRenderer != null) {
@@ -44,6 +47,14 @@ public class MixinRenderSectionManager {
             }
         }
         this.bottomSectionY = this.level.getBottomY()>>4;
+
+        {
+            //TODO: put in a better position
+            var instance = VoxyCommon.getInstance();
+            if (instance != null) {
+                instance.setNumThreads(Math.max(1, VoxyConfig.CONFIG.serviceThreads - this.builder.getTotalThreadCount()));
+            }
+        }
     }
 
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
