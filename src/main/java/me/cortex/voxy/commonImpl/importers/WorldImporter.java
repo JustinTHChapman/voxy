@@ -3,23 +3,22 @@ package me.cortex.voxy.commonImpl.importers;
 import com.mojang.serialization.Codec;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceSlice;
-import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.thread3.Service;
+import me.cortex.voxy.common.thread3.ServiceManager;
 import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldUpdater;
-import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.PacketByteBuf;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.collection.IndexedIterable;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeKeys;
@@ -39,6 +38,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
@@ -54,13 +54,13 @@ public class WorldImporter implements IDataImporter {
     private final AtomicInteger chunksProcessed = new AtomicInteger();
 
     private final ConcurrentLinkedDeque<Runnable> jobQueue = new ConcurrentLinkedDeque<>();
-    private final ServiceSlice threadPool;
+    private final Service service;
 
     private volatile boolean isRunning;
 
-    public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, BooleanSupplier runChecker) {
+    public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceManager sm, BooleanSupplier runChecker) {
         this.world = worldEngine;
-        this.threadPool = servicePool.createServiceNoCleanup("World importer", 3, ()->()->this.jobQueue.poll().run(), runChecker);
+        this.service = sm.createService(()->new Pair<>(()->this.jobQueue.poll().run(), ()->{}), 3, "World importer", runChecker);
 
         var biomeRegistry = mcWorld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
         var defaultBiome = biomeRegistry.getOrThrow(BiomeKeys.PLAINS);
@@ -143,7 +143,11 @@ public class WorldImporter implements IDataImporter {
         return this.world;
     }
 
+    private final AtomicBoolean isShutdown = new AtomicBoolean();
     public void shutdown() {
+        if (this.isShutdown.getAndSet(true)) {
+            return;
+        }
         this.isRunning = false;
         if (this.worker != null) {
             try {
@@ -152,9 +156,9 @@ public class WorldImporter implements IDataImporter {
                 throw new RuntimeException(e);
             }
         }
-        if (!this.threadPool.isFreed()) {
+        if (this.service.isLive()) {
             this.world.releaseRef();
-            this.threadPool.shutdown();
+            this.service.shutdown();
         }
         //Free all the remaining entries by running the lambda
         while (!this.jobQueue.isEmpty()) {
@@ -254,13 +258,13 @@ public class WorldImporter implements IDataImporter {
                     }
                 }
                 if (!this.isRunning) {
-                    this.threadPool.blockTillEmpty();
+                    this.service.blockTillEmpty();
                     this.completionCallback.onCompletion(this.totalChunks.get());
                     this.worker = null;
                     return;
                 }
             }
-            this.threadPool.blockTillEmpty();
+            this.service.blockTillEmpty();
             while (this.chunksProcessed.get() != this.totalChunks.get() && this.isRunning) {
                 Thread.yield();
                 try {
@@ -269,9 +273,11 @@ public class WorldImporter implements IDataImporter {
                     throw new RuntimeException(e);
                 }
             }
-            this.worker = null;
-            this.world.releaseRef();
-            this.threadPool.shutdown();
+            if (!this.isShutdown.getAndSet(true)) {
+                this.worker = null;
+                this.service.shutdown();
+                this.world.releaseRef();
+            }
             this.completionCallback.onCompletion(this.totalChunks.get());
         });
         this.worker.setName("World importer");
@@ -386,7 +392,7 @@ public class WorldImporter implements IDataImporter {
                         });
                         this.totalChunks.incrementAndGet();
                         this.estimatedTotalChunks.incrementAndGet();
-                        this.threadPool.execute();
+                        this.service.execute();
                     }
                 }
             }

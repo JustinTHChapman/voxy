@@ -2,7 +2,8 @@ package me.cortex.voxy.commonImpl.importers;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceSlice;
-import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.thread3.Service;
+import me.cortex.voxy.common.thread3.ServiceManager;
 import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
@@ -43,7 +44,7 @@ import java.util.function.BooleanSupplier;
 public class DHImporter implements IDataImporter {
     private final Connection db;
     private final WorldEngine engine;
-    private final ServiceSlice threadPool;
+    private final Service service;
     private final World world;
     private final int bottomOfWorld;
     private final int worldHeightSections;
@@ -68,7 +69,7 @@ public class DHImporter implements IDataImporter {
         }
     }
 
-    public DHImporter(File file, WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, BooleanSupplier rateLimiter) {
+    public DHImporter(File file, WorldEngine worldEngine, World mcWorld, ServiceManager servicePool, BooleanSupplier rateLimiter) {
         this.engine = worldEngine;
         this.world = mcWorld;
         this.biomeRegistry = mcWorld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
@@ -85,7 +86,7 @@ public class DHImporter implements IDataImporter {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-        this.threadPool = servicePool.createService("DH Importer", 1, ()->{
+        this.service = servicePool.createService(()->{
             try {
                 var dataFetchStmt = this.db.prepareStatement("SELECT Data,ColumnGenerationStep,Mapping FROM FullData WHERE DetailLevel = 0 AND PosX = ? AND PosZ = ?;");
                 var ctx = new WorkCTX(dataFetchStmt, this.worldHeightSections*16);
@@ -101,7 +102,7 @@ public class DHImporter implements IDataImporter {
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
-        }, rateLimiter);
+        }, 10, "DH Importer", rateLimiter);
     }
 
     public void runImport(IUpdateCallback updateCallback, ICompletionCallback completionCallback) {
@@ -139,7 +140,7 @@ public class DHImporter implements IDataImporter {
 
             while (this.isRunning&&!taskQ.isEmpty()) {
                 this.tasks.add(taskQ.poll());
-                this.threadPool.execute();
+                this.service.execute();
 
                 while (this.tasks.size() > 100 && this.isRunning) {
                     try {
@@ -369,7 +370,7 @@ public class DHImporter implements IDataImporter {
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        this.threadPool.shutdown();
+        this.service.shutdown();
         this.engine.releaseRef();
         try {
             this.db.close();

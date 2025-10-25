@@ -103,7 +103,7 @@ public class VoxyCommands {
         var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().world);
         if (engine==null)return 1;
         return instance.getImportManager().makeAndRunIfNone(engine, ()->
-                new DHImporter(dbFile_, engine, MinecraftClient.getInstance().world, instance.getThreadPool(), instance.savingServiceRateLimiter))?0:1;
+                new DHImporter(dbFile_, engine, MinecraftClient.getInstance().world, instance.getServiceManager(), instance.savingServiceRateLimiter))?0:1;
     }
 
     private static boolean fileBasedImporter(File directory) {
@@ -115,7 +115,7 @@ public class VoxyCommands {
         var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().world);
         if (engine==null) return false;
         return instance.getImportManager().makeAndRunIfNone(engine, ()->{
-            var importer = new WorldImporter(engine, MinecraftClient.getInstance().world, instance.getThreadPool(), instance.savingServiceRateLimiter);
+            var importer = new WorldImporter(engine, MinecraftClient.getInstance().world, instance.getServiceManager(), instance.savingServiceRateLimiter);
             importer.importRegionDirectoryAsync(directory);
             return importer;
         });
@@ -224,7 +224,7 @@ public class VoxyCommands {
         var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().world);
         if (engine != null) {
             return instance.getImportManager().makeAndRunIfNone(engine, () -> {
-                var importer = new WorldImporter(engine, MinecraftClient.getInstance().world, instance.getThreadPool(), instance.savingServiceRateLimiter);
+                var importer = new WorldImporter(engine, MinecraftClient.getInstance().world, instance.getServiceManager(), instance.savingServiceRateLimiter);
                 importer.importZippedRegionDirectoryAsync(zip, finalInnerDir);
                 return importer;
             }) ? 0 : 1;

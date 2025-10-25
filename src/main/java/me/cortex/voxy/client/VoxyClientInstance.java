@@ -27,7 +27,10 @@ public class VoxyClientInstance extends VoxyInstance {
     private final Path basePath;
     private final boolean noIngestOverride;
     public VoxyClientInstance() {
-        super(VoxyConfig.CONFIG.serviceThreads);
+        super();
+
+        this.threadPool.setNumThreads(VoxyConfig.CONFIG.serviceThreads);
+
         var path = FlashbackCompat.getReplayStoragePath();
         this.noIngestOverride = path != null;
         if (path == null) {

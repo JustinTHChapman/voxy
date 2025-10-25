@@ -3,6 +3,8 @@ package me.cortex.voxy.common.world.service;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceSlice;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.thread3.Service;
+import me.cortex.voxy.common.thread3.ServiceManager;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 
@@ -12,12 +14,12 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 // save to the db, this can be useful for just reducing the amount of thread pools in total
 // might have some issues with threading if the same section is saved from multiple threads?
 public class SectionSavingService {
-    private final ServiceSlice threads;
+    private final Service service;
     private record SaveEntry(WorldEngine engine, WorldSection section) {}
     private final ConcurrentLinkedDeque<SaveEntry> saveQueue = new ConcurrentLinkedDeque<>();
 
-    public SectionSavingService(ServiceThreadPool threadPool) {
-        this.threads = threadPool.createServiceNoCleanup("Section saving service", 100, () -> this::processJob);
+    public SectionSavingService(ServiceManager sm) {
+        this.service = sm.createServiceNoCleanup(() -> this::processJob, 100, "Section saving service");
     }
 
     private void processJob() {
@@ -58,8 +60,8 @@ public class SectionSavingService {
                     throw new RuntimeException(e);
                 }
                 //If we are still full, process entries in the queue ourselves instead of waiting for the service
-                while (this.getTaskCount() > 5_000 && this.threads.isAlive()) {
-                    if (!this.threads.steal()) {
+                while (this.getTaskCount() > 5_000 && this.service.isLive()) {
+                    if (!this.service.steal()) {
                         break;
                     }
                     this.processJob();
@@ -67,18 +69,16 @@ public class SectionSavingService {
             }
 
             this.saveQueue.add(new SaveEntry(in, section));
-            this.threads.execute();
+            this.service.execute();
         }
     }
 
     public void shutdown() {
-        if (this.threads.getJobCount() != 0) {
-            Logger.error("Voxy section saving still in progress, estimated " + this.threads.getJobCount() + " sections remaining.");
-            while (this.threads.getJobCount() != 0) {
-                Thread.onSpinWait();
-            }
+        if (this.service.numJobs() != 0) {
+            Logger.error("Voxy section saving still in progress, estimated " + this.service.numJobs() + " sections remaining.");
+            this.service.blockTillEmpty();
         }
-        this.threads.shutdown();
+        this.service.shutdown();
         //Manually save any remaining entries
         while (!this.saveQueue.isEmpty()) {
             this.processJob();
@@ -86,6 +86,6 @@ public class SectionSavingService {
     }
 
     public int getTaskCount() {
-        return this.threads.getJobCount();
+        return this.service.numJobs();
     }
 }

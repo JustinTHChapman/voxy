@@ -80,7 +80,7 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             return;
         }
         try {
-            this.renderer = new VoxyRenderSystem(world, instance.getThreadPool());
+            this.renderer = new VoxyRenderSystem(world, instance.getServiceManager());
         } catch (RuntimeException e) {
             if (IrisUtil.irisShaderPackEnabled()) {
                 IrisUtil.disableIrisShaders();

@@ -3,6 +3,8 @@ package me.cortex.voxy.commonImpl;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.section.SectionStorage;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.thread3.ServiceManager;
+import me.cortex.voxy.common.thread3.UnifiedServiceThreadPool;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.service.SectionSavingService;
@@ -21,7 +23,7 @@ public abstract class VoxyInstance {
     private volatile boolean isRunning = true;
     private final Thread worldCleaner;
     public final BooleanSupplier savingServiceRateLimiter;//Can run if this returns true
-    protected final ServiceThreadPool threadPool;
+    protected final UnifiedServiceThreadPool threadPool;
     protected final SectionSavingService savingService;
     protected final VoxelIngestService ingestService;
 
@@ -30,11 +32,11 @@ public abstract class VoxyInstance {
 
     protected final ImportManager importManager;
 
-    public VoxyInstance(int threadCount) {
+    public VoxyInstance() {
         Logger.info("Initializing voxy instance");
-        this.threadPool = new ServiceThreadPool(threadCount);
-        this.savingService = new SectionSavingService(this.threadPool);
-        this.ingestService = new VoxelIngestService(this.threadPool);
+        this.threadPool = new UnifiedServiceThreadPool();
+        this.savingService = new SectionSavingService(this.getServiceManager());
+        this.ingestService = new VoxelIngestService(this.getServiceManager());
         this.importManager = this.createImportManager();
         this.savingServiceRateLimiter = ()->this.savingService.getTaskCount()<1200;
         this.worldCleaner = new Thread(()->{
@@ -60,8 +62,8 @@ public abstract class VoxyInstance {
         return new ImportManager();
     }
 
-    public ServiceThreadPool getThreadPool() {
-        return this.threadPool;
+    public ServiceManager getServiceManager() {
+        return this.threadPool.serviceManager;
     }
     public VoxelIngestService getIngestService() {
         return this.ingestService;

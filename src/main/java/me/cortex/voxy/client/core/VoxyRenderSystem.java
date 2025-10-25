@@ -29,6 +29,7 @@ import me.cortex.voxy.client.core.util.GPUTiming;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.thread3.ServiceManager;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
@@ -73,7 +74,7 @@ public class VoxyRenderSystem {
         return new MDICSectionRenderer(pipeline, modelStore, (BasicSectionGeometryData) geometryData);//We only have MDIC backend... for now
     }
 
-    public VoxyRenderSystem(WorldEngine world, ServiceThreadPool threadPool) {
+    public VoxyRenderSystem(WorldEngine world, ServiceManager sm) {
         //Keep the world loaded, NOTE: this is done FIRST, to keep and ensure that even if the rest of loading takes more
         // than timeout, we keep the world acquired
         world.acquireRef();
@@ -96,7 +97,7 @@ public class VoxyRenderSystem {
 
 
                 this.modelService = new ModelBakerySubsystem(world.getMapper());
-                this.renderGen = new RenderGenerationService(world, this.modelService, threadPool, false, () -> true);
+                this.renderGen = new RenderGenerationService(world, this.modelService, sm, false);
 
                 this.geometryData = new BasicSectionGeometryData(1 << 20, geometryCapacity);
 

@@ -1,8 +1,8 @@
 package me.cortex.voxy.common.world.service;
 
 import me.cortex.voxy.common.Logger;
-import me.cortex.voxy.common.thread.ServiceSlice;
-import me.cortex.voxy.common.thread.ServiceThreadPool;
+import me.cortex.voxy.common.thread3.Service;
+import me.cortex.voxy.common.thread3.ServiceManager;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
@@ -22,12 +22,12 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class VoxelIngestService {
     private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
-    private final ServiceSlice threads;
+    private final Service service;
     private record IngestSection(int cx, int cy, int cz, WorldEngine world, ChunkSection section, ChunkNibbleArray blockLight, ChunkNibbleArray skyLight){}
     private final ConcurrentLinkedDeque<IngestSection> ingestQueue = new ConcurrentLinkedDeque<>();
 
-    public VoxelIngestService(ServiceThreadPool pool) {
-        this.threads = pool.createServiceNoCleanup("Ingest service", 5000, ()-> this::processJob);
+    public VoxelIngestService(ServiceManager pool) {
+        this.service = pool.createServiceNoCleanup(()->this::processJob, 5000, "Ingest service");
     }
 
     private void processJob() {
@@ -86,7 +86,7 @@ public class VoxelIngestService {
     }
 
     public boolean enqueueIngest(WorldEngine engine, WorldChunk chunk) {
-        if (!this.threads.isAlive()) {
+        if (!this.service.isLive()) {
             return false;
         }
         if (!engine.isLive()) {
@@ -116,7 +116,7 @@ public class VoxelIngestService {
                 if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
                 this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, null, null));
                 try {
-                    this.threads.execute();
+                    this.service.execute();
                 } catch (Exception e) {
                     Logger.error("Executing had an error: assume shutting down, aborting",e);
                     break;
@@ -156,7 +156,7 @@ public class VoxelIngestService {
 
             this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));//TODO: fixme, this is technically not safe todo on the chunk load ingest, we need to copy the section data so it cant be modified while being read
             try {
-                this.threads.execute();
+                this.service.execute();
             } catch (Exception e) {
                 Logger.error("Executing had an error: assume shutting down, aborting",e);
                 break;
@@ -166,11 +166,11 @@ public class VoxelIngestService {
     }
 
     public int getTaskCount() {
-        return this.threads.getJobCount();
+        return this.service.numJobs();
     }
 
     public void shutdown() {
-        this.threads.shutdown();
+        this.service.shutdown();
     }
 
     //Utility method to ingest a chunk into the given WorldIdentifier or world
@@ -192,7 +192,7 @@ public class VoxelIngestService {
     private boolean rawIngest0(WorldEngine engine, ChunkSection section, int x, int y, int z, ChunkNibbleArray bl, ChunkNibbleArray sl) {
         this.ingestQueue.add(new IngestSection(x, y, z, engine, section, bl, sl));
         try {
-            this.threads.execute();
+            this.service.execute();
             return true;
         } catch (Exception e) {
             Logger.error("Executing had an error: assume shutting down, aborting",e);
