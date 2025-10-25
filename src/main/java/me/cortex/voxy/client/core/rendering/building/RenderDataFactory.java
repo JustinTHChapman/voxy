@@ -561,7 +561,7 @@ public class RenderDataFactory {
                             A &= ~0b110L; A |= getQuadTyping(Am);
                         }
 
-                        long lighter = A;
+                        long lighter = this.sectionData[bi];
                         //if (!ModelQueries.faceUsesSelfLighting(Am, facingForward|(axis*2))) {//TODO: check this is right
                         //    lighter = this.sectionData[bi];
                         //}
@@ -1157,7 +1157,7 @@ public class RenderDataFactory {
                             A &= ~0b110L; A |= getQuadTyping(Am);
                         }
 
-                        long lighter = A;
+                        long lighter = this.sectionData[bi];
                         //if (!ModelQueries.faceUsesSelfLighting(Am, facingForward|(axis*2))) {//TODO: check this is right
                         //    lighter = this.sectionData[bi];
                         //}
