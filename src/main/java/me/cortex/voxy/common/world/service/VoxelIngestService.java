@@ -85,9 +85,9 @@ public class VoxelIngestService {
         return true;
     }
 
-    public void enqueueIngest(WorldEngine engine, WorldChunk chunk) {
+    public boolean enqueueIngest(WorldEngine engine, WorldChunk chunk) {
         if (!this.threads.isAlive()) {
-            return;
+            return false;
         }
         if (!engine.isLive()) {
             throw new IllegalStateException("Tried inserting chunk into WorldEngine that was not alive");
@@ -125,7 +125,7 @@ public class VoxelIngestService {
         }
 
         if (!gotLighting) {
-            return;
+            return false;
         }
 
         var blp = lightingProvider.get(LightType.BLOCK);
@@ -162,6 +162,7 @@ public class VoxelIngestService {
                 break;
             }
         }
+        return true;
     }
 
     public int getTaskCount() {
@@ -180,8 +181,7 @@ public class VoxelIngestService {
         if (!instance.isIngestEnabled(worldId)) return false;
         var engine = instance.getOrCreate(worldId);
         if (engine == null) return false;
-        instance.getIngestService().enqueueIngest(engine, chunk);
-        return true;
+        return instance.getIngestService().enqueueIngest(engine, chunk);
     }
 
     //Try to automatically ingest the chunk into the correct world
