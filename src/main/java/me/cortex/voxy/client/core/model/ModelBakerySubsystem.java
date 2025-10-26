@@ -54,11 +54,9 @@ public class ModelBakerySubsystem {
             this.blockIdCount.addAndGet(-j);
         }
 
-        this.factory.tick();
-
         this.factory.processAllThings();
 
-        this.factory.processUploads();
+        this.factory.tickAndProcessUploads();
         //TimingStatistics.modelProcess.stop();
     }
 

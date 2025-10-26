@@ -42,6 +42,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.lang.invoke.VarHandle;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static me.cortex.voxy.client.core.model.ModelStore.MODEL_SIZE;
 import static org.lwjgl.opengl.ARBDirectStateAccess.nglTextureSubImage2D;
@@ -112,6 +113,7 @@ public class ModelFactory {
     //Contains the set of all block ids that are currently inflight/being baked
     // this is required due to "async" nature of gpu feedback
     private final IntOpenHashSet blockStatesInFlight = new IntOpenHashSet();
+    private final ReentrantLock blockStatesInFlightLock = new ReentrantLock();
 
     private final List<Biome> biomes = new ArrayList<>();
     private final List<Pair<Integer, BlockState>> modelsRequiringBiomeColours = new ArrayList<>();
@@ -122,9 +124,9 @@ public class ModelFactory {
     private final ModelStore storage;
     private final RawDownloadStream downstream = new RawDownloadStream(8*1024*1024);//8mb downstream
 
-    private final Deque<RawBakeResult> rawBakeResults = new ArrayDeque<>();
+    private final ConcurrentLinkedDeque<RawBakeResult> rawBakeResults = new ConcurrentLinkedDeque<>();
 
-    private final Deque<ResultUploader> uploadResults = new ArrayDeque<>();
+    private final ConcurrentLinkedDeque<ResultUploader> uploadResults = new ConcurrentLinkedDeque<>();
 
     private Object2IntMap<BlockState> customBlockStateIdMapping;
 
@@ -143,11 +145,6 @@ public class ModelFactory {
 
         this.modelTexture2id.defaultReturnValue(-1);
         this.addEntry(0);//Add air as the first entry
-    }
-
-
-    public void tick() {
-        this.downstream.tick();
     }
 
     public void setCustomBlockStateMapping(Object2IntMap<BlockState> mapping) {
@@ -172,10 +169,13 @@ public class ModelFactory {
         //We are (probably) going to be baking the block id
         // check that it is currently not inflight, if it is, return as its already being baked
         // else add it to the flight as it is going to be baked
+        this.blockStatesInFlightLock.lock();
         if (!this.blockStatesInFlight.add(blockId)) {
+            this.blockStatesInFlightLock.unlock();
             //Block baking is already in-flight
             return false;
         }
+        this.blockStatesInFlightLock.unlock();
 
         VarHandle.loadLoadFence();
 
@@ -258,18 +258,21 @@ public class ModelFactory {
         while (this.processModelResult());
     }
 
-    public void processUploads() {
-        if (this.uploadResults.isEmpty()) return;
+    public void tickAndProcessUploads() {
+        this.downstream.tick();
+
+        var upload = this.uploadResults.poll();
+        if (upload==null) return;
 
         glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
         glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
         glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-        while (!this.uploadResults.isEmpty()) {
-            var bakeResult = this.uploadResults.pop();
-            bakeResult.upload(this.storage);
-            bakeResult.free();
-        }
+        do {
+            upload.upload(this.storage);
+            upload.free();
+            upload = this.uploadResults.poll();
+        } while (upload != null);
         UploadStream.INSTANCE.commit();
     }
 
@@ -327,9 +330,12 @@ public class ModelFactory {
             throw new IllegalStateException("Block id already added: " + blockId + " for state: " + blockState);
         }
 
+        this.blockStatesInFlightLock.lock();
         if (!this.blockStatesInFlight.contains(blockId)) {
+            this.blockStatesInFlightLock.unlock();
             throw new IllegalStateException("processing a texture bake result but the block state was not in flight!!");
         }
+        this.blockStatesInFlightLock.unlock();
 
         //TODO: add thing for `blockState.hasEmissiveLighting()` and `blockState.getLuminance()`
 
@@ -614,9 +620,12 @@ public class ModelFactory {
         //Set the mapping at the very end
         this.idMappings[blockId] = modelId;
 
+        this.blockStatesInFlightLock.lock();
         if (!this.blockStatesInFlight.remove(blockId)) {
+            this.blockStatesInFlightLock.unlock();
             throw new IllegalStateException("processing a texture bake result but the block state was not in flight!!");
         }
+        this.blockStatesInFlightLock.unlock();
 
         return uploadResult;
     }
