@@ -26,6 +26,7 @@ import net.minecraft.client.render.RenderLayers;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.Pair;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
@@ -40,6 +41,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.lang.invoke.VarHandle;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 import static me.cortex.voxy.client.core.model.ModelStore.MODEL_SIZE;
 import static org.lwjgl.opengl.ARBDirectStateAccess.nglTextureSubImage2D;
@@ -208,10 +210,9 @@ public class ModelFactory {
         return true;
     }
 
-    public boolean processResult() {
-        if (this.rawBakeResults.isEmpty())
-            return false;
+    private boolean processModelResult() {
         var result = this.rawBakeResults.poll();
+        if (result == null) return false;
         ColourDepthTextureData[] textureData = new ColourDepthTextureData[6];
         {//Create texture data
             long ptr = result.rawData.address;
@@ -236,6 +237,25 @@ public class ModelFactory {
             this.uploadResults.add(bakeResult);
         }
         return !this.rawBakeResults.isEmpty();
+    }
+
+    private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeQueue = new ConcurrentLinkedDeque<>();
+    public void addBiome(Mapper.BiomeEntry biome) {
+        this.biomeQueue.add(biome);
+    }
+
+    public void processAllThings() {
+        var biomeEntry = this.biomeQueue.poll();
+        while (biomeEntry != null) {
+            var biomeRegistry = MinecraftClient.getInstance().world.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
+            var res = this.addBiome0(biomeEntry.id, biomeRegistry.get(Identifier.of(biomeEntry.biome)));
+            if (res != null) {
+                this.uploadResults.add(res);
+            }
+            biomeEntry = this.biomeQueue.poll();
+        }
+
+        while (this.processModelResult());
     }
 
     public void processUploads() {
@@ -635,13 +655,6 @@ public class ModelFactory {
         }
     }
 
-    public void addBiome(int id, Biome biome) {
-        var res = this.addBiome0(id, biome);
-        if (res != null) {
-            this.uploadResults.add(res);
-        }
-    }
-
     private BiomeUploadResult addBiome0(int id, Biome biome) {
         for (int i = this.biomes.size(); i <= id; i++) {
             this.biomes.add(null);
@@ -903,6 +916,11 @@ public class ModelFactory {
     }
 
     public int getInflightCount() {
-        return this.blockStatesInFlight.size();
+        //TODO replace all of this with an atomic?
+        int size = this.blockStatesInFlight.size();
+        size += this.uploadResults.size();
+        size += this.rawBakeResults.size();
+        size += this.biomeQueue.size();
+        return size;
     }
 }
