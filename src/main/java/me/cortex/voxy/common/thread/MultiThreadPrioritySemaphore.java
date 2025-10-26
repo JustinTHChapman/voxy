@@ -24,14 +24,41 @@ public class MultiThreadPrioritySemaphore {
             this.blockSemaphore.release(permits);
         }
 
-        public void acquire() {//Block until a permit for this block is availbe, other jobs maybe executed while we wait
+        public void acquire() {
+            this.acquire(true);
+        }
+        public void acquire(boolean runJob) {//Block until a permit for this block is availbe, other jobs maybe executed while we wait
+            /*
             while (true) {
                 this.blockSemaphore.acquireUninterruptibly();//Block on all
                 if (this.localSemaphore.tryAcquire()) {//We prioritize locals first
                     return;
                 }
-                //It wasnt a local job so run
-                this.man.tryRun(this);
+                if (runJob) {
+                    //It wasnt a local job so run
+                    this.man.tryRun(this);
+                } else {
+                    this.blockSemaphore.release(1);
+                    Thread.onSpinWait();
+                    Thread.yield();
+                }
+            }*/
+
+            //Absolutly no idea if this shitty thing functions correctly... at all, it very much probably doesnt
+            while (true) {
+                if (runJob) {
+                    this.blockSemaphore.acquireUninterruptibly();//Block on all
+                    if (this.localSemaphore.tryAcquire()) {//We prioritize locals first
+                        return;
+                    }
+                    this.man.tryRun(this);
+                } else {
+                    this.localSemaphore.acquireUninterruptibly();
+                    if (!this.blockSemaphore.tryAcquire()) {
+                        //This is technicanlly/actually a failure state cause blockSemaphore could have more
+                    }
+                    break;
+                }
             }
         }
 
