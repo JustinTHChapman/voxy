@@ -121,7 +121,8 @@ public class ModelFactory {
     private final RawDownloadStream downstream = new RawDownloadStream(8*1024*1024);//8mb downstream
 
     private final Deque<RawBakeResult> rawBakeResults = new ArrayDeque<>();
-    private final Deque<ModelBakeResultUpload> uploadResults = new ArrayDeque<>();
+
+    private final Deque<ResultUploader> uploadResults = new ArrayDeque<>();
 
     private Object2IntMap<BlockState> customBlockStateIdMapping;
 
@@ -246,14 +247,18 @@ public class ModelFactory {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
         while (!this.uploadResults.isEmpty()) {
             var bakeResult = this.uploadResults.pop();
-            bakeResult.upload(this.storage.modelBuffer, this.storage.modelColourBuffer, this.storage.textures);
+            bakeResult.upload(this.storage);
             bakeResult.free();
         }
         UploadStream.INSTANCE.commit();
     }
 
+    private interface ResultUploader {
+        void upload(ModelStore store);
+        void free();
+    }
 
-    private static final class ModelBakeResultUpload {
+    private static final class ModelBakeResultUpload implements ResultUploader {
         private final MemoryBuffer model = new MemoryBuffer(MODEL_SIZE).zero();
         private final MemoryBuffer texture = new MemoryBuffer((2L*3*computeSizeWithMips(MODEL_TEXTURE_SIZE))*4);
 
@@ -261,6 +266,10 @@ public class ModelFactory {
 
         public int biomeUploadIndex = -1;
         public @Nullable MemoryBuffer biomeUpload;
+
+        public void upload(ModelStore store) {//Uploads and resets for reuse
+            this.upload(store.modelBuffer, store.modelColourBuffer, store.textures);
+        }
 
         public void upload(GlBuffer modelBuffer, GlBuffer colourBuffer, GlTexture atlas) {//Uploads and resets for reuse
             this.model.cpyTo(UploadStream.INSTANCE.upload(modelBuffer, (long) this.modelId * MODEL_SIZE, MODEL_SIZE));
@@ -592,7 +601,48 @@ public class ModelFactory {
         return uploadResult;
     }
 
+    private static final class BiomeUploadResult implements ResultUploader {
+        private final MemoryBuffer biomeColourBuffer;
+        private final MemoryBuffer modelBiomeIndexPairs;
+        private BiomeUploadResult(int biomes, int models) {
+            this.biomeColourBuffer = new MemoryBuffer(biomes*models*4);
+            this.modelBiomeIndexPairs = new MemoryBuffer(models*8);
+        }
+
+        public void upload(ModelStore store) {
+            this.upload(store.modelBuffer, store.modelColourBuffer);
+        }
+
+        public void upload(GlBuffer modelBuffer, GlBuffer modelColourBuffer) {
+            this.biomeColourBuffer.cpyTo(UploadStream.INSTANCE.upload(modelColourBuffer, 0, this.biomeColourBuffer.size));
+
+            //TODO: optimize this to like a compute scatter update or something
+            long ptr = this.modelBiomeIndexPairs.address;
+            for (long offset = 0; offset < this.modelBiomeIndexPairs.size; offset += 8) {
+                long v = MemoryUtil.memGetLong(ptr);ptr += 8;
+                MemoryUtil.memPutInt(UploadStream.INSTANCE.upload(modelBuffer, (MODEL_SIZE*(v&((1<<32)-1)))+ 4*6 + 4, 4), (int) (v>>>32));
+            }
+
+            this.biomeColourBuffer.free();
+            this.modelBiomeIndexPairs.free();
+        }
+
+        public void free() {
+            if (!this.biomeColourBuffer.isFreed()) {
+                this.biomeColourBuffer.free();
+                this.modelBiomeIndexPairs.free();
+            }
+        }
+    }
+
     public void addBiome(int id, Biome biome) {
+        var res = this.addBiome0(id, biome);
+        if (res != null) {
+            this.uploadResults.add(res);
+        }
+    }
+
+    private BiomeUploadResult addBiome0(int id, Biome biome) {
         for (int i = this.biomes.size(); i <= id; i++) {
             this.biomes.add(null);
         }
@@ -605,7 +655,12 @@ public class ModelFactory {
             Logger.error("Biome added was a duplicate");
         }
 
+        if (this.modelsRequiringBiomeColours.isEmpty()) return null;
+
+        var result = new BiomeUploadResult(this.biomes.size(), this.modelsRequiringBiomeColours.size());
+
         int i = 0;
+        long modelUpPtr = result.modelBiomeIndexPairs.address;
         for (var entry : this.modelsRequiringBiomeColours) {
             var colourProvider = getColourProvider(entry.getRight().getBlock());
             if (colourProvider == null) {
@@ -613,8 +668,8 @@ public class ModelFactory {
             }
             //Populate the list of biomes for the model state
             int biomeIndex = (i++) * this.biomes.size();
-            MemoryUtil.memPutInt(UploadStream.INSTANCE.upload(this.storage.modelBuffer, (entry.getLeft()* MODEL_SIZE)+ 4*6 + 4, 4), biomeIndex);
-            long clrUploadPtr = UploadStream.INSTANCE.upload(this.storage.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
+            MemoryUtil.memPutLong(modelUpPtr, Integer.toUnsignedLong(entry.getLeft())|(Integer.toUnsignedLong(biomeIndex)<<32));
+            long clrUploadPtr = result.biomeColourBuffer.address + biomeIndex * 4L;
             for (var biomeE : this.biomes) {
                 if (biomeE == null) {
                     continue;//If null, ignore
@@ -623,7 +678,7 @@ public class ModelFactory {
             }
         }
 
-        UploadStream.INSTANCE.commit();
+        return result;
     }
 
     private static BlockColorProvider getColourProvider(Block block) {
@@ -736,7 +791,7 @@ public class ModelFactory {
         return biomeDependent[0];
     }
 
-    private float[] computeModelDepth(ColourDepthTextureData[] textures, int checkMode) {
+    private static float[] computeModelDepth(ColourDepthTextureData[] textures, int checkMode) {
         float[] res = new float[6];
         for (var dir : Direction.values()) {
             var data = textures[dir.getIndex()];
