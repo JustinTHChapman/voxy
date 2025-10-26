@@ -649,7 +649,7 @@ public class ModelFactory {
             long ptr = this.modelBiomeIndexPairs.address;
             for (long offset = 0; offset < this.modelBiomeIndexPairs.size; offset += 8) {
                 long v = MemoryUtil.memGetLong(ptr);ptr += 8;
-                MemoryUtil.memPutInt(UploadStream.INSTANCE.upload(modelBuffer, (MODEL_SIZE*(v&((1<<32)-1)))+ 4*6 + 4, 4), (int) (v>>>32));
+                MemoryUtil.memPutInt(UploadStream.INSTANCE.upload(modelBuffer, (MODEL_SIZE*(v&((1L<<32)-1)))+ 4*6 + 4, 4), (int) (v>>>32));
             }
 
             this.biomeColourBuffer.free();
