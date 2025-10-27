@@ -187,9 +187,9 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
             glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT | GL_PIXEL_BUFFER_BARRIER_BIT);
 
-            TimingStatistics.I.start();
+            TimingStatistics.F.start();
             this.traversal.doTraversal(viewport);
-            TimingStatistics.I.stop();
+            TimingStatistics.F.stop();
         } while (this.frexStillHasWork.getAsBoolean());
     }
 

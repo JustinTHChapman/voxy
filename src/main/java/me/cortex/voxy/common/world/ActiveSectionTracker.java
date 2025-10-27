@@ -115,7 +115,7 @@ public class ActiveSectionTracker {
             section = this.lruSecondaryCache.remove(key);
 
             WorldSection removal = null;
-            if (section == null && this.lruSize+100<this.lruSecondaryCache.size()+this.getLoadedCacheCount()) {//Add a self clamping lru case for when there are alot of loaded sections
+            if (section == null && (!this.lruSecondaryCache.isEmpty()) && this.lruSize+100<this.lruSecondaryCache.size()+this.getLoadedCacheCount()) {//Add a self clamping lru case for when there are alot of loaded sections
                 removal = this.lruSecondaryCache.removeFirst();
             }
 
