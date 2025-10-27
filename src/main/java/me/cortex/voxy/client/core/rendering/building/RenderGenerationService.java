@@ -79,7 +79,7 @@ public class RenderGenerationService {
             return new Pair<>(() -> {
                 this.processJob(factory, seenMissed);
             }, factory::free);
-        }, 100, "Section mesh generation service");
+        }, 10, "Section mesh generation service");
     }
 
     public void setResultConsumer(Consumer<BuiltSection> consumer) {
