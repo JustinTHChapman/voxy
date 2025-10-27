@@ -478,7 +478,10 @@ public class AsyncNodeManager {
         results.usedGeometry = this.geometryManager.getGeometryUsedBytes();
         results.currentMaxNodeId = this.manager.getCurrentMaxNodeId();
 
-        this.needsWaitForSync |= results.geometryUpload.currentElemCopyAmount*8L > 4L<<20;//4mb limit per frame
+        this.needsWaitForSync |= results.geometryUpload.currentElemCopyAmount*8L > 2L<<20;//2mb limit per frame
+        this.needsWaitForSync |= results.cleanerOperations.size() > 1024;
+        this.needsWaitForSync |= results.scatterWriteLocationMap.size() > 4096;
+        this.needsWaitForSync |= results.tlnDelta.size() > 10;
 
         if (!RESULT_HANDLE.compareAndSet(this, null, results)) {
             throw new IllegalArgumentException("Should always have null");
