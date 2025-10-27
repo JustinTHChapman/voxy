@@ -28,15 +28,30 @@ public class ModelBakerySubsystem {
     private final AtomicInteger blockIdCount = new AtomicInteger();
     private final ConcurrentLinkedDeque<Integer> blockIdQueue = new ConcurrentLinkedDeque<>();//TODO: replace with custom DS
 
+    private final Thread processingThread;
+    private volatile boolean isRunning = true;
     public ModelBakerySubsystem(Mapper mapper) {
         this.mapper = mapper;
         this.factory = new ModelFactory(mapper, this.storage);
+        this.processingThread = new Thread(()->{
+            while (this.isRunning) {
+                this.factory.processAllThings();
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }, "Model factory processor");
+        this.processingThread.start();
     }
 
     public void tick(long totalBudget) {
-        if (this.blockIdCount.get() != 0) {
-            //Always do 1 iteration minimum
-            Integer i = this.blockIdQueue.poll();
+        long start = System.nanoTime();
+        this.factory.tickAndProcessUploads();
+        //Always do 1 iteration minimum
+        Integer i = this.blockIdQueue.poll();
+        if (i != null) {
             int j = 0;
             if (i != null) {
                 int fbBinding = glGetInteger(GL_FRAMEBUFFER_BINDING);
@@ -44,7 +59,7 @@ public class ModelBakerySubsystem {
                 do {
                     this.factory.addEntry(i);
                     j++;
-                    if (24<j)//budget<(System.nanoTime() - start)+1000
+                    if (4<j&&(totalBudget<(System.nanoTime() - start)+50_000))//20<j||
                         break;
                     i = this.blockIdQueue.poll();
                 } while (i != null);
@@ -54,13 +69,17 @@ public class ModelBakerySubsystem {
             this.blockIdCount.addAndGet(-j);
         }
 
-        this.factory.processAllThings();
-
-        this.factory.tickAndProcessUploads();
         //TimingStatistics.modelProcess.stop();
     }
 
     public void shutdown() {
+        this.isRunning = false;
+        try {
+            this.processingThread.join();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+
         this.factory.free();
         this.storage.free();
     }

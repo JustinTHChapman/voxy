@@ -364,9 +364,12 @@ public class ModelFactory {
                 this.idMappings[blockId] = possibleDuplicate;
                 modelId = possibleDuplicate;
                 //Remove from flight
+                this.blockStatesInFlightLock.lock();
                 if (!this.blockStatesInFlight.remove(blockId)) {
+                    this.blockStatesInFlightLock.unlock();
                     throw new IllegalStateException();
                 }
+                this.blockStatesInFlightLock.unlock();
                 return null;
             } else {//Not a duplicate so create a new entry
                 modelId = this.modelTexture2id.size();
@@ -928,7 +931,6 @@ public class ModelFactory {
         //TODO replace all of this with an atomic?
         int size = this.blockStatesInFlight.size();
         size += this.uploadResults.size();
-        size += this.rawBakeResults.size();
         size += this.biomeQueue.size();
         return size;
     }
