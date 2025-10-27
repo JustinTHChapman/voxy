@@ -266,9 +266,10 @@ public class VoxyRenderSystem {
             UploadStream.INSTANCE.tick();
 
             while (this.renderDistanceTracker.setCenterAndProcess(viewport.cameraX, viewport.cameraZ) && VoxyClient.isFrexActive());//While FF is active, run until everything is processed
-
+            TimingStatistics.I.start();
             //Done here as is allows less gl state resetup
-            this.modelService.tick(Math.max(3_000_000-(System.nanoTime()-startTime), 500_000));
+            this.modelService.tick(900_000);
+            TimingStatistics.I.stop();
         }
         GPUTiming.INSTANCE.marker();
         TimingStatistics.postDynamic.stop();

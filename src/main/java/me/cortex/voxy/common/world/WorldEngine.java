@@ -54,7 +54,7 @@ public class WorldEngine {
         this.instanceIn = instance;
 
         int cacheSize = 1024;
-        if (Runtime.getRuntime().maxMemory()>=(1L<<32)-200<<20) {
+        if (Runtime.getRuntime().maxMemory()>=(1L<<32)-(200L<<20)) {
             cacheSize = 2048;
         }
 
