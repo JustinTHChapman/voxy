@@ -71,6 +71,7 @@ public class BasicSectionGeometryData implements IGeometryData {
         if (this.geometryBuffer.isSparse()) {
             if (this.sparseCommitment < size) {//if we try to access memory outside the allocation range, allocate it
                 glBindBuffer(GL_ARRAY_BUFFER, this.geometryBuffer.id);
+                size += 65536L*1024;//increase size by 64mb to prevent driver allocation thrashing
                 glBufferPageCommitmentARB(GL_ARRAY_BUFFER, this.sparseCommitment, size-this.sparseCommitment, true);
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
                 this.sparseCommitment = size;
