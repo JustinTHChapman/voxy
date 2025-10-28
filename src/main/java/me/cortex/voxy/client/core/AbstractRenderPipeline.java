@@ -208,6 +208,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         this.sectionRenderer.free();
         this.depthMaskBlit.delete();
         this.depthSetBlit.delete();
+        this.depthCopy.delete();
         super.free0();
     }
 
