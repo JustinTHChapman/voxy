@@ -33,7 +33,7 @@ public class ModelBakerySubsystem {
     public ModelBakerySubsystem(Mapper mapper) {
         this.mapper = mapper;
         this.factory = new ModelFactory(mapper, this.storage);
-        this.processingThread = new Thread(()->{
+        this.processingThread = new Thread(()->{//TODO replace this with something good/integrate it into the async processor so that we just have less threads overall
             while (this.isRunning) {
                 this.factory.processAllThings();
                 try {
