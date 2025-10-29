@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LevelRenderer.class)
-public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
+public abstract class MixinLevelRenderer implements IGetVoxyRenderSystem {
     @Shadow private @Nullable ClientLevel level;
     @Unique private VoxyRenderSystem renderer;
 

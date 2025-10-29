@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(BlockableEventLoop.class)
-public abstract class MixinThreadExecutor {
+public abstract class MixinBlockableEventLoop {
 
     @Shadow public static boolean isNonRecoverable(Throwable throwable){return false;}
 

@@ -3,9 +3,7 @@ package me.cortex.voxy.client.mixin.iris;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.client.core.util.IrisUtil;
-import me.cortex.voxy.common.Logger;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.caffeinemc.mods.sodium.client.util.FogStorage;
 import net.minecraft.client.Camera;
@@ -24,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import static org.lwjgl.opengl.GL11C.glViewport;
 
 @Mixin(LevelRenderer.class)
-public class MixinWorldRenderer {
+public class MixinLevelRenderer {
     @Shadow @Final private Minecraft minecraft;
 
     @Inject(method = "renderLevel", at = @At("HEAD"), order = 100)

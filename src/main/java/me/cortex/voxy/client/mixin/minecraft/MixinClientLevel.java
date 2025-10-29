@@ -1,9 +1,7 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
-import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -26,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ClientLevel.class)
-public abstract class MixinClientWorld {
+public abstract class MixinClientLevel {
 
     @Unique
     private int bottomSectionY;
