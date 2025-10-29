@@ -693,7 +693,7 @@ public class ModelFactory {
             }
             //Populate the list of biomes for the model state
             int biomeIndex = (i++) * this.biomes.size();
-            MemoryUtil.memPutLong(modelUpPtr, Integer.toUnsignedLong(entry.getLeft())|(Integer.toUnsignedLong(biomeIndex)<<32));
+            MemoryUtil.memPutLong(modelUpPtr, Integer.toUnsignedLong(entry.getLeft())|(Integer.toUnsignedLong(biomeIndex)<<32));modelUpPtr+=8;
             long clrUploadPtr = result.biomeColourBuffer.address + biomeIndex * 4L;
             for (var biomeE : this.biomes) {
                 if (biomeE == null) {
