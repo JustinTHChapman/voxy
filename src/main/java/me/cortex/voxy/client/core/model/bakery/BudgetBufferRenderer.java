@@ -2,14 +2,13 @@ package me.cortex.voxy.client.core.model.bakery;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
-import net.minecraft.client.gl.GlGpuBuffer;
-import net.minecraft.client.render.BuiltBuffer;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
@@ -29,9 +28,9 @@ public class BudgetBufferRenderer {
     public static void init(){}
     private static final GlBuffer indexBuffer;
     static {
-        var i = RenderSystem.getSequentialBuffer(VertexFormat.DrawMode.QUADS);
-        int id = ((GlGpuBuffer) i.getIndexBuffer(4096*3*2)).id;
-        if (i.getIndexType() != VertexFormat.IndexType.SHORT) {
+        var i = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+        int id = ((com.mojang.blaze3d.opengl.GlBuffer) i.getBuffer(4096*3*2)).handle;
+        if (i.type() != VertexFormat.IndexType.SHORT) {
             throw new IllegalStateException();
         }
         indexBuffer = new GlBuffer(3*2*2*4096);
@@ -47,18 +46,18 @@ public class BudgetBufferRenderer {
 
     private static GlBuffer immediateBuffer;
     private static int quadCount;
-    public static void drawFast(BuiltBuffer buffer, GpuTexture tex, Matrix4f matrix) {
-        if (buffer.getDrawParameters().mode() != VertexFormat.DrawMode.QUADS) {
+    public static void drawFast(MeshData buffer, GpuTexture tex, Matrix4f matrix) {
+        if (buffer.drawState().mode() != VertexFormat.Mode.QUADS) {
             throw new IllegalStateException("Fast only supports quads");
         }
 
-        var buff = buffer.getBuffer();
+        var buff = buffer.vertexBuffer();
         int size = buff.remaining();
         if (size%STRIDE != 0) throw new IllegalStateException();
         size /= STRIDE;
         if (size%4 != 0) throw new IllegalStateException();
         size /= 4;
-        setup(MemoryUtil.memAddress(buff), size, ((net.minecraft.client.texture.GlTexture)tex).getGlId());
+        setup(MemoryUtil.memAddress(buff), size, ((com.mojang.blaze3d.opengl.GlTexture)tex).glId());
         buffer.close();
 
         render(matrix);

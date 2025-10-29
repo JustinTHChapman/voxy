@@ -1,38 +1,25 @@
 accessWidener v1 named
 
-accessible class net/minecraft/client/render/RenderLayer$MultiPhase
-accessible class net/minecraft/client/render/RenderLayer$MultiPhaseParameters
+accessible class net/minecraft/client/multiplayer/ClientChunkCache$Storage
+accessible class com/mojang/blaze3d/opengl/GlDebug$LogEntry
 
-accessible field net/minecraft/client/texture/SpriteContents image Lnet/minecraft/client/texture/NativeImage;
-accessible field net/minecraft/client/render/Frustum frustumIntersection Lorg/joml/FrustumIntersection;
-accessible field net/minecraft/client/color/block/BlockColors providers Lnet/minecraft/util/collection/IdList;
-accessible field net/minecraft/client/world/ClientWorld worldRenderer Lnet/minecraft/client/render/WorldRenderer;
-accessible field net/minecraft/world/biome/source/BiomeAccess seed J
+accessible field net/minecraft/client/multiplayer/ClientLevel levelRenderer Lnet/minecraft/client/renderer/LevelRenderer;
+accessible field com/mojang/blaze3d/opengl/GlBuffer handle I
+accessible field net/minecraft/client/color/block/BlockColors blockColors Lnet/minecraft/core/IdMapper;
+accessible field net/minecraft/client/renderer/texture/TextureAtlas mipLevel I
+accessible field net/minecraft/client/gui/components/BossHealthOverlay events Ljava/util/Map;
+accessible field net/minecraft/client/multiplayer/MultiPlayerGameMode connection Lnet/minecraft/client/multiplayer/ClientPacketListener;
 
-accessible field net/minecraft/client/gui/hud/BossBarHud bossBars Ljava/util/Map;
+accessible field net/minecraft/world/level/chunk/PalettedContainer data Lnet/minecraft/world/level/chunk/PalettedContainer$Data;
+accessible field net/minecraft/world/level/chunk/PalettedContainer$Data palette Lnet/minecraft/world/level/chunk/Palette;
+accessible field net/minecraft/world/level/chunk/PalettedContainer$Data storage Lnet/minecraft/util/BitStorage;
 
-accessible field net/minecraft/client/render/RenderLayer$MultiPhaseParameters texture Lnet/minecraft/client/render/RenderPhase$TextureBase;
-accessible field net/minecraft/client/render/RenderLayer$MultiPhase phases Lnet/minecraft/client/render/RenderLayer$MultiPhaseParameters;
-accessible field net/minecraft/client/network/ClientPlayerInteractionManager networkHandler Lnet/minecraft/client/network/ClientPlayNetworkHandler;
+accessible field net/minecraft/client/renderer/RenderType$CompositeRenderType state Lnet/minecraft/client/renderer/RenderType$CompositeState;
+accessible field net/minecraft/client/renderer/RenderType$CompositeState textureState Lnet/minecraft/client/renderer/RenderStateShard$EmptyTextureStateShard;
+accessible method net/minecraft/client/renderer/RenderStateShard$EmptyTextureStateShard cutoutTexture ()Ljava/util/Optional;
 
-accessible method net/minecraft/client/render/GameRenderer getFov (Lnet/minecraft/client/render/Camera;FZ)F
-accessible method net/minecraft/client/render/RenderPhase$TextureBase getId ()Ljava/util/Optional;
+accessible method net/minecraft/client/renderer/texture/MipmapGenerator alphaBlend (IIIIZ)I
+accessible method net/minecraft/client/renderer/GameRenderer getFov (Lnet/minecraft/client/Camera;FZ)F
 
-accessible field net/minecraft/world/chunk/PalettedContainer data Lnet/minecraft/world/chunk/PalettedContainer$Data;
-accessible field net/minecraft/world/chunk/PalettedContainer$Data storage Lnet/minecraft/util/collection/PaletteStorage;
-accessible field net/minecraft/world/chunk/PalettedContainer$Data palette Lnet/minecraft/world/chunk/Palette;
-
-accessible field net/minecraft/client/gl/GlGpuBuffer id I
-
-accessible field net/minecraft/client/gl/GlCommandEncoder currentProgram Lnet/minecraft/client/gl/ShaderProgram;
-accessible field net/minecraft/client/gl/GlCommandEncoder currentPipeline Lcom/mojang/blaze3d/pipeline/RenderPipeline;
-
-accessible class net/minecraft/client/gl/GlDebug$DebugMessage
-
-accessible class net/minecraft/client/world/ClientChunkManager$ClientChunkMap
-accessible method net/minecraft/client/world/ClientChunkManager$ClientChunkMap getChunk (I)Lnet/minecraft/world/chunk/WorldChunk;
-accessible method net/minecraft/client/world/ClientChunkManager$ClientChunkMap getIndex (II)I
-
-accessible field net/minecraft/client/texture/SpriteAtlasTexture mipLevel I
-
-accessible method net/minecraft/client/texture/MipmapHelper blend (IIIIZ)I
+accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage getChunk (I)Lnet/minecraft/world/level/chunk/LevelChunk;
+accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage getIndex (II)I

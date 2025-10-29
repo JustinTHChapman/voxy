@@ -3,47 +3,46 @@ package me.cortex.voxy.client;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.hud.debug.DebugHudEntry;
-import net.minecraft.client.gui.hud.debug.DebugHudLines;
-import net.minecraft.util.Colors;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
+import net.minecraft.client.gui.components.debug.DebugScreenEntry;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.LevelChunk;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class VoxyDebugScreenEntry implements DebugHudEntry {
+public class VoxyDebugScreenEntry implements DebugScreenEntry {
     @Override
-    public void render(DebugHudLines lines, @Nullable World world, @Nullable WorldChunk clientChunk, @Nullable WorldChunk chunk) {
+    public void display(DebugScreenDisplayer lines, @Nullable Level world, @Nullable LevelChunk clientChunk, @Nullable LevelChunk chunk) {
         if (!VoxyCommon.isAvailable()) {
-            lines.addLine(Formatting.RED + "voxy-"+VoxyCommon.MOD_VERSION);//Voxy installed, not avalible
+            lines.addLine(ChatFormatting.RED + "voxy-"+VoxyCommon.MOD_VERSION);//Voxy installed, not avalible
             return;
         }
         var instance = VoxyCommon.getInstance();
         if (instance == null) {
-            lines.addLine(Formatting.YELLOW + "voxy-" + VoxyCommon.MOD_VERSION);//Voxy avalible, no instance active
+            lines.addLine(ChatFormatting.YELLOW + "voxy-" + VoxyCommon.MOD_VERSION);//Voxy avalible, no instance active
             return;
         }
         VoxyRenderSystem vrs = null;
-        var wr = MinecraftClient.getInstance().worldRenderer;
+        var wr = Minecraft.getInstance().levelRenderer;
         if (wr != null) vrs = ((IGetVoxyRenderSystem) wr).getVoxyRenderSystem();
 
         //Voxy instance active
-        lines.addLine((vrs==null?Formatting.DARK_GREEN:Formatting.GREEN)+"voxy-"+VoxyCommon.MOD_VERSION);
+        lines.addLine((vrs==null?ChatFormatting.DARK_GREEN:ChatFormatting.GREEN)+"voxy-"+VoxyCommon.MOD_VERSION);
 
         //lines.addLineToSection();
         List<String> instanceLines = new ArrayList<>();
         instance.addDebug(instanceLines);
-        lines.addLinesToSection(Identifier.of("voxy", "instance_debug"), instanceLines);
+        lines.addToGroup(ResourceLocation.fromNamespaceAndPath("voxy", "instance_debug"), instanceLines);
 
         if (vrs != null) {
             List<String> renderLines = new ArrayList<>();
             vrs.addDebugInfo(renderLines);
-            lines.addLinesToSection(Identifier.of("voxy", "render_debug"), renderLines);
+            lines.addToGroup(ResourceLocation.fromNamespaceAndPath("voxy", "render_debug"), renderLines);
         }
     }
 

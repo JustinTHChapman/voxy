@@ -11,9 +11,8 @@ import net.caffeinemc.mods.sodium.client.gui.options.*;
 import net.caffeinemc.mods.sodium.client.gui.options.control.SliderControl;
 import net.caffeinemc.mods.sodium.client.gui.options.control.TickBoxControl;
 import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,21 +28,21 @@ public abstract class VoxyConfigScreenPages {
         //General
         groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, storage)
-                        .setName(Text.translatable("voxy.config.general.enabled"))
-                        .setTooltip(Text.translatable("voxy.config.general.enabled.tooltip"))
+                        .setName(Component.translatable("voxy.config.general.enabled"))
+                        .setTooltip(Component.translatable("voxy.config.general.enabled.tooltip"))
                         .setControl(TickBoxControl::new)
                         .setBinding((s, v)->{
                             s.enabled = v;
                             if (v) {
                                 if (VoxyClientInstance.isInGame) {
                                     VoxyCommon.createInstance();
-                                    var vrsh = (IGetVoxyRenderSystem) MinecraftClient.getInstance().worldRenderer;
+                                    var vrsh = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
                                     if (vrsh != null && s.enableRendering) {
                                         vrsh.createRenderer();
                                     }
                                 }
                             } else {
-                                var vrsh = (IGetVoxyRenderSystem) MinecraftClient.getInstance().worldRenderer;
+                                var vrsh = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
                                 if (vrsh != null) {
                                     vrsh.shutdownRenderer();
                                 }
@@ -57,12 +56,12 @@ public abstract class VoxyConfigScreenPages {
 
         groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(int.class, storage)
-                        .setName(Text.translatable("voxy.config.general.serviceThreads"))
-                        .setTooltip(Text.translatable("voxy.config.general.serviceThreads.tooltip"))
+                        .setName(Component.translatable("voxy.config.general.serviceThreads"))
+                        .setTooltip(Component.translatable("voxy.config.general.serviceThreads.tooltip"))
                         .setControl(opt->new SliderControl(opt, 1,
                                 CpuLayout.CORES.length, //Just do core size as max
                                 //Runtime.getRuntime().availableProcessors(),//Note: this is threads not cores, the default value is half the core count, is fine as this should technically be the limit but CpuLayout.CORES.length is more realistic
-                                1, v->Text.literal(Integer.toString(v))))
+                                1, v->Component.literal(Integer.toString(v))))
                         .setBinding((s, v)->{
                             s.serviceThreads = v;
                             var instance = VoxyCommon.getInstance();
@@ -83,8 +82,8 @@ public abstract class VoxyConfigScreenPages {
                         .setImpact(OptionImpact.HIGH)
                         .build()
                 ).add(OptionImpl.createBuilder(boolean.class, storage)
-                        .setName(Text.translatable("voxy.config.general.ingest"))
-                        .setTooltip(Text.translatable("voxy.config.general.ingest.tooltip"))
+                        .setName(Component.translatable("voxy.config.general.ingest"))
+                        .setTooltip(Component.translatable("voxy.config.general.ingest.tooltip"))
                         .setControl(TickBoxControl::new)
                         .setBinding((s, v) -> s.ingestEnabled = v, s -> s.ingestEnabled)
                         .setImpact(OptionImpact.MEDIUM)
@@ -94,12 +93,12 @@ public abstract class VoxyConfigScreenPages {
 
         groups.add(OptionGroup.createBuilder()
                 .add(OptionImpl.createBuilder(boolean.class, storage)
-                        .setName(Text.translatable("voxy.config.general.rendering"))
-                        .setTooltip(Text.translatable("voxy.config.general.rendering.tooltip"))
+                        .setName(Component.translatable("voxy.config.general.rendering"))
+                        .setTooltip(Component.translatable("voxy.config.general.rendering.tooltip"))
                         .setControl(TickBoxControl::new)
                         .setBinding((s, v)->{
                             s.enableRendering = v;
-                            var vrsh = (IGetVoxyRenderSystem)MinecraftClient.getInstance().worldRenderer;
+                            var vrsh = (IGetVoxyRenderSystem)Minecraft.getInstance().levelRenderer;
                             if (vrsh != null) {
                                 if (v) {
                                     vrsh.createRenderer();
@@ -111,19 +110,19 @@ public abstract class VoxyConfigScreenPages {
                         .setImpact(OptionImpact.HIGH)
                         .build()
                 ).add(OptionImpl.createBuilder(int.class, storage)
-                        .setName(Text.translatable("voxy.config.general.subDivisionSize"))
-                        .setTooltip(Text.translatable("voxy.config.general.subDivisionSize.tooltip"))
-                        .setControl(opt->new SliderControl(opt, 0, SUBDIV_IN_MAX, 1, v->Text.literal(Integer.toString(Math.round(ln2subDiv(v))))))
+                        .setName(Component.translatable("voxy.config.general.subDivisionSize"))
+                        .setTooltip(Component.translatable("voxy.config.general.subDivisionSize.tooltip"))
+                        .setControl(opt->new SliderControl(opt, 0, SUBDIV_IN_MAX, 1, v->Component.literal(Integer.toString(Math.round(ln2subDiv(v))))))
                         .setBinding((s, v) -> s.subDivisionSize = ln2subDiv(v), s -> subDiv2ln(s.subDivisionSize))
                         .setImpact(OptionImpact.HIGH)
                         .build()
                 ).add(OptionImpl.createBuilder(int.class, storage)
-                        .setName(Text.translatable("voxy.config.general.renderDistance"))
-                        .setTooltip(Text.translatable("voxy.config.general.renderDistance.tooltip"))
-                        .setControl(opt->new SliderControl(opt, 2, 64, 1, v->Text.literal(Integer.toString(v * 32))))//Every unit is equal to 32 vanilla chunks
+                        .setName(Component.translatable("voxy.config.general.renderDistance"))
+                        .setTooltip(Component.translatable("voxy.config.general.renderDistance.tooltip"))
+                        .setControl(opt->new SliderControl(opt, 2, 64, 1, v->Component.literal(Integer.toString(v * 32))))//Every unit is equal to 32 vanilla chunks
                         .setBinding((s, v)-> {
                             s.sectionRenderDistance = v;
-                            var vrsh = (IGetVoxyRenderSystem)MinecraftClient.getInstance().worldRenderer;
+                            var vrsh = (IGetVoxyRenderSystem)Minecraft.getInstance().levelRenderer;
                             if (vrsh != null) {
                                 var vrs = vrsh.getVoxyRenderSystem();
                                 if (vrs != null) {
@@ -134,29 +133,29 @@ public abstract class VoxyConfigScreenPages {
                         .setImpact(OptionImpact.LOW)
                         .build()
                 ).add(OptionImpl.createBuilder(boolean.class, storage)
-                        .setName(Text.translatable("voxy.config.general.environmental_fog"))
-                        .setTooltip(Text.translatable("voxy.config.general.environmental_fog.tooltip"))
+                        .setName(Component.translatable("voxy.config.general.environmental_fog"))
+                        .setTooltip(Component.translatable("voxy.config.general.environmental_fog.tooltip"))
                         .setControl(TickBoxControl::new)
                         .setImpact(OptionImpact.VARIES)
                         .setBinding((s, v)-> s.useEnvironmentalFog = v, s -> s.useEnvironmentalFog)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 ).add(OptionImpl.createBuilder(boolean.class, storage)
-                        .setName(Text.translatable("voxy.config.general.vanilla_fog"))
-                        .setTooltip(Text.translatable("voxy.config.general.vanilla_fog.tooltip"))
+                        .setName(Component.translatable("voxy.config.general.vanilla_fog"))
+                        .setTooltip(Component.translatable("voxy.config.general.vanilla_fog.tooltip"))
                         .setControl(TickBoxControl::new)
                         .setBinding((s, v)-> s.renderVanillaFog = v, s -> s.renderVanillaFog)
                         .build()
                 ).add(OptionImpl.createBuilder(boolean.class, storage)
-                        .setName(Text.translatable("voxy.config.general.render_statistics"))
-                        .setTooltip(Text.translatable("voxy.config.general.render_statistics.tooltip"))
+                        .setName(Component.translatable("voxy.config.general.render_statistics"))
+                        .setTooltip(Component.translatable("voxy.config.general.render_statistics.tooltip"))
                         .setControl(TickBoxControl::new)
                         .setBinding((s, v)-> RenderStatistics.enabled = v, s -> RenderStatistics.enabled)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .build()
                 ).build()
         );
-        return new OptionPage(Text.translatable("voxy.config.title"), ImmutableList.copyOf(groups));
+        return new OptionPage(Component.translatable("voxy.config.title"), ImmutableList.copyOf(groups));
     }
 
     private static final int SUBDIV_IN_MAX = 100;

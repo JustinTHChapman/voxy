@@ -17,7 +17,7 @@ import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
@@ -104,7 +104,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                 .defineIf("TAA_PATCH", taa != null)
                 .defineIf("DEBUG_RENDER", false)
 
-                .defineIf("DARKENED_TINTING", MinecraftClient.getInstance().world.getDimensionEffects().isDarkened())//TODO: FIXME: this is really jank atm
+                .defineIf("DARKENED_TINTING", Minecraft.getInstance().level.effects().constantAmbientLight())//TODO: FIXME: this is really jank atm
 
                 .addSource(ShaderType.VERTEX, vertex);
 

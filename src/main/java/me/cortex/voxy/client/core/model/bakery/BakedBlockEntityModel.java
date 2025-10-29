@@ -1,32 +1,13 @@
 package me.cortex.voxy.client.core.model.bakery;
 
 import me.cortex.voxy.common.Logger;
-import net.minecraft.block.BlockEntityProvider;
-import net.minecraft.block.BlockState;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.Model;
-import net.minecraft.client.model.ModelPart;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.block.MovingBlockRenderState;
-import net.minecraft.client.render.command.ModelCommandRenderer;
-import net.minecraft.client.render.command.OrderedRenderCommandQueue;
-import net.minecraft.client.render.command.OrderedRenderCommandQueueImpl;
-import net.minecraft.client.render.command.RenderCommandQueue;
-import net.minecraft.client.render.entity.state.EntityHitboxAndView;
-import net.minecraft.client.render.entity.state.EntityRenderState;
-import net.minecraft.client.render.item.ItemRenderState;
-import net.minecraft.client.render.model.BakedQuad;
-import net.minecraft.client.render.model.BlockStateModel;
-import net.minecraft.client.render.state.CameraRenderState;
-import net.minecraft.client.texture.Sprite;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.item.ItemDisplayContext;
-import net.minecraft.text.OrderedText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -37,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 public class BakedBlockEntityModel {
-    private record LayerConsumer(RenderLayer layer, ReuseVertexConsumer consumer) {}
+    private record LayerConsumer(RenderType layer, ReuseVertexConsumer consumer) {}
     private final List<LayerConsumer> layers;
     private BakedBlockEntityModel(List<LayerConsumer> layers) {
         this.layers = layers;
@@ -46,12 +27,12 @@ public class BakedBlockEntityModel {
     public void render(Matrix4f matrix, int texId) {
         for (var layer : this.layers) {
             if (layer.consumer.isEmpty()) continue;
-            if (layer.layer instanceof RenderLayer.MultiPhase mp) {
-                Identifier textureId = mp.phases.texture.getId().orElse(null);
+            if (layer.layer instanceof RenderType.CompositeRenderType mp) {
+                ResourceLocation textureId = mp.state.textureState.cutoutTexture().orElse(null);
                 if (textureId == null) {
                     Logger.error("ERROR: Empty texture id for layer: " + layer);
                 } else {
-                    texId = ((net.minecraft.client.texture.GlTexture)MinecraftClient.getInstance().getTextureManager().getTexture(textureId).getGlTexture()).getGlId();
+                    texId = ((com.mojang.blaze3d.opengl.GlTexture)Minecraft.getInstance().getTextureManager().getTexture(textureId).getTexture()).glId();
                 }
             }
             if (texId == 0) continue;
@@ -64,15 +45,15 @@ public class BakedBlockEntityModel {
         this.layers.forEach(layer->layer.consumer.free());
     }
 
-    private static int getMetaFromLayer(RenderLayer layer) {
-        boolean hasDiscard = layer == RenderLayer.getCutout() ||
-                layer == RenderLayer.getCutoutMipped() ||
-                layer == RenderLayer.getTripwire();
+    private static int getMetaFromLayer(RenderType layer) {
+        boolean hasDiscard = layer == RenderType.cutout() ||
+                layer == RenderType.cutoutMipped() ||
+                layer == RenderType.tripwire();
 
-        boolean isMipped = layer == RenderLayer.getCutoutMipped() ||
-                layer == RenderLayer.getSolid() ||
-                layer.isTranslucent() ||
-                layer == RenderLayer.getTripwire();
+        boolean isMipped = layer == RenderType.cutoutMipped() ||
+                layer == RenderType.solid() ||
+                layer.sortOnUpload() ||
+                layer == RenderType.tripwire();
 
         int meta = hasDiscard?1:0;
         meta |= isMipped?2:0;
@@ -80,13 +61,13 @@ public class BakedBlockEntityModel {
     }
 
     public static BakedBlockEntityModel bake(BlockState state) {
-        Map<RenderLayer, LayerConsumer> map = new HashMap<>();
-        var entity = ((BlockEntityProvider)state.getBlock()).createBlockEntity(BlockPos.ORIGIN, state);
+        Map<RenderType, LayerConsumer> map = new HashMap<>();
+        var entity = ((EntityBlock)state.getBlock()).newBlockEntity(BlockPos.ZERO, state);
         if (entity == null) {
             return null;
         }
-        var renderer = MinecraftClient.getInstance().getBlockEntityRenderDispatcher().get(entity);
-        entity.setWorld(MinecraftClient.getInstance().world);
+        var renderer = Minecraft.getInstance().getBlockEntityRenderDispatcher().getRenderer(entity);
+        entity.setLevel(Minecraft.getInstance().level);
         if (renderer != null) {
             try {
                 /*
@@ -104,7 +85,7 @@ public class BakedBlockEntityModel {
                 Logger.error("Unable to bake block entity: " + entity, e);
             }
         }
-        entity.markRemoved();
+        entity.setRemoved();
         if (map.isEmpty()) {
             return null;
         }

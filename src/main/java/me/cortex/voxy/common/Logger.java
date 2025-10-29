@@ -1,8 +1,8 @@
 package me.cortex.voxy.common;
 
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
@@ -53,11 +53,11 @@ public class Logger {
         String error = (INSERT_CLASS?("["+callClsName()+"]: "):"") + Stream.of(args).map(Logger::objToString).collect(Collectors.joining(" "));
         LOGGER.error(error, throwable);
         if (VoxyCommon.IS_IN_MINECRAFT && !VoxyCommon.IS_DEDICATED_SERVER) {
-            var instance = MinecraftClient.getInstance();
+            var instance = Minecraft.getInstance();
             if (instance != null) {
-                instance.executeSync(() -> {
-                    var player = MinecraftClient.getInstance().player;
-                    if (player != null) player.sendMessage(Text.literal(error), true);
+                instance.executeIfPossible(() -> {
+                    var player = Minecraft.getInstance().player;
+                    if (player != null) player.displayClientMessage(Component.literal(error), true);
                 });
             }
         }

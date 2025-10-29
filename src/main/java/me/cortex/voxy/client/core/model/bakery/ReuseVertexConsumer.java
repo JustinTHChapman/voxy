@@ -2,11 +2,12 @@ package me.cortex.voxy.client.core.model.bakery;
 
 
 import me.cortex.voxy.common.util.MemoryBuffer;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.renderer.block.model.BakedQuad;
 import org.lwjgl.system.MemoryUtil;
 
 import static me.cortex.voxy.client.core.model.bakery.BudgetBufferRenderer.VERTEX_FORMAT_SIZE;
+
+import com.mojang.blaze3d.vertex.VertexConsumer;
 
 public final class ReuseVertexConsumer implements VertexConsumer {
     private MemoryBuffer buffer = new MemoryBuffer(8192);
@@ -24,7 +25,7 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     @Override
-    public ReuseVertexConsumer vertex(float x, float y, float z) {
+    public ReuseVertexConsumer addVertex(float x, float y, float z) {
         this.ensureCanPut();
         this.ptr += VERTEX_FORMAT_SIZE; this.count++; //Goto next vertex
         this.meta(this.defaultMeta);
@@ -40,43 +41,43 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     @Override
-    public ReuseVertexConsumer color(int red, int green, int blue, int alpha) {
+    public ReuseVertexConsumer setColor(int red, int green, int blue, int alpha) {
         return this;
     }
 
     @Override
-    public ReuseVertexConsumer texture(float u, float v) {
+    public ReuseVertexConsumer setUv(float u, float v) {
         MemoryUtil.memPutFloat(this.ptr + 16, u);
         MemoryUtil.memPutFloat(this.ptr + 20, v);
         return this;
     }
 
     @Override
-    public ReuseVertexConsumer overlay(int u, int v) {
+    public ReuseVertexConsumer setUv1(int u, int v) {
         return this;
     }
 
     @Override
-    public ReuseVertexConsumer light(int u, int v) {
+    public ReuseVertexConsumer setUv2(int u, int v) {
         return this;
     }
 
     @Override
-    public ReuseVertexConsumer normal(float x, float y, float z) {
+    public ReuseVertexConsumer setNormal(float x, float y, float z) {
         return this;
     }
 
     public ReuseVertexConsumer quad(BakedQuad quad, int metadata) {
         this.ensureCanPut();
-        int[] data = quad.vertexData();
+        int[] data = quad.vertices();
         for (int i = 0; i < 4; i++) {
             float x = Float.intBitsToFloat(data[i * 8]);
             float y = Float.intBitsToFloat(data[i * 8 + 1]);
             float z = Float.intBitsToFloat(data[i * 8 + 2]);
-            this.vertex(x,y,z);
+            this.addVertex(x,y,z);
             float u = Float.intBitsToFloat(data[i * 8 + 4]);
             float v = Float.intBitsToFloat(data[i * 8 + 5]);
-            this.texture(u,v);
+            this.setUv(u,v);
 
             this.meta(metadata);
         }

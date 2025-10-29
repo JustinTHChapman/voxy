@@ -9,7 +9,7 @@ import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.config.storage.StorageBackend;
 import me.cortex.voxy.common.config.storage.StorageConfig;
 import me.cortex.voxy.common.util.MemoryBuffer;
-import net.minecraft.util.math.random.RandomSeed;
+import net.minecraft.world.level.levelgen.RandomSupport;
 import org.apache.commons.lang3.stream.Streams;
 import org.lwjgl.system.MemoryUtil;
 
@@ -26,7 +26,7 @@ public class MemoryStorageBackend extends StorageBackend {
     }
 
     private Long2ObjectMap<MemoryBuffer> getMap(long key) {
-        return this.maps[(int) (RandomSeed.mixStafford13(RandomSeed.mixStafford13(key)^key)&(this.maps.length-1))];
+        return this.maps[(int) (RandomSupport.mixStafford13(RandomSupport.mixStafford13(key)^key)&(this.maps.length-1))];
     }
 
     @Override

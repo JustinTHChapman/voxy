@@ -15,11 +15,11 @@ import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkTrackerHolder;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortBehavior;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.world.LightType;
-import net.minecraft.world.chunk.ChunkStatus;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.SectionPos;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -34,19 +34,19 @@ public class MixinRenderSectionManager {
     @Unique
     private static final boolean BOBBY_INSTALLED = FabricLoader.getInstance().isModLoaded("bobby");
 
-    @Shadow @Final private ClientWorld level;
+    @Shadow @Final private ClientLevel level;
 
     @Shadow @Final private ChunkBuilder builder;
 
     @Inject(method = "<init>", at = @At("TAIL"))
-    private void voxy$resetChunkTracker(ClientWorld level, int renderDistance, SortBehavior sortBehavior, CommandList commandList, CallbackInfo ci) {
-        if (level.worldRenderer != null) {
-            var system = ((IGetVoxyRenderSystem)(level.worldRenderer)).getVoxyRenderSystem();
+    private void voxy$resetChunkTracker(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CommandList commandList, CallbackInfo ci) {
+        if (level.levelRenderer != null) {
+            var system = ((IGetVoxyRenderSystem)(level.levelRenderer)).getVoxyRenderSystem();
             if (system != null) {
                 system.chunkBoundRenderer.reset();
             }
         }
-        this.bottomSectionY = this.level.getBottomY()>>4;
+        this.bottomSectionY = this.level.getMinY()>>4;
 
         {
             //TODO: put in a better position
@@ -61,7 +61,7 @@ public class MixinRenderSectionManager {
     private void injectIngest(int x, int z, CallbackInfo ci) {
         //TODO: Am not quite sure if this is right
         if (VoxyConfig.CONFIG.ingestEnabled && !BOBBY_INSTALLED) {
-            var cccm = (ICheekyClientChunkManager)this.level.getChunkManager();
+            var cccm = (ICheekyClientChunkManager)this.level.getChunkSource();
             if (cccm != null) {
                 var chunk = cccm.voxy$cheekyGetChunk(x, z);
                 if (chunk != null) {
@@ -74,8 +74,8 @@ public class MixinRenderSectionManager {
 
     @Inject(method = "onChunkAdded", at = @At("HEAD"))
     private void voxy$ingestOnAdd(int x, int z, CallbackInfo ci) {
-        if (this.level.worldRenderer != null && VoxyConfig.CONFIG.ingestEnabled) {
-            var cccm = this.level.getChunkManager();
+        if (this.level.levelRenderer != null && VoxyConfig.CONFIG.ingestEnabled) {
+            var cccm = this.level.getChunkSource();
             if (cccm != null) {
                 var chunk = cccm.getChunk(x, z, ChunkStatus.FULL, false);
                 if (chunk != null) {
@@ -115,7 +115,7 @@ public class MixinRenderSectionManager {
         if (flags == 0)//Only process things with stuff
             return true;
 
-        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.worldRenderer)).getVoxyRenderSystem();
+        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.levelRenderer)).getVoxyRenderSystem();
         if (system == null) {
             return true;
         }
@@ -125,18 +125,18 @@ public class MixinRenderSectionManager {
             var tracker = ((AccessorChunkTracker)ChunkTrackerHolder.get(this.level)).getChunkStatus();
             //in theory the cache value could be wrong but is so soso unlikely and at worst means we either duplicate ingest a chunk
             // which... could be bad ;-; or we dont ingest atall which is ok!
-            long key = ChunkPos.toLong(x, z);
+            long key = ChunkPos.asLong(x, z);
             if (key != this.cachedChunkPos) {
                 this.cachedChunkPos = key;
                 this.cachedChunkStatus = tracker.getOrDefault(key, 0);
             }
             if (this.cachedChunkStatus == 3) {//If this chunk still has surrounding chunks
                 var section = this.level.getChunk(x,z).getSection(y-this.bottomSectionY);
-                var lp = this.level.getLightingProvider();
+                var lp = this.level.getLightEngine();
 
-                var csp = ChunkSectionPos.from(x,y,z);
-                var blp = lp.get(LightType.BLOCK).getLightSection(csp);
-                var slp = lp.get(LightType.SKY).getLightSection(csp);
+                var csp = SectionPos.of(x,y,z);
+                var blp = lp.getLayerListener(LightLayer.BLOCK).getDataLayerData(csp);
+                var slp = lp.getLayerListener(LightLayer.SKY).getDataLayerData(csp);
 
                 //Note: we dont do this check and just blindly ingest, it shouldbe ok :tm:
                 //if (blp != null || slp != null)
@@ -150,7 +150,7 @@ public class MixinRenderSectionManager {
             x-=sector<<10;
             y+=16+(256-32-sector*30);
         }
-        long pos = ChunkSectionPos.asLong(x,y,z);
+        long pos = SectionPos.asLong(x,y,z);
         if (wasBuilt) {//Remove
             //TODO: on chunk remove do ingest if is surrounded by built chunks (or when the tracker says is ok)
 

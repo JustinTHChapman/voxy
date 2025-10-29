@@ -1,7 +1,7 @@
 package me.cortex.voxy.client.core.model;
 
 import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
-import net.minecraft.client.texture.MipmapHelper;
+import net.minecraft.client.renderer.texture.MipmapGenerator;
 
 //Texturing utils to manipulate data from the model bakery
 public class TextureUtils {
@@ -209,7 +209,7 @@ public class TextureUtils {
 
     public static int mipColours(int one, int two, int three, int four) {
         if (true) {
-            return MipmapHelper.blend(one, two, three, four, false);
+            return MipmapGenerator.alphaBlend(one, two, three, four, false);
         } else {
             return weightedAverageColor(weightedAverageColor(one, two), weightedAverageColor(three, four));
         }

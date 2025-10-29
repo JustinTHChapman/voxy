@@ -9,9 +9,8 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
-import net.minecraft.client.render.Frustum;
-import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.client.world.ClientWorld;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.LevelRenderer;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -20,9 +19,9 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(WorldRenderer.class)
+@Mixin(LevelRenderer.class)
 public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
-    @Shadow private @Nullable ClientWorld world;
+    @Shadow private @Nullable ClientLevel level;
     @Unique private VoxyRenderSystem renderer;
 
     @Override
@@ -30,17 +29,17 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
         return this.renderer;
     }
 
-    @Inject(method = "reload()V", at = @At("RETURN"), order = 900)//We want to inject before sodium
+    @Inject(method = "allChanged()V", at = @At("RETURN"), order = 900)//We want to inject before sodium
     private void reloadVoxyRenderer(CallbackInfo ci) {
         this.shutdownRenderer();
-        if (this.world != null) {
+        if (this.level != null) {
             this.createRenderer();
         }
     }
 
-    @Inject(method = "setWorld", at = @At("HEAD"))
-    private void voxy$captureSetWorld(ClientWorld world, CallbackInfo ci) {
-        if (this.world != world) {
+    @Inject(method = "setLevel", at = @At("HEAD"))
+    private void voxy$captureSetWorld(ClientLevel world, CallbackInfo ci) {
+        if (this.level != world) {
             this.shutdownRenderer();
         }
     }
@@ -65,7 +64,7 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             Logger.info("Not creating renderer due to disabled");
             return;
         }
-        if (this.world == null) {
+        if (this.level == null) {
             Logger.error("Not creating renderer due to null world");
             return;
         }
@@ -74,7 +73,7 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             Logger.error("Not creating renderer due to null instance");
             return;
         }
-        WorldEngine world = WorldIdentifier.ofEngine(this.world);
+        WorldEngine world = WorldIdentifier.ofEngine(this.level);
         if (world == null) {
             Logger.error("Null world selected");
             return;

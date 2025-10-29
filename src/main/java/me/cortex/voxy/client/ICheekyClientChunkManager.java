@@ -1,7 +1,7 @@
 package me.cortex.voxy.client;
 
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 public interface ICheekyClientChunkManager {
-    WorldChunk voxy$cheekyGetChunk(int x, int z);
+    LevelChunk voxy$cheekyGetChunk(int x, int z);
 }
