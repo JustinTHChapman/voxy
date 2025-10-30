@@ -79,25 +79,25 @@ public class WorldIdentifier {
         return instance.getNullable(this);
     }
 
-    public static WorldIdentifier of(Level world) {
+    public static WorldIdentifier of(Level level) {
         //Gets or makes an identifier for world
-        if (world == null) {
+        if (level == null) {
             return null;
         }
-        return ((IWorldGetIdentifier)world).voxy$getIdentifier();
+        return ((IWorldGetIdentifier)level).voxy$getIdentifier();
     }
 
     //Common utility function to get or create a world engine
-    public static WorldEngine ofEngine(Level world) {
-        var id = of(world);
+    public static WorldEngine ofEngine(Level level) {
+        var id = of(level);
         if (id == null) {
             return null;
         }
         return id.getOrCreateEngine();
     }
 
-    public static WorldEngine ofEngineNullable(Level world) {
-        var id = of(world);
+    public static WorldEngine ofEngineNullable(Level level) {
+        var id = of(level);
         if (id == null) {
             return null;
         }
