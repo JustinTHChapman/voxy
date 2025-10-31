@@ -79,7 +79,7 @@ public class RenderGenerationService {
             return new Pair<>(() -> {
                 this.processJob(factory, seenMissed);
             }, factory::free);
-        }, 10, "Section mesh generation service");
+        }, 10, "Section mesh generation service", ()->modelBakery.getProcessingCount()<400||RenderGenerationService.MESH_FAILED_COUNTER.get()<500);
     }
 
     public void setResultConsumer(Consumer<BuiltSection> consumer) {
@@ -354,14 +354,12 @@ public class RenderGenerationService {
     }
 
     private long lastChangedTime = 0;
-    private int failedCounter = 0;
     public void addDebugData(List<String> debug) {
-        if (System.currentTimeMillis()-this.lastChangedTime > 1000) {
-            this.failedCounter = 0;
+        if (System.currentTimeMillis()-this.lastChangedTime > 100) {
+            MESH_FAILED_COUNTER.set(0);
             this.lastChangedTime = System.currentTimeMillis();
         }
-        this.failedCounter += MESH_FAILED_COUNTER.getAndSet(0);
-        debug.add("RSSQ/TFC: " + this.taskQueueCount.get() + "/" + this.failedCounter);//render section service queue, Task Fail Counter
+        debug.add("RSSQ/TFC: " + this.taskQueueCount.get() + "/" + MESH_FAILED_COUNTER.get());//render section service queue, Task Fail Counter
 
     }
 

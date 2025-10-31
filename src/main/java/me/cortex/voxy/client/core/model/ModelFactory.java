@@ -913,14 +913,14 @@ public class ModelFactory {
     }
 
     public void free() {
+        this.bakery.free();
+        this.downstream.free();
         while (!this.rawBakeResults.isEmpty()) {
             this.rawBakeResults.poll().rawData.free();
         }
         while (!this.uploadResults.isEmpty()) {
             this.uploadResults.poll().free();
         }
-        this.downstream.free();
-        this.bakery.free();
     }
 
     public int getBakedCount() {

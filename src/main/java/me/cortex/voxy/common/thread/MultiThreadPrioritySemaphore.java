@@ -4,6 +4,8 @@ import me.cortex.voxy.common.util.TrackedObject;
 
 import java.util.*;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.function.IntSupplier;
 
 //Basiclly acts as a priority based mutlti semaphore
 // allows the pooling of multiple threadpools together while prioritizing the work the original was ment for
@@ -51,7 +53,9 @@ public class MultiThreadPrioritySemaphore {
                     if (this.localSemaphore.tryAcquire()) {//We prioritize locals first
                         return;
                     }
-                    this.man.tryRun(this);
+                    if (this.man.tryRun(this)) {//Returns true if it captured a local job
+                        break;
+                    }
                 } else {
                     this.localSemaphore.acquireUninterruptibly();
                     if (!this.blockSemaphore.tryAcquire()) {
@@ -87,11 +91,11 @@ public class MultiThreadPrioritySemaphore {
     }
 
     private final Semaphore pooledSemaphore = new Semaphore(0);
-    private final Runnable executor;
+    private final IntSupplier executor;
 
     private volatile Block[] blocks = new Block[0];
 
-    public MultiThreadPrioritySemaphore(Runnable executor) {
+    public MultiThreadPrioritySemaphore(IntSupplier executor) {
         this.executor = executor;
     }
 
@@ -136,7 +140,22 @@ public class MultiThreadPrioritySemaphore {
             }
         }*/
         //Run the pooled job
-        this.executor.run();
-        return true;
+        while (true) {
+            int status = this.executor.getAsInt();
+            if (status == 0) return false;//We finished pure and true
+            if (status == 1) return false;// we didnt run a job because there either wasnt any or no services exist
+            if (2 <= status) {//2 and 3 mean failed to find a service that can currently run, but should try again after a delay
+                try {
+                    if (block.localSemaphore.tryAcquire(10, TimeUnit.MILLISECONDS)) {//Await 10 millis for a local job to come in
+                        //We do this confusing thing
+                        block.blockSemaphore.tryAcquire();//Try acquire the block that we just got
+                        this.pooledRelease(1);//We need to release back into the pool
+                        return true;
+                    }
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        }
     }
 }

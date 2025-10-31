@@ -18,7 +18,7 @@ public class UnifiedServiceThreadPool {
     public UnifiedServiceThreadPool() {
         this.dedicatedPool = new ThreadGroup("Voxy Dedicated Service");
         this.serviceManager = new ServiceManager(this::release);
-        this.groupSemaphore = new MultiThreadPrioritySemaphore(this.serviceManager::runAJob);
+        this.groupSemaphore = new MultiThreadPrioritySemaphore(this.serviceManager::tryRunAJob);
 
         this.selfBlock = this.groupSemaphore.createBlock();
     }

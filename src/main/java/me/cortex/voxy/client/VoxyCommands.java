@@ -70,6 +70,7 @@ public class VoxyCommands {
         }
 
         VoxyCommon.shutdownInstance();
+        System.gc();
         VoxyCommon.createInstance();
         if (wr!=null) {
             ((IGetVoxyRenderSystem)wr).createRenderer();

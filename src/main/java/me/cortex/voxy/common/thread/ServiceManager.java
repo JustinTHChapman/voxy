@@ -58,48 +58,49 @@ public class ServiceManager {
         return newService;
     }
 
-    public boolean runAJob() {//Executes a single job on the current thread
-        while (true) {
-            if (this.services.length == 0 || this.totalJobs.get() == 0) return false;
-            if (this.runAJob0()) return true;
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
+    public int tryRunAJob() {//Executes a single job on the current thread
+        if (this.services.length == 0 || this.totalJobs.get() == 0) return 1;
+        return this.runAJob0();
     }
 
-    private boolean runAJob0() {//Executes a single job on the current thread
-        if (this.services.length == 0) return false;
+    private int runAJob0() {//Executes a single job on the current thread
+        if (this.services.length == 0) return 1;
         var ctx = this.accelerationContext.get();
         outer:
         while (true) {
+            long skipMsk = 0;
             var services = this.services;//Capture the current services array
-            if (services.length == 0) return false;
-            if (this.totalJobs.get()==0) return false;
+            if (services.length == 0) return 1;
+            if (this.totalJobs.get()==0) return 1;
             long totalWeight = 0;
             int shiftFactor = (ctx.shiftFactor++)&Integer.MAX_VALUE;//We cycle and shift the starting service when choosing to prevent bias
             int c = shiftFactor;
             Service selectedService = null;
-            for (var service:services) {
+            for (int i = 0; i < services.length; i++) {
+                var service = services[i];
                 if (!service.isLive()) {
                     Thread.yield();
                     continue outer;//We need to refetch the array and start over
                 }
                 boolean sc = c--<=0;
-                if (service.limiter!=null && !service.limiter.getAsBoolean()) continue;
+                if (service.limiter!=null && !service.limiter.getAsBoolean()) {
+                    skipMsk |= 1L<<i;
+                    continue;
+                }
                 long jc = service.numJobs();
                 if (sc&&jc!=0&&selectedService==null) selectedService=service;
                 totalWeight += jc * service.weight;
             }
-            if (totalWeight == 0) return false;
+            if (totalWeight == 0) return skipMsk!=0?3:2;
 
             long sample = ctx.rand(totalWeight);//Random number
 
             for (int i = 0; i < services.length; i++) {
                 var service = services[(i+shiftFactor)%services.length];
-                if (service.limiter!=null && !service.limiter.getAsBoolean()) continue;
+                if (service.limiter!=null && (((skipMsk&(1L<<i))!=0)|| !service.limiter.getAsBoolean())) {
+                    skipMsk |= 1L<<i;
+                    continue;
+                }
                 sample -= service.numJobs() * service.weight;
                 if (sample<=0) {
                     selectedService = service;
@@ -108,7 +109,7 @@ public class ServiceManager {
             }
 
             if (selectedService == null) {
-                return false;
+                return skipMsk!=0?3:2;
             }
 
             if (!selectedService.isLive()) {
@@ -124,7 +125,7 @@ public class ServiceManager {
             }
             break;
         }
-        return true;
+        return 0;
     }
 
     public void shutdown() {

@@ -80,6 +80,17 @@ public class RawDownloadStream {
     }
 
     public void free() {
+        glFinish();
+        this.tick();
+        GlFence fence = new GlFence();
+        while (!fence.signaled()) {
+            glFinish();
+        }
+        fence.free();
+        this.tick();
+        if (this.frames.size() != 0) {
+            throw new IllegalStateException();
+        }
         this.frames.forEach(a->a.fence.free());
         this.downloadBuffer.free();
     }

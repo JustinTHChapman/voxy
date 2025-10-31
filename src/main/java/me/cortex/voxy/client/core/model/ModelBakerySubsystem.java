@@ -33,7 +33,7 @@ public class ModelBakerySubsystem {
             while (this.isRunning) {
                 this.factory.processAllThings();
                 try {
-                    Thread.sleep(50);
+                    Thread.sleep(10);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }

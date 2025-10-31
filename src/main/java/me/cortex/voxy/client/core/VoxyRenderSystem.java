@@ -77,6 +77,7 @@ public class VoxyRenderSystem {
         //Keep the world loaded, NOTE: this is done FIRST, to keep and ensure that even if the rest of loading takes more
         // than timeout, we keep the world acquired
         world.acquireRef();
+        System.gc();
 
         //Fking HATE EVERYTHING AAAAAAAAAAAAAAAA
         int[] oldBufferBindings = new int[10];
