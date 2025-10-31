@@ -7,9 +7,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 
-@Mixin(SodiumWorldRenderer.class)
+@Mixin(value = SodiumWorldRenderer.class, remap = false)
 public class MixinSodiumWorldRenderer {
-    @Inject(method = "initRenderer", at = @At("TAIL"))
+    @Inject(method = "initRenderer", at = @At("TAIL"), remap = false)
     private void voxy$injectThreadUpdate() {
         var vi = VoxyCommon.getInstance();
         if (vi != null) vi.updateDedicatedThreads();
