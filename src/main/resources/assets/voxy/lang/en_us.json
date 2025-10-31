@@ -7,6 +7,9 @@
   "voxy.config.general.serviceThreads": "Service threads",
   "voxy.config.general.serviceThreads.tooltip": "Number of threads the ServiceThreadPool can use",
 
+  "voxy.config.general.useSodiumBuilder": "Use sodium threads",
+  "voxy.config.general.useSodiumBuilder.tooltip": "Uses sodium builder threads as part of voxys thread pool, can reduce stuttering and lag when moving quickly at high render distance",
+
   "voxy.config.general.ingest": "Chunk Ingest",
   "voxy.config.general.ingest.tooltip": "Enables or disables voxies ability to convert new chunks into LoDs",
 

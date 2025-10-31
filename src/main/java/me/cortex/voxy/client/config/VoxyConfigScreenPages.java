@@ -66,20 +66,24 @@ public abstract class VoxyConfigScreenPages {
                             s.serviceThreads = v;
                             var instance = VoxyCommon.getInstance();
                             if (instance != null) {
-                                var swr = SodiumWorldRenderer.instanceNullable();
-                                if (swr != null) {
-                                    var rsm = ((AccessorSodiumWorldRenderer)swr).getRenderSectionManager();
-                                    if (rsm!=null) {
-                                        instance.setNumThreads(Math.max(1, v-rsm.getBuilder().getTotalThreadCount()));
-                                    } else {
-                                        instance.setNumThreads(v);
-                                    }
-                                } else {
-                                    instance.setNumThreads(v);
-                                }
+                                instance.updateDedicatedThreads();
                             }
                         }, s -> s.serviceThreads)
                         .setImpact(OptionImpact.HIGH)
+                        .build()
+                ).add(OptionImpl.createBuilder(boolean.class, storage)
+                        .setName(Component.translatable("voxy.config.general.useSodiumBuilder"))
+                        .setTooltip(Component.translatable("voxy.config.general.useSodiumBuilder.tooltip"))
+                        .setControl(TickBoxControl::new)
+                        .setImpact(OptionImpact.VARIES)
+                        .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
+                        .setBinding((s,v)->{
+                            s.dontUseSodiumBuilderThreads = !v;
+                            var instance = VoxyCommon.getInstance();
+                            if (instance != null) {
+                                instance.updateDedicatedThreads();
+                            }
+                        }, s->!s.dontUseSodiumBuilderThreads)
                         .build()
                 ).add(OptionImpl.createBuilder(boolean.class, storage)
                         .setName(Component.translatable("voxy.config.general.ingest"))

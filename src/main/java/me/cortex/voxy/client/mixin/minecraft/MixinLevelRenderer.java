@@ -87,5 +87,6 @@ public abstract class MixinLevelRenderer implements IGetVoxyRenderSystem {
                 throw e;
             }
         }
+        instance.updateDedicatedThreads();
     }
 }

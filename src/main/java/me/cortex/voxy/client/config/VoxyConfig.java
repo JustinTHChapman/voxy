@@ -33,6 +33,7 @@ public class VoxyConfig implements OptionStorage<VoxyConfig> {
     public boolean renderVanillaFog = false;
     public boolean useEnvironmentalFog = false;
     public boolean renderStatistics = false;
+    public boolean dontUseSodiumBuilderThreads = false;
 
     private static VoxyConfig loadOrCreate() {
         if (VoxyCommon.isAvailable()) {

@@ -57,11 +57,15 @@ public abstract class VoxyInstance {
         this.worldCleaner.start();
     }
 
-    public void setNumThreads(int threads) {
+    protected void setNumThreads(int threads) {
         if (threads<0) throw new IllegalArgumentException("Num threads <0");
         if (this.threadPool.setNumThreads(threads)) {
             Logger.info("Dedicated voxy thread pool size: " + threads);
         }
+    }
+
+    public void updateDedicatedThreads() {
+        this.setNumThreads(3);
     }
 
     protected ImportManager createImportManager() {

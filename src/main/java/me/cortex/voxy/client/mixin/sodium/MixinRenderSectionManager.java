@@ -46,14 +46,6 @@ public class MixinRenderSectionManager {
             }
         }
         this.bottomSectionY = this.level.getMinY()>>4;
-
-        {
-            //TODO: put in a better position
-            var instance = VoxyCommon.getInstance();
-            if (instance != null) {
-                instance.setNumThreads(Math.max(1, VoxyConfig.CONFIG.serviceThreads - this.builder.getTotalThreadCount()));
-            }
-        }
     }
 
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
