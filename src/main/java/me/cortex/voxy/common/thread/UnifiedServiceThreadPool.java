@@ -14,6 +14,7 @@ public class UnifiedServiceThreadPool {
     private final MultiThreadPrioritySemaphore.Block selfBlock;
     private final ThreadGroup dedicatedPool;
     private final List<Thread> threads = new ArrayList<>();
+    private int threadId = 0;
 
     public UnifiedServiceThreadPool() {
         this.dedicatedPool = new ThreadGroup("Voxy Dedicated Service");
@@ -33,7 +34,7 @@ public class UnifiedServiceThreadPool {
                 this.selfBlock.release(-diff);
             } else {//Add threads
                 for (int i = 0; i < diff; i++) {
-                    var t = new Thread(this.dedicatedPool, this::workerThread);
+                    var t = new Thread(this.dedicatedPool, this::workerThread, "Dedicated Voxy Worker #"+(this.threadId++));
                     t.setPriority(3);
                     t.setDaemon(true);
                     this.threads.add(t);
