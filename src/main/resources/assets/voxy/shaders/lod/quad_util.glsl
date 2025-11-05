@@ -182,7 +182,7 @@ vec4 getQuadCornerPos(in QuadData quad, uint cornerId) {
     return pos;
 }
 
-#ifdef USE_INTERPOLATED_UV
+#ifndef USE_NV_BARRY
 vec2 getCornerUV(const in QuadData quad, uint cornerId) {
     return quad.uvCorner + quad.quadSizeAddin*vec2((cornerId>>1)&1u, cornerId&1u);
 }

@@ -7,15 +7,13 @@
 #define POSITION_SCRATCH_BINDING 5
 #define LIGHTING_SAMPLER_BINDING 1
 
-#define USE_INTERPOLATED_UV
-
 #import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/block_model.glsl>
 #import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/quad_util.glsl>
 
 layout(location = 0) out flat uvec4 interData;
-#ifdef USE_INTERPOLATED_UV
+#ifndef USE_NV_BARRY
 layout(location = 1) out vec2 uv;
 #endif
 
@@ -37,7 +35,7 @@ void main() {
     uint cornerId = gl_VertexID&3;
     gl_Position = getQuadCornerPos(quad, cornerId);
 
-    #ifdef USE_INTERPOLATED_UV
+    #ifndef USE_NV_BARRY
     uv = getCornerUV(quad, cornerId);
     #endif
 

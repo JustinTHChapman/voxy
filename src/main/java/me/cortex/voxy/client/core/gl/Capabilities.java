@@ -27,6 +27,7 @@ public class Capabilities {
     public final boolean subgroup;
     public final boolean sparseBuffer;
     public final boolean isNvidia;
+    public final boolean nvBarryCoords;
 
     public Capabilities() {
         var cap = GL.getCapabilities();
@@ -73,6 +74,8 @@ public class Capabilities {
             this.totalDedicatedMemory = -1;
             this.totalDynamicMemory = -1;
         }
+
+        this.nvBarryCoords = cap.GL_NV_fragment_shader_barycentric;
     }
 
     public static void init() {

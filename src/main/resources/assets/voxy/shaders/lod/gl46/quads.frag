@@ -2,6 +2,9 @@
 //Use quad shuffling to compute fragment mip
 //#extension GL_KHR_shader_subgroup_quad: enable
 
+#ifdef USE_NV_BARRY
+#extension GL_NV_fragment_shader_barycentric: require
+#endif
 
 layout(binding = 0) uniform sampler2D blockModelAtlas;
 layout(binding = 2) uniform sampler2D depthTex;
@@ -12,7 +15,9 @@ layout(binding = 2) uniform sampler2D depthTex;
 // however they are not a full block
 
 layout(location = 0) in flat uvec4 interData;
+#ifndef USE_NV_BARRY
 layout(location = 1) in vec2 uv;
+#endif
 
 #ifdef DEBUG_RENDER
 layout(location = 7) in flat uint quadDebug;
@@ -109,6 +114,10 @@ void main() {
     //vec2 uv = vec2(0);
     //Tile is the tile we are in
     vec2 tile;
+    #ifdef USE_NV_BARRY
+    vec2 uv = mix(gl_BaryCoordNV.yx, 1-gl_BaryCoordNV.xz, gl_PrimitiveID&1)*(vec2((interData.x>>8)&0xFu, (interData.x>>12)&0xFu)+1);
+    #endif
+
     vec2 uv2 = modf(uv, tile)*(1.0/(vec2(3.0,2.0)*256.0));
     vec4 colour;
     vec2 texPos = uv2 + getBaseUV();

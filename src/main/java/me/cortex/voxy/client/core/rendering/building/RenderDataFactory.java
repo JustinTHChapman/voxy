@@ -199,7 +199,7 @@ public class RenderDataFactory {
 
     private static long packPartialQuadData(int modelId, long state, long metadata) {
         //This uses hardcoded data to shuffle things
-        long lightAndBiome =  (state&((0x1FFL<<47)|(0xFFL<<56)))>>1;
+        long lightAndBiome =  (state&((0x1FFL<<47)|(0xFFL<<56)))>>>1;
         lightAndBiome &= ModelQueries.isBiomeColoured(metadata)?-1:~(0x1FFL<<46);//46 not 47 because is already shifted by 1 THIS WASTED 4 HOURS ;-; aaaaaAAAAAA
         lightAndBiome &= ModelQueries.isFullyOpaque(metadata)?~(0xFFL<<55):-1;//If its fully opaque it always uses neighbor light?
 
@@ -221,7 +221,7 @@ public class RenderDataFactory {
         for (int i = 0; i < 32*32*32;) {
             long block = rawSectionData[i];//Get the block mapping
             if (Mapper.isAir(block)) {//If it is air, just emit lighting
-                sectionData[i * 2] = (block&(0xFFL<<56))>>1;
+                sectionData[i * 2] = (block&(0xFFL<<56))>>>1;
                 sectionData[i * 2 + 1] = 0;
             } else {
                 int modelId = rawModelIds[Mapper.getBlockId(block)];
@@ -484,7 +484,7 @@ public class RenderDataFactory {
 
                         this.blockMesher.putNext(((side == 0) ? 0L : 1L) |
                                 (A&~LM) |
-                                ((neighborId & (0xFFL << 56)) >> 1)
+                                ((neighborId & (0xFFL << 56)) >>> 1)
                         );
                     }
                 }
@@ -650,7 +650,7 @@ public class RenderDataFactory {
 
                         this.blockMesher.putNext((side == 0 ? 0L : 1L) |
                                 (A&~LM) |
-                                ((neighborId&(0xFFL<<56))>>1)
+                                ((neighborId&(0xFFL<<56))>>>1)
                         );
                     }
                 }
@@ -1017,7 +1017,7 @@ public class RenderDataFactory {
                         long A = this.sectionData[(i<<5) * 2];
                         ma.putNext(0L |
                                 (A&~LM) |
-                                ((neighborId&(0xFFL<<56))>>1)
+                                ((neighborId&(0xFFL<<56))>>>1)
                         );
                     } else {skipA++;}
                 } else {skipA++;}
@@ -1039,7 +1039,7 @@ public class RenderDataFactory {
                         long A = this.sectionData[(i*32+31) * 2];
                         mb.putNext(1L |
                                 (A&~LM) |
-                                ((neighborId&(0xFFL<<56))>>1)
+                                ((neighborId&(0xFFL<<56))>>>1)
                         );
                     } else {skipB++;}
                 } else {skipB++;}
@@ -1261,7 +1261,7 @@ public class RenderDataFactory {
                         ma.skip(skipA); skipA = 0;
 
                         //TODO: LIGHTING
-                        long lightData = ((neighborId&(0xFFL<<56))>>1);//A;
+                        long lightData = ((neighborId&(0xFFL<<56))>>>1);//A;
                         //if (!ModelQueries.faceUsesSelfLighting(Am, facingForward|(axis*2))) {//TODO: check this is right
                         //    lighter = this.sectionData[bi];
                         //}
@@ -1322,7 +1322,7 @@ public class RenderDataFactory {
                         mb.skip(skipB); skipB = 0;
 
                         //TODO: LIGHTING
-                        long lightData = ((neighborId&(0xFFL<<56))>>1);//A;
+                        long lightData = ((neighborId&(0xFFL<<56))>>>1);//A;
                         //if (!ModelQueries.faceUsesSelfLighting(Am, facingForward|(axis*2))) {//TODO: check this is right
                         //    lighter = this.sectionData[bi];
                         //}
