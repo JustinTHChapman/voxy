@@ -162,7 +162,9 @@ void setupQuad(out QuadData quad, const in Quad rawQuad, uvec2 sPos, bool genera
     }
 
     vec4 faceSize = getFaceSize(faceData);
-
+    #ifdef USE_SINGLE_TRI
+    faceSize *= 2;
+    #endif
     vec3 quadStart = extractPos(rawQuad);
     float depthOffset = extractFaceIndentation(faceData);
     quadStart += swizzelDataAxis(face>>1, vec3(faceSize.xz, mix(depthOffset, 1-depthOffset, float(face&1u))));
@@ -170,7 +172,11 @@ void setupQuad(out QuadData quad, const in Quad rawQuad, uvec2 sPos, bool genera
     quad.lodScale = lodScale;
     quad.axis = face>>1;
     quad.basePoint = (quadStart*lodScale)+vec3(baseSection<<5);
-    quad.quadSizeAddin = (faceSize.yw + quadSize - 1);
+    #ifdef USE_SINGLE_TRI
+    quad.quadSizeAddin = (faceSize.yw + (quadSize - 1)*2);
+    #else
+    quad.quadSizeAddin = faceSize.yw + quadSize - 1;
+    #endif
     quad.uvCorner = faceSize.xz;
 }
 

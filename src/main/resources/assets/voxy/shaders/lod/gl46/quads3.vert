@@ -7,6 +7,10 @@
 #define POSITION_SCRATCH_BINDING 5
 #define LIGHTING_SAMPLER_BINDING 1
 
+#ifdef USE_SINGLE_TRI
+#define USE_NV_BARRY
+#endif
+
 #import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/block_model.glsl>
 #import <voxy:lod/gl46/bindings.glsl>
