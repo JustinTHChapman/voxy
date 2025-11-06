@@ -18,8 +18,9 @@ import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.hierachical.AsyncNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
-import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
-import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
+import me.cortex.voxy.client.core.rendering.section.IUsesMeshlets;
+import me.cortex.voxy.client.core.rendering.section.backend.AbstractSectionRenderer;
+import me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICSectionRenderer;
 import me.cortex.voxy.client.core.rendering.section.geometry.BasicSectionGeometryData;
 import me.cortex.voxy.client.core.rendering.section.geometry.IGeometryData;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
@@ -68,9 +69,9 @@ public class VoxyRenderSystem {
 
     private final AbstractRenderPipeline pipeline;
 
-    private static AbstractSectionRenderer<?,?> createSectionRenderer(AbstractRenderPipeline pipeline, ModelStore modelStore, IGeometryData geometryData) {
+    private static AbstractSectionRenderer.Factory<?,? extends IGeometryData> getRenderBackendFactory() {
         //TODO: need todo a thing where selects optimal section render based on if supports the pipeline and geometry data type
-        return new MDICSectionRenderer(pipeline, modelStore, (BasicSectionGeometryData) geometryData);//We only have MDIC backend... for now
+        return MDICSectionRenderer.FACTORY;
     }
 
     public VoxyRenderSystem(WorldEngine world, ServiceManager sm) {
@@ -93,11 +94,11 @@ public class VoxyRenderSystem {
             this.worldIn = world;
 
             long geometryCapacity = getGeometryBufferSize();
+            var backendFactory = getRenderBackendFactory();
+
             {
-
-
                 this.modelService = new ModelBakerySubsystem(world.getMapper());
-                this.renderGen = new RenderGenerationService(world, this.modelService, sm, false);
+                this.renderGen = new RenderGenerationService(world, this.modelService, sm, IUsesMeshlets.class.isAssignableFrom(backendFactory.clz()));
 
                 this.geometryData = new BasicSectionGeometryData(1 << 20, geometryCapacity);
 
@@ -115,7 +116,7 @@ public class VoxyRenderSystem {
 
             this.pipeline = RenderPipelineFactory.createPipeline(this.nodeManager, this.nodeCleaner, this.traversal, this::frexStillHasWork);
             this.pipeline.setupExtraModelBakeryData(this.modelService);//Configure the model service
-            var sectionRenderer = createSectionRenderer(this.pipeline, this.modelService.getStore(), this.geometryData);
+            var sectionRenderer = backendFactory.create(this.pipeline, this.modelService.getStore(), this.geometryData);
             this.pipeline.setSectionRenderer(sectionRenderer);
             this.viewportSelector = new ViewportSelector<>(sectionRenderer::createViewport);
 
@@ -371,7 +372,7 @@ public class VoxyRenderSystem {
         return base.mulLocal(
                 makeProjectionMatrix(0.05f, Minecraft.getInstance().gameRenderer.getDepthFar()).invert(),
                 new Matrix4f()
-        ).mulLocal(makeProjectionMatrix(16, 16*3000));
+        ).mulLocal(makeProjectionMatrix(VoxyClient.getOcclusionDebugState()<=1?16f:0.1f, 16*3000));
     }
 
     private boolean frexStillHasWork() {

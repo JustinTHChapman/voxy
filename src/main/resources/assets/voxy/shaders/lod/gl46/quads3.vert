@@ -46,7 +46,7 @@ void main() {
 
 
     #ifdef DEBUG_RENDER
-    quadDebug = extractDetail(positionBuffer[gl_BaseInstance]);
+    quadDebug = uint(gl_VertexID)>>(2+5);
     #endif
 }
 
