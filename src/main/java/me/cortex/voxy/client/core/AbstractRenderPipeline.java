@@ -53,6 +53,11 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     private final FullscreenBlit depthMaskBlit = new FullscreenBlit("voxy:post/fullscreen2.vert", "voxy:post/noop.frag");
     private final FullscreenBlit depthSetBlit = new FullscreenBlit("voxy:post/fullscreen2.vert", "voxy:post/depth0.frag");
     private final FullscreenBlit depthCopy = new FullscreenBlit("voxy:post/fullscreen2.vert", "voxy:post/depth_copy.frag");
+    private static final int DEPTH_SAMPLER = glGenSamplers();
+    static {
+        glSamplerParameteri(DEPTH_SAMPLER, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glSamplerParameteri(DEPTH_SAMPLER, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    }
 
     protected AbstractRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
         this.frexStillHasWork = frexSupplier;
@@ -109,9 +114,11 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         // the mismatched formats in this case is the d32 to d24s8
         glBindFramebuffer(GL30.GL_FRAMEBUFFER, targetFb);
 
+        this.depthCopy.bind();
         int depthTexture = glGetNamedFramebufferAttachmentParameteri(sourceFrameBuffer, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
         glBindTextureUnit(0, depthTexture);
-
+        glBindSampler(0, DEPTH_SAMPLER);
+        glUniform2f(1,((float)width)/srcWidth, ((float)height)/srcHeight);
         glColorMask(false,false,false,false);
         this.depthCopy.blit();
 
