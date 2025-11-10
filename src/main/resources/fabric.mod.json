@@ -28,7 +28,10 @@
     ]
   },
   "mixins": [
-    "client.voxy.mixins.json",
+    {
+      "config": "client.voxy.mixins.json",
+      "environment": "client"
+    },
     "common.voxy.mixins.json"
   ],
   "depends": {
