@@ -59,7 +59,8 @@ public class WorldConversionFactory {
         }
         return false;
     }
-    private static void setupLocalPalette(Palette<BlockState> vp, Reference2IntOpenHashMap<BlockState> blockCache, Mapper mapper, int[] pc) {
+    private static int setupLocalPalette(Palette<BlockState> vp, Reference2IntOpenHashMap<BlockState> blockCache, Mapper mapper, int[] pc) {
+        int c = vp.getSize();
         if (vp instanceof LinearPalette<BlockState>) {
             for (int i = 0; i < vp.getSize(); i++) {
                 var state = vp.valueFor(i);
@@ -107,6 +108,7 @@ public class WorldConversionFactory {
                 throw new IllegalStateException("Unknown palette type: " + vp);
             }
         }
+        return c;
     }
 
     public static VoxelizedSection convert(VoxelizedSection section,
@@ -128,10 +130,13 @@ public class WorldConversionFactory {
         var pc = cache.getPaletteCache(vp.getSize());
         GlobalPalette<BlockState> bps = null;
 
+        int pcc = 0;
         if (blockContainer.data.palette instanceof GlobalPalette<BlockState> _bps) {
             bps = _bps;
+            pcc = bps.getSize();
         } else {
-            setupLocalPalette(vp, blockCache, stateMapper, pc);
+            pcc = setupLocalPalette(vp, blockCache, stateMapper, pc);
+            pcc = Math.max(0,pcc-1);
         }
 
         {
@@ -164,7 +169,7 @@ public class WorldConversionFactory {
                 }
                 int bId;
                 if (bps == null) {
-                    bId = pc[(int) (sample & MSK)];
+                    bId = pc[Math.min((int) (sample & MSK), pcc)];
                 } else {
                     bId = stateMapper.getIdForBlockState(bps.valueFor((int) (sample&MSK)));
                 }
