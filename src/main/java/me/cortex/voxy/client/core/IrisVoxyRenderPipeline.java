@@ -113,7 +113,7 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
             glClear(GL_COLOR_BUFFER_BIT);
         }
 
-        if (this.data.useViewportDims) {
+        if (!this.data.useViewportDims) {
             srcWidth = viewport.width;
             srcHeight = viewport.height;
         }

@@ -66,6 +66,7 @@ def gitCommitHash = { ->
 }
 
 def buildtime = {System.currentTimeSeconds()}
+
 processResources {
     def time = buildtime()
     def hash = gitCommitHash()
