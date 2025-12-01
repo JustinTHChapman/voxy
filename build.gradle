@@ -124,6 +124,8 @@ dependencies {
 
     //modCompileOnly("maven.modrinth:immersiveportals:v5.1.7-mc1.20.4")
 
+    modCompileOnly("maven.modrinth:sodium-extra:mc1.21.10-0.7.1+fabric")
+    modRuntimeOnlyMsk("maven.modrinth:sodium-extra:mc1.21.10-0.7.1+fabric")
 
     modCompileOnly("maven.modrinth:chunky:1.4.40-fabric")
     //modRuntimeOnlyMsk("maven.modrinth:chunky:1.4.40-fabric")
