@@ -7,8 +7,8 @@ layout(location = 2) uniform mat4 projMat;
 #ifdef EMIT_COLOUR
 layout(binding = 3) uniform sampler2D colourTex;
 #ifdef USE_ENV_FOG
-layout(location = 4) uniform vec3 endParams;
-layout(location = 5) uniform vec3 fogColour;
+layout(location = 4) uniform vec4 endParams;
+layout(location = 5) uniform vec4 fogColour;
 #endif
 #endif
 
@@ -43,9 +43,9 @@ void main() {
         discard;
     }
     #ifdef USE_ENV_FOG
-    {
+    if (fogColour.a>0.0){
         float fogLerp = clamp(fma(min(length(point.xyz), endParams.x),endParams.y,endParams.z),0,1);//512 is 32*16 which is the render distance in blocks
-        colour.rgb = mix(colour.rgb, fogColour, fogLerp);
+        colour.rgb = mix(colour.rgb, fogColour.rgb, fogLerp*fogColour.a);
     }
     #endif
     #else

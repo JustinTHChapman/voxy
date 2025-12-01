@@ -108,10 +108,15 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
         if (this.useEnvFog) {
             float start = viewport.fogParameters.environmentalStart();
             float end = viewport.fogParameters.environmentalEnd();
-            float invEndFogDelta = 1f/(end-start);
-            float endDistance = Minecraft.getInstance().gameRenderer.getRenderDistance()*1.5f;
-            glUniform3f(4, endDistance, invEndFogDelta, Math.abs(start)*invEndFogDelta);
-            glUniform3f(5, viewport.fogParameters.red(), viewport.fogParameters.green(), viewport.fogParameters.blue());
+            if (Math.abs(end-start)>1) {
+                float invEndFogDelta = 1f / (end - start);
+                float endDistance = Minecraft.getInstance().gameRenderer.getRenderDistance() * 1.5f;
+                glUniform4f(4, endDistance, invEndFogDelta, Math.abs(start) * invEndFogDelta, 0);
+                glUniform4f(5, viewport.fogParameters.red(), viewport.fogParameters.green(), viewport.fogParameters.blue(), viewport.fogParameters.alpha());
+            } else {
+                glUniform4f(4, 0, 0, 0, 0);
+                glUniform4f(5, 0, 0, 0, 0);
+            }
         }
 
         glBindTextureUnit(3, this.colourSSAOTex.id);
