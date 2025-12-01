@@ -112,7 +112,7 @@ public class MixinRenderSectionManager {
         }
         int x = instance.getChunkX(), y = instance.getChunkY(), z = instance.getChunkZ();
 
-        if (wasBuilt) {
+        if (wasBuilt && VoxyConfig.CONFIG.ingestEnabled) {
             var tracker = ((AccessorChunkTracker)ChunkTrackerHolder.get(this.level)).getChunkStatus();
             //in theory the cache value could be wrong but is so soso unlikely and at worst means we either duplicate ingest a chunk
             // which... could be bad ;-; or we dont ingest atall which is ok!
