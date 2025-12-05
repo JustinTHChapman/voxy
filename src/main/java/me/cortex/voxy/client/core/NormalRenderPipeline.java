@@ -110,8 +110,8 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             float end = viewport.fogParameters.environmentalEnd();
             if (Math.abs(end-start)>1) {
                 float invEndFogDelta = 1f / (end - start);
-                float endDistance = Minecraft.getInstance().gameRenderer.getRenderDistance()*2f;
-                glUniform4f(4, invEndFogDelta, -start * invEndFogDelta, Math.min(1,(endDistance-start)/end),0);
+                float endDistance = (float) Math.sqrt(Math.pow(Minecraft.getInstance().gameRenderer.getRenderDistance(),2)*3);
+                glUniform4f(4, invEndFogDelta, -start * invEndFogDelta, Math.min(1,endDistance/end),0);
                 glUniform4f(5, viewport.fogParameters.red(), viewport.fogParameters.green(), viewport.fogParameters.blue(), viewport.fogParameters.alpha());
             } else {
                 glUniform4f(4, 0, 0, 0, 0);
