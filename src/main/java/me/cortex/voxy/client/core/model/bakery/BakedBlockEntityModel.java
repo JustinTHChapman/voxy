@@ -4,6 +4,7 @@ import me.cortex.voxy.common.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.EntityBlock;
@@ -72,14 +73,15 @@ public class BakedBlockEntityModel {
             try {
                 /*
                 var rt = renderer.createRenderState();
-                renderer.updateRenderState(entity, rt, 0.0f, new Vec3d(0,0,0), null);
+                renderer.extractRenderState(entity, rt, 0.0f, new Vec3d(0,0,0), null);
 
                 //TODO: FIXME: FINISH
                 var cstate = new CameraRenderState();
-                var queue = new OrderedRenderCommandQueueImpl();
-                renderer.render(rt, new MatrixStack(), queue, cstate);
-                var qq = queue.getBatchingQueue(0);
-                 */
+                var queue = new SubmitNodeStorage();
+                renderer.submit(rt, new MatrixStack(), queue, cstate);
+                var qq = queue.order(0);
+                qq.
+                */
                 //renderer.render(entity, 0.0f, new MatrixStack(), layer->map.computeIfAbsent(layer, rl -> new LayerConsumer(rl, new ReuseVertexConsumer().setDefaultMeta(getMetaFromLayer(rl)))).consumer, 0, 0, new Vec3d(0,0,0));
             } catch (Exception e) {
                 Logger.error("Unable to bake block entity: " + entity, e);
