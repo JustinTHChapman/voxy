@@ -151,7 +151,7 @@ public class Shader extends TrackedObject {
                             + src.substring(src.indexOf('\n')+1);
 
                     for (var replacement : this.replacements.entrySet()) {
-                        src = src.replaceAll(replacement.getKey(), replacement.getValue());
+                        src = src.replace(replacement.getKey(), replacement.getValue());
                     }
 
                     shaders[i++] = createShader(entry.getKey(), src);
