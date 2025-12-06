@@ -69,6 +69,7 @@ public class Shader extends TrackedObject {
             J make(Builder<J> builder, int program);
         }
         final Map<String, String> defines = new HashMap<>();
+        final Map<String, String> replacements = new LinkedHashMap<>();
         private final Map<ShaderType, String> sources = new HashMap<>();
         private final IShaderProcessor processor;
         private final IShaderObjectConstructor<T> constructor;
@@ -109,8 +110,18 @@ public class Shader extends TrackedObject {
             return this;
         }
 
+        public Builder<T> define(String name, float value) {
+            this.defines.put(name, Float.toString(value)+"f");
+            return this;
+        }
+
         public Builder<T> define(String name, String value) {
             this.defines.put(name, value);
+            return this;
+        }
+
+        public Builder<T> replace(String value, String replacement) {
+            this.defines.put(value, replacement);
             return this;
         }
 
@@ -138,6 +149,10 @@ public class Shader extends TrackedObject {
                     src = src.substring(0, src.indexOf('\n')+1) +
                             defs
                             + src.substring(src.indexOf('\n')+1);
+
+                    for (var replacement : this.replacements.entrySet()) {
+                        src = src.replaceAll(replacement.getKey(), replacement.getValue());
+                    }
 
                     shaders[i++] = createShader(entry.getKey(), src);
                 }
