@@ -20,6 +20,7 @@ import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.Direction;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
@@ -110,9 +111,14 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
                 //.defineIf("USE_NV_BARRY", Capabilities.INSTANCE.nvBarryCoords)
 
-                .defineIf("DARKENED_TINTING", Minecraft.getInstance().level.effects().constantAmbientLight())//TODO: FIXME: this is really jank atm
-
                 .addSource(ShaderType.VERTEX, vertex);
+
+        //Apply per face tinting
+        var CL = Minecraft.getInstance().level;
+        if (CL.effects().constantAmbientLight()) {
+            builder.define("DARKENED_TINTING");
+            //TODO: generate the tinting table here
+        }
 
         String frag = ShaderLoader.parse("voxy:lod/gl46/quads.frag");
 
