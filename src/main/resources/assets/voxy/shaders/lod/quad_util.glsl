@@ -58,7 +58,8 @@ uint makeQuadFlags(uint faceData, uint modelId, ivec2 quadSize, const in BlockMo
         flags |= uint(any(greaterThan(quadSize, ivec2(1)))) & faceHasAlphaCuttoutOverride(faceData);
     }
 
-    flags |= uint(!modelHasMipmaps(model))<<1;//Not mipmaps
+    //TODO: remove, there is no non mip code path anymore
+    //flags |= uint(!modelHasMipmaps(model))<<1;//Not mipmaps
 
     flags |= faceTintState(faceData)<<2;
     flags |= face<<4;//Face
@@ -70,6 +71,11 @@ uint packVec4(vec4 vec) {
     uvec4 vec_=uvec4(vec*255)<<uvec4(24,16,8,0);
     return vec_.x|vec_.y|vec_.z|vec_.w;
 }
+
+
+#ifndef PATCHED_SHADER
+float computeDirectionalFaceTint(bool isShaded, uint face);
+#endif
 
 uvec3 makeRemainingAttributes(const in BlockModel model, const in Quad quad, uint lodLevel, uint face) {
     uvec3 attributes = uvec3(0);
@@ -88,8 +94,10 @@ uvec3 makeRemainingAttributes(const in BlockModel model, const in Quad quad, uin
     attributes.y = tintColour;
     #else
     bool isTranslucent = modelIsTranslucent(model);
-    bool hasAO = modelHasMipmaps(model);//TODO: replace with per face AO flag
-    bool isShaded = hasAO;//TODO: make this a per face flag
+
+    //afak, these are the same variable in vanilla, (i.e. shaded == ao)
+    bool isShaded = modelIsShaded(model);
+    bool hasAO = isShaded;
 
     vec4 tinting = getLighting(lighting);
 
@@ -203,3 +211,4 @@ float computeDirectionalFaceTint(bool isShaded, uint face) {
     #endif
     return 1.0f;
 }
+#endif

@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.model.bakery;
 
 
 import me.cortex.voxy.common.util.MemoryBuffer;
+import net.minecraft.client.model.geom.builders.UVPair;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import org.lwjgl.system.MemoryUtil;
 
@@ -14,6 +15,8 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     private long ptr;
     private int count;
     private int defaultMeta;
+
+    public boolean anyShaded;
 
     public ReuseVertexConsumer() {
         this.reset();
@@ -46,6 +49,11 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     @Override
+    public VertexConsumer setColor(int i) {
+        return this;
+    }
+
+    @Override
     public ReuseVertexConsumer setUv(float u, float v) {
         MemoryUtil.memPutFloat(this.ptr + 16, u);
         MemoryUtil.memPutFloat(this.ptr + 20, v);
@@ -67,17 +75,19 @@ public final class ReuseVertexConsumer implements VertexConsumer {
         return this;
     }
 
+    @Override
+    public VertexConsumer setLineWidth(float f) {
+        return null;
+    }
+
     public ReuseVertexConsumer quad(BakedQuad quad, int metadata) {
+        this.anyShaded |= quad.shade();
         this.ensureCanPut();
-        int[] data = quad.vertices();
         for (int i = 0; i < 4; i++) {
-            float x = Float.intBitsToFloat(data[i * 8]);
-            float y = Float.intBitsToFloat(data[i * 8 + 1]);
-            float z = Float.intBitsToFloat(data[i * 8 + 2]);
-            this.addVertex(x,y,z);
-            float u = Float.intBitsToFloat(data[i * 8 + 4]);
-            float v = Float.intBitsToFloat(data[i * 8 + 5]);
-            this.setUv(u,v);
+            var pos = quad.position(i);
+            this.addVertex(pos.x(), pos.y(), pos.z());
+            long puv = quad.packedUV(i);
+            this.setUv(UVPair.unpackU(puv),UVPair.unpackV(puv));
 
             this.meta(metadata);
         }
@@ -98,6 +108,7 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     public ReuseVertexConsumer reset() {
+        this.anyShaded = false;
         this.defaultMeta = 0;//RESET THE DEFAULT META
         this.count = 0;
         this.ptr = this.buffer.address - VERTEX_FORMAT_SIZE;//the thing is first time this gets incremented by FORMAT_STRIDE

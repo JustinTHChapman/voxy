@@ -39,6 +39,6 @@ bool modelIsTranslucent(BlockModel model) {
     return ((model.flagsA)&4u) != 0;
 }
 
-bool modelHasMipmaps(BlockModel model) {
+bool modelIsShaded(BlockModel model) {
     return ((model.flagsA)&8u) != 0;
 }

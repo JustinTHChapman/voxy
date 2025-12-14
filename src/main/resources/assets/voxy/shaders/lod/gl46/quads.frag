@@ -43,15 +43,15 @@ vec4 uint2vec4RGBA(uint colour) {
     return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255.0;
 }
 
-bool useMipmaps() {
-    return (interData.x&2u)==0u;
-}
+//bool useMipmaps() {
+//    return (interData.x&2u)==0u;
+//}
 
 uint tintingState() {
     return (interData.x>>2)&3u;
 }
 
-bool useCutout() {
+bool useDiscard() {
     return (interData.x&1u)==1u;
 }
 
@@ -129,14 +129,16 @@ void main() {
     vec2 uv2 = modf(uv, tile)*(1.0/(vec2(3.0,2.0)*256.0));
     vec4 colour;
     vec2 texPos = uv2 + getBaseUV();
-    if (useMipmaps()) {
+//This is deprecated, TODO: remove the non mip code path
+    //if (useMipmaps())
+    {
         vec2 uvSmol = uv*(1.0/(vec2(3.0,2.0)*256.0));
         vec2 dx = dFdx(uvSmol);//vec2(lDx, dDx);
         vec2 dy = dFdy(uvSmol);//vec2(lDy, dDy);
         colour = textureGrad(blockModelAtlas, texPos, dx, dy);
-    } else {
-        colour = textureLod(blockModelAtlas, texPos, 0);
-    }
+    }// else {
+    //    colour = textureLod(blockModelAtlas, texPos, 0);
+    //}
 
     //If we are in shaders and are a helper invocation, just exit, as it enables extra performance gains for small sized
     // fragments, we do this here after derivative computation
@@ -162,7 +164,11 @@ void main() {
 
 
     //Also, small quad is really fking over the mipping level somehow
-    if (useCutout() && (textureLod(blockModelAtlas, texPos, 0).a <= 0.1f)) {
+    #ifndef TRANSLUCENT
+    if (useDiscard() && (textureLod(blockModelAtlas, texPos, 0).a <= 0.1f)) {
+    #else
+    if (textureLod(blockModelAtlas, texPos, 0).a == 0.0f) {
+    #endif
         //This is stupidly stupidly bad for divergence
         //TODO: FIXME, basicly what this do is sample the exact pixel (no lod) for discarding, this stops mipmapping fucking it over
         #ifndef DEBUG_RENDER

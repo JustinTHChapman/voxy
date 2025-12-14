@@ -191,8 +191,9 @@ public class RenderDataFactory {
             boolean a = ModelQueries.isTranslucent(metadata);
             boolean b = ModelQueries.isDoubleSided(metadata);
             //Pre shift by 1
-            type = a|b?0:4;
-            type |= b?2:0;
+            //type = a|b?0:4;
+            //type |= b&!a?2:0;
+            type = a?0:(b?2:4);
         }
         return type;
     }
