@@ -64,6 +64,6 @@ public class VoxyClient implements ClientModInitializer {
     }
 
     public static boolean disableSodiumChunkRender() {
-        return getOcclusionDebugState() != 0;
+        return false;// getOcclusionDebugState() != 0;
     }
 }

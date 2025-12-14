@@ -14,6 +14,8 @@ accessible field net/minecraft/world/level/chunk/PalettedContainer data Lnet/min
 accessible field net/minecraft/world/level/chunk/PalettedContainer$Data palette Lnet/minecraft/world/level/chunk/Palette;
 accessible field net/minecraft/world/level/chunk/PalettedContainer$Data storage Lnet/minecraft/util/BitStorage;
 
+accessible field net/minecraft/client/renderer/texture/SpriteContents mipmapStrategy Lnet/minecraft/client/renderer/texture/MipmapStrategy;
+
 accessible method net/minecraft/client/renderer/GameRenderer getFov (Lnet/minecraft/client/Camera;FZ)F
 
 accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage getChunk (I)Lnet/minecraft/world/level/chunk/LevelChunk;

@@ -170,7 +170,7 @@ public class ModelTextureBakery {
     }
 
 
-    public boolean renderToStream(BlockState state, int streamBuffer, int streamOffset) {
+    public int renderToStream(BlockState state, int streamBuffer, int streamOffset) {
         this.capture.clear();
         boolean isBlock = true;
         ChunkSectionLayer layer;
@@ -221,10 +221,12 @@ public class ModelTextureBakery {
         }
 
         boolean isAnyShaded = false;
+        boolean isAnyDarkend = false;
         if (isBlock) {
             this.vc.reset();
             this.bakeBlockModel(state, layer);
             isAnyShaded |= this.vc.anyShaded;
+            isAnyDarkend |= this.vc.anyDarkendTex;
             if (!this.vc.isEmpty()) {//only render if there... is shit to render
 
                 //Setup for continual emission
@@ -267,6 +269,7 @@ public class ModelTextureBakery {
                 this.bakeFluidState(state, layer, i);
                 if (this.vc.isEmpty()) continue;
                 isAnyShaded |= this.vc.anyShaded;
+                isAnyDarkend |= this.vc.anyDarkendTex;
                 BudgetBufferRenderer.setup(this.vc.getAddress(), this.vc.quadCount(), blockTextureId);
 
                 glViewport((i % 3) * this.width, (i / 3) * this.height, this.width, this.height);
@@ -331,7 +334,7 @@ public class ModelTextureBakery {
             GL14.glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
 
-        return isAnyShaded;
+        return (isAnyShaded?1:0)|(isAnyDarkend?2:0);
     }
 
 

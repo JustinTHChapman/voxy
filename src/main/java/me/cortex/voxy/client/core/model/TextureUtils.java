@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.model;
 
 import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
 import net.minecraft.client.renderer.texture.MipmapGenerator;
+import net.minecraft.util.ARGB;
 
 //Texturing utils to manipulate data from the model bakery
 public class TextureUtils {
@@ -9,14 +10,14 @@ public class TextureUtils {
     public static int getWrittenPixelCount(ColourDepthTextureData texture, int checkMode) {
         int count = 0;
         for (int i = 0; i < texture.colour().length; i++) {
-            count += wasPixelWritten(texture, checkMode, i)?1:0;
+            count += wasPixelWritten(texture, checkMode, i) ? 1 : 0;
         }
         return count;
     }
 
     public static boolean isSolid(ColourDepthTextureData texture) {
         for (int pixel : texture.colour()) {
-            if (((pixel>>24)&0xFF) != 255) {
+            if (((pixel >> 24) & 0xFF) != 255) {
                 return false;
             }
         }
@@ -26,14 +27,15 @@ public class TextureUtils {
     public static final int WRITE_CHECK_STENCIL = 1;
     public static final int WRITE_CHECK_DEPTH = 2;
     public static final int WRITE_CHECK_ALPHA = 3;
+
     private static boolean wasPixelWritten(ColourDepthTextureData data, int mode, int index) {
         if (mode == WRITE_CHECK_STENCIL) {
-            return (data.depth()[index]&0xFF)!=0;
+            return (data.depth()[index] & 0xFF) != 0;
         } else if (mode == WRITE_CHECK_DEPTH) {
-            return (data.depth()[index]>>>8)!=((1<<24)-1);
+            return (data.depth()[index] >>> 8) != ((1 << 24) - 1);
         } else if (mode == WRITE_CHECK_ALPHA) {
             //TODO:FIXME: for some reason it has an alpha of 1 even if its ment to be 0
-            return ((data.colour()[index]>>>24)&0xff)>1;
+            return ((data.colour()[index] >>> 24) & 0xff) > 1;
         }
         throw new IllegalArgumentException();
     }
@@ -54,10 +56,10 @@ public class TextureUtils {
             if (!wasPixelWritten(texture, checkMode, i)) {
                 continue;
             }
-            if ((colourData[i]&0xFFFFFF) == 0 || (colourData[i]>>>24)==0) {//If the pixel is fully black (or translucent)
+            if ((colourData[i] & 0xFFFFFF) == 0 || (colourData[i] >>> 24) == 0) {//If the pixel is fully black (or translucent)
                 continue;
             }
-            boolean pixelTinited = (depthData[i]&(1<<7))!=0;
+            boolean pixelTinited = (depthData[i] & (1 << 7)) != 0;
             wasWriten |= true;
             allTinted &= pixelTinited;
             someTinted |= pixelTinited;
@@ -66,7 +68,7 @@ public class TextureUtils {
         if (!wasWriten) {
             return 0;
         }
-        return someTinted?(allTinted?3:2):1;
+        return someTinted ? (allTinted ? 3 : 2) : 1;
     }
 
     public static final int DEPTH_MODE_AVG = 1;
@@ -90,7 +92,7 @@ public class TextureUtils {
             if (!wasPixelWritten(texture, checkMode, i)) {
                 continue;
             }
-            int depth = depthData[i]>>>8;
+            int depth = depthData[i] >>> 8;
             if (mode == DEPTH_MODE_AVG) {
                 a++;
                 b += depth;
@@ -105,7 +107,7 @@ public class TextureUtils {
             if (a == 0) {
                 return -1;
             }
-            return u2fdepth((int) (b/a));
+            return u2fdepth((int) (b / a));
         } else if (mode == DEPTH_MODE_MAX) {
             if (a == Long.MIN_VALUE) {
                 return -1;
@@ -121,7 +123,7 @@ public class TextureUtils {
     }
 
     private static float u2fdepth(int depth) {
-        float depthF = (float) ((double)depth/((1<<24)-1));
+        float depthF = (float) ((double) depth / ((1 << 24) - 1));
         //https://registry.khronos.org/OpenGL-Refpages/gl4/html/glDepthRange.xhtml
         // due to this and the unsigned bullshit, believe the depth value needs to get multiplied by 2
 
@@ -150,10 +152,10 @@ public class TextureUtils {
             minX++;
         } while (minX != data.width());
 
-        int maxX = data.width()-1;
+        int maxX = data.width() - 1;
         maxXCheck:
         do {
-            for (int y = data.height()-1; y!=-1; y--) {
+            for (int y = data.height() - 1; y != -1; y--) {
                 int idx = maxX + (y * data.width());
                 if (wasPixelWritten(data, checkMode, idx)) {
                     break maxXCheck;//pixel was written too so break from loop
@@ -178,10 +180,10 @@ public class TextureUtils {
         } while (minY != data.height());
 
 
-        int maxY = data.height()-1;
+        int maxY = data.height() - 1;
         maxYCheck:
         do {
-            for (int x = data.width()-1; x!=-1; x--) {
+            for (int x = data.width() - 1; x != -1; x--) {
                 int idx = (maxY * data.height()) + x;
                 if (wasPixelWritten(data, checkMode, idx)) {
                     break maxYCheck;//pixel was written too so break from loop
@@ -195,70 +197,42 @@ public class TextureUtils {
     }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-    public static int mipColours(int one, int two, int three, int four) {
-        if (false) {
-            return 0;
-            //return MipmapGenerator.alphaBlend(one, two, three, four, false);
-        } else {
-            return weightedAverageColor(weightedAverageColor(one, two), weightedAverageColor(three, four));
+    public static int mipColours(boolean darkend, int C00, int C01, int C10, int C11) {
+        darkend = !darkend;//Invert to make it easier
+        float r = 0.0f;
+        float g = 0.0f;
+        float b = 0.0f;
+        float a = 0.0f;
+        if (darkend || (C00 >>> 24) != 0) {
+            r += ColorSRGB.srgbToLinear((C00 >> 0) & 0xFF);
+            g += ColorSRGB.srgbToLinear((C00 >> 8) & 0xFF);
+            b += ColorSRGB.srgbToLinear((C00 >> 16) & 0xFF);
+            a += darkend ? (C00 >>> 24) : ColorSRGB.srgbToLinear(C00 >>> 24);
         }
-    }
-
-    //TODO: FIXME!!! ITS READING IT AS ABGR??? isnt the format RGBA??
-    private static int weightedAverageColor(int a, int b) {
-        //We specifically want the entire other component if the alpha is zero
-        // this prevents black mips from generating due to A) non filled colours, and B) when the sampler samples everything it doesnt detonate
-        if ((a&0xFF000000) == 0) {
-            //return (b&0x00FFFFFF)|((b>>>2)&0x3FC00000);
-            return b;
+        if (darkend || (C01 >>> 24) != 0) {
+            r += ColorSRGB.srgbToLinear((C01 >> 0) & 0xFF);
+            g += ColorSRGB.srgbToLinear((C01 >> 8) & 0xFF);
+            b += ColorSRGB.srgbToLinear((C01 >> 16) & 0xFF);
+            a += darkend ? (C01 >>> 24) : ColorSRGB.srgbToLinear(C01 >>> 24);
         }
-        if ((b&0xFF000000) == 0) {
-            //return (a&0x00FFFFFF)|((a>>>2)&0x3FC00000);
-            return a;
+        if (darkend || (C10 >>> 24) != 0) {
+            r += ColorSRGB.srgbToLinear((C10 >> 0) & 0xFF);
+            g += ColorSRGB.srgbToLinear((C10 >> 8) & 0xFF);
+            b += ColorSRGB.srgbToLinear((C10 >> 16) & 0xFF);
+            a += darkend ? (C10 >>> 24) : ColorSRGB.srgbToLinear(C10 >>> 24);
+        }
+        if (darkend || (C11 >>> 24) != 0) {
+            r += ColorSRGB.srgbToLinear((C11 >> 0) & 0xFF);
+            g += ColorSRGB.srgbToLinear((C11 >> 8) & 0xFF);
+            b += ColorSRGB.srgbToLinear((C11 >> 16) & 0xFF);
+            a += darkend ? (C11 >>> 24) : ColorSRGB.srgbToLinear(C11 >>> 24);
         }
 
-        if (((a^b)&0xFF000000)==0) {
-            return ColorSRGB.linearToSrgb(
-                    addHalfLinear(0, a,b),
-                    addHalfLinear(8, a,b),
-                    addHalfLinear(16, a,b),
-                    a>>>24);
-        }
-
-
-
-
-
-        {
-            int A = (a>>>24);
-            int B = (a>>>24);
-            float mul = 1.0F / (float)(A+B);
-            float wA = A * mul;
-            float wB = B * mul;
-            return ColorSRGB.linearToSrgb(
-                    addMulLinear(0, a,b,wA,wB),
-                    addMulLinear(8, a,b,wA,wB),
-                    addMulLinear(16, a,b,wA,wB)
-                    , (A + B)/2);
-        }
-    }
-
-    private static float addHalfLinear(int shift, int a, int b) {
-        return addMulLinear(shift, a, b, 0.5f, 0.5f);
-    }
-    private static float addMulLinear(int shift, int a, int b, float mulA, float mulB) {
-        return Math.fma(ColorSRGB.srgbToLinear((a>>shift)&0xFF),mulA, ColorSRGB.srgbToLinear((b>>shift)&0xFF)*mulB);
+        return ColorSRGB.linearToSrgb(
+                r / 4,
+                g / 4,
+                b / 4,
+                darkend ? ((int) a) / 4 : ARGB.linearToSrgbChannel(a / 4)
+        );
     }
 }

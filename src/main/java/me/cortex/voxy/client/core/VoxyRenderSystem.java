@@ -376,7 +376,7 @@ public class VoxyRenderSystem {
         return base.mulLocal(
                 makeProjectionMatrix(0.05f, Minecraft.getInstance().gameRenderer.getDepthFar()).invert(),
                 new Matrix4f()
-        ).mulLocal(makeProjectionMatrix(VoxyClient.getOcclusionDebugState()<=1?16f:0.1f, 16*3000));
+        ).mulLocal(makeProjectionMatrix(VoxyClient.disableSodiumChunkRender()?0.1f:16f, 16*3000));
     }
 
     private boolean frexStillHasWork() {

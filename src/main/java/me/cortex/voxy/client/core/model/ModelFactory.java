@@ -63,6 +63,7 @@ import static org.lwjgl.opengl.GL11.*;
 // this _quarters_ the memory requirements for the texture atlas!!! WHICH IS HUGE saving
 public class ModelFactory {
     public static final int MODEL_TEXTURE_SIZE = 16;
+    public static final int LAYERS = Integer.numberOfTrailingZeros(MODEL_TEXTURE_SIZE);
 
     //TODO: replace the fluid BlockState with a client model id integer of the fluidState, requires looking up
     // the fluid state in the mipper
@@ -158,6 +159,7 @@ public class ModelFactory {
         private final MemoryBuffer rawData;
 
         public boolean isShaded;
+        public boolean hasDarkenedTextures;
 
         public RawBakeResult(int blockId, BlockState blockState, MemoryBuffer rawData) {
             this.blockId = blockId;
@@ -219,7 +221,9 @@ public class ModelFactory {
 
         RawBakeResult result = new RawBakeResult(blockId, blockState);
         int allocation = this.downstream.download(MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*2*4*6, ptr -> this.rawBakeResults.add(result.cpyBuf(ptr)));
-        result.isShaded = this.bakery.renderToStream(blockState, this.downstream.getBufferId(), allocation);
+        int flags = this.bakery.renderToStream(blockState, this.downstream.getBufferId(), allocation);
+        result.hasDarkenedTextures = (flags&2)!=0;
+        result.isShaded = (flags&1)!=0;
         return true;
     }
 
@@ -245,7 +249,7 @@ public class ModelFactory {
             }
         }
         result.rawData.free();
-        var bakeResult = this.processTextureBakeResult(result.blockId, result.blockState, textureData, result.isShaded);
+        var bakeResult = this.processTextureBakeResult(result.blockId, result.blockState, textureData, result.isShaded, result.hasDarkenedTextures);
         if (bakeResult!=null) {
             this.uploadResults.add(bakeResult);
         }
@@ -337,7 +341,7 @@ public class ModelFactory {
         }
     }
 
-    private ModelBakeResultUpload processTextureBakeResult(int blockId, BlockState blockState, ColourDepthTextureData[] textureData, boolean isShaded) {
+    private ModelBakeResultUpload processTextureBakeResult(int blockId, BlockState blockState, ColourDepthTextureData[] textureData, boolean isShaded, boolean darkenedTinting) {
         if (this.idMappings[blockId] != -1) {
             //This should be impossible to reach as it means that multiple bakes for the same blockId happened and where inflight at the same time!
             throw new IllegalStateException("Block id already added: " + blockId + " for state: " + blockState);
@@ -636,7 +640,7 @@ public class ModelFactory {
         //TODO callback to inject extra data into the model data
 
 
-        this.putTextures(textureData, uploadResult.texture);
+        MipGen.putTextures(darkenedTinting, textureData, uploadResult.texture);
 
         //glGenerateTextureMipmap(this.textures.id);
 
@@ -734,7 +738,7 @@ public class ModelFactory {
     // if it is, need to add it to a list and mark it as biome colour dependent or something then the shader
     // will either use the uint as an index or a direct colour multiplier
     private static int captureColourConstant(BlockColor colorProvider, BlockState state, Biome biome) {
-        return colorProvider.getColor(state, new BlockAndTintGetter() {
+        var getter = new BlockAndTintGetter() {
             @Override
             public float getShade(Direction direction, boolean shaded) {
                 return 0;
@@ -780,12 +784,16 @@ public class ModelFactory {
             public int getMinY() {
                 return 0;
             }
-        }, BlockPos.ZERO, 0);
+        };
+        //Multiple layer bs to do with flower beds
+        int c = colorProvider.getColor(state, getter, BlockPos.ZERO, 0);
+        if (c!=-1) return c;
+        return colorProvider.getColor(state, getter, BlockPos.ZERO, 1);
     }
 
     private static boolean isBiomeDependentColour(BlockColor colorProvider, BlockState state) {
         boolean[] biomeDependent = new boolean[1];
-        colorProvider.getColor(state, new BlockAndTintGetter() {
+        var getter = new BlockAndTintGetter() {
             @Override
             public float getShade(Direction direction, boolean shaded) {
                 return 0;
@@ -832,7 +840,9 @@ public class ModelFactory {
             public int getMinY() {
                 return 0;
             }
-        }, BlockPos.ZERO, 0);
+        };
+        colorProvider.getColor(state, getter, BlockPos.ZERO, 0);
+        colorProvider.getColor(state, getter, BlockPos.ZERO, 1);
         return biomeDependent[0];
     }
 
@@ -881,57 +891,6 @@ public class ModelFactory {
     }
 
 
-    private static int computeSizeWithMips(int size) {
-        int total = 0;
-        for (;size!=0;size>>=1) total += size*size;
-        return total;
-    }
-    private static final MemoryBuffer SCRATCH_TEX = new MemoryBuffer((2L*3*computeSizeWithMips(MODEL_TEXTURE_SIZE))*4);
-    private static final int LAYERS = Integer.numberOfTrailingZeros(MODEL_TEXTURE_SIZE);
-    //TODO: redo to batch blit, instead of 6 seperate blits, and also fix mipping
-    private void putTextures(ColourDepthTextureData[] textures, MemoryBuffer into) {
-        //if (MODEL_TEXTURE_SIZE != 16) {throw new IllegalStateException("THIS METHOD MUST BE REDONE IF THIS CONST CHANGES");}
-
-        //TODO: need to use a write mask to see what pixels must be used to contribute to mipping
-        // as in, using the depth/stencil info, check if pixel was written to, if so, use that pixel when blending, else dont
-
-        final long addr = into.address;
-        final int LENGTH_B = MODEL_TEXTURE_SIZE*3;
-        for (int i = 0; i < 6; i++) {
-            int x = (i>>1)*MODEL_TEXTURE_SIZE;
-            int y = (i&1)*MODEL_TEXTURE_SIZE;
-            int j = 0;
-            for (int t : textures[i].colour()) {
-                int o = ((y+(j>>LAYERS))*LENGTH_B + ((j&(MODEL_TEXTURE_SIZE-1))+x))*4; j++;//LAYERS here is just cause faster
-                MemoryUtil.memPutInt(addr+o, t);
-            }
-        }
-
-        //Mip the scratch
-        long dAddr = addr;
-        for (int i = 0; i < LAYERS-1; i++) {
-            long sAddr = dAddr;
-            dAddr += (MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*3*2*4)>>(i<<1);//is.. i*2 because shrink both MODEL_TEXTURE_SIZE by >>i so is 2*i total shift
-            int width = (MODEL_TEXTURE_SIZE*3)>>(i+1);
-            int sWidth = (MODEL_TEXTURE_SIZE*3)>>i;
-            int height = (MODEL_TEXTURE_SIZE*2)>>(i+1);
-            //TODO: OPTIMZIE THIS
-            for (int px = 0; px < width; px++) {
-                for (int py = 0; py < height; py++) {
-                    long bp = sAddr + (px*2 + py*2*sWidth)*4;
-                    int C00 = MemoryUtil.memGetInt(bp);
-                    int C01 = MemoryUtil.memGetInt(bp+sWidth*4);
-                    int C10 = MemoryUtil.memGetInt(bp+4);
-                    int C11 = MemoryUtil.memGetInt(bp+sWidth*4+4);
-                    MemoryUtil.memPutInt(dAddr + (px+py*width) * 4L, TextureUtils.mipColours(C00, C01, C10, C11));
-                }
-            }
-        }
-
-        /*
-        */
-    }
-
     public void free() {
         this.bakery.free();
         this.downstream.free();
@@ -953,5 +912,12 @@ public class ModelFactory {
         size += this.uploadResults.size();
         size += this.biomeQueue.size();
         return size;
+    }
+
+
+    private static int computeSizeWithMips(int size) {
+        int total = 0;
+        for (;size!=0;size>>=1) total += size*size;
+        return total;
     }
 }

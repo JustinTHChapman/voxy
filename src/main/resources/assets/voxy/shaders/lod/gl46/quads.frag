@@ -166,6 +166,7 @@ void main() {
     //Also, small quad is really fking over the mipping level somehow
     #ifndef TRANSLUCENT
     if (useDiscard() && (textureLod(blockModelAtlas, texPos, 0).a <= 0.1f)) {
+    //if (useDiscard() && (colour.a <= 0.1f)) {
     #else
     if (textureLod(blockModelAtlas, texPos, 0).a == 0.0f) {
     #endif
