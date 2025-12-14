@@ -114,11 +114,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                 .addSource(ShaderType.VERTEX, vertex);
 
         //Apply per face tinting
-        var CL = Minecraft.getInstance().level;
-        if (CL.effects().constantAmbientLight()) {
-            builder.define("DARKENED_TINTING");
-            //TODO: generate the tinting table here
-        }
+        addDirectionalFaceTint(builder, Minecraft.getInstance().level);
 
         String frag = ShaderLoader.parse("voxy:lod/gl46/quads.frag");
 
@@ -129,28 +125,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.terrainShader = tryCompilePatchedOrNormal(builder, opaqueFrag, frag);
 
         String translucentFrag = pipeline.patchTranslucentShader(this, frag);
-        if (translucentFrag != null) {
-            this.translucentTerrainShader = tryCompilePatchedOrNormal(builder, translucentFrag, frag);
-        } else {
-            this.translucentTerrainShader = this.terrainShader;
-        }
-    }
+        translucentFrag = translucentFrag==null?frag:translucentFrag;
 
-    private static Shader tryCompilePatchedOrNormal(Shader.Builder<?> builder, String shader, String original) {
-        boolean patched = shader != original;//This is the correct comparison type (reference)
-        try {
-            return builder.clone()
-                    .defineIf("PATCHED_SHADER", patched)
-                    .addSource(ShaderType.FRAGMENT, shader)
-                    .compile();
-        } catch (RuntimeException e) {
-            if (patched) {
-                Logger.error("Failed to compile shader patch, using normal pipeline to prevent errors", e);
-                return tryCompilePatchedOrNormal(builder, original, original);
-            } else {
-                throw e;
-            }
-        }
+        this.translucentTerrainShader = tryCompilePatchedOrNormal(builder.define("TRANSLUCENT"), translucentFrag, frag);
     }
 
     private void uploadUniformBuffer(MDICViewport viewport) {
@@ -379,11 +356,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     @Override
     public void free() {
-        if (this.terrainShader != this.translucentTerrainShader) {
-            this.translucentTerrainShader.free();
-        }
         this.uniform.free();
         this.distanceCountBuffer.free();
+        this.translucentTerrainShader.free();
         this.terrainShader.free();
         this.commandGenShader.free();
         this.cullShader.free();

@@ -9,7 +9,6 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import me.cortex.voxy.common.Logger;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
-import org.apache.commons.logging.Log;
 import org.lwjgl.opengl.ARBDrawBuffersBlend;
 
 import java.lang.reflect.Modifier;
