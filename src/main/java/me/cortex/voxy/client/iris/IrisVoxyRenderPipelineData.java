@@ -450,7 +450,10 @@ public class IrisVoxyRenderPipelineData {
             @Override
             public boolean addDynamicSampler(TextureType type, IntSupplier texture, ValueUpdateNotifier notifier, Supplier<GlSampler> sampler, String... names) {
                 if (!this.hasSampler(names)) return false;
-                samplerSet.add(new TextureWSampler(this.name(names), texture, sampler!=null?()->sampler.get().getId():()->-1));
+                samplerSet.add(new TextureWSampler(this.name(names), texture, sampler!=null?()->{
+                    var s = sampler.get();
+                    return s!=null?s.getId():-1;
+                }:()->-1));
                 return true;
             }
 
