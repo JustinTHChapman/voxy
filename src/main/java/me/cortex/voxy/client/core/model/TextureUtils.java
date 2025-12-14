@@ -208,8 +208,9 @@ public class TextureUtils {
 
 
     public static int mipColours(int one, int two, int three, int four) {
-        if (true) {
-            return MipmapGenerator.alphaBlend(one, two, three, four, false);
+        if (false) {
+            return 0;
+            //return MipmapGenerator.alphaBlend(one, two, three, four, false);
         } else {
             return weightedAverageColor(weightedAverageColor(one, two), weightedAverageColor(three, four));
         }
@@ -220,9 +221,11 @@ public class TextureUtils {
         //We specifically want the entire other component if the alpha is zero
         // this prevents black mips from generating due to A) non filled colours, and B) when the sampler samples everything it doesnt detonate
         if ((a&0xFF000000) == 0) {
+            //return (b&0x00FFFFFF)|((b>>>2)&0x3FC00000);
             return b;
         }
         if ((b&0xFF000000) == 0) {
+            //return (a&0x00FFFFFF)|((a>>>2)&0x3FC00000);
             return a;
         }
 
@@ -233,6 +236,10 @@ public class TextureUtils {
                     addHalfLinear(16, a,b),
                     a>>>24);
         }
+
+
+
+
 
         {
             int A = (a>>>24);

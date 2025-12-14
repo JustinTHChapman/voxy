@@ -32,9 +32,10 @@
     "sodium.AccessorSodiumWorldRenderer",
     "sodium.MixinChunkJobQueue",
     "sodium.MixinDefaultChunkRenderer",
+    "sodium.MixinRenderRegionManager",
     "sodium.MixinRenderSectionManager",
-    "sodium.MixinSodiumOptionsGUI",
     "sodium.MixinSodiumWorldRenderer",
+    "sodium.MixinVideoSettingsScreen",
     "minecraft.MixinLayerLightSectionStorage"
   ],
   "injectors": {

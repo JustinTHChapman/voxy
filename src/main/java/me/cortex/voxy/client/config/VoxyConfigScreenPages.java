@@ -15,7 +15,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import java.util.ArrayList;
 import java.util.List;
-
+/*
 public abstract class VoxyConfigScreenPages {
     private VoxyConfigScreenPages(){}
 
@@ -181,3 +181,4 @@ public abstract class VoxyConfigScreenPages {
     }
 
 }
+*/
