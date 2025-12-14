@@ -5,7 +5,7 @@ import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.LightLayer;
@@ -48,16 +48,15 @@ public class ModelTextureBakery {
 
     public static int getMetaFromLayer(ChunkSectionLayer layer) {
         boolean hasDiscard = layer == ChunkSectionLayer.CUTOUT ||
-                layer == ChunkSectionLayer.CUTOUT_MIPPED ||
+                layer == ChunkSectionLayer.TRANSLUCENT||
                 layer == ChunkSectionLayer.TRIPWIRE;
 
-        boolean isMipped = layer == ChunkSectionLayer.CUTOUT_MIPPED ||
-                layer == ChunkSectionLayer.SOLID ||
+        boolean isMipped = layer == ChunkSectionLayer.SOLID ||
                 layer == ChunkSectionLayer.TRANSLUCENT ||
                 layer == ChunkSectionLayer.TRIPWIRE;
 
         int meta = hasDiscard?1:0;
-        meta |= isMipped?2:0;
+        meta |= true?2:0;
         return meta;
     }
 
@@ -171,7 +170,7 @@ public class ModelTextureBakery {
     }
 
 
-    public void renderToStream(BlockState state, int streamBuffer, int streamOffset) {
+    public boolean renderToStream(BlockState state, int streamBuffer, int streamOffset) {
         this.capture.clear();
         boolean isBlock = true;
         ChunkSectionLayer layer;
@@ -187,9 +186,9 @@ public class ModelTextureBakery {
         }
 
         //TODO: support block model entities
-        BakedBlockEntityModel bbem = null;
+        //BakedBlockEntityModel bbem = null;
         if (state.hasBlockEntity()) {
-            bbem = BakedBlockEntityModel.bake(state);
+            //bbem = BakedBlockEntityModel.bake(state);
         }
 
         //Setup GL state
@@ -217,14 +216,15 @@ public class ModelTextureBakery {
             //Bind the capture framebuffer
             glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
 
-            var tex = Minecraft.getInstance().getTextureManager().getTexture(ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png")).getTexture();
+            var tex = Minecraft.getInstance().getTextureManager().getTexture(Identifier.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png")).getTexture();
             blockTextureId = ((com.mojang.blaze3d.opengl.GlTexture)tex).glId();
         }
 
-        //TODO: fastpath for blocks
+        boolean isAnyShaded = false;
         if (isBlock) {
             this.vc.reset();
             this.bakeBlockModel(state, layer);
+            isAnyShaded |= this.vc.anyShaded;
             if (!this.vc.isEmpty()) {//only render if there... is shit to render
 
                 //Setup for continual emission
@@ -266,6 +266,7 @@ public class ModelTextureBakery {
                 this.vc.reset();
                 this.bakeFluidState(state, layer, i);
                 if (this.vc.isEmpty()) continue;
+                isAnyShaded |= this.vc.anyShaded;
                 BudgetBufferRenderer.setup(this.vc.getAddress(), this.vc.quadCount(), blockTextureId);
 
                 glViewport((i % 3) * this.width, (i / 3) * this.height, this.width, this.height);
@@ -283,6 +284,7 @@ public class ModelTextureBakery {
         }
 
         //Render block model entity data if it exists
+        /*
         if (bbem != null) {
             //Rerender everything again ;-; but is ok (is not)
 
@@ -308,7 +310,7 @@ public class ModelTextureBakery {
             glBindVertexArray(0);
 
             bbem.release();
-        }
+        }*/
 
 
 
@@ -328,6 +330,8 @@ public class ModelTextureBakery {
             //reset the blend func
             GL14.glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
+
+        return isAnyShaded;
     }
 
 

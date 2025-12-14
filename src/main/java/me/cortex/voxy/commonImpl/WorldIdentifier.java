@@ -3,7 +3,7 @@ package me.cortex.voxy.commonImpl;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.DimensionType;
 import org.jetbrains.annotations.NotNull;
@@ -14,7 +14,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 public class WorldIdentifier {
-    private static final ResourceKey<DimensionType> NULL_DIM_KEY = ResourceKey.create(Registries.DIMENSION_TYPE, ResourceLocation.parse("voxy:null_dimension_id"));
+    private static final ResourceKey<DimensionType> NULL_DIM_KEY = ResourceKey.create(Registries.DIMENSION_TYPE, Identifier.parse("voxy:null_dimension_id"));
 
     public final ResourceKey<Level> key;
     public final long biomeSeed;
@@ -53,7 +53,7 @@ public class WorldIdentifier {
     private static <T> boolean equal(ResourceKey<T> a, ResourceKey<T> b) {
         if (a == b) return true;
         if (a == null || b == null) return false;
-        return a.registry().equals(b.registry()) && a.location().equals(b.location());
+        return a.registry().equals(b.registry()) && a.identifier().equals(b.identifier());
     }
 
     //Quick access utility method to get or create a world object in the current instance
@@ -117,7 +117,7 @@ public class WorldIdentifier {
 
     private static long registryKeyHashCode(ResourceKey<?> key) {
         var A = key.registry();
-        var B = key.location();
+        var B = key.identifier();
         int a = A==null?0:A.hashCode();
         int b = B==null?0:B.hashCode();
         return (Integer.toUnsignedLong(a)<<32)|Integer.toUnsignedLong(b);

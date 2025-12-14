@@ -9,7 +9,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import java.util.HashSet;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -39,7 +39,7 @@ public class VoxyClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        DebugScreenEntries.register(ResourceLocation.fromNamespaceAndPath("voxy","debug"), new VoxyDebugScreenEntry());
+        DebugScreenEntries.register(Identifier.fromNamespaceAndPath("voxy","debug"), new VoxyDebugScreenEntry());
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             if (VoxyCommon.isAvailable()) {
                 dispatcher.register(VoxyCommands.register());
