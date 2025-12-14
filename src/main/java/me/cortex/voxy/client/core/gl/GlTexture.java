@@ -96,6 +96,11 @@ public class GlTexture extends TrackedObject {
         return this.levels;
     }
 
+    public int getFormat() {
+        this.assertAllocated();
+        return this.format;
+    }
+
     private long getEstimatedSize() {
         this.assertAllocated();
         long elemSize = switch (this.format) {

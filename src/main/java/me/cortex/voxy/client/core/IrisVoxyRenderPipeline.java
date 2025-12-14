@@ -26,8 +26,7 @@ import static org.lwjgl.opengl.GL45C.*;
 public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     private final IrisVoxyRenderPipelineData data;
     private final FullscreenBlit depthBlit = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag");
-    public final DepthFramebuffer fb = new DepthFramebuffer(GL_DEPTH24_STENCIL8);
-    public final DepthFramebuffer fbTranslucent = new DepthFramebuffer(GL_DEPTH24_STENCIL8);
+    public final DepthFramebuffer fbTranslucent = new DepthFramebuffer(this.fb.getDepthTex().getFormat());
 
     private final GlBuffer shaderUniforms;
 
@@ -79,7 +78,6 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         this.data.thePipeline = null;
 
         this.depthBlit.delete();
-        this.fb.free();
         this.fbTranslucent.free();
 
         if (this.shaderUniforms != null) {
