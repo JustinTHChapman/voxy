@@ -62,4 +62,8 @@ public class DepthFramebuffer {
     public void bind() {
         glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);
     }
+
+    public int getFormat() {
+        return this.depthType;
+    }
 }
