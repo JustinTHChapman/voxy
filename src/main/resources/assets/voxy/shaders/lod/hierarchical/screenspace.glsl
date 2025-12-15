@@ -128,6 +128,9 @@ bool outsideFrustum() {
 }
 
 bool isCulledByHiz() {
+    //Things start breaking down if the area is the entire scree, no idea why, just abort if we hit this case
+    if ((maxBB.xy-minBB.xy)==vec2(1.0f)) return false;
+
     ivec2 ssize = ivec2(packedHizSize>>16,packedHizSize&0xFFFF);
     vec2 size = (maxBB.xy-minBB.xy)*ssize;
     float miplevel = log2(max(max(size.x, size.y),1));
