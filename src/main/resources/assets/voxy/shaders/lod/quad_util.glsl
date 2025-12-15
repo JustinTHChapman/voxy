@@ -179,36 +179,23 @@ vec2 getCornerUV(const in QuadData quad, uint cornerId) {
 #ifndef PATCHED_SHADER
 float computeDirectionalFaceTint(bool isShaded, uint face) {
     //Apply face tint
-    #ifdef DARKENED_TINTING
     if (isShaded) {
         //just index on a const array with the face as an index, will be much faster
         // or use a vector and select/sum
         // but per face might be easier?
-        //TODO: make branchless, infact apply ahead of time to the texture itself in ModelManager since that is
-        // per face
+
+
         if ((face>>1) == 1) {//NORTH, SOUTH
-            return 0.8f;
+            return Z_AXIS_FACE_TINT;
         } else if ((face>>1) == 2) {//EAST, WEST
-            return 0.6f;
-        } else {//UP DOWN
-            return 0.9f;
+            return X_AXIS_FACE_TINT;
+        } else if (face == 1) {//UP
+            return UP_FACE_TINT;
         }
+        //DOWN
+        return DOWN_FACE_TINT;
     } else {
-        return 0.9f;
+        return NO_SHADE_FACE_TINT;
     }
-    #else
-    if (isShaded) {
-        //TODO: make branchless, infact apply ahead of time to the texture itself in ModelManager since that is
-        // per face
-        if ((face>>1) == 1) {//NORTH, SOUTH
-            return 0.8f;
-        } else if ((face>>1) == 2) {//EAST, WEST
-            return 0.6f;
-        } else if (face == 0) {//DOWN
-            return 0.5f;
-        }
-    }
-    #endif
-    return 1.0f;
 }
 #endif
