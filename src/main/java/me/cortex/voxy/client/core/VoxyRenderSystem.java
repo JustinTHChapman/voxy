@@ -136,7 +136,7 @@ public class VoxyRenderSystem {
                         this.nodeManager::addTopLevel,
                         this.nodeManager::removeTopLevel);
 
-                this.renderDistanceTracker.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
+                this.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
             }
 
             this.chunkBoundRenderer = new ChunkBoundRenderer(this.pipeline);

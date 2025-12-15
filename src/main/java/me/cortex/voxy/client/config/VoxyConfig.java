@@ -31,7 +31,6 @@ public class VoxyConfig {
     public float subDivisionSize = 64;
     public boolean renderVanillaFog = false;
     public boolean useEnvironmentalFog = false;
-    public boolean renderStatistics = false;
     public boolean dontUseSodiumBuilderThreads = false;
 
     private static VoxyConfig loadOrCreate() {
