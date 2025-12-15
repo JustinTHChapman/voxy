@@ -55,7 +55,11 @@ public class WorldUpdater {
                     final int iSecMsk1 = (~secMsk) + 1;
 
                     int secIdx = 0;
-                    //TODO: manually unroll and do e.g. 4 iterations per loop
+
+                    //TODO rotate the loop parralelization
+                    // i.e. instead of doing 4 consecutive blocks, which would all be in the same cache line
+                    // do 4 seperate rows so they are in different cache lines, should allow
+                    // more instruction pipelining (in theory)
                     for (int i = 0; i <= 0xFFF; i+=4) {
                         int cSecIdx = secIdx + baseSec;
                         secIdx = (secIdx + iSecMsk1) & secMsk;
