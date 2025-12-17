@@ -12,5 +12,5 @@ flat in uint value;
 
 void main() {
     visibilityData[id] = value;
-    //colour = vec4(float(id&7u)/7, float((id>>3)&7u)/7, float((id>>6)&7u)/7, 0);
+    //colour = vec4(float(id&7u)/7, float((id>>3)&7u)/7, float((id>>6)&7u)/7, 1);
 }
