@@ -133,7 +133,7 @@ public class ChunkBoundRenderer {
 
         //Batch the draws into groups of size 32
         int count = this.chunk2idx.size();
-        if (count > 32) {
+        if (count >= 32) {
             glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3 * 32, GL_UNSIGNED_BYTE, 0, count/32);
         }
         if (count%32 != 0) {
