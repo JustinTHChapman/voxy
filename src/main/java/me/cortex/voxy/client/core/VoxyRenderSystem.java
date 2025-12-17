@@ -80,6 +80,10 @@ public class VoxyRenderSystem {
         world.acquireRef();
         System.gc();
 
+        if (Minecraft.getInstance().gameRenderer.getRenderDistance()<40) {
+            Logger.warn("Having a vanilla render distance of 2 can cause culling issues, please use 3 or more");
+        }
+
         //Fking HATE EVERYTHING AAAAAAAAAAAAAAAA
         int[] oldBufferBindings = new int[10];
         for (int i = 0; i < oldBufferBindings.length; i++) {
@@ -373,10 +377,17 @@ public class VoxyRenderSystem {
 
     //TODO: Make a reverse z buffer
     private static Matrix4f computeProjectionMat(Matrix4fc base) {
+        //THis is a wild and insane problem to have
+        // at short render distances the vanilla terrain doesnt end up covering the 16f near plane voxy uses
+        // meaning that it explodes (due to near plane clipping).. _badly_ with the rastered culling being wrong in rare cases for the immediate
+        // sections rendered after the vanilla render distance
+        float nearVoxy = Minecraft.getInstance().gameRenderer.getRenderDistance()<=32.0f?8f:16f;
+        nearVoxy = VoxyClient.disableSodiumChunkRender()?0.1f:nearVoxy;
+
         return base.mulLocal(
                 makeProjectionMatrix(0.05f, Minecraft.getInstance().gameRenderer.getDepthFar()).invert(),
                 new Matrix4f()
-        ).mulLocal(makeProjectionMatrix(VoxyClient.disableSodiumChunkRender()?0.1f:16f, 16*3000));
+        ).mulLocal(makeProjectionMatrix(nearVoxy, 16*3000));
     }
 
     private boolean frexStillHasWork() {
