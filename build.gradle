@@ -106,8 +106,7 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
     //TODO: this is to eventually not need sodium installed as atm its just used for parsing shaders
-    modRuntimeOnlyMsk "maven.modrinth:sodium:mc1.21.11-0.8.0-fabric"
-    modCompileOnly "maven.modrinth:sodium:mc1.21.11-0.8.0-fabric"
+    modImplementation "maven.modrinth:sodium:mc1.21.11-0.8.0-fabric"
 
     modImplementation("maven.modrinth:lithium:mc1.21.11-0.21.0-fabric")
 
@@ -125,7 +124,7 @@ dependencies {
     //modCompileOnly("maven.modrinth:immersiveportals:v5.1.7-mc1.20.4")
 
     modCompileOnly("maven.modrinth:sodium-extra:mc1.21.11-0.8.0+fabric")
-    modRuntimeOnlyMsk("maven.modrinth:sodium-extra:mc1.21.11-0.8.0+fabric")
+    //modRuntimeOnlyMsk("maven.modrinth:sodium-extra:mc1.21.11-0.8.0+fabric")
 
     modCompileOnly("maven.modrinth:chunky:1.4.54-fabric")
     //modRuntimeOnlyMsk("maven.modrinth:chunky:1.4.40-fabric")
