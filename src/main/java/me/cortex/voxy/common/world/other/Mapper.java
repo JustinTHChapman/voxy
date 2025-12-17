@@ -185,8 +185,8 @@ public class Mapper {
         }
 
         entry = new StateEntry(this.blockId2stateEntry.size(), state);
-        this.block2stateEntry.put(state, entry);
         this.blockId2stateEntry.add(entry);
+        this.block2stateEntry.put(state, entry);
         this.blockLock.unlock();
 
         byte[] serialized = entry.serialize();
@@ -208,8 +208,8 @@ public class Mapper {
             return entry;
         }
         entry = new BiomeEntry(this.biomeId2biomeEntry.size(), biome);
-        this.biome2biomeEntry.put(biome, entry);
         this.biomeId2biomeEntry.add(entry);
+        this.biome2biomeEntry.put(biome, entry);
         this.biomeLock.unlock();
 
         byte[] serialized = entry.serialize();
@@ -234,7 +234,6 @@ public class Mapper {
         return this.blockId2stateEntry.get(blockId).state;
     }
 
-    //TODO: replace lambda with a class cached lambda ref (cause doing this:: still does a lambda allocation)
     public int getIdForBlockState(BlockState state) {
         if (state.isAir()) {
             return 0;
