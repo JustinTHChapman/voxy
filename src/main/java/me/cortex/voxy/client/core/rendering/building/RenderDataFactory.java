@@ -462,7 +462,8 @@ public class RenderDataFactory {
 
                         int nib = Mapper.getBlockId(neighborId);
                         if (nib != 0) {//Not air
-                            long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
+                            int cid = this.modelMan.getModelId(nib);
+                            long meta = this.modelMan.getModelMetadataFromClientId(cid);
                             if (ModelQueries.isFullyOpaque(meta)) {//Dont mesh this face
                                 this.blockMesher.skip(1);
                                 continue;
@@ -472,7 +473,7 @@ public class RenderDataFactory {
                             //TODO:FIXME, when non opaque geometry is added
                             if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
                                 boolean culls = false;
-                                culls |= nib==((A>>26)&0xFFFF)&&ModelQueries.cullsSame(meta);
+                                culls |= cid==((A>>26)&0xFFFF)&&ModelQueries.cullsSame(meta);
                                 culls |= ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side));
                                 if (culls) {
                                     this.blockMesher.skip(1);
