@@ -764,12 +764,12 @@ public class RenderDataFactory {
                         //Check and test if can cull W.R.T neighbor
                         if (Mapper.getBlockId(neighborId) != 0) {//Not air
                             int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
-                            /*
-                            if (modelId == ((A>>26)&0xFFFF)) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
+
+
+                            if (ModelQueries.cullsSame(B) && modelId == ((A>>26)&0xFFFF)) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
                                 //TODO: check self occlsuion in the if statment
                                 fail = true;
-                            } else */
-                            {
+                            } else {
                                 long meta = this.modelMan.getModelMetadataFromClientId(modelId);
 
                                 if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
@@ -783,14 +783,10 @@ public class RenderDataFactory {
                         boolean failB = false;
                         //TODO: check self occlusion
 
-                        /*
-                        if ((nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
+                        if (ModelQueries.cullsSame(nB) && (nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
                             //TODO: check self occlsuion in the if statment
                             failB = true;
-                        } else
-                         */
-
-                        {
+                        } else {
                             if (ModelQueries.faceOccludes(nB, (axis << 1) | (side))) {
                                 failB = true;
                             }
@@ -1494,8 +1490,8 @@ public class RenderDataFactory {
             int skipB = 0;
             for (int z = 0; z < 32; z++) {
                 int i = y*32+z;
-                int msk = this.opaqueMasks[i];
-                if ((msk & 1)== 0) {//-x
+                int msk = this.nonOpaqueMasks[i];
+                if ((msk & 1) != 0) {//-x
                     long neighborId = this.neighboringFaces[i];
                     //TODO also check self occlusion
 
@@ -1516,7 +1512,7 @@ public class RenderDataFactory {
                     dualMeshNonOpaqueOuterX(0, A, Am, modelId, Mapper.getLightId(neighborId), nM, this.sectionData[sidx+2], this.sectionData[sidx+3], nnx, npx);
                 } else {skipA++;}
 
-                if ((msk & (1<<31)) == 0) {//+x
+                if ((msk & (1<<31)) != 0) {//+x
                     long neighborId = this.neighboringFaces[i+32*32];
                     //TODO also check self occlusion
 
