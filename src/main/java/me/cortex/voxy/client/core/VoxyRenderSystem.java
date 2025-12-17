@@ -80,8 +80,8 @@ public class VoxyRenderSystem {
         world.acquireRef();
         System.gc();
 
-        if (Minecraft.getInstance().gameRenderer.getRenderDistance()<40) {
-            Logger.warn("Having a vanilla render distance of 2 can cause culling issues, please use 3 or more");
+        if (Minecraft.getInstance().options.getEffectiveRenderDistance()<3) {
+            Logger.warn("Having a vanilla render distance of 2 can cause rare culling near the edge of your screen issues, please use 3 or more");
         }
 
         //Fking HATE EVERYTHING AAAAAAAAAAAAAAAA
