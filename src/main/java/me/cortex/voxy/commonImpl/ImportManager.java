@@ -83,12 +83,17 @@ public class ImportManager {
     }
 
     public boolean makeAndRunIfNone(WorldEngine engine, Supplier<IDataImporter> factory) {
-        synchronized (this) {
-            if (this.activeImporters.containsKey(engine)) {
-                return false;
+        try {
+            engine.acquireRef();
+            synchronized (this) {
+                if (this.activeImporters.containsKey(engine)) {
+                    return false;
+                }
             }
+            return this.tryRunImport(factory.get());
+        } finally {
+            engine.releaseRef();
         }
-        return this.tryRunImport(factory.get());
     }
 
     public boolean cancelImport(WorldEngine engine) {

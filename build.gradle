@@ -127,7 +127,7 @@ dependencies {
     modCompileOnly("maven.modrinth:sodium-extra:mc1.21.11-0.8.0+fabric")
     modRuntimeOnlyMsk("maven.modrinth:sodium-extra:mc1.21.11-0.8.0+fabric")
 
-    modCompileOnly("maven.modrinth:chunky:1.4.40-fabric")
+    modCompileOnly("maven.modrinth:chunky:1.4.54-fabric")
     //modRuntimeOnlyMsk("maven.modrinth:chunky:1.4.40-fabric")
 
     modRuntimeOnlyMsk("maven.modrinth:spark:1.10.152-fabric")
