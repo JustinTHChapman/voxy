@@ -145,6 +145,7 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         } else {
             // normally disabled by AbstractRenderPipeline but since we are skipping it we do it here
             glDisable(GL_STENCIL_TEST);
+            glDisable(GL_DEPTH_TEST);
         }
     }
 
