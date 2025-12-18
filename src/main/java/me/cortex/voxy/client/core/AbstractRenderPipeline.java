@@ -58,17 +58,20 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
     public final DepthFramebuffer fb = new DepthFramebuffer(GL_DEPTH24_STENCIL8);
 
+    protected final boolean deferTranslucency;
+
     private static final int DEPTH_SAMPLER = glGenSamplers();
     static {
         glSamplerParameteri(DEPTH_SAMPLER, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glSamplerParameteri(DEPTH_SAMPLER, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     }
 
-    protected AbstractRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
+    protected AbstractRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier, boolean deferTranslucency) {
         this.frexStillHasWork = frexSupplier;
         this.nodeManager = nodeManager;
         this.nodeCleaner = nodeCleaner;
         this.traversal = traversal;
+        this.deferTranslucency = deferTranslucency;
     }
 
     //Allows pipelines to configure model baking system
@@ -107,7 +110,9 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
         this.postOpaquePreTranslucent(viewport);
 
-        rs.renderTranslucent(viewport);
+        if (!this.deferTranslucency) {
+            rs.renderTranslucent(viewport);
+        }
 
         this.finish(viewport, sourceFrameBuffer, srcWidth, srcHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);

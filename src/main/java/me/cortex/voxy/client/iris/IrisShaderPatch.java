@@ -26,7 +26,6 @@ public class IrisShaderPatch {
     public static final boolean IMPERSONATE_DISTANT_HORIZONS = System.getProperty("voxy.impersonateDHShader", "false").equalsIgnoreCase("true");
 
 
-
     private static final class SSBODeserializer implements JsonDeserializer<Int2ObjectOpenHashMap<String>> {
         @Override
         public Int2ObjectOpenHashMap<String> deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
@@ -176,6 +175,7 @@ public class IrisShaderPatch {
         public boolean excludeLodsFromVanillaDepth;
         public float[] renderScale;
         public boolean useViewportDims;
+        //public boolean deferTranslucentRendering;
         public String checkValid() {
             if (this.blending != null) {
                 int i = 0;
@@ -266,6 +266,10 @@ public class IrisShaderPatch {
             return new float[]{this.patchData.renderScale[0],this.patchData.renderScale[0]};
         }
         return new float[]{Math.max(0.01f,this.patchData.renderScale[0]),Math.max(0.01f,this.patchData.renderScale[1])};
+    }
+
+    public boolean deferedTranslucentRendering() {
+        return false;//this.patchData.deferTranslucentRendering;
     }
 
     public Runnable createBlendSetup() {
