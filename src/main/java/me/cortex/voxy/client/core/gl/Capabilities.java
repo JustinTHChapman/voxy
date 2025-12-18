@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.gl;
 
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.common.Logger;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL20C;
@@ -171,7 +172,11 @@ public class Capabilities {
             glBindTextureUnit(0,0);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-            isCorrect &= Math.abs(value - gottenValue)<0.0000001f;
+            boolean localCorrect = Math.abs(value - gottenValue)<0.0000001f;
+            if (!localCorrect) {
+                Logger.error("Depth read test failed at value: " + value);
+            }
+            isCorrect &= localCorrect;
         }
 
         glDeleteFramebuffers(fb);
