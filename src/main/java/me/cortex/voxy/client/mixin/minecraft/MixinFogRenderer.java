@@ -22,13 +22,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class MixinFogRenderer {
     @Inject(method = "setupFog", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;getDevice()Lcom/mojang/blaze3d/systems/GpuDevice;", remap = false))
     private void voxy$modifyFog(Camera camera, int rdInt, DeltaTracker tracker, float pTick, ClientLevel lvl, CallbackInfoReturnable<Vector4f> cir, @Local(type=FogData.class) FogData data) {
-        if (VoxyConfig.CONFIG.renderVanillaFog) {
+        if (!(VoxyConfig.CONFIG.useRenderFog||VoxyConfig.CONFIG.useEnvironmentalFog)) {
             return;
         }
         var vrs = IGetVoxyRenderSystem.getNullable();
         if (vrs == null) return;
-        data.renderDistanceStart = 999999999;
-        data.renderDistanceEnd = 999999999;
+        if (!VoxyConfig.CONFIG.useRenderFog) {
+            data.renderDistanceStart = 999999999;
+            data.renderDistanceEnd = 999999999;
+        }
         if (!VoxyConfig.CONFIG.useEnvironmentalFog) {
             data.environmentalStart = 99999999;
             data.environmentalEnd = 99999999;

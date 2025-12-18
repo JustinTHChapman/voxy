@@ -3,9 +3,7 @@ package me.cortex.voxy.client.config;
 import me.cortex.voxy.common.util.Pair;
 import net.caffeinemc.mods.sodium.api.config.ConfigState;
 import net.caffeinemc.mods.sodium.api.config.StorageEventHandler;
-import net.caffeinemc.mods.sodium.api.config.option.ControlValueFormatter;
-import net.caffeinemc.mods.sodium.api.config.option.OptionFlag;
-import net.caffeinemc.mods.sodium.api.config.option.Range;
+import net.caffeinemc.mods.sodium.api.config.option.*;
 import net.caffeinemc.mods.sodium.api.config.structure.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -144,15 +142,15 @@ public class SodiumConfigBuilder {
         }
 
 
-        protected BiConsumer<TYPE, TYPE> postRunner;
-        protected String[] postRunnerConflicts;
-        protected String[] postChangeFlags;
-        public OPTION setPostChangeRunner(BiConsumer<TYPE, TYPE> postRunner, String... dontRunIfChangedVars) {
+        protected Consumer<TYPE> postRunner;
+        protected Identifier[] postRunnerConflicts;
+        protected Identifier[] postChangeFlags;
+        public OPTION setPostChangeRunner(Consumer<TYPE> postRunner, String... dontRunIfChangedVars) {
             if (this.postChangeFlags != null) {
                 throw new IllegalStateException();
             }
             this.postRunner = postRunner;
-            this.postRunnerConflicts = dontRunIfChangedVars;
+            this.postRunnerConflicts = mapIds(dontRunIfChangedVars);
             return (OPTION) this;
         }
 
@@ -160,7 +158,7 @@ public class SodiumConfigBuilder {
             if (this.postRunner != null) {
                 throw new IllegalStateException();
             }
-            this.postChangeFlags = flags;
+            this.postChangeFlags = mapIds(flags);
             return (OPTION) this;
         }
 
@@ -171,54 +169,17 @@ public class SodiumConfigBuilder {
             option.setName(this.name);
             option.setTooltip(this.tooltip);
 
-            Consumer<TYPE> setter = this.setter;
             if (this.postRunner != null) {
-                var pSetter = setter;
-                var getter = this.getter;
-                Object[] oldValue = new Object[1];
-                var id = Identifier.parse(this.id).getPath();
-                var flagAdder = ctx.addFlag;
-                setter = v->{
-                    oldValue[0] = getter.get();
-                    pSetter.accept(v);
-                    flagAdder.accept(id);
-                };
+                var id = Identifier.parse(this.id);
                 var runner = this.postRunner;
-                ctx.postRunner.register(id, ()->{
-                    var old = (TYPE) oldValue[0];
-                    var cur = getter.get();
-                    if (old != cur) {
-                        runner.accept(old, cur);
-                    }
-                    oldValue[0] = null;
-                }, this.postRunnerConflicts);
+                var getter = this.getter;
+                ctx.postRunner.register(id, ()->runner.accept(getter.get()), this.postRunnerConflicts);
+                option.setFlags(id);
             } else if (this.postChangeFlags != null) {
-                List<String> flags = new ArrayList<>();
-                List<OptionFlag> oFlags = new ArrayList<>();
-                for (var flag : this.postChangeFlags) {
-                    if (flag.equalsIgnoreCase("RENDERER_RELOAD")) {
-                        oFlags.add(OptionFlag.REQUIRES_RENDERER_RELOAD);
-                    }
-                    flags.add(flag);
-                }
-
-                option.setFlags(oFlags.toArray(OptionFlag[]::new));
-
-                if (!flags.isEmpty()) {
-                    var pSetter = setter;
-                    var flagAdder = ctx.addFlag;
-                    var sflags = flags.toArray(new String[0]);
-                    setter = v -> {
-                        pSetter.accept(v);
-                        for (var flag : sflags) {
-                            flagAdder.accept(flag);
-                        }
-                    };
-                }
+                option.setFlags(this.postChangeFlags);
             }
 
-
-            option.setBinding(setter, this.getter);
+            option.setBinding(this.setter, this.getter);
             if (this.enabler != null) {
                 var pred = this.enabler.tester;
                 option.setEnabledProvider(s->pred.test(s), this.enabler.dependencies);
@@ -263,7 +224,7 @@ public class SodiumConfigBuilder {
             if (this.rangeDependencies == null || this.rangeDependencies.length == 0) {
                 option.setRange(this.rangeProvider.apply(null));
             } else {
-                option.setRangeProvider(this.rangeProvider, mapIds(this.rangeDependencies));
+                option.setRangeProvider((Function<ConfigState, SteppedValidator>)(Object) this.rangeProvider, mapIds(this.rangeDependencies));
             }
             option.setValueFormatter(this.formatter);
             return option;
@@ -298,70 +259,67 @@ public class SodiumConfigBuilder {
     }
 
 
-    public static class PostApplyOps {
-        private Map<String, Set<String>> conflicts = new LinkedHashMap<>();
-        private Map<String, Runnable> executors = new LinkedHashMap<>();
-        private LinkedHashSet<String> localFlagChanges = new LinkedHashSet<>();
+    public static class PostApplyOps implements FlagHook {
+        private record Hook(Identifier name, Runnable runnable, Set<Identifier> conflicts) {}
+        private Map<Identifier, Hook> hooks = new LinkedHashMap<>();
 
-        public void register(String name, Runnable postRunner, String... conflicts) {
-            this.conflicts.put(name, new LinkedHashSet<>(List.of(conflicts)));
-            this.executors.put(name, postRunner);
+        public PostApplyOps register(String name, Runnable postRunner, String... conflicts) {
+            return this.register(Identifier.parse(name), postRunner, mapIds(conflicts));
         }
 
-        protected void build() {
+        public PostApplyOps register(Identifier name, Runnable postRunner, Identifier... conflicts) {
+            this.hooks.put(name, new Hook(name, postRunner, new LinkedHashSet<>(List.of(conflicts))));
+            return this;
+        }
+
+        protected PostApplyOps build() {
             boolean changed = false;
             do {
                 changed = false;
-                for (var value : this.conflicts.values()) {
-                    for (var ref : new LinkedHashSet<>(value)) {
-                        changed |= value.addAll(this.conflicts.getOrDefault(ref, Collections.EMPTY_SET));
+                for (var hook : this.hooks.values()) {
+                    for (var ref : new LinkedHashSet<>(hook.conflicts)) {
+                        var other = this.hooks.getOrDefault(ref, null);
+                        if (other != null) {
+                            changed |= hook.conflicts.addAll(other.conflicts);
+                        }
                     }
                 }
             } while (changed);
+
+            return this;
         }
 
-        protected void addFlag(String flag) {
-            this.localFlagChanges.add(flag);
+        @Override
+        public Collection<Identifier> getTriggers() {
+            return this.hooks.keySet();
         }
 
-        protected void run() {
-            if (this.localFlagChanges.isEmpty()) return;
-            var original = new HashSet<>(this.localFlagChanges);
-            var iter = this.localFlagChanges.iterator();
-            while (iter.hasNext()) {
-                var flag = iter.next();
-                if (!Collections.disjoint(this.conflicts.getOrDefault(flag, Collections.EMPTY_SET), original)) {
-                    iter.remove();
+        @Override
+        public void accept(Collection<Identifier> identifiers, ConfigState configState) {
+            for (var id : identifiers) {
+                var hook = this.hooks.get(id);
+                if (hook != null) {
+                    if (Collections.disjoint(identifiers, hook.conflicts)) {
+                        hook.runnable.run();
+                    }
                 }
             }
-
-            for (var flag : this.localFlagChanges) {
-                var exec = this.executors.get(flag);
-                if (exec != null) exec.run();
-            }
-
-            this.localFlagChanges.clear();
         }
     }
 
 
     private static final class BuildCtx {
         public PostApplyOps postRunner = new PostApplyOps();
-        public Consumer<String> addFlag = this.postRunner::addFlag;
         public StorageEventHandler saveHandler;
     }
 
-    public static void buildToSodium(ConfigBuilder builder, ModOptionsBuilder options, Runnable saveHandler, Consumer<PostApplyOps> registerOps, Page... pages) {
+    public static void buildToSodium(ConfigBuilder builder, ModOptionsBuilder options, StorageEventHandler saveHandler, Consumer<PostApplyOps> registerOps, Page... pages) {
         var ctx = new BuildCtx();
         registerOps.accept(ctx.postRunner);
-        var post = ctx.postRunner;
-        ctx.saveHandler = ()->{
-            saveHandler.run();
-            post.run();
-        };
+        ctx.saveHandler = saveHandler;
         for (var page : pages) {
             options.addPage(page.create(builder, ctx));
         }
-        post.build();
+        options.registerFlagHook(ctx.postRunner.build());
     }
 }

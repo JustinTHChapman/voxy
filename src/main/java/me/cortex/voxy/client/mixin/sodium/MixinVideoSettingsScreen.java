@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = VideoSettingsScreen.class, remap = false)
 public abstract class MixinVideoSettingsScreen implements IConfigPageSetter {
-    @Shadow public abstract void jumpToPage(OptionPage page);
+    @Shadow public abstract void jumpToPage(Page page);
 
     @Shadow protected abstract void onSectionFocused(Page page);
 
