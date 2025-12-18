@@ -122,7 +122,7 @@ public class Capabilities {
                 };
                 
                 void main() {
-                    outData[0] = texelFetch(depthSampler, ivec2(1, 1), 0).r;
+                    outData[0] = texelFetch(depthSampler, ivec2(31, 31), 0).r;
                 }
                 """;
         int program = GL20C.glCreateProgram();
@@ -143,7 +143,7 @@ public class Capabilities {
         glNamedBufferStorage(buffer, 4096, GL_DYNAMIC_STORAGE_BIT|GL_MAP_READ_BIT);
 
         int tex = glCreateTextures(GL_TEXTURE_2D);
-        glTextureStorage2D(tex, 1, GL_DEPTH24_STENCIL8, 3, 3);
+        glTextureStorage2D(tex, 1, GL_DEPTH24_STENCIL8, 64, 64);
         glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
