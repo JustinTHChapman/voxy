@@ -30,17 +30,37 @@ public class GPUTiming {
 
     private final GlTimestampQuerySet timingSet = new GlTimestampQuerySet();
 
+    private float[] timings = new float[0];
+
     public void marker() {
         this.timingSet.capture(0);
+    }
+
+    public String getDebug() {
+        StringBuilder str = new StringBuilder("GpuTime: [");
+        for (int i = 0; i < this.timings.length; i++) {
+            str.append(String.format("%.2f", this.timings[i]));
+            if (i!=this.timings.length-1) {
+                str.append(',');
+            }
+        }
+        str.append(']');
+        return str.toString();
     }
 
     public void tick() {
         this.timingSet.download((meta,data)->{
             long current = data[0];
+
+            if (data.length-1!=this.timings.length) {
+                this.timings = new float[data.length-1];
+            }
+
             for (int i = 1; i < meta.length; i++) {
                 long next = data[i];
                 long delta = next - current;
-                //System.out.println(delta);
+                float time = (float) (((double)delta)/1_000_000);
+                this.timings[i-1] = Math.max(this.timings[i-1]*0.99f+time*0.01f, time);
                 current = next;
             }
         });
