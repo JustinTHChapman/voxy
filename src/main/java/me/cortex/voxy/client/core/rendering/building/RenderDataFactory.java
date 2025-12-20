@@ -344,8 +344,8 @@ public class RenderDataFactory {
     private static boolean shouldMeshNonOpaqueBlockFace(int face, long quad, long meta, long neighborQuad, long neighborMeta) {
         if (((quad^neighborQuad)&(0xFFFFL<<26))==0 && (DISABLE_CULL_SAME_OCCLUDES || (ModelQueries.cullsSame(meta)||ModelQueries.faceOccludes(meta, face)))) return false;//This is a hack, if the neigbor and this are the same, dont mesh the face// TODO: FIXME
         if (!ModelQueries.faceExists(meta, face)) return false;//Dont mesh if no face
-        //if (ModelQueries.faceCanBeOccluded(meta, face)) //TODO: maybe enable this
-            if (ModelQueries.faceOccludes(neighborMeta, face^1)) return false;
+        if (ModelQueries.faceCanBeOccluded(meta, face)) //TODO: maybe enable this
+          if (ModelQueries.faceOccludes(neighborMeta, face^1)) return false;
         return true;
     }
 
