@@ -17,6 +17,7 @@ import static org.lwjgl.opengl.ARBMapBufferRange.*;
 import static org.lwjgl.opengl.GL11.glFinish;
 import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL42C.GL_BUFFER_UPDATE_BARRIER_BIT;
+import static org.lwjgl.opengl.GL44.GL_CLIENT_STORAGE_BIT;
 import static org.lwjgl.opengl.GL44.GL_MAP_COHERENT_BIT;
 import static org.lwjgl.opengl.GL45C.glFlushMappedNamedBufferRange;
 
@@ -31,7 +32,7 @@ public class UploadStream {
     private static final boolean USE_COHERENT = false;
 
     public UploadStream(long size) {
-        this.uploadBuffer = new GlPersistentMappedBuffer(size,GL_MAP_WRITE_BIT|GL_MAP_UNSYNCHRONIZED_BIT|(USE_COHERENT?GL_MAP_COHERENT_BIT:GL_MAP_FLUSH_EXPLICIT_BIT)).name("UploadStream");
+        this.uploadBuffer = new GlPersistentMappedBuffer(size,GL_CLIENT_STORAGE_BIT|GL_MAP_WRITE_BIT|GL_MAP_UNSYNCHRONIZED_BIT|(USE_COHERENT?GL_MAP_COHERENT_BIT:GL_MAP_FLUSH_EXPLICIT_BIT)).name("UploadStream");
         this.allocationArena.setLimit(size);
     }
 
