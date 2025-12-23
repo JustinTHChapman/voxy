@@ -1698,7 +1698,13 @@ public class RenderDataFactory {
         aabb |= (this.maxY-this.minY-1)<<20;
         aabb |= (this.maxZ-this.minZ-1)<<25;
 
-        return new BuiltSection(section.key, section.getNonEmptyChildren(), aabb, buff, offsets);
+        MemoryBuffer occupancy = null;
+        if (BUILD_OCCUPANCY_SET && !this.occupancy.isEmpty()) {
+            occupancy = new MemoryBuffer(this.occupancy.writeSize());
+            this.occupancy.write(occupancy.address, false);
+        }
+
+        return new BuiltSection(section.key, section.getNonEmptyChildren(), aabb, buff, offsets, occupancy);
     }
 
     public void free() {
