@@ -56,7 +56,7 @@ public class OccupancySet {
     }
 
     public int writeSize() {
-        return 8+Long.bitCount(this.topLvl)*8;
+        return 8+Long.bitCount(this.topLvl)*8*8;
     }
 
     public boolean isEmpty() {
