@@ -102,7 +102,7 @@ public class Capabilities {
         if (this.compute&&this.isAmd) {
             this.hasBrokenDepthSampler = testDepthSampler();
             if (this.hasBrokenDepthSampler) {
-                //throw new IllegalStateException("it bork, amd is bork");
+                throw new IllegalStateException("it bork, amd is bork");
             }
         } else {
             this.hasBrokenDepthSampler = false;
@@ -115,15 +115,20 @@ public class Capabilities {
     private static boolean testDepthSampler() {
         String src = """
                 #version 460 core
-                layout(local_size_x=1) in;
+                layout(local_size_x=16,local_size_y=16) in;
                 
                 layout(binding = 0) uniform sampler2D depthSampler;
                 layout(binding = 1) buffer OutData {
                     float[] outData;
                 };
                 
+                layout(location = 2) uniform int dynamicSampleThing;
+                layout(location = 3) uniform float sampleData;
+                
                 void main() {
-                    outData[0] = texelFetch(depthSampler, ivec2(31, 31), 0).r;
+                    if (abs(texelFetch(depthSampler, ivec2(gl_GlobalInvocationID.xy), dynamicSampleThing).r-sampleData)>0.000001f) {
+                        outData[0] = 1.0;
+                    }
                 }
                 """;
         int program = GL20C.glCreateProgram();
@@ -144,40 +149,44 @@ public class Capabilities {
         glNamedBufferStorage(buffer, 4096, GL_DYNAMIC_STORAGE_BIT|GL_MAP_READ_BIT);
 
         int tex = glCreateTextures(GL_TEXTURE_2D);
-        glTextureStorage2D(tex, 1, GL_DEPTH24_STENCIL8, 64, 64);
+        glTextureStorage2D(tex, 2, GL_DEPTH24_STENCIL8, 256, 256);
         glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
         int fb = glCreateFramebuffers();
-        glNamedFramebufferTexture(fb, GL_DEPTH_STENCIL_ATTACHMENT, tex, 0);
-
         boolean isCorrect = true;
-        for (int i = 0; i <= 10; i++) {
-            float value = (float) (i/10.0);
+        for (int lvl = 0; lvl <= 1; lvl++) {
+            glNamedFramebufferTexture(fb, GL_DEPTH_STENCIL_ATTACHMENT, tex, lvl);
 
-            nglClearNamedBufferSubData(buffer, GL_R32F, 0, 4096, GL_RED, GL_FLOAT, 0);//Zero the buffer
-            glClearNamedFramebufferfi(fb, GL_DEPTH_STENCIL, 0, value, 1);//Set the depth texture
+            for (int i = 0; i <= 10; i++) {
+                float value = (float) (i / 10.0);
 
-            glUseProgram(program);
-            glBindTextureUnit(0, tex);
-            GL30.glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, buffer);
+                nglClearNamedBufferSubData(buffer, GL_R32F, 0, 4096, GL_RED, GL_FLOAT, 0);//Zero the buffer
+                glClearNamedFramebufferfi(fb, GL_DEPTH_STENCIL, 0, value, 1);//Set the depth texture
 
-            glDispatchCompute(1,1,1);
-            glFinish();
+                glUseProgram(program);
+                glUniform1i(2, lvl);
+                glUniform1f(3, value);
+                glBindTextureUnit(0, tex);
+                GL30.glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, buffer);
 
-            long ptr = nglMapNamedBuffer(buffer, GL_READ_ONLY);
-            float gottenValue = MemoryUtil.memGetFloat(ptr);
-            glUnmapNamedBuffer(buffer);
+                glDispatchCompute(256>>(lvl+4), 256>>(lvl+4), 1);
+                glFinish();
 
-            glUseProgram(0);
-            glBindTextureUnit(0,0);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+                long ptr = nglMapNamedBuffer(buffer, GL_READ_ONLY);
+                float gottenValue = MemoryUtil.memGetFloat(ptr);
+                glUnmapNamedBuffer(buffer);
 
-            boolean localCorrect = Math.abs(value - gottenValue)<0.0000001f;
-            if (!localCorrect) {
-                Logger.error("Depth read test failed at value: " + value);
+                glUseProgram(0);
+                glBindTextureUnit(0, 0);
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+                boolean localCorrect = gottenValue==0.0f;
+                if (!localCorrect) {
+                    Logger.error("Depth read test failed at value: " + value);
+                }
+                isCorrect &= localCorrect;
             }
-            isCorrect &= localCorrect;
         }
 
         glDeleteFramebuffers(fb);
