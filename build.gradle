@@ -120,10 +120,10 @@ dependencies {
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    if (true) {
+    if (false) {
         modImplementation "maven.modrinth:sodium:mc1.21.11-0.8.1-fabric"
     } else {
-        modImplementation "net.caffeinemc:sodium-fabric:0.8.1-SNAPSHOT+mc1.21.11+"
+        modImplementation "net.caffeinemc:sodium-fabric:0.8.2-SNAPSHOT+mc1.21.11+"
     }
 
     modImplementation("maven.modrinth:lithium:mc1.21.11-0.21.0-fabric")

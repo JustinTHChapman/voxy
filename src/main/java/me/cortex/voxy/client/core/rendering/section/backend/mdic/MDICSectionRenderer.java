@@ -169,6 +169,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
 
         glDisable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
         this.terrainShader.bind();
         glBindVertexArray(GlVertexArray.STATIC_VAO);//Needs to be before binding
