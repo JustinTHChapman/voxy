@@ -49,6 +49,9 @@ public class GlViewCapture {
         glTextureParameteri(this.metaTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTextureParameteri(this.metaTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
+        glTextureParameteri(this.depthTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTextureParameteri(this.depthTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
         this.copyOutShader = Shader.makeAuto()
                 .define("WIDTH", width)
                 .define("HEIGHT", height)

@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.iris;
 
+import net.irisshaders.iris.gl.sampler.GlSampler;
 import net.irisshaders.iris.gl.sampler.SamplerHolder;
 import net.irisshaders.iris.gl.texture.TextureType;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
@@ -32,7 +33,7 @@ public class VoxySamplers {
                     return 0;
                 }
                 return dt.id;
-            }, null, opaqueNames);
+            }, ()->GlSampler.MIPPED_NEAREST_NEAREST, opaqueNames);
 
             samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> {
                 var pipeData = ((IGetIrisVoxyPipelineData)pipeline).voxy$getPipelineData();
@@ -48,7 +49,7 @@ public class VoxySamplers {
                     return 0;
                 }
                 return dt.id;
-            }, null, translucentNames);
+            }, ()->GlSampler.MIPPED_NEAREST_NEAREST, translucentNames);
         }
     }
 }
