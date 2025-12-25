@@ -10,6 +10,10 @@ public class Mipper {
 
     //TODO: also pass in the level its mipping from, cause at lower levels you want to preserve block details
     // but at higher details you want more air
+
+
+
+    //TODO: instead of opacity only, add a level to see if the visual bounding box allows for seeing through top down etc
     public static long mip(long I000, long I100, long I001, long I101,
                            long I010, long I110, long I011, long I111,
                           Mapper mapper) {
