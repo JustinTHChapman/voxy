@@ -4,6 +4,7 @@ import me.cortex.voxy.client.compat.FlashbackCompat;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.mixin.sodium.AccessorSodiumWorldRenderer;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.StorageConfigUtil;
 import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.config.Serialization;
 import me.cortex.voxy.common.config.compressors.ZSTDCompressor;
@@ -35,7 +36,7 @@ public class VoxyClientInstance extends VoxyInstance {
             path = getBasePath();
         }
         this.basePath = path;
-        this.storageConfig = getCreateStorageConfig(path);
+        this.storageConfig = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==1&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, path).sectionStorageConfig;
         this.updateDedicatedThreads();
     }
 
@@ -69,44 +70,6 @@ public class VoxyClientInstance extends VoxyInstance {
         return this.storageConfig.build(ctx);
     }
 
-    public static SectionStorageConfig getCreateStorageConfig(Path path) {
-        try {
-            Files.createDirectories(path);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        var json = path.resolve("config.json");
-        Config config = null;
-        if (Files.exists(json)) {
-            try {
-                config = Serialization.GSON.fromJson(Files.readString(json), Config.class);
-                if (config == null) {
-                    Logger.error("Config deserialization null, reverting to default");
-                } else {
-                    if (config.sectionStorageConfig == null) {
-                        Logger.error("Config section storage null, reverting to default");
-                        config = null;
-                    }
-                }
-            } catch (Exception e) {
-                Logger.error("Failed to load the storage configuration file, resetting it to default, this will probably break your save if you used a custom storage config", e);
-            }
-        }
-
-        if (config == null) {
-            config = DEFAULT_STORAGE_CONFIG;
-        }
-        try {
-            Files.writeString(json, Serialization.GSON.toJson(config));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed write the config, aborting!", e);
-        }
-        if (config == null) {
-            throw new IllegalStateException("Config is still null\n");
-        }
-        return config.sectionStorageConfig;
-    }
-
     public Path getStorageBasePath() {
         return this.basePath;
     }
@@ -124,21 +87,7 @@ public class VoxyClientInstance extends VoxyInstance {
     private static final Config DEFAULT_STORAGE_CONFIG;
     static {
         var config = new Config();
-
-        //Load the default config
-        var baseDB = new RocksDBStorageBackend.Config();
-
-        var compressor = new ZSTDCompressor.Config();
-        compressor.compressionLevel = 1;
-
-        var compression = new CompressionStorageAdaptor.Config();
-        compression.delegate = baseDB;
-        compression.compressor = compressor;
-
-        var serializer = new SectionSerializationStorage.Config();
-        serializer.storage = compression;
-        config.sectionStorageConfig = serializer;
-
+        config.sectionStorageConfig = StorageConfigUtil.createDefaultSerializer();
         DEFAULT_STORAGE_CONFIG = config;
     }
 
