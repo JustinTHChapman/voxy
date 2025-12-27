@@ -27,6 +27,7 @@ import org.lwjgl.opengl.GL14;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.opengl.GL40.glBlendFuncSeparatei;
 import static org.lwjgl.opengl.GL45.glTextureBarrier;
 
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -200,8 +201,9 @@ public class ModelTextureBakery {
             glEnable(GL_DEPTH_TEST);
             glEnable(GL_CULL_FACE);
             if (layer == ChunkSectionLayer.TRANSLUCENT) {
-                glEnable(GL_BLEND);
-                glBlendFuncSeparate(GL_ONE_MINUS_DST_ALPHA, GL_DST_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+                glEnablei(GL_BLEND, 0);
+                glDisablei(GL_BLEND, 1);
+                glBlendFuncSeparatei(0, GL_ONE_MINUS_DST_ALPHA, GL_DST_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             } else {
                 glDisable(GL_BLEND);//FUCK YOU INTEL (screams), for _some reason_ discard or something... JUST DOESNT WORK??
                 //glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ONE);
