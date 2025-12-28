@@ -3,6 +3,7 @@ package me.cortex.voxy.common.world;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.world.other.Mapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.MethodHandles;
@@ -155,7 +156,9 @@ public class ActiveSectionTracker {
                 //TODO: REWRITE THE section tracker _again_ to not be so shit and jank, and so that Arrays.fill is not 10% of the execution time
                 if (status == 1) {
                     //We need to set the data to air as it is undefined state
-                    Arrays.fill(section.data, 0);
+                    int sky = 15;
+                    int block = 0;
+                    Arrays.fill(section.data, Mapper.composeMappingId((byte) (sky|(block<<4)),0,0));
                 }
                 section.acquire(1);
             }
