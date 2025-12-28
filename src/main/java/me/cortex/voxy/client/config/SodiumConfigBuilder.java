@@ -146,18 +146,12 @@ public class SodiumConfigBuilder {
         protected Identifier[] postRunnerConflicts;
         protected Identifier[] postChangeFlags;
         public OPTION setPostChangeRunner(Consumer<TYPE> postRunner, String... dontRunIfChangedVars) {
-            if (this.postChangeFlags != null) {
-                throw new IllegalStateException();
-            }
             this.postRunner = postRunner;
             this.postRunnerConflicts = mapIds(dontRunIfChangedVars);
             return (OPTION) this;
         }
 
         public OPTION setPostChangeFlags(String... flags) {
-            if (this.postRunner != null) {
-                throw new IllegalStateException();
-            }
             this.postChangeFlags = mapIds(flags);
             return (OPTION) this;
         }
@@ -169,14 +163,21 @@ public class SodiumConfigBuilder {
             option.setName(this.name);
             option.setTooltip(this.tooltip);
 
+            Set<Identifier> flags = new LinkedHashSet<>();
             if (this.postRunner != null) {
                 var id = Identifier.parse(this.id);
                 var runner = this.postRunner;
                 var getter = this.getter;
                 ctx.postRunner.register(id, ()->runner.accept(getter.get()), this.postRunnerConflicts);
-                option.setFlags(id);
-            } else if (this.postChangeFlags != null) {
-                option.setFlags(this.postChangeFlags);
+                flags.add(id);
+            }
+
+            if (this.postChangeFlags != null) {
+                flags.addAll(List.of(this.postChangeFlags));
+            }
+
+            if (!flags.isEmpty()) {
+                option.setFlags(flags.toArray(Identifier[]::new));
             }
 
             option.setBinding(this.setter, this.getter);

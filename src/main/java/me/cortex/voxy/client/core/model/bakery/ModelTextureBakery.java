@@ -22,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.lwjgl.opengl.ARBDrawBuffersBlend;
 import org.lwjgl.opengl.GL14;
 
 import static org.lwjgl.opengl.GL11.*;
@@ -203,7 +204,7 @@ public class ModelTextureBakery {
             if (layer == ChunkSectionLayer.TRANSLUCENT) {
                 glEnablei(GL_BLEND, 0);
                 glDisablei(GL_BLEND, 1);
-                glBlendFuncSeparatei(0, GL_ONE_MINUS_DST_ALPHA, GL_DST_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+                ARBDrawBuffersBlend.glBlendFuncSeparateiARB(0, GL_ONE_MINUS_DST_ALPHA, GL_DST_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             } else {
                 glDisable(GL_BLEND);//FUCK YOU INTEL (screams), for _some reason_ discard or something... JUST DOESNT WORK??
                 //glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ONE);

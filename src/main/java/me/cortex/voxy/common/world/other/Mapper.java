@@ -86,6 +86,10 @@ public class Mapper {
         return (id&(~(0xFFL<<56)))|(Integer.toUnsignedLong(light&0xFF)<<56);
     }
 
+    public static long withBlockBiome(long id, int block, int biome) {
+        return (id&(0xFFL<<56))|(Integer.toUnsignedLong(block)<<27)|(Integer.toUnsignedLong(biome)<<47);
+    }
+
     public static long airWithLight(int light) {
         return Integer.toUnsignedLong(light&0xFF)<<56;
     }

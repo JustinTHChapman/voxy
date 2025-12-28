@@ -5,6 +5,7 @@ import me.cortex.voxy.client.config.SodiumConfigBuilder.*;
 import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
+import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.util.cpu.CpuLayout;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.api.config.ConfigEntryPoint;
@@ -24,37 +25,37 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
         var cc = B.registerModOptions("voxy", "Voxy", VoxyCommon.MOD_VERSION)
                 .setIcon(Identifier.parse("voxy:icon.png"));
 
+        final var RENDER_RELOAD = OptionFlag.REQUIRES_RENDERER_RELOAD.getId().toString();
+
         SodiumConfigBuilder.buildToSodium(B, cc, CFG::save, postOp->{
                     postOp.register("voxy:update_threads", ()->{
                         var instance = VoxyCommon.getInstance();
                         if (instance != null) {
                             instance.updateDedicatedThreads();
                         }
-                    }, "voxy:enabled");
+                    }, "voxy:enabled").register("voxy:iris_reload", ()->IrisUtil.reload());
                 },
                 new Page(Component.translatable("voxy.config.general"),
                         new Group(
                                 new BoolOption(
                                         "voxy:enabled",
                                         Component.translatable("voxy.config.general.enabled"),
-                                        ()->CFG.enabled, v->CFG.enabled=v)
+                                        ()->CFG.enabled, v->{
+                                            CFG.enabled=v;
+                                            //we need to special case enabled, since the render reload flag runs befor us and its quite important we get it right
+                                            if (v&&VoxyClientInstance.isInGame) {
+                                                VoxyCommon.createInstance();
+                                            }
+                                        })
                                         .setPostChangeRunner(c->{
-                                            if (c) {
-                                                if (VoxyClientInstance.isInGame) {
-                                                    VoxyCommon.createInstance();
-                                                    var vrsh = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
-                                                    if (vrsh != null && CFG.enableRendering) {
-                                                        vrsh.createRenderer();
-                                                    }
-                                                }
-                                            } else {
+                                            if (!c) {
                                                 var vrsh = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
                                                 if (vrsh != null) {
                                                     vrsh.shutdownRenderer();
                                                 }
                                                 VoxyCommon.shutdownInstance();
                                             }
-                                        }).setEnabler(null)
+                                        }).setPostChangeFlags(RENDER_RELOAD, "voxy:iris_reload").setEnabler(null)
                         ), new Group(
                                 new IntOption(
                                         "voxy:thread_count",
@@ -89,7 +90,8 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                                     vrsh.shutdownRenderer();
                                                 }
                                             }
-                                        },"voxy:enabled", "voxy:renderer_reload")
+                                        },"voxy:enabled", RENDER_RELOAD)
+                                        .setPostChangeFlags("voxy:iris_reload")
                                         .setEnabler("voxy:enabled")
                         ), new Group(
                                 new IntOption(
@@ -112,19 +114,19 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                                     vrs.setRenderDistance(c);
                                                 }
                                             }
-                                        }, "voxy:rendering", "voxy:renderer_reload")
+                                        }, "voxy:rendering", RENDER_RELOAD)
                         ), new Group(
                                 new BoolOption(
                                         "voxy:eviromental_fog",
                                         Component.translatable("voxy.config.general.environmental_fog"),
                                         ()->CFG.useEnvironmentalFog, v->CFG.useEnvironmentalFog=v)
-                                        .setPostChangeFlags(OptionFlag.REQUIRES_RENDERER_RELOAD.getId().toString())
+                                        .setPostChangeFlags(RENDER_RELOAD)
                         ), new Group(
                                 new BoolOption(
                                         "voxy:render_debug",
                                         Component.translatable("voxy.config.general.render_statistics"),
                                         ()-> RenderStatistics.enabled, v->RenderStatistics.enabled=v)
-                                        .setPostChangeFlags(OptionFlag.REQUIRES_RENDERER_RELOAD.getId().toString()))
+                                        .setPostChangeFlags(RENDER_RELOAD))
                 ).setEnablerAND("voxy:enabled", "voxy:rendering"));
 
     }
