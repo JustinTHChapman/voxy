@@ -119,6 +119,7 @@ public class VoxelIngestService {
             for (var section : chunk.getSections()) {
                 i++;
                 if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
+                engine.markActive();
                 this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, null, null));
                 try {
                     this.service.execute();
@@ -158,7 +159,7 @@ public class VoxelIngestService {
             //if (blNone && slNone) {
             //    continue;
             //}
-
+            engine.markActive();
             this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));//TODO: fixme, this is technically not safe todo on the chunk load ingest, we need to copy the section data so it cant be modified while being read
             try {
                 this.service.execute();
