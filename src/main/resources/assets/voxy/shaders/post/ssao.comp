@@ -8,6 +8,7 @@ layout(binding = 2) uniform sampler2D colourTex;
 layout(location = 3) uniform mat4 MVP;
 layout(location = 4) uniform mat4 invMVP;
 
+
 vec3 rev3d(vec3 clip) {
     vec4 view = invMVP * vec4(clip*2.0-1.0,1.0);
     return view.xyz/view.w;
@@ -33,14 +34,26 @@ vec4 reDeProject(vec3 pos) {
     return vec4(view.xyz/view.w, 1.0f);
 }
 
-float computeAOAngle(vec3 pos, float testHeight, vec3 normal) {
+float computeAO(vec3 pos, float testHeight, vec3 normal) {
     vec4 reproData = reDeProject(pos + normal*testHeight);
     if (reproData.w < 0.0f) {
         return 0.0f;
     }
     vec3 repro = reproData.xyz - pos;
     float len = length(repro);
-    return dot(repro, normal)/len;
+    if (len<0.1*testHeight) {
+        return 0.0f;
+    }
+    float ao = (dot(repro, normal));
+    if (ao<0.01) {
+        return 0.0f;
+    }
+    return ao;
+    //return exp(ao);//return log(1/ao);
+}
+
+vec3 face2norm(uint face) {
+    return vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (float(int(face)&1)*2-1);
 }
 
 void main() {
@@ -71,52 +84,28 @@ void main() {
             if (hasAO) {
                 float d = 0.0;
                 //TODO: TODO: only encode the axis, then use then it as as a mask along with pos and multiply by the -sign of everything
-                vec3 viewNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (float(int(face)&1)*2-1);
-                //vec3 viewNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (-sign(pos));
+                vec3 worldNormal = face2norm(face);
+                //vec3 worldNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (-sign(pos));
 
-                d = computeAOAngle(pos, 1.0*(1<<lod), viewNormal);//1
-                if (d<0.1) {
-                    d = 0.0f;
-                }
+                float DIST = 0.5f;
+                float OFFSET = 0.5f;
+
+                //d += clamp(computeAO(pos, DIST*(1<<lod), worldNormal),0,1);//1
+                d += clamp(computeAO(pos+OFFSET*face2norm(((face+2)%6)), DIST*(1<<lod), worldNormal),0,1);//1
+                d += clamp(computeAO(pos+OFFSET*face2norm(((face+2)%6)^1u), DIST*(1<<lod), worldNormal),0,1);//1
+                d += clamp(computeAO(pos+OFFSET*face2norm(((face+4)%6)), DIST*(1<<lod), worldNormal),0,1);//1
+                d += clamp(computeAO(pos+OFFSET*face2norm(((face+4)%6)^1u), DIST*(1<<lod), worldNormal),0,1);//1
+
+                d/=4.0f;
+
+                d = 1.0-d;
+                d = pow(d,3);
+                d = 1.0-d;
 
                 ocolour.xyz *= ((1.0f-d)/3.0f+(2.0f/3.0f));
+                //ocolour.rgb = vec3(d);
             }
         }
     }
     imageStore(colourTexOut, ivec2(gl_GlobalInvocationID.xy), ocolour);
 }
-//vec4 ocolour =  vec4(max(0, d), abs(min(0,d)), 0, 1);
-//vec4 ocolour =  vec4(repro-(viewNormal/2), 1);
-//vec4 ocolour =  vec4(viewNormal/2+0.5, 1);
-//if (any(lessThan(ivec3(4), abs(repro-offset)))) {// || all(lessThan(abs(repro-offset), ivec3(0.01)))
-//return;
-//}
-
-
-
-
-/*
-vec3 proj3dscreen(vec3 pos) {
-    vec4 view = MVP * vec4(pos, 1);
-    view.xyz /= view.w;
-    return view.xyz * 0.5 + 0.5;
-}
-
-vec3 reDeProjectContained(vec3 pos) {
-    vec4 view = MVP * vec4(pos, 1);
-    view.xy /= view.w;
-    float depth = texture(depthTex, clamp(view.xy*0.5+0.5, 0, 1)).x*2-1;
-    view.z = min(view.z, depth);
-    view.w = 1;
-    view = invMVP * view;
-    return view.xyz/view.w;
-}
-vec3 computeDifference(vec3 pos, vec3 offset) {
-    return reDeProject(pos + offset) - pos - offset;
-}
-
-float computeAngleDifference(vec3 pos, vec3 offset) {
-    vec3 repro = reDeProject(pos + offset) - pos;
-    return dot(repro, offset)/(length(repro) * length(offset));
-}
-*/
