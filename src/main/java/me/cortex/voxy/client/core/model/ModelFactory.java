@@ -446,7 +446,7 @@ public class ModelFactory {
         //TODO: special case stuff like vines and glow lichen, where it can be represented by a single double sided quad
         // since that would help alot with perf of lots of vines, can be done by having one of the faces just not exist and the other be in no occlusion mode
 
-        var depths = this.computeModelDepth(textureData, checkMode);
+        var depths = computeModelDepth(textureData, checkMode, blockRenderLayer!=ChunkSectionLayer.SOLID?TextureUtils.DEPTH_MODE_MIN:TextureUtils.DEPTH_MODE_AVG);
 
         //TODO: THIS, note this can be tested for in 2 ways, re render the model with quad culling disabled and see if the result
         // is the same, (if yes then needs double sided quads)
@@ -847,10 +847,14 @@ public class ModelFactory {
     }
 
     private static float[] computeModelDepth(ColourDepthTextureData[] textures, int checkMode) {
+        return computeModelDepth(textures, checkMode, TextureUtils.DEPTH_MODE_AVG);
+    }
+
+    private static float[] computeModelDepth(ColourDepthTextureData[] textures, int checkMode, int computeMode) {
         float[] res = new float[6];
         for (var dir : Direction.values()) {
             var data = textures[dir.get3DDataValue()];
-            float fd = TextureUtils.computeDepth(data, TextureUtils.DEPTH_MODE_AVG, checkMode);//Compute the min float depth, smaller means closer to the camera, range 0-1
+            float fd = TextureUtils.computeDepth(data, computeMode, checkMode);//Compute the min float depth, smaller means closer to the camera, range 0-1
             //int depth = Math.round(fd * MODEL_TEXTURE_SIZE);
             //If fd is -1, it means that there was nothing rendered on that face and it should be discarded
             if (fd < -0.1) {
