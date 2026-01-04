@@ -278,9 +278,8 @@ if (!isInGHA) {
     }
 
     dependencies {
-        /*
-        modRuntimeOnly('me.djtheredstoner:DevAuth-fabric:1.2.1') {
+        modRuntimeOnly('me.djtheredstoner:DevAuth-fabric:1.2.2') {
             exclude group: 'net.fabricmc', module: 'fabric-loader'
-        }*/
+        }
     }
 }
