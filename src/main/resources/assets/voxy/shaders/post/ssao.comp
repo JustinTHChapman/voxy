@@ -44,6 +44,9 @@ float computeAO(vec3 pos, float testHeight, vec3 normal) {
     if (len<0.1*testHeight) {
         return 0.0f;
     }
+    if (len>1.5*testHeight) {
+        return 0.0f;
+    }
     float ao = (dot(repro, normal));
     if (ao<0.01) {
         return 0.0f;
@@ -91,10 +94,10 @@ void main() {
                 float OFFSET = 0.5f;
 
                 //d += clamp(computeAO(pos, DIST*(1<<lod), worldNormal),0,1);//1
-                d += clamp(computeAO(pos+OFFSET*face2norm(((face+2)%6)), DIST*(1<<lod), worldNormal),0,1);//1
-                d += clamp(computeAO(pos+OFFSET*face2norm(((face+2)%6)^1u), DIST*(1<<lod), worldNormal),0,1);//1
-                d += clamp(computeAO(pos+OFFSET*face2norm(((face+4)%6)), DIST*(1<<lod), worldNormal),0,1);//1
-                d += clamp(computeAO(pos+OFFSET*face2norm(((face+4)%6)^1u), DIST*(1<<lod), worldNormal),0,1);//1
+                d += clamp(computeAO(pos+OFFSET*face2norm(((face+2)%6)), DIST, worldNormal),0,1);//1
+                d += clamp(computeAO(pos+OFFSET*face2norm(((face+2)%6)^1u), DIST, worldNormal),0,1);//1
+                d += clamp(computeAO(pos+OFFSET*face2norm(((face+4)%6)), DIST, worldNormal),0,1);//1
+                d += clamp(computeAO(pos+OFFSET*face2norm(((face+4)%6)^1u), DIST, worldNormal),0,1);//1
 
                 d/=4.0f;
 
