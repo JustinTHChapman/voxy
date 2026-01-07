@@ -12,6 +12,7 @@ import me.cortex.voxy.client.core.rendering.post.FullscreenBlit;
 import me.cortex.voxy.client.core.rendering.section.backend.AbstractSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DepthFramebuffer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
+import me.cortex.voxy.client.core.util.GPUTiming;
 import me.cortex.voxy.common.util.TrackedObject;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL30;
@@ -103,9 +104,11 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         if (occlusionDebug==0) {
             this.innerPrimaryWork(viewport, depthTexture);
         }
+
         if (occlusionDebug<=1) {
             rs.buildDrawCalls(viewport);
         }
+
         rs.renderTemporal(viewport);
 
         this.postOpaquePreTranslucent(viewport);
