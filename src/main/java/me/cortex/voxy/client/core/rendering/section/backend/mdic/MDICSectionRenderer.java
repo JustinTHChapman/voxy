@@ -45,8 +45,11 @@ import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FR
 public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryData> {
     public static final Factory<MDICViewport, BasicSectionGeometryData> FACTORY = AbstractSectionRenderer.Factory.create(MDICSectionRenderer.class);
 
-    private static final int TRANSLUCENT_OFFSET = 400_000;//in draw calls
-    private static final int TEMPORAL_OFFSET = 500_000;//in draw calls
+    public static final int OPAQUE_DRAW_COUNT = 200_000;//in draw calls
+    public static final int TRANSLUCENT_DRAW_COUNT = 100_000;//in draw calls
+    public static final int TEMPORAL_DRAW_COUNT = 100_000;//in draw calls
+    private static final int TRANSLUCENT_OFFSET = OPAQUE_DRAW_COUNT;//in draw calls
+    private static final int TEMPORAL_OFFSET = TRANSLUCENT_OFFSET+TRANSLUCENT_DRAW_COUNT;//in draw calls
     private static final int STATISTICS_BUFFER_BINDING = 8;
     private final Shader terrainShader;
     private final Shader translucentTerrainShader;
@@ -89,7 +92,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private final GlBuffer uniform = new GlBuffer(1024).zero();//TODO move to viewport?
 
     //TODO: needs to be in the viewport, since it contains the compute indirect call/values
-    private final GlBuffer distanceCountBuffer = new GlBuffer(1024*4+100_000*4).zero();//TODO move to viewport?
+    private final GlBuffer distanceCountBuffer = new GlBuffer(1024*4+TRANSLUCENT_DRAW_COUNT*4).zero();//TODO move to viewport?
 
     //Statistics
     private final GlBuffer statisticsBuffer = new GlBuffer(1024).zero();
@@ -203,7 +206,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         this.uploadUniformBuffer(viewport);
 
-        this.renderTerrain(viewport, 0, 4*3, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), 400_000));
+        this.renderTerrain(viewport, 0, 4*3, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), OPAQUE_DRAW_COUNT));
     }
 
     @Override
@@ -222,7 +225,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);//Barrier everything is needed
         glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
-        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, Math.min(this.geometryManager.getSectionCount(), 100_000), 0);
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, Math.min(this.geometryManager.getSectionCount(), TRANSLUCENT_DRAW_COUNT), 0);
 
         glEnable(GL_CULL_FACE);
         glBindVertexArray(0);
@@ -341,7 +344,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     public void renderTemporal(MDICViewport viewport) {
         if (this.geometryManager.getSectionCount() == 0) return;
         //Render temporal
-        this.renderTerrain(viewport, TEMPORAL_OFFSET*5*4, 4*5, Math.min(this.geometryManager.getSectionCount(), 100_000));
+        this.renderTerrain(viewport, TEMPORAL_OFFSET*5*4, 4*5, Math.min(this.geometryManager.getSectionCount(), TEMPORAL_DRAW_COUNT));
     }
 
     @Override
