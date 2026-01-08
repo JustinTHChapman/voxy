@@ -513,6 +513,7 @@ public class AsyncNodeManager {
         {//Update basic geometry data
             var store = (BasicSectionGeometryData)this.geometryData;
 
+            this.currentGeometrySectionCount = results.geometrySectionCount;
             store.setSectionCount(results.geometrySectionCount);
 
             var upload = results.geometryUpload;
@@ -588,6 +589,8 @@ public class AsyncNodeManager {
         this.tlnAddCallback = add;
         this.tlnRemoveCallback = remove;
     }
+
+    private int currentGeometrySectionCount = 0;
 
     private int currentMaxNodeId = 0;
     public int getCurrentMaxNodeId() {
@@ -756,7 +759,7 @@ public class AsyncNodeManager {
     }
 
     public void addDebug(List<String> debug) {
-        debug.add("UC/GC: " + (this.getUsedGeometryCapacity()/(1<<20))+"/"+(this.getGeometryCapacity()/(1<<20)));
+        debug.add("UC/GC,#N: " + (this.getUsedGeometryCapacity()/(1<<20))+"/"+(this.getGeometryCapacity()/(1<<20)) + "," + (this.currentGeometrySectionCount));
         //debug.add("GUQ/NRC: " + this.geometryUpdateQueue.size()+"/"+this.removeBatchQueue.size());
     }
 
