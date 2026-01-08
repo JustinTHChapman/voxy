@@ -45,7 +45,7 @@ import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FR
 public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryData> {
     public static final Factory<MDICViewport, BasicSectionGeometryData> FACTORY = AbstractSectionRenderer.Factory.create(MDICSectionRenderer.class);
 
-    public static final int OPAQUE_DRAW_COUNT = 200_000;//in draw calls
+    public static final int OPAQUE_DRAW_COUNT = 400_000;//in draw calls
     public static final int TRANSLUCENT_DRAW_COUNT = 100_000;//in draw calls
     public static final int TEMPORAL_DRAW_COUNT = 100_000;//in draw calls
     private static final int TRANSLUCENT_OFFSET = OPAQUE_DRAW_COUNT;//in draw calls
