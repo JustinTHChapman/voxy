@@ -102,13 +102,16 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         rs.renderOpaque(viewport);
         var occlusionDebug = VoxyClient.getOcclusionDebugState();
         if (occlusionDebug==0) {
+            GPUTiming.INSTANCE.marker("I");
             this.innerPrimaryWork(viewport, depthTexture);
+            GPUTiming.INSTANCE.marker();
         }
 
         if (occlusionDebug<=1) {
             rs.buildDrawCalls(viewport);
         }
 
+        GPUTiming.INSTANCE.marker("TP");
         rs.renderTemporal(viewport);
 
         this.postOpaquePreTranslucent(viewport);
