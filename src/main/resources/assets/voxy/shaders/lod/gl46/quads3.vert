@@ -34,7 +34,8 @@ void main() {
     taaOffset = taaShift();
 
     QuadData quad;
-    setupQuad(quad, quadData[uint(gl_VertexID)>>2], positionBuffer[gl_BaseInstance], (gl_VertexID&3) == 1);
+    uvec2 pos = positionBuffer[gl_BaseInstance];
+    setupQuad(quad, quadData[uint(gl_VertexID)>>2], pos, (gl_VertexID&3) == 1);
 
     uint cornerId = gl_VertexID&3;
     gl_Position = getQuadCornerPos(quad, cornerId);
@@ -48,7 +49,8 @@ void main() {
 
 
     #ifdef DEBUG_RENDER
-    quadDebug = uint(gl_VertexID)>>(2+5);
+    //quadDebug = uint(extractDetail(pos));
+    quadDebug = uint(gl_VertexID)>>2;
     #endif
 }
 
