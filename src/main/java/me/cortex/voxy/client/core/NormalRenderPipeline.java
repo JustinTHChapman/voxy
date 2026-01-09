@@ -29,6 +29,7 @@ import static org.lwjgl.opengl.GL11C.GL_RGBA8;
 import static org.lwjgl.opengl.GL14.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL15.GL_READ_WRITE;
 import static org.lwjgl.opengl.GL30C.*;
+import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
 import static org.lwjgl.opengl.GL45C.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45C.glTextureParameterf;
@@ -94,7 +95,9 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
 
         glBindImageTexture(0, this.colourSSAOTex.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
         glBindTextureUnit(1, this.fb.getDepthTex().id);
+        glBindSampler(1,0);
         glBindTextureUnit(2, this.colourTex.id);
+        glBindSampler(2,0);
 
         glDispatchCompute((viewport.width+31)/32, (viewport.height+31)/32, 1);
 
