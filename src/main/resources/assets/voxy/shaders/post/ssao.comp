@@ -18,7 +18,6 @@ vec4 reDeProject(vec3 pos) {
     vec4 view = MVP * vec4(pos, 1.0);
     view.xy /= view.w;
     vec2 UV = clamp(view.xy*0.5+0.5, 0.0, 1.0);
-    //TODO: sample the colour texture and check if the alpha has the hasAO flag
 
     float depth = texture(depthTex, UV).x;
     if (depth == 1.0f) {
@@ -34,26 +33,26 @@ vec4 reDeProject(vec3 pos) {
     return vec4(view.xyz/view.w, 1.0f);
 }
 
-float computeAO(vec3 pos, float testHeight, vec3 normal) {
-    vec4 reproData = reDeProject(pos + normal*testHeight);
+float computeAO(vec3 pos, vec3 offset, vec3 normal) {
+    vec3 point = pos+offset;
+    vec4 reproData = reDeProject(point);
     if (reproData.w < 0.0f) {
+        return 0.0f;
+    }
+    float rpLen = length(reproData.xyz-point);
+    if (rpLen>1.0f) {//Filter out when the depth is just way to far away
+        return 0.0f;
+    }
+    if (rpLen<0.02) {
         return 0.0f;
     }
     vec3 repro = reproData.xyz - pos;
     float len = length(repro);
-    /*
-    if (len<0.1*testHeight) {
-        return 0.0f;
-    }*/
-    if (len>testHeight+2) {
+    float ao = dot(repro, normal);
+    if (ao<0.0f) {
         return 0.0f;
     }
-    float ao = (dot(repro, normal)/len);
-    if (ao<0.005f) {
-        return 0.0f;
-    }
-    return ao;
-    //return exp(ao);//return log(1/ao);
+    return rpLen;
 }
 
 vec3 face2norm(uint face) {
@@ -88,35 +87,42 @@ void main() {
             if (hasAO) {
                 float d = 0.0f;
                 //TODO: TODO: only encode the axis, then use then it as as a mask along with pos and multiply by the -sign of everything
-                vec3 worldNormal = face2norm(face);
+
                 //vec3 worldNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (-sign(pos));
 
-                float DIST = 0.5f;
+                vec3 worldNormal = face2norm(face);
+
                 float OFFSET = 0.5f;
 
-                //d += clamp(computeAO(pos, DIST, worldNormal),0,1);//1
-                float t = 0;
-                float f = 0;
-                t = clamp(computeAO(pos+OFFSET*face2norm(((face+2)%6)), DIST, worldNormal),0,1); if (t>0) {d+=t;f+=1;}
-                t = clamp(computeAO(pos+OFFSET*face2norm(((face+2)%6)^1u), DIST, worldNormal),0,1); if (t>0) {d+=t;f+=1;}
-                t = clamp(computeAO(pos+OFFSET*face2norm(((face+4)%6)), DIST, worldNormal),0,1); if (t>0) {d+=t;f+=1;}
-                t = clamp(computeAO(pos+OFFSET*face2norm(((face+4)%6)^1u), DIST, worldNormal),0,1); if (t>0) {d+=t;f+=1;}
+                //comput the other axis's
+                vec3 A = face2norm((face+2)%6);
+                vec3 B = face2norm((face+4)%6);
 
+                d += clamp(computeAO(pos, OFFSET* A, worldNormal),0,1)*(1f/8f);
+                d += clamp(computeAO(pos, OFFSET*-A, worldNormal),0,1)*(1f/8f);
+                d += clamp(computeAO(pos, OFFSET* B, worldNormal),0,1)*(1f/8f);
+                d += clamp(computeAO(pos, OFFSET*-B, worldNormal),0,1)*(1f/8f);
 
-                DIST = 0.5f;
-                OFFSET = 0.25f;
-                t = clamp(computeAO(pos+OFFSET*face2norm(((face+2)%6)), DIST, worldNormal),0,1); if (t>0) {d+=t*1.5f;f+=1.5;}
-                t = clamp(computeAO(pos+OFFSET*face2norm(((face+2)%6)^1u), DIST, worldNormal),0,1); if (t>0) {d+=t*1.5f;f+=1.5;}
-                t = clamp(computeAO(pos+OFFSET*face2norm(((face+4)%6)), DIST, worldNormal),0,1); if (t>0) {d+=t*1.5f;f+=1.5;}
-                t = clamp(computeAO(pos+OFFSET*face2norm(((face+4)%6)^1u), DIST, worldNormal),0,1); if (t>0) {d+=t*1.5f;f+=1.5;}
+                float ISQRT2 = 0.70710678f;
+                d += clamp(computeAO(pos, OFFSET*( (A+B)*ISQRT2), worldNormal),0,1)*(1f/8f);
+                d += clamp(computeAO(pos, OFFSET*( (A-B)*ISQRT2), worldNormal),0,1)*(1f/8f);
+                d += clamp(computeAO(pos, OFFSET*((-A+B)*ISQRT2), worldNormal),0,1)*(1f/8f);
+                d += clamp(computeAO(pos, OFFSET*((-A-B)*ISQRT2), worldNormal),0,1)*(1f/8f);
 
-                if (f>0.1) {
-                    d /= f;
+                if (d<0.01) {
+                    d = 0.0f;
                 }
+                d = clamp(d,0,1);
+                d = round(d*10000.0f)/10000.0f;
+                d = pow(d,0.25f);
 
-                float mul = ((pow(1-d,1.5f))/3.0f+(2.0f/3.0f));
+                float mul = ((1-d)/3.0f+(2.0f/3.0f));
                 ocolour.xyz *= mul;
-                //ocolour.rgb = vec3(mul);
+                ocolour.rgb = vec3(mul);//*(worldNormal*0.5+0.5)
+                /*
+                if (d>1||d<0) {
+                    ocolour.rgb = vec3(1,1,0);
+                }*/
             }
         }
     }
