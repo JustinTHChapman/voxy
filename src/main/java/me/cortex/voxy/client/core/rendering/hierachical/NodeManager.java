@@ -896,7 +896,7 @@ public class NodeManager {
 
                     //TODO: make into warning or log error
                     //throw new IllegalStateException("Request result with child existence of 0");
-
+                    Logger.warn("Request result with child existence of 0, for child pos " + WorldEngine.pprintPos(childPos));
                 }
                 this.nodeData.setNodeChildExistence(childNodeId, childExistence);
                 this.nodeData.setNodeGeometry(childNodeId, request.getChildMesh(childIdx));
