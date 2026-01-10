@@ -156,6 +156,10 @@ public class WorldIdentifier {
         }
     }
 
+    @Override
+    public String toString() {
+        return "WorldIdentifier[" + this.key.identifier().toString() + ", " + this.biomeSeed + ", " + this.dimension.identifier().toString() + ']';
+    }
 
     public static class GsonAdapter extends TypeAdapter<WorldIdentifier> {
         public static final GsonAdapter INSTANCE = new GsonAdapter();
