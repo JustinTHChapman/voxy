@@ -32,8 +32,8 @@ public class DepthFramebuffer {
                 this.depthBuffer.free();
             }
             this.depthBuffer = new GlTexture().store(this.depthType, 1, width, height);
-            glTextureParameteri(this.depthBuffer.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTextureParameteri(this.depthBuffer.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            //glTextureParameteri(this.depthBuffer.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            //glTextureParameteri(this.depthBuffer.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
             this.framebuffer.bind(this.getDepthAttachmentType(), this.depthBuffer).verify();
             return true;
         }
