@@ -27,14 +27,16 @@ public class MixinFogRenderer {
         var vrs = IGetVoxyRenderSystem.getNullable();
         if (vrs == null) return;
 
-        data.renderDistanceStart = 999999999;
-        data.renderDistanceEnd = 999999999;
         /*
         if (!VoxyConfig.CONFIG.useRenderFog) {
         }*/
-        if (!VoxyConfig.CONFIG.useEnvironmentalFog) {
+        boolean fogIsDamnClose = data.environmentalEnd<10;
+        if (!VoxyConfig.CONFIG.useEnvironmentalFog && !fogIsDamnClose) {
             data.environmentalStart = 99999999;
             data.environmentalEnd = 99999999;
         }
+
+        data.renderDistanceStart = 999999999;
+        data.renderDistanceEnd = 999999999;
     }
 }
