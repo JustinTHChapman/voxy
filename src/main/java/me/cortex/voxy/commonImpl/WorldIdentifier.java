@@ -158,6 +158,10 @@ public class WorldIdentifier {
 
 
     public static class GsonAdapter extends TypeAdapter<WorldIdentifier> {
+        public static final GsonAdapter INSTANCE = new GsonAdapter();
+
+        private GsonAdapter(){}
+
         @Override
         public void write(JsonWriter writer, WorldIdentifier identifier) throws IOException {
             writer.beginObject();
@@ -179,6 +183,7 @@ public class WorldIdentifier {
         @Override
         public WorldIdentifier read(JsonReader reader) throws IOException {
             var obj = GSON.getAdapter(JsonElement.class).read(reader).getAsJsonObject();
+
             var sKey = obj.getAsJsonPrimitive("key").getAsString();
             long biomeSeed = obj.getAsJsonPrimitive("biomeSeed").getAsLong();
             var sDim = obj.getAsJsonPrimitive("dimension").getAsString();
