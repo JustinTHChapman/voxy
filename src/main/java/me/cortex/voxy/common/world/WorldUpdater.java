@@ -154,7 +154,7 @@ public class WorldUpdater {
 
         long status = 0;
         status |= didStateChange?1:0;
-        status |= Integer.toUnsignedLong(airCount)<<1;
+        status |= Integer.toUnsignedLong(airCount)<<1;//VERY VERY VERY IMPORTANT NOTE: IS 13 BITS BIG NOT 12 BITS (since it can be 4096 which is 6 bits large)
         return status;
     }
 }
