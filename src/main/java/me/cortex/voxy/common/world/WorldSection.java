@@ -198,6 +198,7 @@ public final class WorldSection {
     }
 
     public long set(int x, int y, int z, long id) {
+        //TODO: this needs to update the block counts
         int idx = getIndex(x,y,z);
         long old = this.data[idx];
         this.data[idx] = id;
