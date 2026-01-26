@@ -35,7 +35,7 @@ public class WorldUpdater {
 
             long status = insertSectionLvlIntoWorld(section, worldSection);
             boolean didStateChange = (status&1)==1;
-            int airCount = (int) ((status>>1)&0xFFF);
+            int airCount = (int) ((status>>1)&0x1FFF);
 
 
             if (lvl == 0) {
