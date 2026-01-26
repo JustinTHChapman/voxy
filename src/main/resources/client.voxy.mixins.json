@@ -24,6 +24,7 @@
     "minecraft.MixinDebugScreenEntryList",
     "minecraft.MixinFogRenderer",
     "minecraft.MixinGlDebug",
+    "minecraft.MixinLayerLightSectionStorage",
     "minecraft.MixinLevelRenderer",
     "minecraft.MixinMinecraft",
     "minecraft.MixinRenderSystem",
@@ -35,9 +36,7 @@
     "sodium.MixinDefaultChunkRenderer",
     "sodium.MixinRenderRegionManager",
     "sodium.MixinRenderSectionManager",
-    "sodium.MixinSodiumWorldRenderer",
-    "sodium.MixinVideoSettingsScreen",
-    "minecraft.MixinLayerLightSectionStorage"
+    "sodium.MixinSodiumWorldRenderer"
   ],
   "injectors": {
     "defaultRequire": 1
