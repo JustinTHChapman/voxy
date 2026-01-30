@@ -69,8 +69,7 @@ public class SaveLoadSystem3 {
         MemoryUtil.memPutLong(metadataPtr, metadata);
         //TODO: do hash
 
-        //TODO: rework the storage system to not need to do useless copies like this (this is an issue for serialization, deserialization has solved this already)
-        return buffer.subSize(ptr-buffer.address).copy();
+        return buffer.subSize(ptr-buffer.address);//Does not get freed
     }
 
     public static boolean deserialize(WorldSection section, MemoryBuffer data) {
