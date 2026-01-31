@@ -41,7 +41,7 @@ public class VoxelIngestService {
             WorldUpdater.insertUpdate(task.world, vs.zero());
         } else {
             VoxelizedSection csec = WorldConversionFactory.convert(
-                    SECTION_CACHE.get(),
+                    vs,
                     task.world.getMapper(),
                     section.getStates(),
                     section.getBiomes(),
