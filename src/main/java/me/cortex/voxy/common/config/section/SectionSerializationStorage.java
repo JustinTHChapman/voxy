@@ -72,8 +72,8 @@ public class SectionSerializationStorage extends SectionStorage {
     }
 
     @Override
-    public void iterateStoredSectionPositions(LongConsumer consumer) {
-        this.backend.iterateStoredSectionPositions(consumer);
+    public void iteratePositions(int level, LongConsumer consumer) {
+        this.backend.iteratePositions(level, consumer);
     }
 
     public static class Config extends SectionStorageConfig {

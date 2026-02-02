@@ -117,15 +117,26 @@ public class RocksDBStorageBackend extends StorageBackend {
     }
 
     @Override
-    public void iterateStoredSectionPositions(LongConsumer consumer) {
+    public void iteratePositions(int level, LongConsumer consumer) {
         try (var stack = MemoryStack.stackPush()) {
             ByteBuffer keyBuff = stack.calloc(8);
             long keyBuffPtr = MemoryUtil.memAddress(keyBuff);
+            //TODO: this can be optimized if needed by useing a prefix-seek https://github.com/facebook/rocksdb/wiki/Prefix-Seek
             var iter = this.db.newIterator(this.worldSections, this.sectionReadOps);
-            iter.seekToFirst();
+            if (level!=-1) {//-1 means iterate all
+                var seekBuff = stack.calloc(8);
+                MemoryUtil.memPutLong(MemoryUtil.memAddress(seekBuff), Long.reverseBytes(Integer.toUnsignedLong(level)<<60));
+                iter.seek(seekBuff);//we seak to the first level
+            } else {
+                iter.seekToFirst();
+            }
             while (iter.isValid()) {
+                keyBuff.clear();
                 iter.key(keyBuff);
                 long key = Long.reverseBytes(MemoryUtil.memGetLong(keyBuffPtr));
+                if (level!=-1 && WorldEngine.getLevel(key) != level) {
+                    break;
+                }
                 consumer.accept(key);
                 iter.next();
             }
