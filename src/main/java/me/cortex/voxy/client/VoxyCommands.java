@@ -6,6 +6,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
+import me.cortex.voxy.common.DebugUtils;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
@@ -22,6 +23,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.storage.LevelResource;
+import org.apache.commons.math3.analysis.function.Min;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,10 +65,16 @@ public class VoxyCommands {
                             .executes(VoxyCommands::importDistantHorizons)));
         }
 
+        var debug = ClientCommandManager.literal("debug")
+                .then(ClientCommandManager.literal("verifyTLNChildMask")
+                        .executes(VoxyCommands::verifyTLNs)
+                );
+
         return ClientCommandManager.literal("voxy")//.requires((ctx)-> VoxyCommon.getInstance() != null)
                 .then(ClientCommandManager.literal("reload")
                         .executes(VoxyCommands::reloadInstance))
-                .then(imports);
+                .then(imports)
+                .then(debug);
     }
 
     private static int reloadInstance(CommandContext<FabricClientCommandSource> ctx) {
@@ -89,7 +97,18 @@ public class VoxyCommands {
         return 0;
     }
 
-
+    private static int verifyTLNs(CommandContext<FabricClientCommandSource> ctx) {
+        var instance = VoxyCommon.getInstance();
+        if (instance == null) {
+            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            return 1;
+        }
+        if (Minecraft.getInstance().level == null) {
+            throw new IllegalStateException("How you even do this");
+        }
+        DebugUtils.verifyAllTopLevelNodes(WorldIdentifier.ofEngine(Minecraft.getInstance().level));
+        return 0;
+    }
 
 
     private static int importDistantHorizons(CommandContext<FabricClientCommandSource> ctx) {
