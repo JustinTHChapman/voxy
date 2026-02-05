@@ -108,7 +108,9 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         }
 
         if (occlusionDebug<=1) {
+            TimingStatistics.G.start();
             rs.buildDrawCalls(viewport);
+            TimingStatistics.G.stop();
         }
 
         GPUTiming.INSTANCE.marker("TP");

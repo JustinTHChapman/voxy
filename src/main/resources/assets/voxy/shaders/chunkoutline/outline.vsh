@@ -2,8 +2,8 @@
 
 layout(binding = 0, std140) uniform SceneUniform {
     mat4 MVP;
-    ivec4 section;
-    vec4 negInnerSec;
+    ivec4 cameraBlockPos;
+    vec4 negInnerBlock;
 };
 
 layout(binding = 1, std430) restrict readonly buffer ChunkPosBuffer {
@@ -15,9 +15,9 @@ ivec3 unpackPos(ivec2 pos) {
 }
 
 bool shouldRender(ivec3 icorner) {
-    vec3 corner = vec3(mix(mix(ivec3(0), icorner-1, greaterThan(icorner-1, ivec3(0))), icorner+17, lessThan(icorner+17, ivec3(0))))-negInnerSec.xyz;
-    bool visible = (corner.x*corner.x + corner.z*corner.z) < (negInnerSec.w*negInnerSec.w);
-    visible = visible && abs(corner.y) < negInnerSec.w;
+    vec3 corner = vec3(mix(mix(ivec3(0), icorner-1, greaterThan(icorner-1, ivec3(0))), icorner+17, lessThan(icorner+17, ivec3(0))))-negInnerBlock.xyz;
+    bool visible = (corner.x*corner.x + corner.z*corner.z) < (negInnerBlock.w*negInnerBlock.w);
+    visible = visible && abs(corner.y) < negInnerBlock.w;
     return visible;
 }
 
@@ -29,7 +29,7 @@ void main() {
     uint id = (gl_InstanceID<<5)+gl_BaseInstance+(gl_VertexID>>3);
 
     ivec3 origin = unpackPos(chunkPos[id])*16;
-    origin -= section.xyz;
+    origin -= cameraBlockPos.xyz;
 
     if (!shouldRender(origin)) {
         gl_Position = vec4(-100.0f, -100.0f, -100.0f, 0.0f);

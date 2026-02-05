@@ -93,19 +93,21 @@ public class ChunkBoundRenderer {
         final float renderDistance = Minecraft.getInstance().options.getEffectiveRenderDistance()*16;//In blocks
 
         {//This is recomputed to be in chunk section space not worldsection
-            int sx = (int)(viewport.cameraX);
-            int sy = (int)(viewport.cameraY);
-            int sz = (int)(viewport.cameraZ);
-            new Vector3i(sx, sy, sz).getToAddress(ptr); ptr += 4*4;
 
-            var negInnerSec = new Vector3f(
-                    (float) (viewport.cameraX - sx),
-                    (float) (viewport.cameraY - sy),
-                    (float) (viewport.cameraZ - sz));
+            //Camera block pos
+            int bx = (int)(viewport.cameraX);
+            int by = (int)(viewport.cameraY);
+            int bz = (int)(viewport.cameraZ);
+            new Vector3i(bx, by, bz).getToAddress(ptr); ptr += 4*4;
+
+            var negInnerBlock = new Vector3f(
+                    (float) (viewport.cameraX - bx),
+                    (float) (viewport.cameraY - by),
+                    (float) (viewport.cameraZ - bz));
 
 
-            negInnerSec.getToAddress(ptr); ptr += 4*3;
-            viewport.MVP.translate(negInnerSec.negate(), new Matrix4f()).getToAddress(matPtr);
+            negInnerBlock.getToAddress(ptr); ptr += 4*3;
+            viewport.MVP.translate(negInnerBlock.negate(), new Matrix4f()).getToAddress(matPtr);
             MemoryUtil.memPutFloat(ptr, renderDistance); ptr += 4;
         }
         UploadStream.INSTANCE.commit();
