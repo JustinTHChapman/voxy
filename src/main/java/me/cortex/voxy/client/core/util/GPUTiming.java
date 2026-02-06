@@ -22,15 +22,28 @@ public class GPUTiming {
     private float[] timings = new float[0];
     private String[] lables = new String[0];
 
+    private boolean enabled = false;
+
     public void marker() {
         this.marker(null);
     }
 
     public void marker(String lable) {
-        this.timingSet.capture(lable);
+        if (this.enabled) {
+            this.timingSet.capture(lable);
+        }
+    }
+
+    public void setEnabled(boolean enable) {
+        if (this.enabled != enable) {
+            this.enabled = enable;
+        }
     }
 
     public String getDebug() {
+        if (!this.enabled) {
+            return "";
+        }
         StringBuilder str = new StringBuilder("GpuTime: [");
         for (int i = 0; i < this.timings.length; i++) {
             if (this.lables[i] != null) {
@@ -39,7 +52,7 @@ public class GPUTiming {
                 str.append(String.format("%.2f", this.timings[i]));
             }
             if (i!=this.timings.length-1) {
-                str.append(',');
+                str.append(", ");
             }
         }
         str.append(']');
@@ -117,11 +130,13 @@ public class GPUTiming {
         }
 
         public void download(TimingDataConsumer<T[]> consumer) {
-            var queries = Arrays.copyOf(this.queries, this.index);
-            var metadata = Arrays.copyOf(this.metadata, this.index);
-            Arrays.fill(this.metadata, null);
-            this.index = 0;
-            this.INFLIGHT.enqueue(new InflightRequest(queries, metadata, consumer));
+            if (this.index != 0) {
+                var queries = Arrays.copyOf(this.queries, this.index);
+                var metadata = Arrays.copyOf(this.metadata, this.index);
+                Arrays.fill(this.metadata, null);
+                this.index = 0;
+                this.INFLIGHT.enqueue(new InflightRequest(queries, metadata, consumer));
+            }
         }
 
         public void tick() {
