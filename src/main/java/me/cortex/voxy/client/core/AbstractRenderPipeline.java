@@ -99,6 +99,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         int depthTexture = this.setup(viewport, sourceFrameBuffer, srcWidth, srcHeight);
 
         var rs = ((AbstractSectionRenderer)this.sectionRenderer);
+        GPUTiming.INSTANCE.marker("RO");
         rs.renderOpaque(viewport);
         var occlusionDebug = VoxyClient.getOcclusionDebugState();
         if (occlusionDebug==0) {
@@ -117,10 +118,12 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         rs.renderTemporal(viewport);
 
         this.postOpaquePreTranslucent(viewport);
+        GPUTiming.INSTANCE.marker("RT");
 
         if (!this.deferTranslucency) {
             rs.renderTranslucent(viewport);
         }
+        GPUTiming.INSTANCE.marker();
 
         this.finish(viewport, sourceFrameBuffer, srcWidth, srcHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);
