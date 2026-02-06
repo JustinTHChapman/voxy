@@ -369,9 +369,20 @@ public class IrisVoxyRenderPipelineData {
                 throw new IllegalStateException("Type not implemented for uniform: " + uniform);
                 //return this;
             }
+            //TODO: override the uniform1b call to specialcase booleans
 
             @Override
             public LocationalUniformHolder addUniform(UniformUpdateFrequency uniformUpdateFrequency, Uniform uniform) {
+                //TODO: error/log the type of uniform that was added (and its location)
+
+                if (uniform instanceof BooleanUniform bu) {
+                    //TODO: need to assert the loc is from a actually valid location
+                    int loc = bu.getLocation();
+                    var ul = patch.getUniformList();
+                    if (loc<ul.length) {
+                        var uniformName = ul[loc];
+                    }
+                }
                 return this;
             }
 
