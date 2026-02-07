@@ -22,7 +22,7 @@ public class GPUTiming {
     private float[] timings = new float[0];
     private String[] lables = new String[0];
 
-    private boolean enabled = false;
+    private boolean enabled = true;
 
     public void marker() {
         this.marker(null);
