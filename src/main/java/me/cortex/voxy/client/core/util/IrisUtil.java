@@ -43,7 +43,7 @@ public class IrisUtil {
 
     private static void reload0() {
         try {
-            if (IrisApi.getInstance().isShaderPackInUse()) {//Only reload if there is a shaderpack
+            if (IrisApi.getInstance().isShaderPackInUse()||IrisApi.getInstance().getConfig().areShadersEnabled()) {//Only reload if there is a shaderpack
                 Iris.reload();
             }
         } catch (IOException e) {
