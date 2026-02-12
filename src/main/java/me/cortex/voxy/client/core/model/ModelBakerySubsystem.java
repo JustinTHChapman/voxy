@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.model;
 
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.other.Mapper;
 import java.util.List;
@@ -9,7 +10,11 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static org.lwjgl.opengl.GL11.GL_STENCIL_TEST;
+import static org.lwjgl.opengl.GL11.glEnable;
 import static org.lwjgl.opengl.GL11.glGetInteger;
+import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL11C.GL_EQUAL;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_BINDING;
 import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
@@ -61,6 +66,13 @@ public class ModelBakerySubsystem {
                 } while (i != null);
 
                 glBindFramebuffer(GL_FRAMEBUFFER, fbBinding);//This is done here as stops needing to set then unset the fb in the thing 1000x
+
+                //_sobs_ (unbelievable jank hacky and awful fix for frex)
+                if (VoxyClient.isFrexActive()) {//(pure and utter screaming)
+                    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+                    glStencilFunc(GL_EQUAL, 1, 0xFF);
+                    glEnable(GL_STENCIL_TEST);
+                }
             }
             this.blockIdCount.addAndGet(-j);
         }
