@@ -220,7 +220,6 @@ public class VoxyRenderSystem {
 
         TimingStatistics.resetSamplers();
 
-        long startTime = System.nanoTime();
         TimingStatistics.all.start();
         GPUTiming.INSTANCE.marker();//Start marker
         TimingStatistics.main.start();
@@ -292,6 +291,7 @@ public class VoxyRenderSystem {
         {//Reset state manager stuffs
             glUseProgram(0);
             glEnable(GL_DEPTH_TEST);
+            glDisable(GL_STENCIL_TEST);
 
             GlStateManager._glBindVertexArray(0);//Clear binding
 
