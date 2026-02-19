@@ -199,6 +199,7 @@ public class Mapper {
         buffer.rewind();
         this.storage.putIdMapping(entry.id | (BLOCK_STATE_TYPE<<30), buffer);
         MemoryUtil.memFree(buffer);
+        this.storage.flush();
 
         if (this.newStateCallback!=null)this.newStateCallback.accept(entry);
         return entry;
@@ -222,6 +223,7 @@ public class Mapper {
         buffer.rewind();
         this.storage.putIdMapping(entry.id | (BIOME_TYPE<<30), buffer);
         MemoryUtil.memFree(buffer);
+        this.storage.flush();
 
         if (this.newBiomeCallback!=null)this.newBiomeCallback.accept(entry);
         return entry;
