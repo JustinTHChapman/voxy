@@ -29,12 +29,10 @@ import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LeavesBlock;
-import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
@@ -200,6 +198,14 @@ public class ModelFactory {
         }
 
         var blockState = this.mapper.getBlockStateFromBlockId(blockId);
+
+        if (blockState.getBlock() instanceof StairBlock sb) {
+            if (sb.baseState.hasProperty(BlockStateProperties.WATERLOGGED)) {
+                blockState = sb.baseState.setValue(BlockStateProperties.WATERLOGGED, blockState.getValue(BlockStateProperties.WATERLOGGED));
+            } else {
+                blockState = sb.baseState;
+            }
+        }
 
         //Before we enqueue the baking of this blockstate, we must check if it has a fluid state associated with it
         // if it does, we must ensure that it is (effectivly) baked BEFORE we bake this blockstate
