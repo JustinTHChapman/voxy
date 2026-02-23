@@ -83,7 +83,7 @@ public class VoxyRenderSystem {
 
         System.gc();
 
-        if (Minecraft.getInstance().options.getEffectiveRenderDistance()<3) {
+        if (Minecraft.getInstance().options.renderDistance().get()<3) {
             String msg = "Voxy: Having a vanilla render distance of 2 can cause rare culling near the edge of your screen issues, please use 3 or more";
             Logger.warn(msg);
             Minecraft.getInstance().getChatListener().handleSystemMessage(Component.literal(msg), false);
