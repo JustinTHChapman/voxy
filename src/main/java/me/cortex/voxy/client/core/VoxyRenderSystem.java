@@ -409,8 +409,8 @@ public class VoxyRenderSystem {
         return this.nodeManager.hasWork() || this.renderGen.getTaskCount()!=0 || !this.modelService.areQueuesEmpty();
     }
 
-    public void setRenderDistance(int renderDistance) {
-        this.renderDistanceTracker.setRenderDistance(renderDistance+1);//the +1 is to cover the outer ring of chunks when rendering a circle
+    public void setRenderDistance(float renderDistance) {
+        this.renderDistanceTracker.setRenderDistance((int) Math.ceil(renderDistance+1));//the +1 is to cover the outer ring of chunks when rendering a circle
     }
 
     public Viewport<?> getViewport() {

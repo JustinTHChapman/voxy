@@ -105,9 +105,11 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                 new IntOption(
                                         "voxy:render_distance",
                                         Component.translatable("voxy.config.general.renderDistance"),
-                                        ()->CFG.sectionRenderDistance, v->CFG.sectionRenderDistance=v,
-                                        new Range(2, 64, 1))
-                                        .setFormatter(v->Component.literal(Integer.toString(v*32)))//Top level rd == 32 chunks
+                                        ()->Math.round(CFG.sectionRenderDistance*16), v->CFG.sectionRenderDistance=((float)v)/16,
+                                        new Range(2*16, 64*16, 1))
+                                        //The value is stored as a float with respect to the size of top level lods, it its increment is a fraction with respect to the size of the bottom level lod
+                                        // the value is displayed as a chunk render distance
+                                        .setFormatter(v->Component.literal(Integer.toString(v*2)))
                                         .setPostChangeRunner(c->{
                                             var vrsh = (IGetVoxyRenderSystem)Minecraft.getInstance().levelRenderer;
                                             if (vrsh != null) {
