@@ -121,7 +121,7 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
     if (true) {
-        modImplementation "maven.modrinth:sodium:mc1.21.11-0.8.4-fabric"
+        modImplementation "maven.modrinth:sodium:mc1.21.11-0.8.6-fabric"
     } else {
         modImplementation "net.caffeinemc:sodium-fabric:0.8.4-SNAPSHOT+mc1.21.11+"
     }
