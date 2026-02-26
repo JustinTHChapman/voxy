@@ -272,4 +272,8 @@ public abstract class VoxyInstance {
     public boolean isIngestEnabled(WorldIdentifier worldId) {
         return true;
     }
+
+    public boolean isRunning() {
+        return this.isRunning;
+    }
 }

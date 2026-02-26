@@ -6,20 +6,29 @@ import me.cortex.voxy.common.world.WorldEngine;
 
 public class DebugUtils {
     public static void verifyAllTopLevelNodes(WorldEngine engine) {
-        //TODO: run this async probably
-
+        engine.markActive();
         var worker = new Thread(()->{
-            Logger.info("Verifying top level node masks, start");
-            LongArrayFIFOQueue positions = new LongArrayFIFOQueue();
-            engine.storage.iteratePositions(WorldEngine.MAX_LOD_LAYER, positions::enqueue);
-            int count = positions.size();
-            Logger.info("Verifying " + count + " top level nodes");
-            while (!positions.isEmpty()) {
-                long pos = positions.dequeueLong();
-                verifyTopNodeChildren(engine, WorldEngine.getX(pos), WorldEngine.getY(pos), WorldEngine.getZ(pos));
-                //if ((count - positions.size())/count)
+            engine.acquireRef();
+            try {
+                Logger.info("Verifying top level node masks, start");
+                LongArrayFIFOQueue positions = new LongArrayFIFOQueue();
+                engine.storage.iteratePositions(WorldEngine.MAX_LOD_LAYER, positions::enqueue);
+                int count = positions.size();
+                Logger.info("Verifying " + count + " top level nodes");
+                while (!positions.isEmpty()) {
+                    if (engine.instanceIn != null && !engine.instanceIn.isRunning()) break;
+                    long pos = positions.dequeueLong();
+                    verifyTopNodeChildren(engine, WorldEngine.getX(pos), WorldEngine.getY(pos), WorldEngine.getZ(pos));
+                    //if ((count - positions.size())/count)
+                }
+                if (engine.instanceIn != null && !engine.instanceIn.isRunning()) {
+                    Logger.info("Verification aborted due to shutdown");
+                } else {
+                    Logger.info("Verification complete");
+                }
+            } finally {
+                engine.releaseRef();
             }
-            Logger.info("Verification complete");
         });
         worker.setDaemon(true);
         worker.setName("Verification thread");
