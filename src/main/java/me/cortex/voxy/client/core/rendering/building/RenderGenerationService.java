@@ -218,11 +218,6 @@ public class RenderGenerationService {
 
                 if (task.hasDoneModelRequestInner && task.hasDoneModelRequestOuter) {
                     task.attempts++;
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException ex) {
-                        throw new RuntimeException(ex);
-                    }
                 } else {
                     if (task.hasDoneModelRequestInner) {
                         task.attempts++;//This is because it can be baking and just model thing isnt keeping up
