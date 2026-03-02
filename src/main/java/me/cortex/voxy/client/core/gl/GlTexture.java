@@ -101,6 +101,17 @@ public class GlTexture extends TrackedObject {
         return this.format;
     }
 
+    public int getPixelTransferFormat() {
+        this.assertAllocated();
+        return switch (this.format) {
+            case GL_RGBA8 -> GL_RGBA;
+            case GL_R32UI, GL_R32F -> GL_RED;
+            case GL_DEPTH_COMPONENT24,GL_DEPTH_COMPONENT32F,GL_DEPTH_COMPONENT32 -> GL_DEPTH_COMPONENT;
+            case GL_DEPTH24_STENCIL8 -> GL_DEPTH_STENCIL;
+            default -> throw new IllegalStateException("Unknown format");
+        };
+    }
+
     private long getEstimatedSize() {
         this.assertAllocated();
         long elemSize = switch (this.format) {
@@ -125,6 +136,20 @@ public class GlTexture extends TrackedObject {
         }
     }
 
+    public GlTexture zero() {
+        this.assertAllocated();
+        int type = switch (this.format) {
+            case GL_RGBA8,GL_R32UI -> GL_INT;
+            case GL_R32F,GL_DEPTH_COMPONENT24,GL_DEPTH_COMPONENT32F,GL_DEPTH_COMPONENT32 -> GL_FLOAT;
+            case GL_DEPTH24_STENCIL8 -> GL_UNSIGNED_INT_24_8;
+            case GL_DEPTH32F_STENCIL8 -> GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
+            default -> throw new IllegalStateException("Unknown format");
+        };
+        for (int lvl = 0; lvl < this.levels; lvl++) {
+            nglClearTexImage(this.id, lvl, this.getPixelTransferFormat(), type, 0);
+        }
+        return this;
+    }
 
     public static int getCount() {
         return COUNT;
