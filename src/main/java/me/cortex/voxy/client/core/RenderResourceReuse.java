@@ -106,6 +106,8 @@ public class RenderResourceReuse {
             geometryCapacity = Math.max(geometryCapacity, 1L<<30);//intel moment, force min 1gb
         }
 
+        geometryCapacity = Math.max(512*1024*1024, geometryCapacity);//min of 512 mb
+
         //Limit to available dedicated memory if possible
         if (Capabilities.INSTANCE.canQueryGpuMemory) {
             //512mb less than avalible,
