@@ -521,15 +521,17 @@ public class AsyncNodeManager {
                 TimingStatistics.A.start();
 
                 int copies = upload.dataUploadPoints.size();
+                int upCopies = UploadStream.alignUpAlloc(copies*16);
                 int scratchSize = (int) upload.arena.getSize() * 8;
-                long ptr = UploadStream.INSTANCE.rawUploadAddress(scratchSize + copies * 16);
+                int upScratchSize = UploadStream.alignUpAlloc(scratchSize);
+                long ptr = UploadStream.INSTANCE.rawUploadAddress(upScratchSize + upCopies);
                 UnsafeUtil.memcpy(upload.scratchHeaderBuffer.address, UploadStream.INSTANCE.getBaseAddress() + ptr, copies * 16L);
-                UnsafeUtil.memcpy(upload.scratchDataBuffer.address, UploadStream.INSTANCE.getBaseAddress() + ptr + copies * 16L, scratchSize);
+                UnsafeUtil.memcpy(upload.scratchDataBuffer.address, UploadStream.INSTANCE.getBaseAddress() + ptr + upCopies, scratchSize);
                 UploadStream.INSTANCE.commit();//Commit the buffer
 
                 this.multiMemcpy.bind();
-                glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, UploadStream.INSTANCE.getRawBufferId(), ptr, copies*16L);
-                glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, UploadStream.INSTANCE.getRawBufferId(), ptr+copies*16L, scratchSize);
+                glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, UploadStream.INSTANCE.getRawBufferId(), ptr, upCopies);
+                glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, UploadStream.INSTANCE.getRawBufferId(), ptr+upCopies, upScratchSize);
                 glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ((BasicSectionGeometryData) this.geometryData).getGeometryBuffer().id);
 
                 if (copies > 500) {
@@ -549,13 +551,12 @@ public class AsyncNodeManager {
             int count = results.scatterWriteLocationMap.size();//Number of writes, not chunks or uvec4 count
             int chunks = (count+3)/4;
             int streamSize = chunks*80;//80 bytes per chunk, it is guaranteed the buffer is big enough
-            long ptr = UploadStream.INSTANCE.rawUploadAddress(streamSize + 16);//Ensure it is 16 byte aligned
-            ptr = (ptr+15L)&~0xFL;//Align up to 16 bytes
+            long ptr = UploadStream.INSTANCE.rawUploadAddress(streamSize);//Internally implicitly aligned alloc
             MemoryUtil.memCopy(results.scatterWriteBuffer.address, UploadStream.INSTANCE.getBaseAddress() + ptr, streamSize);
             UploadStream.INSTANCE.commit();//Commit the buffer
 
             this.scatterWrite.bind();
-            glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, UploadStream.INSTANCE.getRawBufferId(), ptr, streamSize);
+            glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, UploadStream.INSTANCE.getRawBufferId(), ptr, UploadStream.alignUpAlloc(streamSize));
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nodeBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ((BasicSectionGeometryData) this.geometryData).getMetadataBuffer().id);
             glUniform1ui(0, count);
