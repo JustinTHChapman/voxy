@@ -75,8 +75,8 @@ public class ModelFactory {
 
     private final Biome DEFAULT_BIOME = Minecraft.getInstance().level.registryAccess().lookupOrThrow(Registries.BIOME).getValue(Biomes.PLAINS);
 
-    public final ModelTextureBakery bakery;
     public final SoftwareModelTextureBakery bakery2;
+    private final long bakeScratchBuffer = MemoryUtil.nmemAlloc(MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*8*6);
 
 
     //Model data might also contain a constant colour if the colour resolver produces a constant colour, this saves space in the
@@ -125,9 +125,8 @@ public class ModelFactory {
 
     private final Mapper mapper;
     private final ModelStore storage;
-    private final RawDownloadStream downstream = new RawDownloadStream(8*1024*1024);//8mb downstream
 
-    private final ConcurrentLinkedDeque<RawBakeResult> rawBakeResults = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<BlockBake> bakeQueue = new ConcurrentLinkedDeque<>();
 
     private final ConcurrentLinkedDeque<ResultUploader> uploadResults = new ConcurrentLinkedDeque<>();
 
@@ -138,7 +137,6 @@ public class ModelFactory {
     public ModelFactory(Mapper mapper, ModelStore storage) {
         this.mapper = mapper;
         this.storage = storage;
-        this.bakery = new ModelTextureBakery(MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
         this.bakery2 = new SoftwareModelTextureBakery();
         this.bakery2.setupTexture();
 
@@ -156,28 +154,7 @@ public class ModelFactory {
         this.customBlockStateIdMapping = mapping;
     }
 
-    private static final class RawBakeResult {
-        private final int blockId;
-        private final BlockState blockState;
-        private final MemoryBuffer rawData;
-
-        public boolean isShaded;
-        public boolean hasDarkenedTextures;
-
-        public RawBakeResult(int blockId, BlockState blockState, MemoryBuffer rawData) {
-            this.blockId = blockId;
-            this.blockState = blockState;
-            this.rawData = rawData;
-        }
-
-        public RawBakeResult(int blockId, BlockState blockState) {
-            this(blockId, blockState, new MemoryBuffer(MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*2*4*6));
-        }
-
-        public RawBakeResult cpyBuf(long ptr) {
-            this.rawData.cpyFrom(ptr);
-            return this;
-        }
+    private static final record BlockBake(int blockId, BlockState state) {
     }
 
     public boolean addEntry(int blockId) {
@@ -229,26 +206,22 @@ public class ModelFactory {
                 addEntry(fluidStateId);
             }
         }
-
-        RawBakeResult result = new RawBakeResult(blockId, blockState);
-        int allocation = this.downstream.download(MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*2*4*6, ptr -> this.rawBakeResults.add(result.cpyBuf(ptr)));
-        int flags = this.bakery.renderToStream(blockState, this.downstream.getBufferId(), allocation);
-        result.hasDarkenedTextures = (flags&2)!=0;
-        result.isShaded = (flags&1)!=0;
-
+        this.bakeQueue.add(new BlockBake(blockId, blockState));
         return true;
     }
 
     private boolean processModelResult() {
-        var result = this.rawBakeResults.poll();
-        if (result == null) return false;
+        var bake = this.bakeQueue.poll();
+        if (bake == null) return false;
         ColourDepthTextureData[] textureData = new ColourDepthTextureData[6];
 
-        long scratchBuffer = MemoryUtil.nmemAlloc(MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*8*6);
-        this.bakery2.renderToOutput(result.blockState, scratchBuffer);
+        int flags = this.bakery2.renderToOutput(bake.state, this.bakeScratchBuffer);
+
+        boolean hasDarkenedTextures = (flags&2)!=0;
+        boolean isShaded = (flags&1)!=0;
 
         {//Create texture data
-            long ptr = scratchBuffer;
+            long ptr = this.bakeScratchBuffer;
             //long ptr = result.rawData.address;
             final int FACE_SIZE = MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE;
             for (int face = 0; face < 6; face++) {
@@ -270,16 +243,11 @@ public class ModelFactory {
             }
         }
 
-
-        MemoryUtil.nmemFree(scratchBuffer);
-
-
-        result.rawData.free();
-        var bakeResult = this.processTextureBakeResult(result.blockId, result.blockState, textureData, result.isShaded, result.hasDarkenedTextures);
+        var bakeResult = this.processTextureBakeResult(bake.blockId, bake.state, textureData, isShaded, hasDarkenedTextures);
         if (bakeResult!=null) {
             this.uploadResults.add(bakeResult);
         }
-        return !this.rawBakeResults.isEmpty();
+        return !this.bakeQueue.isEmpty();
     }
 
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeQueue = new ConcurrentLinkedDeque<>();
@@ -301,9 +269,7 @@ public class ModelFactory {
         while (this.processModelResult());
     }
 
-    public void tickAndProcessUploads() {
-        this.downstream.tick();
-
+    public void processUploads() {
         var upload = this.uploadResults.poll();
         if (upload==null) return;
 
@@ -923,12 +889,7 @@ public class ModelFactory {
 
     public void free() {
         this.bakery2.free();
-
-        this.bakery.free();
-        this.downstream.free();
-        while (!this.rawBakeResults.isEmpty()) {
-            this.rawBakeResults.poll().rawData.free();
-        }
+        MemoryUtil.nmemFree(this.bakeScratchBuffer);
         while (!this.uploadResults.isEmpty()) {
             this.uploadResults.poll().free();
         }
@@ -943,6 +904,7 @@ public class ModelFactory {
         int size = this.blockStatesInFlight.size();
         size += this.uploadResults.size();
         size += this.biomeQueue.size();
+        size += this.bakeQueue.size();
         return size;
     }
 
