@@ -129,12 +129,12 @@ public class TextureUtils {
         //https://registry.khronos.org/OpenGL-Refpages/gl4/html/glDepthRange.xhtml
         // due to this and the unsigned bullshit, believe the depth value needs to get multiplied by 2
 
-        //Shouldent be needed due to the compute bake copy
-        depthF *= 2;
-        if (depthF > 1.00001f) {//Basicly only happens when a model goes out of bounds (thing)
-            //System.err.println("Warning: Depth greater than 1");
-            depthF = 1.0f;
-        }
+        ////Shouldent be needed due to the compute bake copy
+        //depthF *= 2;
+        //if (depthF > 1.00001f) {//Basicly only happens when a model goes out of bounds (thing)
+        //    //System.err.println("Warning: Depth greater than 1");
+        //    depthF = 1.0f;
+        //}
         return depthF;
     }
 

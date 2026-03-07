@@ -9,6 +9,8 @@ import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.bakery.ModelTextureBakery;
+import me.cortex.voxy.client.core.model.bakery.SoftwareModelTextureBakery;
+import me.cortex.voxy.client.core.model.bakery.SoftwareRasterizer;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
@@ -74,6 +76,7 @@ public class ModelFactory {
     private final Biome DEFAULT_BIOME = Minecraft.getInstance().level.registryAccess().lookupOrThrow(Registries.BIOME).getValue(Biomes.PLAINS);
 
     public final ModelTextureBakery bakery;
+    public final SoftwareModelTextureBakery bakery2;
 
 
     //Model data might also contain a constant colour if the colour resolver produces a constant colour, this saves space in the
@@ -136,6 +139,8 @@ public class ModelFactory {
         this.mapper = mapper;
         this.storage = storage;
         this.bakery = new ModelTextureBakery(MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
+        this.bakery2 = new SoftwareModelTextureBakery();
+        this.bakery2.setupTexture();
 
         this.metadataCache = new long[1<<16];
         this.fluidStateLUT = new int[1<<16];
@@ -230,6 +235,7 @@ public class ModelFactory {
         int flags = this.bakery.renderToStream(blockState, this.downstream.getBufferId(), allocation);
         result.hasDarkenedTextures = (flags&2)!=0;
         result.isShaded = (flags&1)!=0;
+
         return true;
     }
 
@@ -237,8 +243,13 @@ public class ModelFactory {
         var result = this.rawBakeResults.poll();
         if (result == null) return false;
         ColourDepthTextureData[] textureData = new ColourDepthTextureData[6];
+
+        long scratchBuffer = MemoryUtil.nmemAlloc(MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*8*6);
+        this.bakery2.renderToOutput(result.blockState, scratchBuffer);
+
         {//Create texture data
-            long ptr = result.rawData.address;
+            long ptr = scratchBuffer;
+            //long ptr = result.rawData.address;
             final int FACE_SIZE = MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE;
             for (int face = 0; face < 6; face++) {
                 long faceDataPtr = ptr + (FACE_SIZE * 4) * face * 2;
@@ -247,13 +258,22 @@ public class ModelFactory {
 
                 //Copy out colour
                 for (int i = 0; i < FACE_SIZE; i++) {
-                    //De-interpolate results
-                    colour[i] = MemoryUtil.memGetInt(faceDataPtr + (i * 4 * 2));
-                    depth[i] = MemoryUtil.memGetInt(faceDataPtr + (i * 4 * 2) + 4);
+                    ////De-interpolate results
+                    //colour[i] = MemoryUtil.memGetInt(faceDataPtr + (i * 4 * 2));
+                    //depth[i] = MemoryUtil.memGetInt(faceDataPtr + (i * 4 * 2) + 4);
+
+                    long value = MemoryUtil.memGetLong(faceDataPtr+i*8);
+                    colour[i] = (int)value;
+                    depth[i] = (int) (value>>>32);
                 }
                 textureData[face] = new ColourDepthTextureData(colour, depth, MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
             }
         }
+
+
+        MemoryUtil.nmemFree(scratchBuffer);
+
+
         result.rawData.free();
         var bakeResult = this.processTextureBakeResult(result.blockId, result.blockState, textureData, result.isShaded, result.hasDarkenedTextures);
         if (bakeResult!=null) {
@@ -902,6 +922,8 @@ public class ModelFactory {
 
 
     public void free() {
+        this.bakery2.free();
+
         this.bakery.free();
         this.downstream.free();
         while (!this.rawBakeResults.isEmpty()) {
