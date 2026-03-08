@@ -106,7 +106,7 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                         "voxy:render_distance",
                                         Component.translatable("voxy.config.general.renderDistance"),
                                         ()->Math.round(CFG.sectionRenderDistance*16), v->CFG.sectionRenderDistance=((float)v)/16,
-                                        new Range(1*16, 64*16, 1))
+                                        new Range(10/*1*16*/, 64*16, 1))
                                         //The value is stored as a float with respect to the size of top level lods, it its increment is a fraction with respect to the size of the bottom level lod
                                         // the value is displayed as a chunk render distance
                                         .setFormatter(v->Component.literal(Integer.toString(v*2)))
