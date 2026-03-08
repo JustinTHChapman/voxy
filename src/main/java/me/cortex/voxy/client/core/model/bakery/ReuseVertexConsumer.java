@@ -7,11 +7,10 @@ import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.MipmapStrategy;
 import org.lwjgl.system.MemoryUtil;
 
-import static me.cortex.voxy.client.core.model.bakery.BudgetBufferRenderer.VERTEX_FORMAT_SIZE;
-
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
 public final class ReuseVertexConsumer implements VertexConsumer {
+    public static final int VERTEX_FORMAT_SIZE = 24;
     private MemoryBuffer buffer = new MemoryBuffer(8192);
     private long ptr;
     private int count;
