@@ -204,14 +204,14 @@ public class ActiveSectionTracker {
         }
     }
 
-    void tryUnload(WorldSection section) {
+    void tryUnload(WorldSection section, int hints) {
         if (this.engine != null) this.engine.lastActiveTime = System.currentTimeMillis();
         if (section.isDirty&&this.engine!=null) {
             if (section.tryAcquire()) {
                 if (section.setNotDirty()) {//If the section is dirty we must enqueue for saving
                     this.engine.saveSection(section);//can block
                 }
-                section.release(false);//Special
+                section.release(false, hints);//Special
             }
         }
 
@@ -231,7 +231,7 @@ public class ActiveSectionTracker {
                         if (this.engine != null)
                             this.engine.saveSection(section, true);//not allowed to block as we are in a lock
                     }
-                    section.release(false);//Special
+                    section.release(false, hints);//Special
                 } else {
                     throw new IllegalStateException("Section was dirty but is also unloaded, this is very bad");
                 }

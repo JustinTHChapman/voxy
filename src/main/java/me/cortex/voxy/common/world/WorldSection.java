@@ -131,12 +131,18 @@ public final class WorldSection {
         return ((int)ATOMIC_STATE_HANDLE.get(this))>>1;
     }
 
-    //TODO: add the ability to hint to the tracker that yes the section is unloaded, try to cache it in a secondary cache since it will be reused/needed later
     public int release() {
-        return release(true);
+        return release(true, 0);
     }
 
-    int release(boolean unload) {
+
+    public static int RELEASE_HINT_POSSIBLE_REUSE = 1;
+    //Unload but specify possible reuse hints
+    public int release(int hints) {
+        return release(true, hints);
+    }
+
+    int release(boolean unload, int hints) {
         int state = ((int) ATOMIC_STATE_HANDLE.getAndAdd(this, -2)) - 2;
         if (state < 1) {
             throw new IllegalStateException("Section got into an invalid state");
@@ -146,7 +152,7 @@ public final class WorldSection {
         }
         if ((state>>1)==0 && unload) {
             if (this.tracker != null) {
-                this.tracker.tryUnload(this);
+                this.tracker.tryUnload(this, hints);
             } else {
                 //This should _ONLY_ ever happen when its an untracked section
                 // If it is, try release it

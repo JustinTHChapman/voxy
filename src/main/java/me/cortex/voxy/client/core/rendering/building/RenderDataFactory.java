@@ -292,7 +292,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i] = raw[(i<<5)+31];//pull the +x faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
         if ((msk&2)!=0) {//+x
             var sec = this.world.acquire(section.lvl, section.x + 1, section.y, section.z);
@@ -301,7 +301,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i+32*32] = raw[(i<<5)];//pull the -x faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
 
         if ((msk&4)!=0) {//-y
@@ -311,7 +311,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i+32*32*2] = raw[i|(0x1F<<10)];//pull the +y faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
         if ((msk&8)!=0) {//+y
             var sec = this.world.acquire(section.lvl, section.x, section.y + 1, section.z);
@@ -320,7 +320,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i+32*32*3] = raw[i];//pull the -y faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
 
         if ((msk&16)!=0) {//-z
@@ -330,7 +330,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i+32*32*4] = raw[Integer.expand(i,0b11111_00000_11111)|(0x1F<<5)];//pull the +z faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
         if ((msk&32)!=0) {//+z
             var sec = this.world.acquire(section.lvl, section.x, section.y, section.z + 1);
@@ -339,7 +339,7 @@ public class RenderDataFactory {
             for (int i = 0; i < 32*32; i++) {
                 this.neighboringFaces[i+32*32*5] = raw[Integer.expand(i,0b11111_00000_11111)];//pull the -z faces from the section
             }
-            sec.release();
+            sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
     }
 

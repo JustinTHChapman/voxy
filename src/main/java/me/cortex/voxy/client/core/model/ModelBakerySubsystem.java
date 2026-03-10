@@ -8,6 +8,7 @@ import me.cortex.voxy.common.world.other.Mapper;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class ModelBakerySubsystem {
@@ -27,6 +28,7 @@ public class ModelBakerySubsystem {
             while (this.isRunning) {
                 this.factory.processAllThings();
                 try {
+                    //TODO: replace with LockSupport.park();
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
