@@ -17,6 +17,8 @@ import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.List;
+
 import static me.cortex.voxy.client.core.rendering.util.PrintfDebugUtil.PRINTF_processor;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_UNPACK_IMAGE_HEIGHT;
@@ -373,4 +375,11 @@ public class HierarchicalOcclusionTraverser {
     }
 
     private static final long SCRATCH = MemoryUtil.nmemAlloc(32);//32 bytes of scratch memory
+
+    public void addDebug(List<String> debug) {
+        //Conditionally add debug
+        if (this.topNodeCount>this.idx2topNodeMapping.length/2) {
+            debug.add("TLN#: " + this.topNodeCount);
+        }
+    }
 }
