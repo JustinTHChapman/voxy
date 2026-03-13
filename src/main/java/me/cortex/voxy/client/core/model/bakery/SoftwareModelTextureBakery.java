@@ -206,10 +206,9 @@ public class SoftwareModelTextureBakery {
     // in this version the values are simply appended (0,0),(1,0),(2,0),(0,1),(1,1),(2,1)
 
     public int renderToOutput(BlockState state, long outputBuffer) {
-        //if (state.getBlock() != Blocks.OAK_SLAB) {
-        //    MemoryUtil.memSet(outputBuffer,0,16*16*8*6);
-        //    return 0;
-        //}
+        MemoryUtil.memSet(outputBuffer,0,16*16*8*6);
+
+
         boolean isBlock = true;
         ChunkSectionLayer layer;
         if (state.getBlock() instanceof LiquidBlock) {
