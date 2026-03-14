@@ -223,32 +223,31 @@ public class RenderDataFactory {
         long partialFluid = 0;
 
         int neighborAcquireMskAndFlags = 0;//-+x, -+z, -+y
-        for (int i = 0; i < 32*32*32;) {
-            long block = rawSectionData[i];//Get the block mapping
-            if (Mapper.isAir(block)) {//If it is air, just emit lighting
-                sectionData[i * 2] = (block&(0xFFL<<56))>>>1;
-                sectionData[i * 2 + 1] = 0;
-            } else {
-                int modelId = rawModelIds[Mapper.getBlockId(block)];
-                if (modelId == -1) {//Failed, so just return error
-                    return Mapper.getBlockId(block)|(1<<31);
+        int i = 0;
+        for (int q = 0; q < 512; q++) {
+            for (int j = 0; j < 64; i++, j++) {
+                long block = rawSectionData[i];//Get the block mapping
+                if (Mapper.isAir(block)) {//If it is air, just emit lighting
+                    sectionData[i * 2] = (block & (0xFFL << 56)) >>> 1;
+                    sectionData[i * 2 + 1] = 0;
+                } else {
+                    int modelId = rawModelIds[Mapper.getBlockId(block)];
+                    if (modelId == -1) {//Failed, so just return error
+                        return Mapper.getBlockId(block) | (1 << 31);
+                    }
+                    long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
+
+                    sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
+                    sectionData[i * 2 + 1] = modelMetadata;
+
+                    long msk = 1L << j;
+                    opaque |= ModelQueries.isFullyOpaque(modelMetadata) ? msk : 0;
+                    notEmpty |= modelId != 0 ? msk : 0;
+                    pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
+                    partialFluid |= ModelQueries.containsFluid(modelMetadata) ? msk : 0;
                 }
-                long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
-
-                sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
-                sectionData[i * 2 + 1] = modelMetadata;
-
-                long msk = 1L << (i & 63);
-                opaque |= ModelQueries.isFullyOpaque(modelMetadata) ? msk : 0;
-                notEmpty |= modelId != 0 ? msk : 0;
-                pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
-                partialFluid |= ModelQueries.containsFluid(modelMetadata) ? msk : 0;
             }
-
-            //Do increment here
-            i++;
-
-            if ((i & 63) == 0 && notEmpty != 0) {
+            if (notEmpty != 0) {
                 long nonOpaque = (notEmpty^opaque)&~pureFluid;
                 long fluid = pureFluid|partialFluid;
                 this.opaqueMasks[(i >> 5) - 2] = (int) opaque;
