@@ -44,13 +44,16 @@ public class ChunkBoundRenderer {
     private final AbstractRenderPipeline pipeline;
     public ChunkBoundRenderer(AbstractRenderPipeline pipeline) {
         this.chunk2idx.defaultReturnValue(-1);
-        this.pipeline = pipeline;
 
         String vert = ShaderLoader.parse("voxy:chunkoutline/outline.vsh");
         String taa = pipeline.taaFunction("getTAA");
         if (taa != null) {
+            this.pipeline = pipeline;
             vert = vert+"\n\n\n"+taa;
+        } else {
+            this.pipeline = null;
         }
+
         this.rasterShader = Shader.makeAuto()
                 .addSource(ShaderType.VERTEX, vert)
                 .defineIf("TAA", taa != null)
@@ -128,7 +131,7 @@ public class ChunkBoundRenderer {
         viewport.depthBoundingBuffer.bind();
         this.rasterShader.bind();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BB_BYTE.id());
-        this.pipeline.bindUniforms();
+        if (this.pipeline != null) this.pipeline.bindUniforms();//shader TAA
 
         //Batch the draws into groups of size 32
         int count = this.chunk2idx.size();

@@ -192,7 +192,7 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         super.addDebug(debug);
     }
 
-    private static final int UNIFORM_BINDING_POINT = 5;//TODO make ths binding point... not randomly 5
+    private static final int UNIFORM_BINDING_POINT = 7;//TODO make ths binding point... not randomly 5
 
     private StringBuilder buildGenericShaderHeader(AbstractSectionRenderer<?, ?> renderer, String input) {
         StringBuilder builder = new StringBuilder(input).append("\n\n\n");
@@ -237,12 +237,21 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     }
 
     @Override
+    public boolean hasTAA() {
+        return this.data.TAA != null;
+    }
+
+    @Override
     public String taaFunction(String functionName) {
         return this.taaFunction(UNIFORM_BINDING_POINT, functionName);
     }
 
     @Override
     public String taaFunction(int uboBindingPoint, String functionName) {
+        if (this.data.TAA == null) {
+            return null;
+        }
+
         var builder = new StringBuilder();
 
         if (this.data.getUniforms() != null) {

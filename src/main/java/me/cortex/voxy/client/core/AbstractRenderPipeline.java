@@ -255,6 +255,10 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     public void bindUniforms(int index) {
     }
 
+    public boolean hasTAA() {
+        return false;
+    }
+
     //null means no function, otherwise return the taa injection function
     public String taaFunction(String functionName) {
         return this.taaFunction(-1, functionName);
