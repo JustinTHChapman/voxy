@@ -126,12 +126,7 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                         Component.translatable("voxy.config.general.environmental_fog"),
                                         ()->CFG.useEnvironmentalFog, v->CFG.useEnvironmentalFog=v)
                                         .setPostChangeFlags(RENDER_RELOAD)
-                        ), new Group(
-                                new BoolOption(
-                                        "voxy:render_debug",
-                                        Component.translatable("voxy.config.general.render_statistics"),
-                                        ()-> RenderStatistics.enabled, v->RenderStatistics.enabled=v)
-                                        .setPostChangeFlags(RENDER_RELOAD))
+                        )
                 ).setEnablerAND("voxy:enabled", "voxy:rendering"));
 
     }
