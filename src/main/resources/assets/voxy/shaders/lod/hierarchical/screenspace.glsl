@@ -67,9 +67,9 @@ void setupScreenspace(in UnpackedNode node) {
         return;
     }
 
-    vec4 P000 = VP * vec4(basePos, 1);
-    mat3x4 Axis = mat3x4(VP) * float(32<<node.lodLevel);
-
+    //TODO: CHECK THIS IS AT ALL RIGHT
+    vec4 P000 = MVP * vec4(basePos, 1);
+    mat3x4 Axis = mat3x4(MVP)*float(32<<node.lodLevel);
     vec4 P100 = Axis[0] + P000;
     vec4 P001 = Axis[2] + P000;
     vec4 P101 = Axis[2] + P100;
@@ -77,6 +77,15 @@ void setupScreenspace(in UnpackedNode node) {
     vec4 P110 = Axis[1] + P100;
     vec4 P011 = Axis[1] + P001;
     vec4 P111 = Axis[1] + P101;
+
+    //vec4 P000 = MVP * vec4(basePos, 1);
+    //vec4 P100 = MVP * vec4(basePos+vec3(1,0,0)*(32<<node.lodLevel), 1);
+    //vec4 P001 = MVP * vec4(basePos+vec3(0,0,1)*(32<<node.lodLevel), 1);
+    //vec4 P101 = MVP * vec4(basePos+vec3(1,0,1)*(32<<node.lodLevel), 1);
+    //vec4 P010 = MVP * vec4(basePos+vec3(0,1,0)*(32<<node.lodLevel), 1);
+    //vec4 P110 = MVP * vec4(basePos+vec3(1,1,0)*(32<<node.lodLevel), 1);
+    //vec4 P011 = MVP * vec4(basePos+vec3(0,1,1)*(32<<node.lodLevel), 1);
+    //vec4 P111 = MVP * vec4(basePos+vec3(1,1,1)*(32<<node.lodLevel), 1);
 
 
     //Perspective divide + convert to screenspace (i.e. range 0->1 if within viewport)

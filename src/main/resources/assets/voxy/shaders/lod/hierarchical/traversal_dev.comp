@@ -8,7 +8,7 @@ layout(local_size_x=LOCAL_SIZE) in;//, local_size_y=1
 #import <voxy:lod/frustum.glsl>
 
 layout(binding = SCENE_UNIFORM_BINDING, std140) uniform SceneUniform {
-    mat4 VP;
+    mat4 MVP;
     ivec3 camSecPos;
     uint packedHizSize;
     vec3 camSubSecPos;
