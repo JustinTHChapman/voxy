@@ -43,6 +43,10 @@ bool frustumCulled = false;
 
 float screenSize = 0.0f;
 
+#ifdef TAA
+vec2 getTAA();
+#endif
+
 UnpackedNode node22;
 //Sets up screenspace with the given node id, returns true on success false on failure/should not continue
 //Accesses data that is setup in the main traversal and is just shared to here
@@ -125,6 +129,13 @@ void setupScreenspace(in UnpackedNode node) {
     minBB = min(min(min(p000, p100), min(p001, p101)), min(min(p010, p110), min(p011, p111)));
     maxBB = max(max(max(p000, p100), max(p001, p101)), max(max(p010, p110), max(p011, p111)));
 
+
+    #ifdef TAA
+    vec2 taaValue = getTAA()*0.5f;//Note! this might be need tobe *0.5f
+    minBB.xy += taaValue;
+    maxBB.xy += taaValue;
+    #endif
+
     minBB = clamp(minBB, vec3(0), vec3(1));
     maxBB = clamp(maxBB, vec3(0), vec3(1));
 }
@@ -137,21 +148,24 @@ bool outsideFrustum() {
 }
 
 bool isCulledByHiz() {
+    //if (node22.lodLevel!=0) return false;
+
     //Things start breaking down if the area is the entire scree, no idea why, just abort if we hit this case
-    if ((maxBB.xy-minBB.xy)==vec2(1.0f)) return false;
+    //if ((maxBB.xy-minBB.xy)==vec2(1.0f)) return false;
+    if (any(lessThan(abs(maxBB.xy-minBB.xy-vec2(1.0f)), vec2(0.000001f)))) return false;
 
     ivec2 ssize = ivec2(packedHizSize>>16,packedHizSize&0xFFFF);
     vec2 size = (maxBB.xy-minBB.xy)*ssize;
     float miplevel = log2(max(max(size.x, size.y),1));
 
     miplevel = floor(miplevel)-1;
-    //miplevel = clamp(miplevel, 0, 6);
+    //miplevel = clamp(miplevel, 0, 0);
     miplevel = clamp(miplevel, 0, textureQueryLevels(hizDepthSampler)-1);
 
     int ml = int(miplevel);
     ssize = max(ivec2(1), ssize>>ml);
-    ivec2 mxbb = min(ivec2(maxBB.xy*ssize),ssize-1);
-    ivec2 mnbb = ivec2(minBB.xy*ssize);
+    ivec2 mxbb = min(ivec2(ceil(maxBB.xy*ssize)),ssize-1);
+    ivec2 mnbb = ivec2(floor(minBB.xy*ssize));
 
     float pointSample = -1.0f;
     //float pointSample2 = 0.0f;
@@ -164,8 +178,7 @@ bool isCulledByHiz() {
         }
     }
     //pointSample = mix(pointSample, pointSample2, pointSample<=0.000001f);
-
-    return pointSample<=minBB.z;
+    return pointSample<minBB.z-0.000001f;;////(minBB.z*2-1);
 }
 
 
@@ -174,3 +187,4 @@ bool isCulledByHiz() {
 bool shouldDecend() {
     return screenSize > minSSS;
 }
+
