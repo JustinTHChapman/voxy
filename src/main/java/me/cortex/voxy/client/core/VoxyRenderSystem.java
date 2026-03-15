@@ -124,6 +124,11 @@ public class VoxyRenderSystem {
 
             this.pipeline = RenderPipelineFactory.createPipeline(this.nodeManager, this.nodeCleaner, this.traversal, this::frexStillHasWork);
             this.pipeline.setupExtraModelBakeryData(this.modelService);//Configure the model service
+
+            //Late stage traversal compile for shaders with taa
+            this.traversal.lateStageCompile(this.pipeline);
+
+
             var sectionRenderer = backendFactory.create(this.pipeline, this.modelService.getStore(), this.geometryData);
             this.pipeline.setSectionRenderer(sectionRenderer);
             this.viewportSelector = new ViewportSelector<>(sectionRenderer::createViewport);
