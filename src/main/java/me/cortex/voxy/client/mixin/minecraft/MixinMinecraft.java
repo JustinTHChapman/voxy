@@ -15,6 +15,7 @@ public class MixinMinecraft {
         if (VoxyCommon.isAvailable() && VoxyClientInstance.isInGame) {
             VoxyCommon.shutdownInstance();
             VoxyClientInstance.isInGame = false;
+            VoxyCommon.onSessionLeave();
         }
     }
 

@@ -89,6 +89,7 @@ public class VoxyClientInstance extends VoxyInstance {
 
     private static class Config {
         public int version = 1;
+        public boolean disabled = false;
         public SectionStorageConfig sectionStorageConfig;
     }
 
