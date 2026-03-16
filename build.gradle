@@ -2,7 +2,7 @@ plugins {
     id 'fabric-loom' version "1.14-SNAPSHOT"
     id 'maven-publish'
 }
-def INCLUDE_OTHER_ARCHS = false
+def INCLUDE_OTHER_ARCHS = "true".equalsIgnoreCase(project.findProperty("includeOtherArchs"))
 
 def isInGHA = System.getenv("GITHUB_ACTIONS") == "true"
 
