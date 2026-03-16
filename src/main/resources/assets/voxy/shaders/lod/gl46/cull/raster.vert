@@ -31,8 +31,10 @@ void main() {
     ivec3 pos = (((ipos<<detail)-baseSectionPos)<<5);
 
     //TODO maybe make the size expansion 0.5 (or maybe get rid of it all together?)
-    const int EXPANSION = 1;
-    ivec3 offset = aabbOffset-1;
+    const int EXPANSION = 0;
+
+
+    ivec3 offset = aabbOffset-EXPANSION;
     offset += ivec3(gl_VertexID&1, (gl_VertexID>>2)&1, (gl_VertexID>>1)&1)*(size+2*EXPANSION);
 
     pos += offset*(1<<detail);
