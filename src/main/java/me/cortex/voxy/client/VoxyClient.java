@@ -33,7 +33,7 @@ public class VoxyClient implements ClientModInitializer {
              Logger.error("Voxy is unsupported on your system.");
         }
 
-        if (systemSupported) {
+        if (systemSupported && System.getProperty("voxy.exclusiveLock", "false").equalsIgnoreCase("true")) {
             //Try acquire the lock file
             var vf = Minecraft.getInstance().gameDirectory.toPath().resolve(".voxy");
             if (!vf.toFile().isDirectory()) {
