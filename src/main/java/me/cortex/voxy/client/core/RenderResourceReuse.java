@@ -9,6 +9,7 @@ import me.cortex.voxy.client.core.rendering.section.geometry.IGeometryData;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.ThreadUtils;
 import me.cortex.voxy.common.util.TrackedObject;
+import me.cortex.voxy.commonImpl.VoxyCommon;
 
 import java.util.ArrayList;
 
@@ -104,6 +105,9 @@ public class RenderResourceReuse {
         long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
         if (Capabilities.INSTANCE.isIntel) {
             geometryCapacity = Math.max(geometryCapacity, 1L<<30);//intel moment, force min 1gb
+        }
+        if (Capabilities.INSTANCE.isNvidia && ThreadUtils.isLinux) {
+            geometryCapacity = Math.min(geometryCapacity, (1L<<31)-64L<<20);//nvidia linux moment, force max 2gb heap
         }
 
         geometryCapacity = Math.max(512*1024*1024, geometryCapacity);//min of 512 mb

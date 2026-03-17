@@ -10,6 +10,7 @@ public class ThreadUtils {
     public static final int WIN32_THREAD_MODE_BACKGROUND_BEGIN = 0x00010000;
     public static final int WIN32_THREAD_MODE_BACKGROUND_END = 0x00020000;
     public static final boolean isWindows = Platform.get() == Platform.WINDOWS;
+    public static final boolean isLinux = Platform.get() == Platform.LINUX;
     private static final long SetThreadPriority;
     private static final long SetThreadSelectedCpuSetMasks;
     private static final long schedSetaffinity;
