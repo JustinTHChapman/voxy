@@ -37,11 +37,11 @@ bool checkPointInView(vec4 point) {
     return within(vec3(-point.w,-point.w,0.0f), point.xyz, vec3(point.w));
 }
 
-vec3 minBB = vec3(0.0f);
-vec3 maxBB = vec3(0.0f);
-bool frustumCulled = false;
+vec3 _minBB = vec3(0.0f);
+vec3 _maxBB = vec3(0.0f);
+bool _frustumCulled = false;
 
-float screenSize = 0.0f;
+float _screenSize = 0.0f;
 
 #ifdef TAA
 vec2 getTAA();
@@ -64,10 +64,10 @@ void setupScreenspace(in UnpackedNode node) {
 
     vec3 basePos = vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos;
 
-    frustumCulled = outsideFrustum(frustum, basePos, float(32<<node.lodLevel));
+    _frustumCulled = outsideFrustum(frustum, basePos, float(32<<node.lodLevel));
 
     //Fast exit
-    if (frustumCulled) {
+    if (_frustumCulled) {
         return;
     }
 
@@ -123,26 +123,26 @@ void setupScreenspace(in UnpackedNode node) {
             ssize += crossMag(C,B);
         }
         ssize *= 0.5f;//Half the size since we did both back and front area
-        screenSize = ssize;
+        _screenSize = ssize;
     }
 
-    minBB = min(min(min(p000, p100), min(p001, p101)), min(min(p010, p110), min(p011, p111)));
-    maxBB = max(max(max(p000, p100), max(p001, p101)), max(max(p010, p110), max(p011, p111)));
+    _minBB = min(min(min(p000, p100), min(p001, p101)), min(min(p010, p110), min(p011, p111)));
+    _maxBB = max(max(max(p000, p100), max(p001, p101)), max(max(p010, p110), max(p011, p111)));
 
 
     #ifdef TAA
     vec2 taaValue = getTAA()*0.5f;//Note! this might be need tobe *0.5f
-    minBB.xy += taaValue;
-    maxBB.xy += taaValue;
+    _minBB.xy += taaValue;
+    _maxBB.xy += taaValue;
     #endif
 
-    minBB = clamp(minBB, vec3(0), vec3(1));
-    maxBB = clamp(maxBB, vec3(0), vec3(1));
+    _minBB = clamp(_minBB, vec3(0), vec3(1));
+    _maxBB = clamp(_maxBB, vec3(0), vec3(1));
 }
 
 //Checks if the node is implicitly culled (outside frustum)
 bool outsideFrustum() {
-    return frustumCulled;// maxW < 16 is a trick where 16 is the near plane
+    return _frustumCulled;// maxW < 16 is a trick where 16 is the near plane
 
     //|| any(lessThanEqual(minBB, vec3(0.0f, 0.0f, 0.0f))) || any(lessThanEqual(vec3(1.0f, 1.0f, 1.0f), maxBB));
 }
@@ -152,10 +152,10 @@ bool isCulledByHiz() {
 
     //Things start breaking down if the area is the entire scree, no idea why, just abort if we hit this case
     //if ((maxBB.xy-minBB.xy)==vec2(1.0f)) return false;
-    if (any(lessThan(abs(maxBB.xy-minBB.xy-vec2(1.0f)), vec2(0.000001f)))) return false;
+    if (any(lessThan(abs(_maxBB.xy-_minBB.xy-vec2(1.0f)), vec2(0.000001f)))) return false;
 
     ivec2 ssize = ivec2(packedHizSize>>16,packedHizSize&0xFFFF);
-    vec2 size = (maxBB.xy-minBB.xy)*ssize;
+    vec2 size = (_maxBB.xy-_minBB.xy)*ssize;
     float miplevel = log2(max(max(size.x, size.y),1));
 
     miplevel = floor(miplevel)-1;
@@ -164,8 +164,8 @@ bool isCulledByHiz() {
 
     int ml = int(miplevel);
     ssize = max(ivec2(1), ssize>>ml);
-    ivec2 mxbb = min(ivec2(ceil(maxBB.xy*ssize)),ssize-1);
-    ivec2 mnbb = ivec2(floor(minBB.xy*ssize));
+    ivec2 mxbb = min(ivec2(ceil(_maxBB.xy*ssize)),ssize-1);
+    ivec2 mnbb = ivec2(floor(_minBB.xy*ssize));
 
     float pointSample = -1.0f;
     //float pointSample2 = 0.0f;
@@ -178,13 +178,13 @@ bool isCulledByHiz() {
         }
     }
     //pointSample = mix(pointSample, pointSample2, pointSample<=0.000001f);
-    return pointSample<minBB.z-0.000001f;;////(minBB.z*2-1);
+    return pointSample<_minBB.z-0.000001f;;////(minBB.z*2-1);
 }
 
 
 
 //Returns if we should decend into its children or not
 bool shouldDecend() {
-    return screenSize > minSSS;
+    return _screenSize > minSSS;
 }
 
