@@ -107,7 +107,7 @@ public class RenderResourceReuse {
             geometryCapacity = Math.max(geometryCapacity, 1L<<30);//intel moment, force min 1gb
         }
         if (Capabilities.INSTANCE.isNvidia && ThreadUtils.isLinux) {
-            geometryCapacity = Math.min(geometryCapacity, (1L<<31)-64L<<20);//nvidia linux moment, force max 2gb heap
+            geometryCapacity = Math.min(geometryCapacity, 2000L*1024L*1024L);//nvidia linux moment, force max 2gb heap
         }
 
         geometryCapacity = Math.max(512*1024*1024, geometryCapacity);//min of 512 mb

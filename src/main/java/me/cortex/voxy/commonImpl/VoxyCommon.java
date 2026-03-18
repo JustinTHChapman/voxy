@@ -81,10 +81,6 @@ public class VoxyCommon implements ModInitializer {
         INSTANCE = FACTORY.create();
     }
 
-    public static void onSessionLeave() {
-
-    }
-
     //Is voxy available in any capacity
     public static boolean isAvailable() {
         return FACTORY != null;

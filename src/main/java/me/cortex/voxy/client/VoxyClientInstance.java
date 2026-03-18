@@ -24,9 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class VoxyClientInstance extends VoxyInstance {
-    public static boolean isInGame = false;
-
-    private final SectionStorageConfig storageConfig;
+    private final Config config;
     private final Path basePath;
     private final boolean noIngestOverride;
     public VoxyClientInstance() {
@@ -37,7 +35,7 @@ public class VoxyClientInstance extends VoxyInstance {
             path = getBasePath();
         }
         this.basePath = path;
-        this.storageConfig = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==1&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, path).sectionStorageConfig;
+        this.config = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==1&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, path);
         this.updateDedicatedThreads();
     }
 
@@ -69,7 +67,7 @@ public class VoxyClientInstance extends VoxyInstance {
         ctx.setProperty(ConfigBuildCtx.WORLD_IDENTIFIER, identifier.getWorldId());
         ctx.setProperty(ConfigBuildCtx.PLAYER_UUID, Minecraft.getInstance().getUser().getProfileId().toString().replace(':','-'));
         ctx.pushPath(ConfigBuildCtx.DEFAULT_STORAGE_PATH);
-        return this.storageConfig.build(ctx);
+        return this.config.sectionStorageConfig.build(ctx);
     }
 
     public Path getStorageBasePath() {
