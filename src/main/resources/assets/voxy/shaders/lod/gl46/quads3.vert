@@ -1,5 +1,6 @@
 #version 460 core
 #extension GL_ARB_gpu_shader_int64 : enable
+#extension GL_NV_gpu_shader5 : enable
 
 #define QUAD_BUFFER_BINDING 1
 #define MODEL_BUFFER_BINDING 3
@@ -21,6 +22,12 @@ layout(location = 0) out flat uvec4 interData;
 layout(location = 1) out vec2 uv;
 #endif
 
+#ifdef GL_NV_gpu_shader5
+out gl_PerVertex {
+    f16vec4 gl_Position;
+};
+#endif
+
 #ifdef DEBUG_RENDER
 layout(location = 7) out flat uint quadDebug;
 #endif
@@ -35,10 +42,20 @@ void main() {
 
     QuadData quad;
     uvec2 pos = positionBuffer[gl_BaseInstance];
-    setupQuad(quad, quadData[uint(gl_VertexID)>>2], pos, (gl_VertexID&3) == 1);
+    setupQuad(quad, quadData[uint(gl_VertexID)>>2], pos, false);//(gl_VertexID&3) == 1
 
     uint cornerId = gl_VertexID&3;
-    gl_Position = getQuadCornerPos(quad, cornerId);
+
+    gl_Position =
+    #ifdef GL_NV_gpu_shader5
+    f16vec4(
+    #endif
+    getQuadCornerPos(quad, cornerId)
+    #ifdef GL_NV_gpu_shader5
+    )
+    #endif
+    ;
+
 
     #ifndef USE_NV_BARRY
     uv = getCornerUV(quad, cornerId);
