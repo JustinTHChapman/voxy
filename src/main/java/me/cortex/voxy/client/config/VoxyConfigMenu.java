@@ -70,7 +70,7 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                         "voxy:use_sodium_threads",
                                         Component.translatable("voxy.config.general.useSodiumBuilder"),
                                         ()->!CFG.dontUseSodiumBuilderThreads, v->CFG.dontUseSodiumBuilderThreads=!v)
-                                        .setPostChangeFlags("voxy:update_threads")
+                                        .setPostChangeFlags("voxy:update_threads", RENDER_RELOAD)
                         ), new Group(
                                 new BoolOption(
                                         "voxy:ingest_enabled",
