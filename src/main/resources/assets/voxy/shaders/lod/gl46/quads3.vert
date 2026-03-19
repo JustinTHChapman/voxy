@@ -1,6 +1,9 @@
 #version 460 core
 #extension GL_ARB_gpu_shader_int64 : enable
+
+#ifdef USE_NV_JANK
 #extension GL_NV_gpu_shader5 : enable
+#endif
 
 #define QUAD_BUFFER_BINDING 1
 #define MODEL_BUFFER_BINDING 3
@@ -46,12 +49,11 @@ void main() {
 
     uint cornerId = gl_VertexID&3;
 
+    gl_Position =
     #ifdef GL_NV_gpu_shader5
-    gl_Position = f16vec4(getQuadCornerPos(quad, cornerId));
-    #else
-    gl_Position = getQuadCornerPos(quad, cornerId);
+    f16vec4
     #endif
-
+    (getQuadCornerPos(quad, cornerId));
 
 
     #ifndef USE_NV_BARRY

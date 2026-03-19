@@ -110,6 +110,8 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                 .defineIf("TAA_PATCH", taa != null)
                 .defineIf("DEBUG_RENDER", false)
 
+                .defineIf("USE_NV_JANK", Capabilities.INSTANCE.isNvidia)
+
                 //.defineIf("USE_NV_BARRY", Capabilities.INSTANCE.nvBarryCoords)
 
                 .addSource(ShaderType.VERTEX, vertex);

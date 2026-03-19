@@ -31,7 +31,7 @@ void main() {
     ivec3 pos = (((ipos<<detail)-baseSectionPos)<<5);
 
     //TODO maybe make the size expansion 0.5 (or maybe get rid of it all together?)
-    const float EXPANSION = 1f;
+    const float EXPANSION = 1.0f;
 
 
     vec3 offset = aabbOffset-EXPANSION;
