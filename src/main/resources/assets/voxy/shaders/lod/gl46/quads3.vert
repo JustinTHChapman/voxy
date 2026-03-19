@@ -42,19 +42,16 @@ void main() {
 
     QuadData quad;
     uvec2 pos = positionBuffer[gl_BaseInstance];
-    setupQuad(quad, quadData[uint(gl_VertexID)>>2], pos, false);//(gl_VertexID&3) == 1
+    setupQuad(quad, quadData[uint(gl_VertexID)>>2], pos, (gl_VertexID&3) == 1);
 
     uint cornerId = gl_VertexID&3;
 
-    gl_Position =
     #ifdef GL_NV_gpu_shader5
-    f16vec4(
+    gl_Position = f16vec4(getQuadCornerPos(quad, cornerId));
+    #else
+    gl_Position = getQuadCornerPos(quad, cornerId);
     #endif
-    getQuadCornerPos(quad, cornerId)
-    #ifdef GL_NV_gpu_shader5
-    )
-    #endif
-    ;
+
 
 
     #ifndef USE_NV_BARRY
