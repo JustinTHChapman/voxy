@@ -25,10 +25,12 @@ layout(location = 0) out flat uvec4 interData;
 layout(location = 1) out vec2 uv;
 #endif
 
+#ifdef USE_NV_JANK
 #ifdef GL_NV_gpu_shader5
 out gl_PerVertex {
     f16vec4 gl_Position;
 };
+#endif
 #endif
 
 #ifdef DEBUG_RENDER
@@ -50,8 +52,10 @@ void main() {
     uint cornerId = gl_VertexID&3;
 
     gl_Position =
+    #ifdef USE_NV_JANK
     #ifdef GL_NV_gpu_shader5
     f16vec4
+    #endif
     #endif
     (getQuadCornerPos(quad, cornerId));
 
