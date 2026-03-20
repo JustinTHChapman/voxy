@@ -22,7 +22,7 @@ import static org.lwjgl.opengl.GL33.*;
 
 public class IrisShaderPatch {
     public static final int VERSION = ((IntSupplier)()->1).getAsInt();
-    public static final int SHADER_DEFINE_VERSION = 1;
+    public static final int SHADER_DEFINE_VERSION = 2;
 
 
     private static final class SSBODeserializer implements JsonDeserializer<Int2ObjectOpenHashMap<String>> {
@@ -174,6 +174,7 @@ public class IrisShaderPatch {
         public boolean excludeLodsFromVanillaDepth;
         public float[] renderScale;
         public boolean useViewportDims;
+        public boolean skipShaderDepthHackFix;
         //public boolean deferTranslucentRendering;
         public String checkValid() {
             if (this.blending != null) {
@@ -225,6 +226,7 @@ public class IrisShaderPatch {
         return this.patchData.useViewportDims;
     }
 
+    public boolean skipShaderDepthHackFix() { return this.patchData.skipShaderDepthHackFix; }
     public Int2ObjectMap<String> getSSBOs() {
         return new Int2ObjectLinkedOpenHashMap<>(this.ssbos);
     }

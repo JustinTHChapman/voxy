@@ -28,6 +28,8 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     private final FullscreenBlit depthBlit = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag");
     public final DepthFramebuffer fbTranslucent = new DepthFramebuffer(this.fb.getFormat());
 
+    private final FullscreenBlit shaderDepthHackFixTransformBlit;
+
     private final GlBuffer shaderUniforms;
 
     public IrisVoxyRenderPipeline(IrisVoxyRenderPipelineData data, AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
@@ -63,6 +65,12 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         } else {
             this.shaderUniforms = null;
         }
+
+        if (!this.data.skipShaderDepthHackFix) {
+            this.shaderDepthHackFixTransformBlit = new FullscreenBlit("voxy:post/fullscreen2.vert", "voxy:post/noop.frag");
+        } else {
+            this.shaderDepthHackFixTransformBlit = null;
+        }
     }
 
     @Override
@@ -79,6 +87,10 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
 
         this.depthBlit.delete();
         this.fbTranslucent.free();
+
+        if (this.shaderDepthHackFixTransformBlit != null) {
+            this.shaderDepthHackFixTransformBlit.delete();
+        }
 
         if (this.shaderUniforms != null) {
             this.shaderUniforms.free();
@@ -100,7 +112,6 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
 
     @Override
     protected int setup(Viewport<?> viewport, int sourceFramebuffer, int srcWidth, int srcHeight) {
-
         this.fb.resize(viewport.width, viewport.height);
         this.fbTranslucent.resize(viewport.width, viewport.height);
 
@@ -121,6 +132,20 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
 
     @Override
     protected void postOpaquePreTranslucent(Viewport<?> viewport) {
+        if (this.shaderDepthHackFixTransformBlit != null) {
+            this.fb.bind();
+            glEnable(GL_DEPTH_TEST);
+            glColorMask(false, false, false, false);
+            glDepthFunc(GL_ALWAYS);
+            glStencilFunc(GL_EQUAL, 0, 0xFF);//set the depth to 1 where the mask is 0
+            this.shaderDepthHackFixTransformBlit.blit();
+            glStencilFunc(GL_EQUAL, 1, 0xFF);//revert the mask test
+            glDepthFunc(GL_LEQUAL);
+            glColorMask(true, true, true, true);
+        }
+
+        glTextureBarrier();
+
         int msk = GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT;
         if (true) {//TODO: make shader specified
             if (false) {//TODO: only do this if shader specifies

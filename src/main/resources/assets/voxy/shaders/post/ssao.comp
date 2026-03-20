@@ -27,7 +27,8 @@ vec4 reDeProject(vec3 pos) {
     float depth = mix(depths2.x, depths2.y, frac.x);*/
 
     float depth = texture(depthTex, UV).x;
-    if (depth >= 0.999999f) {
+
+    if (depth >= 0.999999f || depth == 0.0f) {
         return vec4(-1.0f);
     }
 
