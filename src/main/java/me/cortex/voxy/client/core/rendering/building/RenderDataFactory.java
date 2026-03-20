@@ -235,16 +235,23 @@ public class RenderDataFactory {
                     if (modelId == -1) {//Failed, so just return error
                         return Mapper.getBlockId(block) | (1 << 31);
                     }
-                    long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
+                    if (modelId == 0) {//modelId == 0, its basicly air so set it as air
+                        sectionData[i * 2] = (block & (0xFFL << 56)) >>> 1;
+                        sectionData[i * 2 + 1] = 0;
+                    } else {
+                        //TODO: cache the results of this, then link it to `block` do same optimization as SaveLoadSystem3
 
-                    sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
-                    sectionData[i * 2 + 1] = modelMetadata;
+                        long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
 
-                    long msk = 1L << j;
-                    opaque |= ModelQueries.isFullyOpaque(modelMetadata) ? msk : 0;
-                    notEmpty |= modelId != 0 ? msk : 0;
-                    pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
-                    partialFluid |= ModelQueries.containsFluid(modelMetadata) ? msk : 0;
+                        sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
+                        sectionData[i * 2 + 1] = modelMetadata;
+
+                        long msk = 1L << j;
+                        opaque |= ModelQueries.isFullyOpaque(modelMetadata) ? msk : 0;
+                        notEmpty |= modelId != 0 ? msk : 0;
+                        pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
+                        partialFluid |= ModelQueries.containsFluid(modelMetadata) ? msk : 0;
+                    }
                 }
             }
             if (notEmpty != 0) {
