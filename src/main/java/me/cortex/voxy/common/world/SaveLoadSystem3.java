@@ -90,22 +90,20 @@ public class SaveLoadSystem3 {
         final long metadata = MemoryUtil.memGetLong(ptr); ptr += 8;
         section.nonEmptyChildren = (byte) ((metadata>>>16)&0xFF);
         final long lutBasePtr = ptr + WorldSection.SECTION_VOLUME * 2;
-        if (section.lvl == 0) {
-            int nonEmptyBlockCount = 0;
-            final var blockData = section.data;
-            for (int i = 0; i < WorldSection.SECTION_VOLUME; i++) {
-                final short lutId = MemoryUtil.memGetShort(ptr); ptr += 2;
-                final long blockId = MemoryUtil.memGetLong(lutBasePtr + Short.toUnsignedLong(lutId) * 8L);
-                nonEmptyBlockCount += Mapper.isAir(blockId) ? 0 : 1;
-                blockData[i] = blockId;
-            }
-            section.nonEmptyBlockCount = nonEmptyBlockCount;
-        } else {
-            final var blockData = section.data;
-            for (int i = 0; i < WorldSection.SECTION_VOLUME; i++) {
-                blockData[i] = MemoryUtil.memGetLong(lutBasePtr + Short.toUnsignedLong(MemoryUtil.memGetShort(ptr)) * 8L);ptr += 2;
-            }
+
+        final var blockData = section.data;
+        for (int i = 0; i < WorldSection.SECTION_VOLUME; i++) {
+            blockData[i] = MemoryUtil.memGetLong(lutBasePtr + Short.toUnsignedLong(MemoryUtil.memGetShort(ptr)) * 8L);ptr += 2;
         }
+
+        if (section.lvl == 0) {
+            int emptyBlockCount = 0;
+            for (long block : blockData) {
+                emptyBlockCount += Mapper.isAir(block) ? 1 : 0;
+            }
+            section.nonEmptyBlockCount = WorldSection.SECTION_VOLUME-emptyBlockCount;
+        }
+
         ptr = lutBasePtr + (metadata & 0xFFFF) * 8L;
         return true;
     }

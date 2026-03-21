@@ -190,23 +190,14 @@ public class RenderDataFactory {
     }
 
     private static long getQuadTyping(long metadata) {//2 bits
-        int type = 0;
-        {
-            boolean a = ModelQueries.isTranslucent(metadata);
-            boolean b = ModelQueries.isDoubleSided(metadata);
-            //Pre shift by 1
-            //type = a|b?0:4;
-            //type |= b&!a?2:0;
-            type = a?0:(b?2:4);
-        }
-        return type;
+        return 0b111L&(0b000_000_010_100L>>(ModelQueries._isTranslucent(metadata)*6+ModelQueries._isDoubleSided(metadata)*3));
     }
 
     private static long packPartialQuadData(int modelId, long state, long metadata) {
         //This uses hardcoded data to shuffle things
         long lightAndBiome =  (state&((0x1FFL<<47)|(0xFFL<<56)))>>>1;
-        lightAndBiome &= ModelQueries.isBiomeColoured(metadata)?-1:~(0x1FFL<<46);//46 not 47 because is already shifted by 1 THIS WASTED 4 HOURS ;-; aaaaaAAAAAA
-        lightAndBiome &= ModelQueries.isFullyOpaque(metadata)?~(0xFFL<<55):-1;//If its fully opaque it always uses neighbor light?
+        lightAndBiome &= ~(ModelQueries._notIsBiomeColoured(metadata) * (0x1FFL << 46));//46 not 47 because is already shifted by 1 THIS WASTED 4 HOURS ;-; aaaaaAAAAAA
+        lightAndBiome &= ~(ModelQueries._isFullyOpaque(metadata)*(0xFFL << 55));//If its fully opaque it always uses neighbor light?
 
         long quadData = lightAndBiome;
         quadData |= Integer.toUnsignedLong(modelId)<<26;
@@ -246,11 +237,10 @@ public class RenderDataFactory {
                         sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
                         sectionData[i * 2 + 1] = modelMetadata;
 
-                        long msk = 1L << j;
-                        opaque |= ModelQueries.isFullyOpaque(modelMetadata) ? msk : 0;
-                        notEmpty |= modelId != 0 ? msk : 0;
-                        pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
-                        partialFluid |= ModelQueries.containsFluid(modelMetadata) ? msk : 0;
+                        notEmpty |= 1L << j;
+                        opaque |= ModelQueries._isFullyOpaque(modelMetadata)<<j;
+                        pureFluid |= ModelQueries._isFluid(modelMetadata)<<j;
+                        partialFluid |= ModelQueries._containsFluid(modelMetadata)<<j;
                     }
                 }
             }
