@@ -23,7 +23,6 @@
     "minecraft.MixinDebugScreenEntryList",
     "minecraft.MixinFogRenderer",
     "minecraft.MixinGlDebug",
-    "minecraft.MixinLayerLightSectionStorage",
     "minecraft.MixinLevelRenderer",
     "minecraft.MixinMinecraft",
     "minecraft.MixinRenderSystem",
