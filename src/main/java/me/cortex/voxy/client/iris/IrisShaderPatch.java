@@ -11,8 +11,11 @@ import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
 import org.lwjgl.opengl.ARBDrawBuffersBlend;
 
+import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.IntSupplier;
@@ -370,8 +373,13 @@ public class IrisShaderPatch {
             }
         } catch (Exception e) {
             patchData = null;
-            Logger.error("Failed to parse patch data gson",e);
-            throw new ShaderLoadError("Failed to parse patch data gson",e);
+            Logger.error("Failed to parse patch data gson, dumping json",e);
+            try {
+                Files.writeString(Path.of("JSON_DUMP.txt"), voxyPatchData);
+            } catch (IOException j) {
+                throw new RuntimeException(j);
+            }
+            throw new ShaderLoadError("Failed to parse patch data gson, dumping json",e);
         }
         if (patchData == null) {
             return null;
