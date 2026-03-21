@@ -79,9 +79,7 @@ public class RenderGenerationService {
             return new Pair<>(() -> {
                 this.processJob(factory, seenMissed);
             }, factory::free);
-        }, 10, "Section mesh generation service", ()->{
-            return modelBakery.getProcessingCount()<400||RenderGenerationService.MESH_FAILED_COUNTER.get()<500;
-        });
+        }, 10, "Section mesh generation service");
     }
 
     public void setResultConsumer(Consumer<BuiltSection> consumer) {
