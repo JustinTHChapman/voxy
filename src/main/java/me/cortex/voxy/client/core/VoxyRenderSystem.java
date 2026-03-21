@@ -143,7 +143,7 @@ public class VoxyRenderSystem {
                     maxSec = 7;
                 }
 
-                this.renderDistanceTracker = new RenderDistanceTracker(20,
+                this.renderDistanceTracker = new RenderDistanceTracker(40,
                         minSec,
                         maxSec,
                         this.nodeManager::addTopLevel,
