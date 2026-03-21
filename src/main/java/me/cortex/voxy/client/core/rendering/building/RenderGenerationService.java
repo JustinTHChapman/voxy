@@ -80,8 +80,6 @@ public class RenderGenerationService {
                 this.processJob(factory, seenMissed);
             }, factory::free);
         }, 10, "Section mesh generation service", ()->{
-            int modelBakeQueueCount = modelBakery.getProcessingCount();
-            if (modelBakeQueueCount>1000) return false;//Pause mesh gen if there is alot of model baking happening
             return modelBakery.getProcessingCount()<400||RenderGenerationService.MESH_FAILED_COUNTER.get()<500;
         });
     }
