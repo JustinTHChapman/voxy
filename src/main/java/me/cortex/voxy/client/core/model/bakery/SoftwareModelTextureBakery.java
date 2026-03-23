@@ -36,6 +36,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.lwjgl.opengl.GL11.glFinish;
+
 public class SoftwareModelTextureBakery {
     //Note: the first bit of metadata is if alpha discard is enabled
     private static final Matrix4f[] VIEWS = new Matrix4f[6];
@@ -73,6 +75,7 @@ public class SoftwareModelTextureBakery {
         };
 
         commandEncoder.copyTextureToBuffer(tex, gpuBuffer, 0, runnable, targetMipLevel);
+        glFinish();//Required for intel since they dont insert there own flush in, causing this loop to never exit
         while (!done[0]) {
             try {
                 Thread.sleep(10);
