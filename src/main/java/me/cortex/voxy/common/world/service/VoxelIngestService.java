@@ -6,6 +6,7 @@ import me.cortex.voxy.common.thread.ServiceManager;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
+import me.cortex.voxy.common.voxelization.WorldVoxilizedSectionMipper;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.commonImpl.VoxyCommon;
@@ -47,7 +48,7 @@ public class VoxelIngestService {
                     section.getBiomes(),
                     getLightingSupplier(task)
             );
-            WorldConversionFactory.mipSection(csec, task.world.getMapper());
+            WorldVoxilizedSectionMipper.mipSection(csec, task.world.getMapper());
             WorldUpdater.insertUpdate(task.world, csec);
         }
     }

@@ -7,6 +7,7 @@ import me.cortex.voxy.common.util.ByteBufferBackedInputStream;
 import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
+import me.cortex.voxy.common.voxelization.WorldVoxilizedSectionMipper;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.common.world.other.Mapper;
@@ -380,7 +381,7 @@ public class DHImporter implements IDataImporter {
                             section.lvl0NonAirCount = nonAirCount;
                         }
 
-                        WorldConversionFactory.mipSection(section, this.engine.getMapper());
+                        WorldVoxilizedSectionMipper.mipSection(section, this.engine.getMapper());
 
                         section.setPosition(X*4+(x>>4), sy+(this.bottomOfWorld>>4), (Z*4)+sz);
                         WorldUpdater.insertUpdate(this.engine, section);
