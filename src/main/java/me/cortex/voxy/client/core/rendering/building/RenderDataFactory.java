@@ -254,20 +254,7 @@ public class RenderDataFactory {
                 this.fluidMasks[(i >> 5) - 2] = (int) fluid;
                 this.fluidMasks[(i >> 5) - 1] = (int) (fluid>>>32);
 
-                int packedEmpty = (int) ((notEmpty>>>32)|notEmpty);
-
-                int neighborMsk = 0;
-                //-+x
-                neighborMsk += packedEmpty&1;//-x
-                neighborMsk += (packedEmpty>>>30)&0b10;//+x
-
-                //notEmpty = (notEmpty != 0)?1:0;
-                neighborMsk += ((((i - 1) >> 10) == 0) ? 0b100 : 0)*(packedEmpty!=0?1:0);//-y
-                neighborMsk += ((((i - 1) >> 10) == 31) ? 0b1000 : 0)*(packedEmpty!=0?1:0);//+y
-                neighborMsk += (((((i - 33) >> 5) & 0x1F) == 0) ? 0b10000 : 0)*(((int)notEmpty)!=0?1:0);//-z
-                neighborMsk += (((((i - 1) >> 5) & 0x1F) == 31) ? 0b100000 : 0)*((notEmpty>>>32)!=0?1:0);//+z
-
-                neighborAcquireMskAndFlags |= neighborMsk;
+                neighborAcquireMskAndFlags |= getNeighborMsk(notEmpty, i);
                 neighborAcquireMskAndFlags |= opaque!=0?(1<<6):0;
 
                 opaque = 0;
@@ -277,6 +264,22 @@ public class RenderDataFactory {
             }
         }
         return neighborAcquireMskAndFlags;
+    }
+
+    private static int getNeighborMsk(long notEmpty, int i) {
+        int packedEmpty = (int) ((notEmpty >>>32)| notEmpty);
+
+        int neighborMsk = 0;
+        //-+x
+        neighborMsk += packedEmpty&1;//-x
+        neighborMsk += (packedEmpty>>>30)&0b10;//+x
+
+        //notEmpty = (notEmpty != 0)?1:0;
+        neighborMsk += ((((i - 1) >> 10) == 0) ? 0b100 : 0)*(packedEmpty!=0?1:0);//-y
+        neighborMsk += ((((i - 1) >> 10) == 31) ? 0b1000 : 0)*(packedEmpty!=0?1:0);//+y
+        neighborMsk += (((((i - 33) >> 5) & 0x1F) == 0) ? 0b10000 : 0)*(((int) notEmpty)!=0?1:0);//-z
+        neighborMsk += (((((i - 1) >> 5) & 0x1F) == 31) ? 0b100000 : 0)*((notEmpty >>>32)!=0?1:0);//+z
+        return neighborMsk;
     }
 
     private void acquireNeighborData(WorldSection section, int msk) {
