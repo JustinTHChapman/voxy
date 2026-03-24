@@ -58,18 +58,19 @@ public class SoftwareModelTextureBakery {
 
         int width = tex.getWidth(targetMipLevel);
         int height = tex.getHeight(targetMipLevel);
-        GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(() -> "Texture output buffer", 9, 4*width*height);//USAGE_COPY_SRC|USAGE_MAP_READ
+        GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(() -> "Texture output buffer", 9, (4L*width)*height);//USAGE_COPY_SRC|USAGE_MAP_READ
         CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
         boolean[] done = new boolean[1];
         Runnable runnable = () -> {
-            try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(gpuBuffer, true, false)) {
-                var texture = new int[width*height];
-                for (int i = 0; i < texture.length; i++) {
-                    texture[i] = mappedView.data().getInt(i*4);
+            var texture = new int[width*height];
+            final long BATCH_SIZE = (1L<<31)-(1L<<20);
+            for (long offset = 0; offset < (4L*width)*height; offset += BATCH_SIZE) {
+                long size = Math.min((4L*width)*height-offset, BATCH_SIZE);
+                try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(gpuBuffer.slice(offset, size), true, false)) {
+                    mappedView.data().asIntBuffer().get(texture, (int) (offset/4), (int) (size/4));
                 }
-
-                this.rasterizer.setSamplerTexture(texture, width, height);
             }
+            this.rasterizer.setSamplerTexture(texture, width, height);
             gpuBuffer.close();
             done[0] = true;
         };
