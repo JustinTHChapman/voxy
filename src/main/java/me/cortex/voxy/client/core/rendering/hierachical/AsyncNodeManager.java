@@ -105,11 +105,11 @@ public class AsyncNodeManager {
             }
         });
         this.thread.setUncaughtExceptionHandler((t,e)->{
-            this.running = false;
             if (e == null) {
                 e = new RuntimeException("null throwable");
             }
             this.uncaughtException = e;
+            this.running = false;
         });
         this.thread.setName("Async Node Manager");
 
@@ -638,7 +638,12 @@ public class AsyncNodeManager {
     private final LongOpenHashSet tlnRem = new LongOpenHashSet();
 
     private void addWork() {
-        if (!this.running) throw new IllegalStateException("Not running");
+        if (!this.running) {
+            if (this.uncaughtException != null) {
+                throw new RuntimeException(this.uncaughtException);//Propagate internal exception
+            }
+            throw new IllegalStateException("Not running");
+        }
         if (this.workCounter.getAndIncrement() == 0) {
             LockSupport.unpark(this.thread);
         }
