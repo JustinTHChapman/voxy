@@ -232,7 +232,7 @@ remapJar {
     if (!isInGHA) {
         def hash = gitCommitHash();
         if (!hash.equals("<UnknownCommit>")) {
-            archiveClassifier.set(hash);
+            archiveClassifier.set(hash.substring(0,7));
         }
     }
 }
