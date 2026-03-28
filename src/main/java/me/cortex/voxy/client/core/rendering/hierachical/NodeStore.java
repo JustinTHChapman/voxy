@@ -181,7 +181,7 @@ public final class NodeStore {
             throw new IllegalStateException("Too many requests to happen at once!");
         int id = id2idx(node)+2;
         long data = this.localNodeData[id];
-        data &= ~REQUEST_ID_MSK;
+        data &= ~(Integer.toUnsignedLong(REQUEST_ID_MSK));
         data |= requestId;
         this.localNodeData[id] = data;
     }

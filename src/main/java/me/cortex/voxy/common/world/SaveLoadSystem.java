@@ -11,7 +11,6 @@ import org.lwjgl.system.MemoryUtil;
 public class SaveLoadSystem {
     public static final boolean VERIFY_HASH_ON_LOAD  = VoxyCommon.isVerificationFlagOn("verifySectionHash");
     public static final boolean VERIFY_MEMORY_ACCESS = VoxyCommon.isVerificationFlagOn("verifyMemoryAccess");
-    public static final int BIGGEST_SERIALIZED_SECTION_SIZE = 32 * 32 * 32 * 8 * 2 + 8;
 
     public static int lin2z(int i) {//y,z,x
         int x = i&0x1F;
