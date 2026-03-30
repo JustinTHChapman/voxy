@@ -35,7 +35,7 @@ public class DebugEntries {
                 }
                 VoxyRenderSystem vrs = null;
                 var wr = Minecraft.getInstance().levelRenderer;
-                if (wr != null) vrs = ((IGetVoxyRenderSystem) wr).getVoxyRenderSystem();
+                if (wr != null) vrs = ((IGetVoxyRenderSystem) wr).voxy$getRenderSystem();
 
                 //Voxy instance active
                 lines.addLine((vrs==null?ChatFormatting.DARK_GREEN:ChatFormatting.GREEN)+"voxy-"+VoxyCommon.MOD_VERSION);

@@ -25,32 +25,32 @@ public abstract class MixinLevelRenderer implements IGetVoxyRenderSystem {
     @Unique private VoxyRenderSystem renderer;
 
     @Override
-    public VoxyRenderSystem getVoxyRenderSystem() {
+    public VoxyRenderSystem voxy$getRenderSystem() {
         return this.renderer;
     }
 
     @Inject(method = "allChanged()V", at = @At("RETURN"), order = 900)//We want to inject before sodium
-    private void reloadVoxyRenderer(CallbackInfo ci) {
-        this.shutdownRenderer();
+    private void voxy$reloadVoxyRenderer(CallbackInfo ci) {
+        this.voxy$shutdownRenderer();
         if (this.level != null) {
-            this.createRenderer();
+            this.voxy$createRenderer();
         }
     }
 
     @Inject(method = "setLevel", at = @At("HEAD"))
     private void voxy$captureSetWorld(ClientLevel world, CallbackInfo ci) {
         if (this.level != world) {
-            this.shutdownRenderer();
+            this.voxy$shutdownRenderer();
         }
     }
 
     @Inject(method = "close", at = @At("HEAD"))
-    private void injectClose(CallbackInfo ci) {
-        this.shutdownRenderer();
+    private void voxy$injectClose(CallbackInfo ci) {
+        this.voxy$shutdownRenderer();
     }
 
     @Override
-    public void shutdownRenderer() {
+    public void voxy$shutdownRenderer() {
         if (this.renderer != null) {
             this.renderer.shutdown();
             this.renderer = null;
@@ -58,7 +58,7 @@ public abstract class MixinLevelRenderer implements IGetVoxyRenderSystem {
     }
 
     @Override
-    public void createRenderer() {
+    public void voxy$createRenderer() {
         if (this.renderer != null) throw new IllegalStateException("Cannot have multiple renderers");
         if (!VoxyConfig.CONFIG.enabled) {
             Logger.info("Not creating renderer due to disabled");

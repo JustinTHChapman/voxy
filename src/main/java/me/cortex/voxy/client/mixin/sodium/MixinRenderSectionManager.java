@@ -40,7 +40,7 @@ public class MixinRenderSectionManager {
     @Inject(method = "<init>", at = @At("TAIL"))
     private void voxy$resetChunkTracker(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CommandList commandList, CallbackInfo ci) {
         if (level.levelRenderer != null) {
-            var system = ((IGetVoxyRenderSystem)(level.levelRenderer)).getVoxyRenderSystem();
+            var system = ((IGetVoxyRenderSystem)(level.levelRenderer)).voxy$getRenderSystem();
             if (system != null) {
                 system.chunkBoundRenderer.reset();
             }
@@ -49,7 +49,7 @@ public class MixinRenderSectionManager {
     }
 
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
-    private void injectIngest(int x, int z, CallbackInfo ci) {
+    private void voxy$injectIngest(int x, int z, CallbackInfo ci) {
         //TODO: Am not quite sure if this is right
         if (VoxyConfig.CONFIG.ingestEnabled && !BOBBY_INSTALLED) {
             var cccm = (ICheekyClientChunkCache)this.level.getChunkSource();
@@ -106,7 +106,7 @@ public class MixinRenderSectionManager {
         if (flags == 0)//Only process things with stuff
             return true;
 
-        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.levelRenderer)).getVoxyRenderSystem();
+        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.levelRenderer)).voxy$getRenderSystem();
         if (system == null) {
             return true;
         }

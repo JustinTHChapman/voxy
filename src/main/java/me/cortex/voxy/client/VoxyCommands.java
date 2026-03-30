@@ -8,7 +8,6 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.common.DebugUtils;
-import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import me.cortex.voxy.commonImpl.importers.DHImporter;
@@ -17,14 +16,9 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.SharedSuggestionProvider;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.storage.LevelResource;
-import org.apache.commons.math3.analysis.function.Min;
 
 import java.io.File;
 import java.io.IOException;
@@ -88,7 +82,7 @@ public class VoxyCommands {
         }
         var wr = Minecraft.getInstance().levelRenderer;
         if (wr!=null) {
-            ((IGetVoxyRenderSystem)wr).shutdownRenderer();
+            ((IGetVoxyRenderSystem)wr).voxy$shutdownRenderer();
         }
 
         VoxyCommon.shutdownInstance();

@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinRenderPipeline {
     @Inject(method = "renderFrame", at = @At("RETURN"))
     private void voxy$injectRender(TerrainRenderPass pass, Viewport frustum, FogParameters fogParameters, ChunkRenderMatrices crm, double px, double py, double pz, GpuSampler terrainSampler, CallbackInfo ci) {
-        var renderer = ((IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer).getVoxyRenderSystem();
+        var renderer = ((IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer).voxy$getRenderSystem();
         if (renderer != null) {
             renderer.renderOpaque(renderer.setupViewport(crm, fogParameters, px, py, pz));
         }
