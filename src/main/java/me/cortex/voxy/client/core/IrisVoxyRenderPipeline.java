@@ -131,7 +131,7 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     }
 
     @Override
-    protected void postOpaquePreTranslucent(Viewport<?> viewport) {
+    protected void postOpaquePreTranslucent(Viewport<?> viewport, int sourceDepthBuffer) {
         if (this.shaderDepthHackFixTransformBlit != null) {
             this.fb.bind();
             glEnable(GL_DEPTH_TEST);
