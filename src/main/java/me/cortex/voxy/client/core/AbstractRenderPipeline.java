@@ -87,7 +87,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     }
 
     protected abstract int setup(Viewport<?> viewport, int sourceFramebuffer, int srcWidth, int srcHeight);
-    protected abstract void postOpaquePreTranslucent(Viewport<?> viewport, int sourceDepthBuffer);
+    protected abstract void postOpaquePreTranslucent(Viewport<?> viewport, int sourceFrameBuffer);
     protected void finish(Viewport<?> viewport, int sourceFrameBuffer, int srcWidth, int srcHeight) {
         glDisable(GL_STENCIL_TEST);
         glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);

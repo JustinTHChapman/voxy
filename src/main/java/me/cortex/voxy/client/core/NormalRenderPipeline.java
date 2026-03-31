@@ -82,7 +82,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
     }
 
     @Override
-    protected void postOpaquePreTranslucent(Viewport<?> viewport, int sourceDepthBuffer) {
+    protected void postOpaquePreTranslucent(Viewport<?> viewport, int sourceFrameBuffer) {
         this.ssaoCompute.bind();
         try (var stack = MemoryStack.stackPush()) {
             long ptr = stack.nmalloc(4*4*4);
