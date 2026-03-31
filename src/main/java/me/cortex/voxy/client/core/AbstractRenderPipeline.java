@@ -115,7 +115,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         GPUTiming.INSTANCE.marker("TP");
         rs.renderTemporal(viewport);
 
-        this.postOpaquePreTranslucent(viewport, depthTexture);
+        this.postOpaquePreTranslucent(viewport, sourceFrameBuffer);
 
         this.postOpaquePreTranslucent(viewport);
         GPUTiming.INSTANCE.marker("RT");
