@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.model.bakery;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -42,7 +43,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureImage;
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL11.glFinish;
+import static org.lwjgl.opengl.GL11C.GL_RGBA;
 
 public class SoftwareModelTextureBakery {
     //Note: the first bit of metadata is if alpha discard is enabled
@@ -67,33 +71,11 @@ public class SoftwareModelTextureBakery {
 
         int width = tex.getWidth(targetMipLevel);
         int height = tex.getHeight(targetMipLevel);
-        GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(() -> "Texture output buffer", 9, (4L*width)*height);//USAGE_COPY_SRC|USAGE_MAP_READ
-        CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
-        boolean[] done = new boolean[1];
-        Runnable runnable = () -> {
-            var texture = new int[width*height];
-            final long BATCH_SIZE = (1L<<31)-(1L<<20);
-            for (long offset = 0; offset < (4L*width)*height; offset += BATCH_SIZE) {
-                long size = Math.min((4L*width)*height-offset, BATCH_SIZE);
-                try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(gpuBuffer.slice(offset, size), true, false)) {
-                    mappedView.data().asIntBuffer().get(texture, (int) (offset/4), (int) (size/4));
-                }
-            }
-            this.rasterizer.setSamplerTexture(texture, width, height);
-            gpuBuffer.close();
-            done[0] = true;
-        };
 
-        commandEncoder.copyTextureToBuffer(tex, gpuBuffer, 0, runnable, targetMipLevel);
-        glFinish();//Required for intel since they dont insert there own flush in, causing this loop to never exit
-        while (!done[0]) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            RenderSystem.executePendingTasks();
-        }
+        //Just do it ourselves as doing it with b3d has some issues, (doing it ourselves is also just much much much shorter)
+        var texture = new int[width*height];
+        glGetTextureImage(((GlTexture)tex).glId(), 0, GL_RGBA, GL_UNSIGNED_BYTE, texture);
+        this.rasterizer.setSamplerTexture(texture, width, height);
     }
 
     private void bakeBlockModel(BlockState state) {
