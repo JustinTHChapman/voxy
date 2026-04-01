@@ -19,18 +19,12 @@ import java.util.function.BooleanSupplier;
 
 import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glBindImageTexture;
-import static org.lwjgl.opengl.GL11.GL_BLEND;
-import static org.lwjgl.opengl.GL11.GL_ONE;
-import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
-import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
-import static org.lwjgl.opengl.GL11.glEnable;
-import static org.lwjgl.opengl.GL11C.GL_NEAREST;
-import static org.lwjgl.opengl.GL11C.GL_RGBA8;
-import static org.lwjgl.opengl.GL14.glBlendFuncSeparate;
-import static org.lwjgl.opengl.GL15.GL_READ_WRITE;
+import static org.lwjgl.opengl.GL30.GL_DEPTH_ATTACHMENT;
+import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME;
 import static org.lwjgl.opengl.GL30C.*;
-import static org.lwjgl.opengl.GL33.glBindSampler;
+import static org.lwjgl.opengl.GL33C.*;
 import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
+import static org.lwjgl.opengl.GL45.glGetNamedFramebufferAttachmentParameteri;
 import static org.lwjgl.opengl.GL45C.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45C.glTextureParameterf;
 
@@ -44,6 +38,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
 
     private final Shader ssaoCompute = Shader.make()
             .add(ShaderType.COMPUTE, "voxy:post/ssao.comp")
+            .define("BETTER_SSAO")
             .compile();
 
     protected NormalRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
@@ -86,22 +81,44 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
         this.ssaoCompute.bind();
         try (var stack = MemoryStack.stackPush()) {
             long ptr = stack.nmalloc(4*4*4);
-            viewport.MVP.getToAddress(ptr);
-            nglUniformMatrix4fv(3, 1, false, ptr);//MVP
-            viewport.MVP.invert(new Matrix4f()).getToAddress(ptr);
-            nglUniformMatrix4fv(4, 1, false, ptr);//invMVP
+            //viewport.MVP.getToAddress(ptr);
+            //nglUniformMatrix4fv(3, 1, false, ptr);//MVP
+            //viewport.MVP.invert(new Matrix4f()).getToAddress(ptr);
+            //nglUniformMatrix4fv(4, 1, false, ptr);//invMVP
+            viewport.projection.getToAddress(ptr);
+            nglUniformMatrix4fv(4, 1, false, ptr);//Proj
+            viewport.projection.invert(new Matrix4f()).getToAddress(ptr);
+            nglUniformMatrix4fv(5, 1, false, ptr);//invProj
+            viewport.modelView.getToAddress(ptr);
+            nglUniformMatrix4fv(6, 1, false, ptr);//MV
+            viewport.vanillaProjection.invert(new Matrix4f()).getToAddress(ptr);
+            nglUniformMatrix4fv(7, 1, false, ptr);//sourceInvProj
         }
 
 
         glBindImageTexture(0, this.colourSSAOTex.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
-        glBindTextureUnit(1, this.fb.getDepthTex().id);
+        glBindTextureUnit(1, this.colourTex.id);
         glBindSampler(1,0);
-        glBindTextureUnit(2, this.colourTex.id);
+        glBindTextureUnit(2, this.fb.getDepthTex().id);
         glBindSampler(2,0);
+
+        int sampler = glGenSamplers();
+        glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+        glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glSamplerParameteri(sampler, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        int depthTexture = glGetNamedFramebufferAttachmentParameteri(sourceFrameBuffer, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+
+        glBindTextureUnit(3, depthTexture);
+        glBindSampler(3,sampler);
 
         glDispatchCompute((viewport.width+31)/32, (viewport.height+31)/32, 1);
 
         glBindFramebuffer(GL_FRAMEBUFFER, this.fbSSAO.id);
+
+        glDeleteSamplers(sampler);
     }
 
     @Override

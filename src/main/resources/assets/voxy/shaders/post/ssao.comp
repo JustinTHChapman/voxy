@@ -1,18 +1,27 @@
 #version 450
 layout(local_size_x = 32, local_size_y = 32) in;
 
-
 layout(binding = 0, rgba8) uniform writeonly restrict image2D colourTexOut;
-layout(binding = 1) uniform sampler2D depthTex;
-layout(binding = 2) uniform sampler2D colourTex;
+layout(binding = 1) uniform sampler2D colourTex;
+layout(binding = 2) uniform sampler2D depthTex;
+
+#ifdef BETTER_SSAO
+layout(binding = 3) uniform sampler2D sourceDepthTex;
+layout(location = 4) uniform mat4 Proj;
+layout(location = 5) uniform mat4 invProj;
+layout(location = 6) uniform mat4 MV;
+layout(location = 7) uniform mat4 sourceInvProj;
+#else
 layout(location = 3) uniform mat4 MVP;
 layout(location = 4) uniform mat4 invMVP;
-ivec2 size;
+#endif
 
-vec3 rev3d(vec3 clip) {
-    vec4 view = invMVP * vec4(clip*2.0-1.0,1.0);
+vec3 rev3d(mat4 matrix, vec3 clip) {
+    vec4 view = matrix * vec4(clip*2.0-1.0,1.0);
     return view.xyz/view.w;
 }
+
+#ifndef BETTER_SSAO
 vec4 reDeProject(vec3 pos) {
     vec4 view = MVP * vec4(pos, 1.0);
     view.xy /= view.w;
@@ -42,32 +51,173 @@ vec4 reDeProject(vec3 pos) {
     return vec4(view.xyz/view.w, 1.0f);
 }
 
-float computeAO(vec3 pos, float offset, vec3 normal) {
+float computeAO(vec3 uvDepth, vec3 normal) {
+    const float offset = 0.5f;
+    vec3 pos = rev3d(invMVP, uvDepth);
     vec4 reproData = reDeProject(pos+normal*offset);
     if (reproData.w < 0.0f) {
-        return 0.0f;
+        return 1.0f;
     }
     vec3 repro = reproData.xyz - pos;
     float len = length(repro);
     if (len > offset+2.0f) {
-        return 0.0f;
+        return 1.0f;
     }
     if (len <0.01f) {
-        return 0.0f;
+        return 1.0f;
     }
     float ao = dot(repro, normal)/len;
     if (ao <0.01f) {
-        return 0.0f;
+        return 1.0f;
     }
-    return ao;
+
+
+    ao = pow(ao,0.15f);
+
+    return clamp(((1.0f-ao)/3.0f+(2.0f/3.0f)), 0,1);
 }
+#endif
+
+
+
+
+#ifdef BETTER_SSAO
+
+#ifndef SSAO_STEPS
+#define SSAO_STEPS 12
+#endif
+
+const float tau = 6.2831853;
+
+const float phi1 = 1.6180339887; // Golden ratio, solution to x^2 = x + 1
+const float phi2 = 1.3247179572; // Plastic constant, solution to x^3 = x + 1
+const float phi3 = 1.2207440846; // Solution to x^4 = x + 1
+
+float r1(int n, float seed) {
+    const float alpha = 1.0 / phi1;
+    return fract(seed + n * alpha);
+}
+
+float r1(int n) { return r1(n, 0.5); }
+
+vec2 get_ssao_sample_offset(int step_index, vec2 dither) {
+    float a = (float(step_index) + dither.x) * (1.0f/(float(SSAO_STEPS)));
+
+    float r = sqrt(r1(step_index, dither.y));
+    float theta = a * tau;
+
+    return r * vec2(cos(theta), sin(theta));
+}
+#define SSAO_MAX_RADIUS_SCREEN 0.1
+#define SSAO_RADIUS 2.0f
+
+mat3 get_tbn_matrix(vec3 normal) {
+    vec3 tangent = normal.y == 1.0
+    ? vec3(1.0, 0.0, 0.0)
+    : normalize(cross(vec3(0.0, 1.0, 0.0), normal));
+    vec3 bitangent = normalize(cross(tangent, normal));
+    return mat3(tangent, bitangent, normal);
+}
+
+vec2 clamp_length(vec2 a, float min, float max) {
+    return normalize(a)*clamp(length(a), min, max);
+}
+vec3 projProj(vec3 point) {
+    vec4 aa = Proj*vec4(point,1);
+    return (aa.xyz/aa.w)*0.5+0.5;
+}
+float computeAO(vec3 uvDepth, vec3 worldNorm)
+{
+    vec3 position_view = rev3d(invProj, uvDepth);
+    vec3 viewNormal = normalize(mat3(MV)*worldNorm);
+
+    mat3 tbn_matrix = get_tbn_matrix(viewNormal);
+
+    mat2 sample_matrix = SSAO_RADIUS *
+        mat2(clamp_length(
+            projProj(
+                position_view + tbn_matrix[0])
+            .xy -
+            uvDepth.xy,
+            0.0,
+            SSAO_MAX_RADIUS_SCREEN
+        ),
+        clamp_length(
+            projProj(
+                position_view + tbn_matrix[1]
+            )
+            .xy -
+            uvDepth.xy,
+            0.0,
+            SSAO_MAX_RADIUS_SCREEN
+        ));
+
+
+
+    float ao = 0.0;
+
+    int samplesDone = 0;
+    for (int i = 0; i < SSAO_STEPS/**1.5 && samplesDone<SSAO_STEPS*/ ; ++i) {
+        vec2 sample_uv = clamp(uvDepth.xy + sample_matrix * get_ssao_sample_offset(i, vec2(0.5)), vec2(0), vec2(1));
+        //vec2 sample_uv = clamp(uvDepth.xy + get_ssao_sample_offset(i, vec2(0))*0.05f, vec2(0), vec2(1));
+        float depth = texture(depthTex, sample_uv).x;
+
+
+        if (depth >= 0.999999f || depth == uvDepth.z) {
+            continue;
+        }
+        vec3 offset_view;
+
+        if (depth == 0.0f) {//Assume vanilla
+            depth = texture(sourceDepthTex, sample_uv).x;
+            if (depth == 1.0f) {
+                continue;
+            }
+            offset_view = rev3d(sourceInvProj, vec3(sample_uv, depth));
+        } else {
+            uint meta = uint(255.0f*texture(colourTex, sample_uv).w);
+            if ((meta&(1<<6))==0) {
+                continue;
+            }
+            offset_view = rev3d(invProj, vec3(sample_uv, depth));
+        }
+
+        offset_view -= position_view;
+        if (length(offset_view)>3.0f) {
+            continue;
+        }
+
+        float rlen = inversesqrt(dot(offset_view,offset_view));
+        float cos_theta = clamp(dot(offset_view, viewNormal) * rlen, 0, 1);
+        float distance_falloff = 1.0f/(1.0 + (1.0/rlen) * (1.0f/(float(SSAO_RADIUS))));
+
+        ao += cos_theta * distance_falloff;
+        samplesDone++;
+    }
+
+    return pow(clamp(1.0 - ao * (1.0f/(float(SSAO_STEPS))),0,1),2.0f);
+}
+
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
 
 vec3 face2norm(uint face) {
     return vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (float(int(face)&1)*2-1);
 }
 
 void main() {
-    size = imageSize(colourTexOut);//TODO: dont use imageSize as it is slow, swap for uniform
+    ivec2 size = imageSize(colourTexOut);//TODO: dont use imageSize as it is slow, swap for uniform
     if (any(lessThanEqual(size, gl_GlobalInvocationID.xy))) {
         return;
     }
@@ -84,8 +234,7 @@ void main() {
             uint metadata = uint(colour.w*255.0f);
             uint face = metadata&7u;
             uint lod = (metadata>>3)&7u;
-            bool hasAO = (metadata>>6)!=0;
-            vec3 pos = rev3d(vec3(point, depth));
+            bool hasAO = (metadata&(1<<6))!=0;
 
 
             ocolour = colour;
@@ -93,108 +242,10 @@ void main() {
 
             if (hasAO) {
                 vec3 worldNormal = face2norm(face);
-
-                float OFFSET = 0.5f;
-
-                float d = clamp(computeAO(pos, OFFSET, worldNormal),0,1);
-
-                d = pow(d,0.15f);
-
-                float mul = ((1.0f-d)/3.0f+(2.0f/3.0f));
-                ocolour.xyz *= mul;
-                //ocolour.rgb = vec3(mul);//*(worldNormal*0.5+0.5)
+                float ao = computeAO(vec3(point, depth), worldNormal);
+                ocolour.rgb *= ao;
             }
         }
     }
     imageStore(colourTexOut, ivec2(gl_GlobalInvocationID.xy), ocolour);
 }
-
-/*
-float computeAO(vec3 pos, vec3 offset, vec3 normal) {
-    vec3 point = pos+offset;
-    vec4 reproData = reDeProject(point);
-    if (reproData.w < 0.0f) {
-        return 0.0f;
-    }
-    float rpLen = length(reproData.xyz-point);
-    if (rpLen>1.0f) {//Filter out when the depth is just way to far away
-        return 0.0f;
-    }
-    if (rpLen<0.001f) {
-        return 0.0f;
-    }
-    vec3 repro = reproData.xyz - pos;
-    float len = length(repro);
-    float ao = dot(repro, normal);
-    if (ao<0.0f) {
-        return 0.0f;
-    }
-    return rpLen;
-}
-
-vec3 face2norm(uint face) {
-    return vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (float(int(face)&1)*2-1);
-}
-
-void main() {
-    size = imageSize(colourTexOut);//TODO: dont use imageSize as it is slow, swap for uniform
-    if (any(lessThanEqual(size, gl_GlobalInvocationID.xy))) {
-        return;
-    }
-    vec2 scale = vec2(1.0f)/size;
-    vec2 point = vec2(gl_GlobalInvocationID.xy)*scale;
-    point += scale*0.5f;//Offset to the center of the textile
-    float depth = texture(depthTex, point).r;
-    vec4 ocolour = vec4(0);
-    if (depth!=0.0f && depth < 1.0f) {
-        vec4 colour = texture(colourTex, point);
-        if (colour == vec4(0.0f, 0.0f, 0.0f, 0.0f)) {
-            ocolour = vec4(1.0f, 0.0f, 0.0f, 1.0f);
-        } else {
-            uint metadata = uint(colour.w*255.0f);
-            uint face = metadata&7u;
-            uint lod = (metadata>>3)&7u;
-            bool hasAO = (metadata>>6)!=0;
-            vec3 pos = rev3d(vec3(point, depth));
-
-
-            ocolour = colour;
-            ocolour.w = 1.0f;
-
-            if (hasAO) {
-                float d = 0.0f;
-                //TODO: TODO: only encode the axis, then use then it as as a mask along with pos and multiply by the -sign of everything
-
-                //vec3 worldNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (-sign(pos));
-
-                vec3 worldNormal = face2norm(face);
-
-                float OFFSET = 0.5f;
-
-                //comput the other axis's
-                vec3 A = face2norm((face+2)%6);
-                vec3 B = face2norm((face+4)%6);
-
-                d += clamp(computeAO(pos, OFFSET* A, worldNormal),0,1)*(1f/8f);
-                d += clamp(computeAO(pos, OFFSET*-A, worldNormal),0,1)*(1f/8f);
-                d += clamp(computeAO(pos, OFFSET* B, worldNormal),0,1)*(1f/8f);
-                d += clamp(computeAO(pos, OFFSET*-B, worldNormal),0,1)*(1f/8f);
-
-                float ISQRT2 = 0.70710678f;
-                d += clamp(computeAO(pos, OFFSET*( (A+B)*ISQRT2), worldNormal),0,1)*(1f/8f);
-                d += clamp(computeAO(pos, OFFSET*( (A-B)*ISQRT2), worldNormal),0,1)*(1f/8f);
-                d += clamp(computeAO(pos, OFFSET*((-A+B)*ISQRT2), worldNormal),0,1)*(1f/8f);
-                d += clamp(computeAO(pos, OFFSET*((-A-B)*ISQRT2), worldNormal),0,1)*(1f/8f);
-
-                d = clamp(d,0,1);
-                d = pow(d,0.2f);
-
-                float mul = ((1-d)/2.0f+(1.0f/2.0f));
-                ocolour.xyz *= mul;
-                //ocolour.rgb = vec3(mul);//*(worldNormal*0.5+0.5)
-            }
-        }
-    }
-    imageStore(colourTexOut, ivec2(gl_GlobalInvocationID.xy), ocolour);
-}
-*/
