@@ -11,6 +11,7 @@ import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTra
 import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
 import me.cortex.voxy.client.core.rendering.post.FullscreenBlit;
 import me.cortex.voxy.client.core.rendering.util.DepthFramebuffer;
+import me.cortex.voxy.client.core.util.GPUTiming;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
@@ -36,16 +37,16 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
     private final boolean useEnvFog;
     private final FullscreenBlit finalBlit;
 
-    private final Shader ssaoCompute = Shader.make()
-            .add(ShaderType.COMPUTE, "voxy:post/ssao.comp")
-            .define("BETTER_SSAO")
-            .compile();
+    private final SSAO ssao;
 
     protected NormalRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
         super(nodeManager, nodeCleaner, traversal, frexSupplier, false);
         this.useEnvFog = VoxyConfig.CONFIG.useEnvironmentalFog;
         this.finalBlit = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag",
                 a->a.defineIf("USE_ENV_FOG", this.useEnvFog).define("EMIT_COLOUR"));
+
+
+        this.ssao = new SSAO();
     }
 
     @Override
@@ -78,47 +79,9 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
 
     @Override
     protected void postOpaquePreTranslucent(Viewport<?> viewport, int sourceFrameBuffer) {
-        this.ssaoCompute.bind();
-        try (var stack = MemoryStack.stackPush()) {
-            long ptr = stack.nmalloc(4*4*4);
-            //viewport.MVP.getToAddress(ptr);
-            //nglUniformMatrix4fv(3, 1, false, ptr);//MVP
-            //viewport.MVP.invert(new Matrix4f()).getToAddress(ptr);
-            //nglUniformMatrix4fv(4, 1, false, ptr);//invMVP
-            viewport.projection.getToAddress(ptr);
-            nglUniformMatrix4fv(4, 1, false, ptr);//Proj
-            viewport.projection.invert(new Matrix4f()).getToAddress(ptr);
-            nglUniformMatrix4fv(5, 1, false, ptr);//invProj
-            viewport.modelView.getToAddress(ptr);
-            nglUniformMatrix4fv(6, 1, false, ptr);//MV
-            viewport.vanillaProjection.invert(new Matrix4f()).getToAddress(ptr);
-            nglUniformMatrix4fv(7, 1, false, ptr);//sourceInvProj
-        }
-
-
-        glBindImageTexture(0, this.colourSSAOTex.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
-        glBindTextureUnit(1, this.colourTex.id);
-        glBindSampler(1,0);
-        glBindTextureUnit(2, this.fb.getDepthTex().id);
-        glBindSampler(2,0);
-
-        int sampler = glGenSamplers();
-        glSamplerParameteri(sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-        glSamplerParameteri(sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glSamplerParameteri(sampler, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        glSamplerParameteri(sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glSamplerParameteri(sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-        int depthTexture = glGetNamedFramebufferAttachmentParameteri(sourceFrameBuffer, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-
-        glBindTextureUnit(3, depthTexture);
-        glBindSampler(3,sampler);
-
-        glDispatchCompute((viewport.width+31)/32, (viewport.height+31)/32, 1);
-
+        GPUTiming.INSTANCE.marker("ao");
+        this.ssao.computeSSAO(viewport, this.colourSSAOTex, this.colourTex, this.fb.getDepthTex(), sourceFrameBuffer);
         glBindFramebuffer(GL_FRAMEBUFFER, this.fbSSAO.id);
-
-        glDeleteSamplers(sampler);
     }
 
     @Override
@@ -172,7 +135,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
     @Override
     public void free() {
         this.finalBlit.delete();
-        this.ssaoCompute.free();
+        this.ssao.free();
         this.fbSSAO.free();
         if (this.colourTex != null) {
             this.colourTex.free();
