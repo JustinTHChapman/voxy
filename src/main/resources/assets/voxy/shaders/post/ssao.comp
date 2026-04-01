@@ -1,5 +1,5 @@
 #version 450
-layout(local_size_x = 32, local_size_y = 32) in;
+layout(local_size_x = 8, local_size_y = 8) in;
 
 layout(binding = 0, rgba8) uniform writeonly restrict image2D colourTexOut;
 layout(binding = 1) uniform sampler2D colourTex;
@@ -127,7 +127,7 @@ vec3 projProj(vec3 point) {
     return (aa.xyz/aa.w)*0.5+0.5;
 }
 
-const vec2 SAMPLE_POINTS[SSAO_STEPS] = vec2[SSAO_STEPS](%%CONST_ARRAY%%);
+const uniform vec2 SAMPLE_POINTS[SSAO_STEPS] = vec2[SSAO_STEPS](%%CONST_ARRAY%%);
 float computeAO(vec3 uvDepth, vec3 worldNorm)
 {
     vec3 position_view = rev3d(invProj, uvDepth);
@@ -159,18 +159,17 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
     float ao = 0.0;
 
     int samplesDone = 0;
-    for (int i = 0; i < SSAO_STEPS/**1.5 && samplesDone<SSAO_STEPS*/ ; ++i) {
+    for (int i = 0; i < SSAO_STEPS; ++i) {
         //TODO: note get_ssao_sample_offset(i, vec2(0.5)) is CONSTANT (its the same every frame for every sample, can move it into a const array or compute it during compile)
         vec2 sample_uv = clamp(uvDepth.xy + sample_matrix * SAMPLE_POINTS[i], vec2(0), vec2(1));
         //vec2 sample_uv = clamp(uvDepth.xy + get_ssao_sample_offset(i, vec2(0))*0.05f, vec2(0), vec2(1));
         float depth = texture(depthTex, sample_uv).x;
 
 
-        if (depth >= 0.999999f || depth == uvDepth.z) {
+        if (depth == 1.0f || depth == uvDepth.z) {
             continue;
         }
-        vec3 offset_view;
-
+        vec3 offset_view;// = rev3d(invProj, vec3(sample_uv, depth));
         if (depth == 0.0f) {//Assume vanilla
             depth = texture(sourceDepthTex, sample_uv).x;
             if (depth == 1.0f) {
@@ -184,15 +183,16 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
             }
             offset_view = rev3d(invProj, vec3(sample_uv, depth));
         }
-
         offset_view -= position_view;
-        if (length(offset_view)>3.0f) {
+
+        float slen = dot(offset_view,offset_view);
+        if (slen>9.0f) {
             continue;
         }
 
-        float rlen = inversesqrt(dot(offset_view,offset_view));
-        float cos_theta = clamp(dot(offset_view, viewNormal) * rlen, 0, 1);
-        float distance_falloff = 1.0f/(1.0 + (1.0/rlen) * (1.0f/(float(SSAO_RADIUS))));
+        float rlen = inversesqrt(slen);
+        float cos_theta = clamp(dot(offset_view, viewNormal)*rlen, 0, 1);
+        float distance_falloff = 1.0f/(1.0 + (1.0f/rlen) * (1.0f/(float(SSAO_RADIUS))));
 
         ao += cos_theta * distance_falloff;
         samplesDone++;

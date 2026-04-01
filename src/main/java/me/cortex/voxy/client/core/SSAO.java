@@ -113,7 +113,7 @@ public class SSAO {
             glBindSampler(3, this.depthSampler);
         }
 
-        glDispatchCompute((viewport.width+31)/32, (viewport.height+31)/32, 1);
+        glDispatchCompute((viewport.width+7)/8, (viewport.height+7)/8, 1);
     }
 
 
