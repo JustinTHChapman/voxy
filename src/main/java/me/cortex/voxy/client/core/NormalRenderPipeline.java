@@ -46,7 +46,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
                 a->a.defineIf("USE_ENV_FOG", this.useEnvFog).define("EMIT_COLOUR"));
 
 
-        this.ssao = new SSAO();
+        this.ssao = new SSAO(true, 12);
     }
 
     @Override

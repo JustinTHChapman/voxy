@@ -121,7 +121,7 @@ public class Shader extends TrackedObject {
         }
 
         public Builder<T> replace(String value, String replacement) {
-            this.defines.put(value, replacement);
+            this.replacements.put(value, replacement);
             return this;
         }
 

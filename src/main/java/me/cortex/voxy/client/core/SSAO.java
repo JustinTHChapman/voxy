@@ -5,6 +5,7 @@ import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import org.joml.Matrix4f;
+import org.joml.Random;
 import org.lwjgl.system.MemoryStack;
 
 import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
@@ -38,6 +39,26 @@ public class SSAO {
         if (betterSSAO) {
             builder.define("BETTER_SSAO")
                     .defineIf("SSAO_STEPS", samples!=0, samples);
+
+
+            String array = "";
+            for (int i = 0; i < samples; i++) {
+                array += "vec2(";
+                float a = (((float)i) + 0.5f) * (1.0f/samples);
+
+                float base = (float) (i*(1.0/1.6180339887)+0.5);
+                float r = (float) Math.sqrt(base-(base%1));
+                float theta = a * 6.2831853f;
+
+                array += (float)(r * Math.cos(theta));
+                array += "f, ";
+                array += (float)(r * Math.sin(theta));
+                array += "f)";
+                if (i!=samples-1) {
+                    array += ", ";
+                }
+            }
+            builder.replace("%%CONST_ARRAY%%", array);
         }
 
         this.ssaoCompute = builder.compile();
