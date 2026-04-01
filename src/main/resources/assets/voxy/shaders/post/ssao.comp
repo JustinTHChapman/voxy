@@ -82,6 +82,8 @@ float computeAO(vec3 uvDepth, vec3 normal) {
 
 
 #ifdef BETTER_SSAO
+//Based on photons ssao https://github.com/sixthsurge/photon/blob/40adec318ea608d9f9ba88fcc272730af0899a62/shaders/include/lighting/ao/ssao.glsl
+// used with permission
 
 #ifndef SSAO_STEPS
 #define SSAO_STEPS 12
