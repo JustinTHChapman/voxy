@@ -9,6 +9,7 @@ import org.joml.Random;
 import org.lwjgl.system.MemoryStack;
 
 import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
+import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glBindImageTexture;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL11C.GL_TEXTURE_WRAP_T;
@@ -35,30 +36,34 @@ public class SSAO {
         var builder = Shader.make()
                 .add(ShaderType.COMPUTE, "voxy:post/ssao.comp");
 
+        boolean useConstArray = false;
+
         this.isBetterSSAO = betterSSAO;
         if (betterSSAO) {
             builder.define("BETTER_SSAO")
-                    .defineIf("SSAO_STEPS", samples!=0, samples);
+                    .defineIf("SSAO_STEPS", samples!=0, samples)
+                    .defineIf("USE_GENERATED_SAMPLE_POINTS", useConstArray);
 
+            if (useConstArray) {
+                String array = "";
+                for (int i = 0; i < samples; i++) {
+                    array += "vec2(";
+                    float a = (((float) i) + 0.5f) * (1.0f / samples);
 
-            String array = "";
-            for (int i = 0; i < samples; i++) {
-                array += "vec2(";
-                float a = (((float)i) + 0.5f) * (1.0f/samples);
+                    float base = (float) (i * (1.0 / 1.6180339887) + 0.5);
+                    float r = (float) Math.sqrt(base % 1);
+                    float theta = a * 6.2831853f;
 
-                float base = (float) (i*(1.0/1.6180339887)+0.5);
-                float r = (float) Math.sqrt(base-(base%1));
-                float theta = a * 6.2831853f;
-
-                array += (float)(r * Math.cos(theta));
-                array += "f, ";
-                array += (float)(r * Math.sin(theta));
-                array += "f)";
-                if (i!=samples-1) {
-                    array += ", ";
+                    array += (float) (r * Math.cos(theta));
+                    array += "f, ";
+                    array += (float) (r * Math.sin(theta));
+                    array += "f)";
+                    if (i != samples - 1) {
+                        array += ", ";
+                    }
                 }
+                builder.replace("%%CONST_ARRAY%%", array);
             }
-            builder.replace("%%CONST_ARRAY%%", array);
         }
 
         this.ssaoCompute = builder.compile();
@@ -114,6 +119,13 @@ public class SSAO {
         }
 
         glDispatchCompute((viewport.width+7)/8, (viewport.height+7)/8, 1);
+
+        glBindTextureUnit(1, 0);
+        glBindSampler(1,0);
+        glBindTextureUnit(2, 0);
+        glBindSampler(2, 0);
+        glBindTextureUnit(3, 0);
+        glBindSampler(3, 0);
     }
 
 

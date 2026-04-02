@@ -110,8 +110,8 @@ vec2 get_ssao_sample_offset(int step_index, vec2 dither) {
 
     return r * vec2(cos(theta), sin(theta));
 }
-#define SSAO_MAX_RADIUS_SCREEN 0.1
-#define SSAO_RADIUS 2.0f
+#define SSAO_MAX_RADIUS_SCREEN 0.05
+#define SSAO_RADIUS 1.0f
 
 mat3 get_tbn_matrix(vec3 normal) {
     vec3 tangent = normal.y == 1.0
@@ -129,7 +129,9 @@ vec3 projProj(vec3 point) {
     return (aa.xyz/aa.w)*0.5+0.5;
 }
 
-const uniform vec2 SAMPLE_POINTS[SSAO_STEPS] = vec2[SSAO_STEPS](%%CONST_ARRAY%%);
+#ifdef USE_GENERATED_SAMPLE_POINTS
+vec2 SAMPLE_POINTS[SSAO_STEPS] = vec2[SSAO_STEPS](%%CONST_ARRAY%%);
+#endif
 float computeAO(vec3 uvDepth, vec3 worldNorm)
 {
     vec3 position_view = rev3d(invProj, uvDepth);
@@ -163,8 +165,12 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
     int samplesDone = 0;
     for (int i = 0; i < SSAO_STEPS; ++i) {
         //TODO: note get_ssao_sample_offset(i, vec2(0.5)) is CONSTANT (its the same every frame for every sample, can move it into a const array or compute it during compile)
+
+        #ifdef USE_GENERATED_SAMPLE_POINTS
         vec2 sample_uv = clamp(uvDepth.xy + sample_matrix * SAMPLE_POINTS[i], vec2(0), vec2(1));
-        //vec2 sample_uv = clamp(uvDepth.xy + get_ssao_sample_offset(i, vec2(0))*0.05f, vec2(0), vec2(1));
+        #else
+        vec2 sample_uv = clamp(uvDepth.xy + sample_matrix*get_ssao_sample_offset(i, vec2(0.5f)), vec2(0), vec2(1));
+        #endif
         float depth = texture(depthTex, sample_uv).x;
 
 
@@ -189,7 +195,7 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
 
         float slen = dot(offset_view,offset_view);
         if (slen>9.0f) {
-            continue;
+            //continue;
         }
 
         float rlen = inversesqrt(slen);
@@ -200,7 +206,7 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
         samplesDone++;
     }
 
-    return pow(clamp(1.0 - ao * (1.0f/(float(SSAO_STEPS))),0,1),2.0f);
+    return pow(clamp(1.0 - ao * (1.0f/(float(SSAO_STEPS))),0,1),2.5f);
 }
 
 #endif
