@@ -47,6 +47,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
 
 
         this.ssao = new SSAO(true, 20);
+        //this.ssao = new SSAO();
     }
 
     @Override

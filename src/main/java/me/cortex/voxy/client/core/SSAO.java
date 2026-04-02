@@ -36,7 +36,7 @@ public class SSAO {
         var builder = Shader.make()
                 .add(ShaderType.COMPUTE, "voxy:post/ssao.comp");
 
-        boolean useConstArray = false;
+        boolean useConstArray = true;
 
         this.isBetterSSAO = betterSSAO;
         if (betterSSAO) {

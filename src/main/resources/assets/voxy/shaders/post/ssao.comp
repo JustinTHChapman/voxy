@@ -130,7 +130,7 @@ vec3 projProj(vec3 point) {
 }
 
 #ifdef USE_GENERATED_SAMPLE_POINTS
-vec2 SAMPLE_POINTS[SSAO_STEPS] = vec2[SSAO_STEPS](%%CONST_ARRAY%%);
+const vec2 SAMPLE_POINTS[SSAO_STEPS] = vec2[SSAO_STEPS](%%CONST_ARRAY%%);
 #endif
 float computeAO(vec3 uvDepth, vec3 worldNorm)
 {
@@ -162,7 +162,6 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
 
     float ao = 0.0;
 
-    int samplesDone = 0;
     for (int i = 0; i < SSAO_STEPS; ++i) {
         //TODO: note get_ssao_sample_offset(i, vec2(0.5)) is CONSTANT (its the same every frame for every sample, can move it into a const array or compute it during compile)
 
@@ -203,7 +202,6 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
         float distance_falloff = 1.0f/(1.0 + (1.0f/rlen) * (1.0f/(float(SSAO_RADIUS))));
 
         ao += cos_theta * distance_falloff;
-        samplesDone++;
     }
 
     return pow(clamp(1.0 - ao * (1.0f/(float(SSAO_STEPS))),0,1),2.5f);
