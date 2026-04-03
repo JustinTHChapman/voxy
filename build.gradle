@@ -264,7 +264,7 @@ dependencies {
     }
 
     include(implementation 'redis.clients:jedis:5.1.0')
-    include(implementation('org.rocksdb:rocksdbjni:10.2.1'))
+    include(implementation('org.rocksdb:rocksdbjni:10.9.1'))//update to 10.10 when issue 14537 is fixed
     include(implementation 'org.apache.commons:commons-pool2:2.12.0')
     include(implementation 'org.lz4:lz4-java:1.8.0')
     include(implementation('org.tukaani:xz:1.10'))
