@@ -144,7 +144,6 @@ public class RocksDBStorageBackend extends StorageBackend {
                     consumer.accept(key);
                     iter.next();
                 }
-                iter.close();
             }
         }
     }
