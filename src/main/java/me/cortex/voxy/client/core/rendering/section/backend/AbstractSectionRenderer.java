@@ -60,6 +60,7 @@ public abstract class AbstractSectionRenderer <T extends Viewport<T>, J extends 
     public abstract void renderOpaque(T viewport);
     public abstract void buildDrawCalls(T viewport);
     public abstract void renderTemporal(T viewport);
+    public void postOpaquePreperation(T viewport){}//can be used for next frame culling
     public abstract void renderTranslucent(T viewport);
     public abstract T createViewport();
     public abstract void free();
