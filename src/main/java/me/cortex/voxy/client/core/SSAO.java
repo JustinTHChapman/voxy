@@ -25,6 +25,13 @@ import static org.lwjgl.opengl.GL45C.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45C.glCreateSamplers;
 
 public class SSAO {
+    public static enum SSAOMode {
+        AUTO,
+        BASIC,
+        BETTER,
+        BEST
+    }
+
     private final Shader ssaoCompute;
     private final boolean isBetterSSAO;
 

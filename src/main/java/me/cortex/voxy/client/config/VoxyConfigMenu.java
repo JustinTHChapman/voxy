@@ -3,11 +3,14 @@ package me.cortex.voxy.client.config;
 import me.cortex.voxy.client.ClientSessionEvents;
 import me.cortex.voxy.client.config.SodiumConfigBuilder.*;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
+import me.cortex.voxy.client.core.SSAO;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.util.cpu.CpuLayout;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.api.config.ConfigEntryPoint;
+import net.caffeinemc.mods.sodium.api.config.ConfigState;
 import net.caffeinemc.mods.sodium.api.config.option.OptionFlag;
+import net.caffeinemc.mods.sodium.api.config.option.OptionImpact;
 import net.caffeinemc.mods.sodium.api.config.option.Range;
 import net.caffeinemc.mods.sodium.api.config.structure.ConfigBuilder;
 import net.minecraft.client.Minecraft;
@@ -98,7 +101,8 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                         Component.translatable("voxy.config.general.subDivisionSize"),
                                         ()->subDiv2ln(CFG.subDivisionSize), v->CFG.subDivisionSize=ln2subDiv(v),
                                         new Range(0, SUBDIV_IN_MAX, 1))
-                                        .setFormatter(v->Component.literal(Integer.toString(Math.round(ln2subDiv(v))))),
+                                        .setFormatter(v->Component.literal(Integer.toString(Math.round(ln2subDiv(v)))))
+                                        .setImpact(OptionImpact.HIGH),
                                 new IntOption(
                                         "voxy:render_distance",
                                         Component.translatable("voxy.config.general.renderDistance"),
@@ -117,13 +121,20 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                                 }
                                             }
                                         }, "voxy:rendering", RENDER_RELOAD)
+                                        .setImpact(OptionImpact.MEDIUM)
                         ), new Group(
                                 new BoolOption(
                                         "voxy:eviromental_fog",
                                         Component.translatable("voxy.config.general.environmental_fog"),
                                         ()->CFG.useEnvironmentalFog, v->CFG.useEnvironmentalFog=v)
+                                        .setPostChangeFlags(RENDER_RELOAD),
+                                new EnumOption<>("voxy:ssao_mode",
+                                        SSAO.SSAOMode.class,
+                                        Component.translatable("voxy.config.general.ssao_mode"),
+                                        ()->CFG.getSSAOMode(), v->CFG.setSSAOMode(v))
+                                        .setImpact(OptionImpact.MEDIUM)//TODO make it on igpus this is high
                                         .setPostChangeFlags(RENDER_RELOAD)
-                        )
+                        ).setEnablerInherit(s->!IrisUtil.irisShadersEnabledInConfig(), ConfigState.UPDATE_ON_REBUILD)
                 ).setEnablerAND("voxy:enabled", "voxy:rendering"));
 
     }
