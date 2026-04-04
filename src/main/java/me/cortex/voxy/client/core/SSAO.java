@@ -45,8 +45,8 @@ public class SSAO {
         } else if (mode == SSAOMode.AUTO) {
             if ((!Capabilities.INSTANCE.canQueryGpuMemory) || Capabilities.INSTANCE.totalDedicatedMemory<2_500_000_000L) {
                 return createSSAO(SSAOMode.BASIC);//Create a basic instance (cant query memory (probably intel igpu or less then 2.5gb vram)
-            } else if (Capabilities.INSTANCE.totalDedicatedMemory<5_000_000_000L) {
-                return createSSAO(SSAOMode.BETTER);//Less then 5gb of dedicated create a better instance
+            } else if (Capabilities.INSTANCE.totalDedicatedMemory<7_000_000_000L) {
+                return createSSAO(SSAOMode.BETTER);//Less then 7gb of dedicated vram create a better instance (mid range dgpus (they can probably do best just fine but just in case)
             } else {
                 return createSSAO(SSAOMode.BEST);//create the best ssao
             }
