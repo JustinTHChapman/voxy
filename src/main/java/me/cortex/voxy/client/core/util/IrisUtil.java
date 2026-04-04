@@ -65,7 +65,7 @@ public class IrisUtil {
         return IRIS_INSTALLED && irisShaderPackEnabled0();
     }
     private static boolean irisShadersEnabledInConfig0() {
-        return IrisApi.getInstance().isShaderPackInUse()||IrisApi.getInstance().getConfig().areShadersEnabled();
+        return !Iris.getCurrentPack().isEmpty();
     }
     public static boolean irisShadersEnabledInConfig() {
         return IRIS_INSTALLED && irisShadersEnabledInConfig0();
