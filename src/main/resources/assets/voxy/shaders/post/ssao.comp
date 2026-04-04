@@ -184,7 +184,7 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
         float depth = texture(depthTex, sample_uv).x;
 
 
-        if (depth == 1.0f) {//depth == uvDepth.z this happens alot when further out
+        if (depth == 1.0f || depth == uvDepth.z) {//TODO FIXME: check depth == uvDepth.z isnt causing any other strange issues (might be better to compare the sample uv instead)
             continue;
         }
         vec3 offset_view;// = rev3d(invProj, vec3(sample_uv, depth));
