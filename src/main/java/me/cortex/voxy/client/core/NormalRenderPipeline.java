@@ -16,6 +16,7 @@ import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
 
+import java.util.List;
 import java.util.function.BooleanSupplier;
 
 import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
@@ -46,8 +47,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
                 a->a.defineIf("USE_ENV_FOG", this.useEnvFog).define("EMIT_COLOUR"));
 
 
-        this.ssao = new SSAO(true, 20);
-        //this.ssao = new SSAO();
+        this.ssao = SSAO.createSSAO(VoxyConfig.CONFIG.getSSAOMode());
     }
 
     @Override
@@ -143,5 +143,11 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             this.colourSSAOTex.free();
         }
         super.free0();
+    }
+
+    @Override
+    public void addDebug(List<String> debug) {
+        super.addDebug(debug);
+        this.ssao.addDebugInfo(debug);
     }
 }

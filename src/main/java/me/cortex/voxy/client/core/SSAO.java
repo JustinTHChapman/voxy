@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core;
 
+import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
@@ -7,6 +8,8 @@ import me.cortex.voxy.client.core.rendering.Viewport;
 import org.joml.Matrix4f;
 import org.joml.Random;
 import org.lwjgl.system.MemoryStack;
+
+import java.util.List;
 
 import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
 import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri;
@@ -32,16 +35,40 @@ public class SSAO {
         BEST
     }
 
+    public static SSAO createSSAO(SSAOMode mode) {
+        if (mode == SSAOMode.BASIC) {
+            return new SSAO();
+        } else if (mode == SSAOMode.BETTER) {
+            return new SSAO(true, 12);
+        } else if (mode == SSAOMode.BEST) {
+            return new SSAO(true, 24);
+        } else if (mode == SSAOMode.AUTO) {
+            if ((!Capabilities.INSTANCE.canQueryGpuMemory) || Capabilities.INSTANCE.totalDedicatedMemory<2_500_000_000L) {
+                return createSSAO(SSAOMode.BASIC);//Create a basic instance (cant query memory (probably intel igpu or less then 2.5gb vram)
+            } else if (Capabilities.INSTANCE.totalDedicatedMemory<5_000_000_000L) {
+                return createSSAO(SSAOMode.BETTER);//Less then 5gb of dedicated create a better instance
+            } else {
+                return createSSAO(SSAOMode.BEST);//create the best ssao
+            }
+        } else {
+            throw new IllegalArgumentException();
+        }
+    }
+
     private final Shader ssaoCompute;
     private final boolean isBetterSSAO;
+    private final int spp;
 
     private final int depthSampler;
     public SSAO() {
         this(false, 0);
     }
+
     public SSAO(boolean betterSSAO, int samples) {
         var builder = Shader.make()
                 .add(ShaderType.COMPUTE, "voxy:post/ssao.comp");
+
+        this.spp = samples;
 
         boolean useConstArray = true;
 
@@ -135,9 +162,12 @@ public class SSAO {
         glBindSampler(3, 0);
     }
 
-
     public void free() {
         glDeleteSamplers(this.depthSampler);
         this.ssaoCompute.free();
+    }
+
+    public void addDebugInfo(List<String> debugLines) {
+        debugLines.add("SSAO: "+(this.isBetterSSAO?("better ("+this.spp+" spp)"):"basic"));
     }
 }
