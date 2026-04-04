@@ -371,6 +371,11 @@ public class VoxyRenderSystem {
         }
     }
 
+    public static float getRenderDistance() {
+        return Minecraft.getInstance().options.getEffectiveRenderDistance()*16;
+    }
+
+    /*
     private static float getGameFoV() {
         var client = Minecraft.getInstance();
         var gameRenderer = client.gameRenderer;
@@ -388,10 +393,6 @@ public class VoxyRenderSystem {
         return projection;
     }
 
-    public static float getRenderDistance() {
-        return Minecraft.getInstance().options.getEffectiveRenderDistance()*16;
-    }
-
     //TODO: Make a reverse z buffer
     private static Matrix4f computeProjectionMat(Matrix4fc base) {
         //THis is a wild and insane problem to have
@@ -405,6 +406,20 @@ public class VoxyRenderSystem {
                 Minecraft.getInstance().gameRenderer.getGameRenderState().levelRenderState.cameraRenderState.projectionMatrix.invert(new Matrix4f()),
                 new Matrix4f()
         ).mulLocal(makeProjectionMatrix(nearVoxy, 16*3000));
+    }*/
+
+    private static Matrix4f computeProjectionMat(Matrix4fc base) {
+        var proj = new Matrix4f(base);
+
+        float near = getRenderDistance()<=32.0f?8f:16f;
+        near = VoxyClient.disableSodiumChunkRender()?0.1f:near;
+
+        float far = 16*3000;
+
+        return proj
+                .m22((far + near) / (near - far))
+                .m32((far+far) * near / (near - far));
+
     }
 
     private boolean frexStillHasWork() {
