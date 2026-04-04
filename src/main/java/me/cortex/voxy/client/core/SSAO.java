@@ -168,6 +168,6 @@ public class SSAO {
     }
 
     public void addDebugInfo(List<String> debugLines) {
-        debugLines.add("SSAO: "+(this.isBetterSSAO?("better ("+this.spp+" spp)"):"basic"));
+        debugLines.add("SSAO: "+(this.isBetterSSAO?("new ("+this.spp+" spp)"):"basic"));
     }
 }
