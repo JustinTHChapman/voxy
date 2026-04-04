@@ -79,7 +79,8 @@ float computeAO(vec3 uvDepth, vec3 normal) {
 #endif
 
 
-
+ivec2 size;
+vec2 scale;
 
 #ifdef BETTER_SSAO
 //Based on photons ssao https://github.com/sixthsurge/photon/blob/40adec318ea608d9f9ba88fcc272730af0899a62/shaders/include/lighting/ao/ssao.glsl
@@ -112,6 +113,14 @@ vec2 get_ssao_sample_offset(int step_index, vec2 dither) {
 }
 #define SSAO_MAX_RADIUS_SCREEN 0.05
 #define SSAO_RADIUS 1.0f
+
+
+vec2 r2(int n, vec2 seed) {
+    const vec2 alpha = 1.0 / vec2(phi2, phi2 * phi2);
+    return fract(seed + n * alpha);
+}
+
+vec2 r2(int n) { return r2(n, vec2(0.5)); }
 
 mat3 get_tbn_matrix(vec3 normal) {
     vec3 tangent = normal.y == 1.0
@@ -169,11 +178,13 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
         vec2 sample_uv = clamp(uvDepth.xy + sample_matrix * SAMPLE_POINTS[i], vec2(0), vec2(1));
         #else
         vec2 sample_uv = clamp(uvDepth.xy + sample_matrix*get_ssao_sample_offset(i, vec2(0.5f)), vec2(0), vec2(1));
+        //vec2 sample_uv = clamp(uvDepth.xy + sample_matrix*get_ssao_sample_offset(i, r2(int(gl_GlobalInvocationID.x*982379281+gl_GlobalInvocationID.y+18711)%8192)), vec2(0), vec2(1));
         #endif
+        sample_uv = (vec2(ivec2(sample_uv*size))+0.5)*scale;
         float depth = texture(depthTex, sample_uv).x;
 
 
-        if (depth == 1.0f || depth == uvDepth.z) {
+        if (depth == 1.0f) {//depth == uvDepth.z this happens alot when further out
             continue;
         }
         vec3 offset_view;// = rev3d(invProj, vec3(sample_uv, depth));
@@ -193,12 +204,14 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
         offset_view -= position_view;
 
         float slen = dot(offset_view,offset_view);
+        /*
+        //TODO THIS BUT IN WORLDSPACE CHECK
         if (slen>9.0f) {
-            //continue;
-        }
-
+            continue;
+        }*/
         float rlen = inversesqrt(slen);
-        float cos_theta = clamp(dot(offset_view, viewNormal)*rlen, 0, 1);
+        float angle = dot(offset_view, viewNormal)*rlen;
+        float cos_theta = clamp(angle, 0, 1);
         float distance_falloff = 1.0f/(1.0 + (1.0f/rlen) * (1.0f/(float(SSAO_RADIUS))));
 
         ao += cos_theta * distance_falloff;
@@ -226,13 +239,12 @@ vec3 face2norm(uint face) {
 }
 
 void main() {
-    ivec2 size = imageSize(colourTexOut);//TODO: dont use imageSize as it is slow, swap for uniform
+    size = imageSize(colourTexOut);//TODO: dont use imageSize as it is slow, swap for uniform
     if (any(lessThanEqual(size, gl_GlobalInvocationID.xy))) {
         return;
     }
-    vec2 scale = vec2(1.0f)/size;
-    vec2 point = vec2(gl_GlobalInvocationID.xy)*scale;
-    point += scale*0.5f;//Offset to the center of the textile
+    scale = vec2(1.0f)/size;
+    vec2 point = vec2(vec2(gl_GlobalInvocationID.xy)+0.5f)*scale;//Offset to the center of the textile
     float depth = texture(depthTex, point).r;
     vec4 ocolour = vec4(0);
     if (depth!=0.0f && depth < 1.0f) {
@@ -251,8 +263,7 @@ void main() {
 
             if (hasAO) {
                 vec3 worldNormal = face2norm(face);
-                float ao = computeAO(vec3(point, depth), worldNormal);
-                ocolour.rgb *= ao;
+                ocolour.rgb *= computeAO(vec3(point, depth), worldNormal);
             }
         }
     }
