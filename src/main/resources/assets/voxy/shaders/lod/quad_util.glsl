@@ -1,4 +1,5 @@
 #import <voxy:lod/pos_util.glsl>
+#import <voxy:lod/lighting.glsl>
 //Common utility functions for decoding and operating on quads
 
 vec3 swizzelDataAxis(uint axis, vec3 data) {
