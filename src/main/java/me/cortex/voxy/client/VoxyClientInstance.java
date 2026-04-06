@@ -34,8 +34,8 @@ public class VoxyClientInstance extends VoxyInstance {
         if (path == null) {
             path = getBasePath();
         }
-        this.basePath = path;
-        this.config = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==1&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, path);
+        this.basePath = path.normalize();
+        this.config = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==1&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, this.basePath);
         this.updateDedicatedThreads();
     }
 
