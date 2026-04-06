@@ -145,6 +145,7 @@ public abstract class VoxyInstance {
 
         if (!this.isRunning) {
             Logger.error("Tried getting world object on voxy instance but its not running");
+            this.activeWorldLock.unlockWrite(stamp);
             return null;
         }
 
