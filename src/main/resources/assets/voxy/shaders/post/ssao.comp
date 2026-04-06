@@ -21,11 +21,16 @@ vec3 rev3d(mat4 matrix, vec3 clip) {
     return view.xyz/view.w;
 }
 
+ivec2 size;
+vec2 scale;
+
 #ifndef BETTER_SSAO
 vec4 reDeProject(vec3 pos) {
     vec4 view = MVP * vec4(pos, 1.0);
     view.xy /= view.w;
-    vec2 UV = clamp(view.xy*0.5+0.5, 0.0, 1.0);
+    vec2 samplePos = view.xy*0.5+0.5;
+    samplePos = clamp((vec2(ivec2(samplePos*size))+0.5)*scale, vec2(0.0f), vec2(1.0f));
+    view.xy = samplePos;
 
     /*
     vec4 depths = textureGather(depthTex, UV);
@@ -35,16 +40,18 @@ vec4 reDeProject(vec3 pos) {
     vec2 depths2 = mix(depths.wz, depths.xy, frac.y);
     float depth = mix(depths2.x, depths2.y, frac.x);*/
 
-    float depth = texture(depthTex, UV).x;
+    float depth = texture(depthTex, view.xy).x;
 
     if (depth >= 0.999999f || depth == 0.0f) {
         return vec4(-1.0f);
     }
 
-    uint meta = uint(255.0f*texture(colourTex, UV).w);
+    uint meta = uint(255.0f*texture(colourTex, view.xy).w);
     if ((meta>>6)==0) {
         return vec4(-1.0f);
     }
+
+    view.xy = view.xy*2.0f-1.0f;
     view.z = depth*2.0-1.0;
     view.w = 1.0;
     view = invMVP * view;
@@ -78,9 +85,6 @@ float computeAO(vec3 uvDepth, vec3 normal) {
 }
 #endif
 
-
-ivec2 size;
-vec2 scale;
 
 #ifdef BETTER_SSAO
 //Based on photons ssao https://github.com/sixthsurge/photon/blob/40adec318ea608d9f9ba88fcc272730af0899a62/shaders/include/lighting/ao/ssao.glsl
