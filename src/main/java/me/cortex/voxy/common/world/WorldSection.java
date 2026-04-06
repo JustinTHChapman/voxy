@@ -171,7 +171,7 @@ public final class WorldSection {
             throw new IllegalStateException("Section marked as free but has refs");
         }
         if (witness == 1 && (this.isDirty || this.inSaveQueue)) {
-            throw new IllegalStateException("Section freed while marked as dirty or in the save queue");
+            throw new IllegalStateException("Section freed while marked as dirty or in the save queue: " + (this.isDirty?"dirty, ":"") + (this.inSaveQueue?"saveQueue":""));
         }
         return witness == 1;
     }
@@ -288,16 +288,22 @@ public final class WorldSection {
         return new WorldSection(lvl, x, y, z, null);
     }
 
-    public boolean exchangeIsInSaveQueue(boolean state) {
-        return ((boolean) IN_SAVE_QUEUE_HANDLE.compareAndExchange(this, !state, state)) == !state;
-    }
-
     public void markDirty() {
         IS_DIRTY_HANDLE.getAndSet(this, true);
     }
 
+
+    public boolean exchangeIsInSaveQueue(boolean state) {
+        return ((boolean) IN_SAVE_QUEUE_HANDLE.compareAndExchange(this, !state, state)) == !state;
+    }
+
+    //Should only be called by the saving service
     public boolean setNotDirty() {
         return (boolean) IS_DIRTY_HANDLE.getAndSet(this, false);
+    }
+
+    public boolean shouldSave() {
+        return this.isDirty&&!this.inSaveQueue;
     }
 
     public boolean isFreed() {
