@@ -1,7 +1,6 @@
 package me.cortex.voxy.client.core.model.bakery;
 
 import me.cortex.voxy.client.core.model.ModelFactory;
-import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;

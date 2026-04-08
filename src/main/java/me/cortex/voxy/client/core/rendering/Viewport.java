@@ -70,8 +70,8 @@ public abstract class Viewport <A extends Viewport<A>> {
         return (A) this;
     }
 
-    public A setModelView(Matrix4f modelView) {
-        this.modelView = modelView;
+    public A setModelView(Matrix4fc modelView) {
+        this.modelView.set(modelView);
         return (A) this;
     }
 
