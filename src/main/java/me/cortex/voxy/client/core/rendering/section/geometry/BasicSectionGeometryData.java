@@ -147,9 +147,9 @@ public class BasicSectionGeometryData implements IGeometryData {
                     Logger.info("Attempting to wait for gpu memory to release");
                     long start = System.currentTimeMillis();
 
-                    long TIMEOUT = 2500;
+                    long TIMEOUT = 400;
 
-                    while (System.currentTimeMillis() - start > TIMEOUT) {//Wait up to 2.5 seconds for memory to release
+                    while (System.currentTimeMillis() - start < TIMEOUT) {//Wait up to 2.5 seconds for memory to release
                         glFinish();
                         if (Capabilities.INSTANCE.getFreeDedicatedGpuMemory() - gpuMemory > releaseSize) break;
                     }
