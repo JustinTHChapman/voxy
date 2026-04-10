@@ -1579,25 +1579,48 @@ public class RenderDataFactory {
         }
     }
 
+    private final int occupancyBarrier(int index) {
+        int occ = 0;
+        int msk = this.opaqueMasks[index];
+        //x
+        occ |= msk^(msk>>1);
+        occ |= msk^(msk<<1);
+        //y
+        occ |= index<32*31?msk^this.opaqueMasks[index+32]:0;
+        occ |= 31<index   ?msk^this.opaqueMasks[index-32]:0;
+        //z
+        occ |= (index&31)<31?msk^this.opaqueMasks[index+1]:0;
+        occ |= 0< (index&31)?msk^this.opaqueMasks[index-1]:0;
+        return occ;
+    }
+
     //Build the occupancy set (used for AO) from the set of fully opaque blocks (atm, this can change in the future if needed to a special occupancy bitset)
     private final void buildOccupancy() {
         //We basicly want to record all the points where we go from air to solid or solid to air (this is to just get better compression)
         for (int i = 0; i < 32*32; i++) {
-            int occ = 0;
-            int msk = this.opaqueMasks[i];
-            //x
-            occ |= msk^(msk>>1);
-            occ |= msk^(msk<<1);
-            //y
-            occ |= i<32*31?msk^this.opaqueMasks[i+32]:0;
-            occ |= 31<i   ?msk^this.opaqueMasks[i-32]:0;
-            //z
-            occ |= (i&31)<31?msk^this.opaqueMasks[i+1]:0;
-            occ |= 0< (i&31)?msk^this.opaqueMasks[i-1]:0;
-
+            int occ = this.occupancyBarrier(i);
             //We now have our occlusion mask, fill in our occupancy set
             for (;occ!=0;occ&=~Integer.lowestOneBit(occ)) {
                 this.occupancy.set(i*32+Integer.numberOfTrailingZeros(occ));
+            }
+        }
+    }
+
+    private final void buildOccupancy16() {
+        //We basicly want to record all the points where we go from air to solid or solid to air (this is to just get better compression)
+        for (int i = 0; i < 16*16; i++) {
+            int x = (i&15)*2;
+            int y = (i>>4)*2;
+            int A = this.occupancyBarrier(y*32+x); A = (A|(A>>16))&0xFFFF;
+            int B = this.occupancyBarrier(y*32+x+1); B = (B|(B>>16))&0xFFFF;
+            int C = this.occupancyBarrier((y+1)*32+x); C = (C|(C>>16))&0xFFFF;
+            int D = this.occupancyBarrier((y+1)*32+x+1); D = (D|(D>>16))&0xFFFF;
+            int occ = A|B|C|D;
+
+            //Shink to 16 bit
+            //We now have our occlusion mask, fill in our occupancy set
+            for (;occ!=0;occ&=~Integer.lowestOneBit(occ)) {
+                this.occupancy.set(i*16+Integer.numberOfTrailingZeros(occ));
             }
         }
     }
