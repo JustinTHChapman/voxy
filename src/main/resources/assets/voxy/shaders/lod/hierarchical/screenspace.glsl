@@ -11,6 +11,30 @@
 //changing the base level/root of the graph for some nodes can be really tricky and incorrect so might not be worth it but it should help
 // substantually for performance (for both persistent threads and incremental)
 
+#ifdef USE_REVERSE_Z
+#define REDUCTION min
+#define NEAR 1.0f
+#define DEPTH_SCALAR_COMPARE(a,b) ((a)>(b))
+#define DEPTH_SCALAR_COMPARE_EQUAL(a,b) ((a)>=(b))
+//We assume here that rev-z means 0->1
+#define USE_ZERO_ONE_DEPTH
+#else
+#define REDUCTION max
+#define NEAR 0.0f
+#define DEPTH_SCALAR_COMPARE(a,b) ((a)<(b))
+#define DEPTH_SCALAR_COMPARE_EQUAL(a,b) ((a)<=(b))
+#endif
+
+#ifdef USE_ZERO_ONE_DEPTH
+vec3 NDC2SCREEN(vec3 val) {
+    return vec3(val.xy*0.5f+0.5f, val.z);
+}
+#else
+vec3 NDC2SCREEN(vec3 val) {
+    return val*0.5f+0.5f;
+}
+#endif
+
 
 layout(binding = HIZ_BINDING) uniform sampler2D hizDepthSampler;
 
@@ -93,14 +117,14 @@ void setupScreenspace(in UnpackedNode node) {
 
 
     //Perspective divide + convert to screenspace (i.e. range 0->1 if within viewport)
-    vec3 p000 = (P000.xyz/P000.w) * 0.5f + 0.5f;
-    vec3 p100 = (P100.xyz/P100.w) * 0.5f + 0.5f;
-    vec3 p001 = (P001.xyz/P001.w) * 0.5f + 0.5f;
-    vec3 p101 = (P101.xyz/P101.w) * 0.5f + 0.5f;
-    vec3 p010 = (P010.xyz/P010.w) * 0.5f + 0.5f;
-    vec3 p110 = (P110.xyz/P110.w) * 0.5f + 0.5f;
-    vec3 p011 = (P011.xyz/P011.w) * 0.5f + 0.5f;
-    vec3 p111 = (P111.xyz/P111.w) * 0.5f + 0.5f;
+    vec3 p000 = NDC2SCREEN(P000.xyz/P000.w);
+    vec3 p100 = NDC2SCREEN(P100.xyz/P100.w);
+    vec3 p001 = NDC2SCREEN(P001.xyz/P001.w);
+    vec3 p101 = NDC2SCREEN(P101.xyz/P101.w);
+    vec3 p010 = NDC2SCREEN(P010.xyz/P010.w);
+    vec3 p110 = NDC2SCREEN(P110.xyz/P110.w);
+    vec3 p011 = NDC2SCREEN(P011.xyz/P011.w);
+    vec3 p111 = NDC2SCREEN(P111.xyz/P111.w);
 
 
     {//Compute exact screenspace size
@@ -167,18 +191,18 @@ bool isCulledByHiz() {
     ivec2 mxbb = min(ivec2(ceil(_maxBB.xy*ssize)),ssize-1);
     ivec2 mnbb = ivec2(floor(_minBB.xy*ssize));
 
-    float pointSample = -1.0f;
+    float pointSample = (NEAR*3.0f)-1.0f;
     //float pointSample2 = 0.0f;
     for (int x = mnbb.x; x<=mxbb.x; x++) {
         for (int y = mnbb.y; y<=mxbb.y; y++) {
             float sp = texelFetch(hizDepthSampler, ivec2(x, y), ml).r;
             //pointSample2 = max(sp, pointSample2);
             //sp = mix(sp, pointSample, 0.9999999f<=sp);
-            pointSample = max(sp, pointSample);
+            pointSample = REDUCTION(sp, pointSample);
         }
     }
     //pointSample = mix(pointSample, pointSample2, pointSample<=0.000001f);
-    return pointSample<_minBB.z-0.000001f;;////(minBB.z*2-1);
+    return DEPTH_SCALAR_COMPARE_EQUAL(pointSample,_minBB.z);
 }
 
 
