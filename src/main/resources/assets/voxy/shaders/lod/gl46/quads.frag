@@ -40,6 +40,10 @@ layout(location = 0) out vec4 outColour;
 #import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/lighting.glsl>
 
+
+#import <voxy:util/depthutils.glsl>
+
+
 vec4 uint2vec4RGBA(uint colour) {
     return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255.0;
 }
@@ -153,7 +157,7 @@ void main() {
     }
 
     //Check the minimum bounding texture and ensure we are greater than it
-    if (gl_FragCoord.z < texelFetch(depthTex, ivec2(gl_FragCoord.xy), 0).r) {
+    if (DEPTH_SCALAR_COMPARE(gl_FragCoord.z, texelFetch(depthTex, ivec2(gl_FragCoord.xy), 0).r)) {
         discard;
         return;
     }
@@ -242,4 +246,7 @@ colour = textureGrad(blockModelAtlas, texPos, dx, dy);
 //#else
 //colour = texture(blockModelAtlas, texPos);
 //#endif
+
+//Undefine the depth stuff
+#import <voxy:util/depthutils.glsl>
 

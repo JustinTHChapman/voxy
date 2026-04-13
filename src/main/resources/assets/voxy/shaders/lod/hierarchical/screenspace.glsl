@@ -11,30 +11,8 @@
 //changing the base level/root of the graph for some nodes can be really tricky and incorrect so might not be worth it but it should help
 // substantually for performance (for both persistent threads and incremental)
 
-#ifdef USE_REVERSE_Z
-#define REDUCTION min
-#define NEAR 1.0f
-#define DEPTH_SCALAR_COMPARE(a,b) ((a)>(b))
-#define DEPTH_SCALAR_COMPARE_EQUAL(a,b) ((a)>=(b))
-//We assume here that rev-z means 0->1
-#define USE_ZERO_ONE_DEPTH
-#else
-#define REDUCTION max
-#define NEAR 0.0f
-#define DEPTH_SCALAR_COMPARE(a,b) ((a)<(b))
-#define DEPTH_SCALAR_COMPARE_EQUAL(a,b) ((a)<=(b))
-#endif
 
-#ifdef USE_ZERO_ONE_DEPTH
-vec3 NDC2SCREEN(vec3 val) {
-    return vec3(val.xy*0.5f+0.5f, val.z);
-}
-#else
-vec3 NDC2SCREEN(vec3 val) {
-    return val*0.5f+0.5f;
-}
-#endif
-
+#import <voxy:util/depthutils.glsl>
 
 layout(binding = HIZ_BINDING) uniform sampler2D hizDepthSampler;
 
