@@ -117,8 +117,8 @@ vec2 get_ssao_sample_offset(int step_index, vec2 dither) {
 
     return r * vec2(cos(theta), sin(theta));
 }
-#define SSAO_MAX_RADIUS_SCREEN 0.05
-#define SSAO_RADIUS 1.0f
+#define SSAO_MAX_RADIUS_SCREEN 0.1
+#define SSAO_RADIUS 1.5f
 
 
 vec2 r2(int n, vec2 seed) {
