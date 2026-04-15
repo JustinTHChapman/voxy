@@ -83,6 +83,7 @@ public class Shader extends TrackedObject {
             var clone = new Builder<>(this.constructor, this.processor);
             clone.defines.putAll(this.defines);
             clone.sources.putAll(this.sources);
+            clone.replacements.putAll(this.replacements);
             return clone;
         }
 
