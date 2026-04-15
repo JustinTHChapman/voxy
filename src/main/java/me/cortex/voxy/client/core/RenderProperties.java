@@ -26,4 +26,8 @@ public record RenderProperties(boolean isZero2One, boolean isReverseZ, boolean u
     public float clearDepth() {
         return this.isReverseZ?0.0f:1.0f;
     }
+
+    public float inverseClearDepth() {
+        return this.isReverseZ?1.0f:0.0f;
+    }
 }
