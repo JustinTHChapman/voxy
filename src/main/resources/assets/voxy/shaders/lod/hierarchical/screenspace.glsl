@@ -180,7 +180,13 @@ bool isCulledByHiz() {
         }
     }
     //pointSample = mix(pointSample, pointSample2, pointSample<=0.000001f);
-    return DEPTH_SCALAR_COMPARE_EQUAL(pointSample,_minBB.z);
+    float depthTestAgainst;
+    #ifdef USE_REVERSE_Z
+    depthTestAgainst = _maxBB.z;
+    #else
+    depthTestAgainst = _minBB.z;
+    #endif
+    return DEPTH_SCALAR_COMPARE_EQUAL(pointSample,depthTestAgainst);
 }
 
 
