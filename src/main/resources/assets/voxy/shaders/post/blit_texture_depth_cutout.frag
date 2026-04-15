@@ -21,6 +21,7 @@ vec3 rev3d(vec3 clip) {
     vec4 view = invProjMat * vec4(SCREEN2NDC(clip),1.0f);
     return view.xyz/view.w;
 }
+
 float projDepth(vec3 pos) {
     vec4 view = projMat * vec4(pos, 1);
     return view.z/view.w;
@@ -34,6 +35,7 @@ void main() {
 
     vec3 point = rev3d(vec3(UV.xy, depth));
     depth = projDepth(point);
+    //TODO: HERE make an option/define to emit the output depth as something other then the input (i.e. if voxy is reverse z and vanilla isnt, transform and emit as not reverrse z)
     depth = REDUCTION2(FAR+CLOSER_SIGN*(2.0f/((1<<24)-1)), depth);
     depth = NDC2SCREEN_DEPTH(depth);
 

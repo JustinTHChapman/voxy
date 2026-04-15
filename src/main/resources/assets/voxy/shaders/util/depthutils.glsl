@@ -11,8 +11,6 @@
 #define CLOSER_SIGN 1.0f
 #define DEPTH_SCALAR_COMPARE(a,b) ((a)>(b))
 #define DEPTH_SCALAR_COMPARE_EQUAL(a,b) ((a)>=(b))
-//We assume here that rev-z means 0->1
-#define USE_ZERO_ONE_DEPTH
 #else
 #define REDUCTION max
 #define REDUCTION2 min
