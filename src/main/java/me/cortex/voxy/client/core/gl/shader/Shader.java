@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
@@ -132,6 +133,11 @@ public class Shader extends TrackedObject {
 
         public Builder<T> addSource(ShaderType type, String source) {
             this.sources.put(type, this.processor.process(type, source));
+            return this;
+        }
+
+        public Builder<T> apply(Consumer<Builder<T>> applyer) {
+            applyer.accept(this);
             return this;
         }
 
