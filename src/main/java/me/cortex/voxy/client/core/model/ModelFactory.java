@@ -180,11 +180,13 @@ public class ModelFactory {
         var blockState = this.mapper.getBlockStateFromBlockId(blockId);
 
         if (blockState.getBlock() instanceof StairBlock sb) {
+            /*
             if (sb.baseState.hasProperty(BlockStateProperties.WATERLOGGED)) {
                 blockState = sb.baseState.setValue(BlockStateProperties.WATERLOGGED, blockState.getValue(BlockStateProperties.WATERLOGGED));
             } else {
                 blockState = sb.baseState;
-            }
+            }*/
+            blockState = sb.baseState.getBlock().withPropertiesOf(blockState);
         }
 
         //Before we enqueue the baking of this blockstate, we must check if it has a fluid state associated with it
