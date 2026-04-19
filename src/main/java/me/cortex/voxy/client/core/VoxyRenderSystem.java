@@ -105,8 +105,7 @@ public class VoxyRenderSystem {
 
             this.worldIn = world;
 
-            this.properties = new RenderProperties(RenderSystem.getDevice().isZZeroToOne(), DepthStencilState.DEFAULT.depthTest().equals(CompareOp.GREATER_THAN_OR_EQUAL), false);
-
+            this.properties = RenderProperties.getRenderProperties();
             var backendFactory = getRenderBackendFactory();
             {
                 this.modelService = new ModelBakerySubsystem(world.getMapper());
