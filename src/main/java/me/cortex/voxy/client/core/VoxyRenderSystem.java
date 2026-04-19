@@ -204,6 +204,10 @@ public class VoxyRenderSystem {
                 height = (int) (height*factor[1]);
             }
         }
+        if (width == 0 || height == 0) {
+            Logger.error("Viewport width or height was zero, this is bad bad bad");
+            return null;
+        }
 
         viewport
                 .setVanillaProjection(vanillaProjection)
@@ -226,6 +230,7 @@ public class VoxyRenderSystem {
             return;
         }
         if (viewport.width <= 0 || viewport.height <= 0) {
+            Logger.error("Viewport width or height was zero, this is bad bad bad, exiting frame");
             return;//Only render on valid viewport
         }
 
