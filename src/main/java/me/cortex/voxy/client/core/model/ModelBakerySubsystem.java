@@ -28,12 +28,7 @@ public class ModelBakerySubsystem {
         this.processingThread = new Thread(()->{//TODO replace this with something good/integrate it into the async processor so that we just have less threads overall
             while (this.isRunning) {
                 this.factory.processAllThings();
-                try {
-                    //TODO: replace with LockSupport.park();
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                LockSupport.park();
             }
         }, "Model factory processor");
         this.processingThread.setUncaughtExceptionHandler((t,e)->{
@@ -55,6 +50,7 @@ public class ModelBakerySubsystem {
 
     public void shutdown() {
         this.isRunning = false;
+        LockSupport.unpark(this.processingThread);
         try {
             this.processingThread.join();
         } catch (InterruptedException e) {
@@ -83,10 +79,12 @@ public class ModelBakerySubsystem {
         this.enqueueLock.lock();
         this.factory.addEntry(blockId);
         this.enqueueLock.unlock();
+        LockSupport.unpark(this.processingThread);
     }
 
     public void addBiome(Mapper.BiomeEntry biomeEntry) {
         this.factory.addBiome(biomeEntry);
+        LockSupport.unpark(this.processingThread);
     }
 
     public void addDebugData(List<String> debug) {
