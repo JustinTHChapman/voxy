@@ -370,6 +370,15 @@ public class RenderDataFactory {
         }
     }
 
+    private static long getQuadLight(long quad, long selfmeta) {
+        final long BLMSK = 0xFL<<(55+4);//block light mask
+        long bl = quad&BLMSK;
+        bl = Math.max(bl, ModelQueries.lightEmission(selfmeta)<<(55+4));
+        quad &= ~(BLMSK);
+        quad |= bl;
+        return quad;
+    }
+
     private void generateYZOpaqueInnerGeometry(int axis) {
         for (int layer = 0; layer < 31; layer++) {
             this.blockMesher.auxiliaryPosition = layer;
