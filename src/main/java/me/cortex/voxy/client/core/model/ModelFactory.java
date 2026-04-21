@@ -686,7 +686,7 @@ public class ModelFactory {
         if (isEmissive) {
             return 15;//full bright
         }
-        return state.getLightEmission();
+        return Math.clamp(state.getLightEmission(),0,15);
     }
 
     private static final class BiomeUploadResult implements ResultUploader {
