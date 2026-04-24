@@ -218,18 +218,6 @@ public class ModelFactory {
 
         int flags = this.bakery2.renderToOutput(bake.state, this.bakeScratchBuffer);
 
-        boolean hasDarkenedTextures = (flags&2)!=0;
-        boolean isShaded = (flags&1)!=0;
-        ChunkSectionLayer layer = ChunkSectionLayer.SOLID;
-        if ((flags&4)!=0) {
-            layer = ChunkSectionLayer.TRANSLUCENT;
-        } else if ((flags&8)!=0) {
-            layer = ChunkSectionLayer.CUTOUT;
-        }
-        if (bake.state.is(BlockTags.LEAVES)) {
-            layer = ChunkSectionLayer.SOLID;
-        }
-
 
         {//Create texture data
             long ptr = this.bakeScratchBuffer;
@@ -253,6 +241,45 @@ public class ModelFactory {
                 textureData[face] = new ColourDepthTextureData(colour, depth, MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
             }
         }
+
+
+        boolean hasDarkenedTextures = (flags&2)!=0;
+        boolean isShaded = (flags&1)!=0;
+        ChunkSectionLayer layer = null;
+        if (layer==null && (flags&4)!=0) {
+            //we do an extra check here to be sure texture is translucent
+
+            //TODO: check this is right
+            boolean anyTranslucent = false;
+            for (var face : textureData) {
+                anyTranslucent|=TextureUtils.hasTranslucentPixel(face);
+                if (anyTranslucent) break;
+            }
+            if (anyTranslucent) {
+                layer = ChunkSectionLayer.TRANSLUCENT;
+            } else {
+                boolean solid = true;
+                for (var face : textureData) {
+                    solid&=TextureUtils.isSolidWhereDrawn(face);
+                    if (!solid) break;
+                }
+                if (solid) {
+                    layer = ChunkSectionLayer.SOLID;
+                } else {
+                    layer = ChunkSectionLayer.CUTOUT;
+                }
+            }
+        }
+        if (layer==null && (flags&8)!=0) {
+            layer = ChunkSectionLayer.CUTOUT;
+        }
+        if (bake.state.is(BlockTags.LEAVES)) {
+            layer = ChunkSectionLayer.SOLID;
+        }
+        if (layer == null) {
+            layer = ChunkSectionLayer.SOLID;
+        }
+
 
         var bakeResult = this.processTextureBakeResult(bake.blockId, bake.state, textureData, isShaded, hasDarkenedTextures, layer);
         if (bakeResult!=null) {
