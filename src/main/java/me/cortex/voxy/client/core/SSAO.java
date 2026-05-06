@@ -43,12 +43,20 @@ public class SSAO {
         } else if (mode == SSAOMode.BEST) {
             return new SSAO(properties, true, 24);
         } else if (mode == SSAOMode.AUTO) {
-            if ((!Capabilities.INSTANCE.canQueryGpuMemory) || Capabilities.INSTANCE.totalDedicatedMemory<2_500_000_000L) {
-                return createSSAO(properties, SSAOMode.BASIC);//Create a basic instance (cant query memory (probably intel igpu or less then 2.5gb vram)
-            } else if (Capabilities.INSTANCE.totalDedicatedMemory<7_000_000_000L) {
-                return createSSAO(properties, SSAOMode.BETTER);//Less then 7gb of dedicated vram create a better instance (mid range dgpus (they can probably do best just fine but just in case)
+            if (Capabilities.INSTANCE.canQueryGpuMemory) {
+                if (Capabilities.INSTANCE.totalDedicatedMemory < 2_500_000_000L) {
+                    return createSSAO(properties, SSAOMode.BASIC);//Create a basic instance (cant query memory (probably intel igpu or less then 2.5gb vram)
+                } else if (Capabilities.INSTANCE.totalDedicatedMemory < 7_000_000_000L) {
+                    return createSSAO(properties, SSAOMode.BETTER);//Less then 7gb of dedicated vram create a better instance (mid range dgpus (they can probably do best just fine but just in case)
+                } else {
+                    return createSSAO(properties, SSAOMode.BEST);//create the best ssao
+                }
             } else {
-                return createSSAO(properties, SSAOMode.BEST);//create the best ssao
+                if (Capabilities.INSTANCE.isAmd) {
+                    return createSSAO(properties, SSAOMode.BETTER);
+                } else {
+                    return createSSAO(properties, SSAOMode.BASIC);
+                }
             }
         } else {
             throw new IllegalArgumentException();
