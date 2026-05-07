@@ -32,6 +32,9 @@ public abstract class VoxyInstance {
     protected final ImportManager importManager;
 
     public VoxyInstance() {
+        if (!this.shouldCreateInstance()) {
+            throw new DontCreateInstance();
+        }
         Logger.info("Initializing voxy instance");
         this.threadPool = new UnifiedServiceThreadPool();
         this.savingService = new SectionSavingService(this.getServiceManager());
@@ -55,6 +58,10 @@ public abstract class VoxyInstance {
         this.worldCleaner.setName("Active world cleaner");
         this.worldCleaner.setDaemon(true);
         this.worldCleaner.start();
+    }
+
+    protected boolean shouldCreateInstance() {
+        return true;
     }
 
     protected void setNumThreads(int threads) {
