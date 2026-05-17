@@ -104,8 +104,12 @@ public class VoxyCommands {
         if (Minecraft.getInstance().level == null) {
             throw new IllegalStateException("How you even do this");
         }
-        DebugUtils.verifyAllTopLevelNodes(WorldIdentifier.ofEngine(Minecraft.getInstance().level), attemptRepair);
-        return 0;
+        var engine = WorldIdentifier.ofEngine(Minecraft.getInstance().level);
+        if (engine!=null) {
+            DebugUtils.verifyAllTopLevelNodes(engine, attemptRepair);
+            return 0;
+        }
+        return 1;
     }
 
 
