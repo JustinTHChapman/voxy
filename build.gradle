@@ -98,9 +98,11 @@ processResources {
     sodium_versions_builder.append("]");
     var sodium_versions = sodium_versions_builder.toString();
 
-    inputs.properties("version": version, "commit": hash, "buildtime": time, "allowed_sodium_versions": sodium_versions)
+    var allowed_mc_version = project.properties.minecraft_version.split("-")[0];
+
+    inputs.properties("version": version, "commit": hash, "buildtime": time, "allowed_sodium_versions": sodium_versions, "allowed_mc_version": allowed_mc_version)
     filesMatching("fabric.mod.json") {
-        expand "version": version, "commit": hash, "buildtime": time, "allowed_sodium_versions": sodium_versions
+        expand "version": version, "commit": hash, "buildtime": time, "allowed_sodium_versions": sodium_versions, "allowed_mc_version": allowed_mc_version
     }
 }
 
