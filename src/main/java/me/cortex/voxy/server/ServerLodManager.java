@@ -48,6 +48,7 @@ public final class ServerLodManager implements AutoCloseable {
     private final MinecraftServer server;
     private final SectionStorageManager storageManager;
     private final ExecutorService voxelizerPool;
+    private final LodDeliveryQueue deliveryQueue;
 
     /** Pending voxelization tasks submitted from the server thread. */
     private final ConcurrentLinkedQueue<LevelChunk> pendingChunks = new ConcurrentLinkedQueue<>();
@@ -57,6 +58,7 @@ public final class ServerLodManager implements AutoCloseable {
         Path worldDir = server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
                 .resolve("voxy");
         this.storageManager = new SectionStorageManager(worldDir);
+        this.deliveryQueue  = new LodDeliveryQueue(this);
 
         int threads = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
         this.voxelizerPool = Executors.newFixedThreadPool(threads, r -> {
@@ -66,6 +68,10 @@ public final class ServerLodManager implements AutoCloseable {
         });
 
         LOGGER.info("[Voxy] Server LOD manager started (voxelizer threads: {})", threads);
+    }
+
+    public LodDeliveryQueue getDeliveryQueue() {
+        return deliveryQueue;
     }
 
     // -------------------------------------------------------------------------
@@ -148,26 +154,60 @@ public final class ServerLodManager implements AutoCloseable {
     /**
      * Sends all requested sections to the specified player.
      * Called from {@link ServerNetworkHandler} when the client requests sections.
+     * Routes through the per-player {@link LodDeliveryQueue} for throttling.
      */
     public void sendSectionsToPlayer(ServerPlayer player, ResourceLocation dimension,
                                      java.util.List<Long> requestedKeys) {
-        String dimKey = dimension.toString();
-        SqliteSectionStorage storage = storageManager.get(dimKey);
         int maxQueue = VoxyConfig.INSTANCE.serverMaxTransferQueuePerClient.get();
-        int sent = 0;
-
-        for (Long key : requestedKeys) {
-            if (sent >= maxQueue) {
-                LOGGER.warn("[Voxy] Transfer queue limit reached for player {}", player.getName().getString());
-                break;
-            }
-            storage.load(key).ifPresent(section -> {
-                LodSectionDataPayload pkt = new LodSectionDataPayload(
-                        dimension, section.key, section.hash, section.toBytes());
-                PacketDistributor.sendToPlayer(player, pkt);
-            });
-            sent++;
+        java.util.List<Long> capped = requestedKeys.size() <= maxQueue
+                ? requestedKeys
+                : requestedKeys.subList(0, maxQueue);
+        if (capped.size() < requestedKeys.size()) {
+            LOGGER.warn("[Voxy] Capping request from player {} to {} sections (requested {})",
+                    player.getName().getString(), maxQueue, requestedKeys.size());
         }
+        deliveryQueue.enqueueAdditional(player, dimension, capped);
+    }
+
+    /**
+     * Pushes the radius-filtered manifest + section data to a newly-joined player
+     * when {@code lodSendOnJoin} is enabled.
+     */
+    public void onPlayerJoin(ServerPlayer player) {
+        if (!VoxyConfig.INSTANCE.lodSendOnJoin.get()) return;
+
+        ResourceLocation dim = player.level().dimension().location();
+        int requestedRadius = VoxyConfig.INSTANCE.clientLodRadius.get();
+        int radius = Math.min(requestedRadius, VoxyConfig.INSTANCE.lodRadiusMax.get());
+
+        int cx = player.blockPosition().getX() >> 4;
+        int cz = player.blockPosition().getZ() >> 4;
+
+        java.util.List<Long> radiusKeys = LodDeliveryQueue.radiusKeys(cx, cz, radius);
+        SqliteSectionStorage storage = storageManager.get(dim.toString());
+
+        // Filter to sections that actually exist on disk (DISK_ONLY mode)
+        // GENERATE mode would additionally enqueue missing chunks for generation here.
+        java.util.List<Long> existing = new java.util.ArrayList<>();
+        for (Long key : radiusKeys) {
+            if (storage.load(key).isPresent()) existing.add(key);
+        }
+
+        LOGGER.info("[Voxy] Player {} joined — queuing {} sections (radius {})",
+                player.getName().getString(), existing.size(), radius);
+        deliveryQueue.enqueue(player, dim, existing);
+    }
+
+    /**
+     * Called from the server tick event. Drains the per-player delivery queues at the
+     * configured rate.
+     */
+    public void tickDelivery() {
+        int perTick = VoxyConfig.INSTANCE.lodChunksPerTick.get();
+        deliveryQueue.tickDeliver(
+                uuid -> server.getPlayerList().getPlayer(uuid),
+                perTick
+        );
     }
 
     // -------------------------------------------------------------------------

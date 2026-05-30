@@ -1,0 +1,82 @@
+name: Sync Voxy NeoForge mod
+
+# Pulls the latest 'latest-neoforge-rewrite' jar from MCRcortex/voxy and
+# commits it into mods/, replacing any existing voxy-*.jar.
+#
+# Triggers (manual only for now):
+#   - 'Run workflow' button on the Actions tab
+#   - repository_dispatch event of type 'voxy-release' (e.g. from another workflow)
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [voxy-release]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-voxy
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Fetch & commit latest voxy jar
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout .minecraft
+        uses: actions/checkout@v4
+
+      - name: Fetch latest jar from voxy release
+        id: fetch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p mods
+
+          # Pull the rolling release JSON
+          RELEASE_JSON=$(gh api repos/MCRcortex/voxy/releases/tags/latest-neoforge-rewrite)
+
+          JAR_URL=$(echo "$RELEASE_JSON" \
+            | jq -r '.assets[] | select(.name | test("^voxy-neoforge.*\\.jar$") and (test("sources") | not)) | .browser_download_url' \
+            | head -n1)
+
+          JAR_NAME=$(echo "$RELEASE_JSON" \
+            | jq -r '.assets[] | select(.name | test("^voxy-neoforge.*\\.jar$") and (test("sources") | not)) | .name' \
+            | head -n1)
+
+          COMMIT_SHA=$(echo "$RELEASE_JSON" | jq -r '.target_commitish')
+
+          if [ -z "$JAR_URL" ] || [ "$JAR_URL" = "null" ]; then
+            echo "::error::Could not find a voxy-neoforge-*.jar in the latest release"
+            exit 1
+          fi
+
+          echo "Downloading $JAR_NAME from $JAR_URL"
+          curl -fL --retry 3 -o "mods/$JAR_NAME" "$JAR_URL"
+
+          # Remove any older voxy-*.jar (different version)
+          find mods -maxdepth 1 -type f -name 'voxy-*.jar' ! -name "$JAR_NAME" -delete || true
+
+          echo "jar_name=$JAR_NAME"   >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Commit & push if changed
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add mods/voxy-*.jar
+          # If nothing changed, exit cleanly
+          if git diff --cached --quiet; then
+            echo "No changes to commit (already up to date)."
+            exit 0
+          fi
+
+          git commit -m "chore(mods): update voxy to ${{ steps.fetch.outputs.jar_name }}
+
+          Source: https://github.com/MCRcortex/voxy/commit/${{ steps.fetch.outputs.commit_sha }}"
+          git push
