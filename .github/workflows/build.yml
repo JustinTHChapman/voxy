@@ -1,17 +1,21 @@
-name: Build and Test
+name: Build, Test, Publish
 
 on:
   push:
-    branches:
-      - neoforge-rewrite
+    branches: [neoforge-rewrite]
   pull_request:
-    branches:
-      - neoforge-rewrite
+    branches: [neoforge-rewrite]
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # needed to create/update the rolling Release
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+
   build:
     name: Build & Test (Java 21)
     runs-on: ubuntu-latest
@@ -34,42 +38,56 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Run unit tests
+      # ---- Compile sanity check (fast fail before MC asset download) ----
+      - name: Compile
+        run: ./gradlew compileJava compileTestJava --no-daemon
+        env:
+          GRADLE_OPTS: "-Xmx2g"
+          CI: "true"
+
+      # ---- Run unit tests (downloads MC assets on first run, then cached) ----
+      - name: Test
         run: ./gradlew test --no-daemon
         env:
           GRADLE_OPTS: "-Xmx2g"
+          CI: "true"
 
-      - name: Publish test results
+      - name: Publish JUnit report
         uses: mikepenz/action-junit-report@v4
         if: always()
         with:
           report_paths: 'build/test-results/test/TEST-*.xml'
           check_name: 'JUnit Test Results'
+          require_tests: true
 
-      - name: Build mod jar
+      # ---- Build the mod jar ----
+      - name: Build
         run: ./gradlew build --no-daemon
         env:
           GRADLE_OPTS: "-Xmx2g"
+          CI: "true"
 
-      - name: Upload build artifacts
+      - name: Upload jar artifact
         uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: voxy-neoforge-${{ github.ref_name }}-${{ github.sha }}
-          path: |
-            build/libs/*.jar
+          name: voxy-neoforge-${{ github.sha }}
+          path: build/libs/*.jar
           retention-days: 30
 
-  check-style:
-    name: Compile check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      # ---- Publish a rolling "latest" Release on pushes to neoforge-rewrite ----
+      - name: Update rolling latest Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/neoforge-rewrite'
+        uses: softprops/action-gh-release@v2
         with:
-          java-version: '21'
-          distribution: 'temurin'
-      - uses: gradle/actions/setup-gradle@v4
-      - run: chmod +x gradlew
-      - name: Compile
-        run: ./gradlew compileJava --no-daemon
+          tag_name: latest-neoforge-rewrite
+          name: "Latest neoforge-rewrite build"
+          body: |
+            Automatic build from commit ${{ github.sha }}.
+
+            **This is an automated rolling release. Do not link to it as a stable version.**
+          prerelease: true
+          files: |
+            build/libs/*.jar
+          fail_on_unmatched_files: true
+          token: ${{ secrets.GITHUB_TOKEN }}

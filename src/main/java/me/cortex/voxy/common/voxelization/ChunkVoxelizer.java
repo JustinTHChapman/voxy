@@ -7,9 +7,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * Converts a Minecraft {@link LevelChunk} into a {@link LodSection} at LOD level 0.
@@ -60,30 +62,25 @@ public final class ChunkVoxelizer {
                 int worldZ = baseZ + lz;
                 int idx    = lx + lz * S;
 
-                // Walk down from sky to find the surface block
-                int surfaceY = minY;
-                BlockState surfaceState = chunk.getLevel().getBlockState(pos.set(worldX, minY, worldZ));
+                // Use Minecraft's heightmap for fast surface lookup.  WORLD_SURFACE skips
+                // air but keeps non-opaque surface blocks (leaves, glass, etc.).
+                int surfaceY = chunk.getHeight(Heightmap.Types.WORLD_SURFACE, lx, lz) - 1;
+                if (surfaceY < minY) surfaceY = minY;
+                if (surfaceY > maxY) surfaceY = maxY;
 
-                for (int y = maxY; y >= minY; y--) {
-                    pos.set(worldX, y, worldZ);
-                    BlockState state = chunk.getBlockState(pos);
-                    if (!state.isAir() && state.isSolid()) {
-                        surfaceY     = y;
-                        surfaceState = state;
-                        break;
-                    }
-                }
+                pos.set(worldX, surfaceY, worldZ);
+                BlockState surfaceState = chunk.getBlockState(pos);
 
                 blockStates[idx] = net.minecraft.world.level.block.Block.getId(surfaceState);
                 heights[idx]     = (short) surfaceY;
 
                 // Light: sample just above the surface block
                 pos.set(worldX, surfaceY + 1, worldZ);
-                int skyLight   = chunk.getLevel().getBrightness(net.minecraft.world.level.LightLayer.SKY,   pos);
-                int blockLight = chunk.getLevel().getBrightness(net.minecraft.world.level.LightLayer.BLOCK, pos);
+                int skyLight   = chunk.getLevel().getBrightness(LightLayer.SKY,   pos);
+                int blockLight = chunk.getLevel().getBrightness(LightLayer.BLOCK, pos);
                 lightData[idx] = (byte) ((skyLight << 4) | (blockLight & 0xF));
 
-                // Biome: sample at surface level
+                // Biome: sample at surface level (noiseBiome uses quart-coords: 1/4 block)
                 Holder<Biome> biomeHolder = chunk.getNoiseBiome(lx >> 2, surfaceY >> 2, lz >> 2);
                 biomeIds[idx] = biomeRegistry.getId(biomeHolder.value());
             }
