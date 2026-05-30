@@ -16,9 +16,53 @@
       ],
       "vmArgs": [
         "@D:\\GitHub\\voxy\\build\\moddev\\clientRunVmArgs.txt",
-        "-Dfml.modFolders\u003d"
+        "-Dfml.modFolders\u003dvoxy%%D:\\GitHub\\voxy\\bin\\main"
       ],
-      "cwd": "${workspaceFolder}\\run",
+      "cwd": "${workspaceFolder}\\run\\client",
+      "env": {},
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    },
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "Data",
+      "presentation": {
+        "group": "Mod Development - voxy-neoforge",
+        "order": 1
+      },
+      "projectName": "voxy-neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@D:\\GitHub\\voxy\\build\\moddev\\dataRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@D:\\GitHub\\voxy\\build\\moddev\\dataRunVmArgs.txt",
+        "-Dfml.modFolders\u003dvoxy%%D:\\GitHub\\voxy\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\run\\data",
+      "env": {},
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    },
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "Server",
+      "presentation": {
+        "group": "Mod Development - voxy-neoforge",
+        "order": 2
+      },
+      "projectName": "voxy-neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@D:\\GitHub\\voxy\\build\\moddev\\serverRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@D:\\GitHub\\voxy\\build\\moddev\\serverRunVmArgs.txt",
+        "-Dfml.modFolders\u003dvoxy%%D:\\GitHub\\voxy\\bin\\main"
+      ],
+      "cwd": "${workspaceFolder}\\run\\server",
       "env": {},
       "console": "internalConsole",
       "shortenCommandLine": "none"
