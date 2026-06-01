@@ -15,6 +15,10 @@ import me.cortex.voxy.common.lod.LodSection;
 import me.cortex.voxy.common.lod.SectionKey;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -28,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Simple LOD terrain renderer.
@@ -46,6 +51,16 @@ public final class LodRenderer {
     private static final Logger LOGGER = LoggerFactory.getLogger(LodRenderer.class);
     /** Timestamp of last per-frame diagnostic log (throttled to once per 2 s). */
     private static volatile long lastDiagLogMs = 0;
+
+    /**
+     * Per-block-state sprite cache.  Populated lazily on the render thread.
+     * The map is intentionally never invalidated here — sprites are stable across
+     * a session unless the user changes resource packs (a full reload clears MC's
+     * model system, so old references would become stale; a future improvement is
+     * to hook into {@code RegisterClientReloadListenersEvent} to clear this).
+     */
+    private static final ConcurrentHashMap<Integer, TextureAtlasSprite> SPRITE_CACHE =
+            new ConcurrentHashMap<>();
 
     private LodRenderer() {}
 
@@ -92,7 +107,10 @@ public final class LodRenderer {
         // -----------------------------------------------------------------------
         RenderSystem.enableDepthTest();
         RenderSystem.disableCull(); // render top face regardless of winding order
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
+        @SuppressWarnings("deprecation")
+        var blockAtlasLoc = TextureAtlas.LOCATION_BLOCKS;
+        RenderSystem.setShaderTexture(0, blockAtlasLoc);
 
         // -----------------------------------------------------------------------
         // Set up shader matrices
@@ -149,7 +167,7 @@ public final class LodRenderer {
         Matrix4f identity = new Matrix4f(); // identity — camera rotation is in ModelViewMat above
 
         Tesselator tesselator = Tesselator.getInstance();
-        BufferBuilder buffer  = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        BufferBuilder buffer  = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
 
         for (LodSection section : toRender) {
             int lodLevel  = SectionKey.lodLevel(section.key);
@@ -169,10 +187,20 @@ public final class LodRenderer {
                 int cx = ci % SIZE;
                 int cz = ci / SIZE;
 
-                int color = blockColorFor(blockStateId);
-                float r = ((color >> 16) & 0xFF) / 255.0f;
-                float g = ((color >>  8) & 0xFF) / 255.0f;
-                float b = ( color        & 0xFF) / 255.0f;
+                // Fetch the top-face sprite and apply any block-specific tint.
+                TextureAtlasSprite topSprite = getTopSpriteForState(blockStateId, mc);
+                float tu0 = topSprite.getU0(), tu1 = topSprite.getU1();
+                float tv0 = topSprite.getV0(), tv1 = topSprite.getV1();
+
+                TextureAtlasSprite sideSprite = getSideSpriteForState(blockStateId, mc);
+                float su0 = sideSprite.getU0(), su1 = sideSprite.getU1();
+                float sv0 = sideSprite.getV0(), sv1 = sideSprite.getV1();
+
+                int tint = blockTintFor(blockStateId);
+                float tr = ((tint >> 16) & 0xFF) / 255.0f;
+                float tg = ((tint >>  8) & 0xFF) / 255.0f;
+                float tb = ( tint        & 0xFF) / 255.0f;
+
                 float bright = 0.7f + 0.3f * Math.min(1.0f, (section.heights[ci] + 1.0f) / 128.0f);
 
                 float[] rel = cameraRelativePos(
@@ -184,51 +212,51 @@ public final class LodRenderer {
                 float s = (float) cellSize;
 
                 // Top face — full brightness
-                float rt = r * bright, gt = g * bright, bt = b * bright;
-                buffer.addVertex(identity, rx,     ry, rz    ).setColor(rt, gt, bt, 1.0f);
-                buffer.addVertex(identity, rx,     ry, rz + s).setColor(rt, gt, bt, 1.0f);
-                buffer.addVertex(identity, rx + s, ry, rz + s).setColor(rt, gt, bt, 1.0f);
-                buffer.addVertex(identity, rx + s, ry, rz    ).setColor(rt, gt, bt, 1.0f);
+                float rt = tr * bright, gt = tg * bright, bt = tb * bright;
+                buffer.addVertex(identity, rx,     ry, rz    ).setUv(tu0, tv0).setColor(rt, gt, bt, 1.0f);
+                buffer.addVertex(identity, rx,     ry, rz + s).setUv(tu0, tv1).setColor(rt, gt, bt, 1.0f);
+                buffer.addVertex(identity, rx + s, ry, rz + s).setUv(tu1, tv1).setColor(rt, gt, bt, 1.0f);
+                buffer.addVertex(identity, rx + s, ry, rz    ).setUv(tu1, tv0).setColor(rt, gt, bt, 1.0f);
 
-                // Side faces — darker tint for depth cue
-                float rs = r * bright * 0.65f;
-                float gs = g * bright * 0.65f;
-                float bs = b * bright * 0.65f;
+                // Side faces — 65 % brightness for depth cue
+                float rs = tr * bright * 0.65f;
+                float gs = tg * bright * 0.65f;
+                float bs = tb * bright * 0.65f;
 
                 // +X (east) side
                 float eny = neighborTopY(section, cx + 1, cz, SIZE, ry, s, camY);
                 if (eny < ry) {
-                    buffer.addVertex(identity, rx+s, ry,  rz    ).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx+s, eny, rz    ).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx+s, eny, rz + s).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx+s, ry,  rz + s).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx+s, ry,  rz    ).setUv(su1, sv0).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx+s, eny, rz    ).setUv(su1, sv1).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx+s, eny, rz + s).setUv(su0, sv1).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx+s, ry,  rz + s).setUv(su0, sv0).setColor(rs, gs, bs, 1.0f);
                 }
 
                 // -X (west) side
                 float wny = neighborTopY(section, cx - 1, cz, SIZE, ry, s, camY);
                 if (wny < ry) {
-                    buffer.addVertex(identity, rx, ry,  rz + s).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx, wny, rz + s).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx, wny, rz    ).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx, ry,  rz    ).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx, ry,  rz + s).setUv(su0, sv0).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx, wny, rz + s).setUv(su0, sv1).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx, wny, rz    ).setUv(su1, sv1).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx, ry,  rz    ).setUv(su1, sv0).setColor(rs, gs, bs, 1.0f);
                 }
 
                 // +Z (south) side
                 float sny = neighborTopY(section, cx, cz + 1, SIZE, ry, s, camY);
                 if (sny < ry) {
-                    buffer.addVertex(identity, rx + s, ry,  rz + s).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx + s, sny, rz + s).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx,     sny, rz + s).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx,     ry,  rz + s).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx + s, ry,  rz + s).setUv(su1, sv0).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx + s, sny, rz + s).setUv(su1, sv1).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx,     sny, rz + s).setUv(su0, sv1).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx,     ry,  rz + s).setUv(su0, sv0).setColor(rs, gs, bs, 1.0f);
                 }
 
                 // -Z (north) side
                 float nny = neighborTopY(section, cx, cz - 1, SIZE, ry, s, camY);
                 if (nny < ry) {
-                    buffer.addVertex(identity, rx,     ry,  rz).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx,     nny, rz).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx + s, nny, rz).setColor(rs, gs, bs, 1.0f);
-                    buffer.addVertex(identity, rx + s, ry,  rz).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx,     ry,  rz).setUv(su0, sv0).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx,     nny, rz).setUv(su0, sv1).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx + s, nny, rz).setUv(su1, sv1).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx + s, ry,  rz).setUv(su1, sv0).setColor(rs, gs, bs, 1.0f);
                 }
             }
         }
@@ -336,87 +364,91 @@ public final class LodRenderer {
     }
 
     // -------------------------------------------------------------------------
-    // Block colour palette
+    // Sprite / texture helpers
     // -------------------------------------------------------------------------
 
-    private static int blockColorFor(int blockStateId) {
-        try {
-            BlockState state = Block.stateById(blockStateId);
-            return paletteColor(state);
-        } catch (Exception e) {
-            return 0x888888;
-        }
+    /**
+     * Returns a cached top-face {@link TextureAtlasSprite} for the given block-state ID.
+     * Falls back to the particle icon when no up-facing baked quad is available.
+     */
+    @SuppressWarnings("deprecation")
+    private static TextureAtlasSprite getTopSpriteForState(int blockStateId, Minecraft mc) {
+        return SPRITE_CACHE.computeIfAbsent(blockStateId, id -> {
+            try {
+                BlockState state = Block.stateById(id);
+                var model = mc.getBlockRenderer().getBlockModelShaper().getBlockModel(state);
+                var quads = model.getQuads(state, Direction.UP, RandomSource.create(),
+                        net.neoforged.neoforge.client.model.data.ModelData.EMPTY, null);
+                if (!quads.isEmpty()) {
+                    return quads.get(0).getSprite();
+                }
+            } catch (Exception ignored) {}
+            try {
+                return mc.getBlockRenderer().getBlockModelShaper().getParticleIcon(Block.stateById(id));
+            } catch (Exception ignored) {}
+            return mc.getModelManager().getAtlas(TextureAtlas.LOCATION_BLOCKS)
+                    .getSprite(net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation());
+        });
     }
 
-    private static int paletteColor(BlockState state) {
-        Block block = state.getBlock();
+    /**
+     * Returns a side-face sprite for the given block-state ID.
+     * Tries the NORTH face first; falls back to the top sprite.
+     */
+    private static TextureAtlasSprite getSideSpriteForState(int blockStateId, Minecraft mc) {
+        // Re-use SPRITE_CACHE keyed by a negative-offset sentinel so side and top
+        // can be cached independently without a second map.
+        int sideKey = -(blockStateId + 1);
+        return SPRITE_CACHE.computeIfAbsent(sideKey, id -> {
+            int bsid = -(id + 1);
+            try {
+                BlockState state = Block.stateById(bsid);
+                var model = mc.getBlockRenderer().getBlockModelShaper().getBlockModel(state);
+                var quads = model.getQuads(state, Direction.NORTH, RandomSource.create(),
+                        net.neoforged.neoforge.client.model.data.ModelData.EMPTY, null);
+                if (!quads.isEmpty()) {
+                    return quads.get(0).getSprite();
+                }
+            } catch (Exception ignored) {}
+            // Fall back to the top sprite
+            return getTopSpriteForState(bsid, mc);
+        });
+    }
 
-        // Water / lava
-        if (block == Blocks.WATER)                                               return 0x3F76E4;
-        if (block == Blocks.LAVA)                                                return 0xE04000;
+    // -------------------------------------------------------------------------
+    // Block tint palette  (applied as colour multiplier on top of the sprite)
+    // -------------------------------------------------------------------------
 
-        // Grass-family surface blocks
-        if (block == Blocks.GRASS_BLOCK)                                         return 0x5D9B3E;
-        if (block == Blocks.MYCELIUM)                                            return 0x7A6080;
-        if (block == Blocks.PODZOL)                                              return 0x7A5530;
+    /**
+     * Returns an RGB tint (packed as {@code 0xRRGGBB}) to multiply against the
+     * block's sprite texture.  Returns {@code 0xFFFFFF} (white, no tint) for
+     * blocks whose atlas texture already carries the right colour.
+     *
+     * <p>Tinting is needed for blocks whose atlas texture is grayscale and relies
+     * on a biome/block colour provider at render time (grass tops, leaves, water).
+     */
+    private static int blockTintFor(int blockStateId) {
+        try {
+            BlockState state = Block.stateById(blockStateId);
+            Block block = state.getBlock();
 
-        // Dirt
-        if (block == Blocks.DIRT || block == Blocks.COARSE_DIRT
-                || block == Blocks.ROOTED_DIRT || block == Blocks.MUD)          return 0x97694F;
+            // Water / lava — tint the animated texture
+            if (block == Blocks.WATER)                              return 0x3F76E4;
+            if (block == Blocks.LAVA)                               return 0xFFFFFF; // lava texture is self-coloured
 
-        // Sand / gravel / clay
-        if (block == Blocks.SAND || block == Blocks.SANDSTONE
-                || block == Blocks.SMOOTH_SANDSTONE)                             return 0xDDB74D;
-        if (block == Blocks.RED_SAND || block == Blocks.RED_SANDSTONE)          return 0xB4613B;
-        if (block == Blocks.GRAVEL)                                              return 0x8A8A8A;
-        if (block == Blocks.CLAY)                                                return 0x9BA5B0;
+            // Grass top is a grayscale texture — apply plains biome colour
+            if (block == Blocks.GRASS_BLOCK)                        return 0x91BD59;
 
-        // Stone family
-        if (block == Blocks.STONE || block == Blocks.COBBLESTONE
-                || block == Blocks.MOSSY_COBBLESTONE
-                || block == Blocks.SMOOTH_STONE)                                 return 0x9B9B9B;
-        if (block == Blocks.GRANITE || block == Blocks.POLISHED_GRANITE)        return 0xAA6347;
-        if (block == Blocks.DIORITE || block == Blocks.POLISHED_DIORITE)        return 0xCACACA;
-        if (block == Blocks.ANDESITE || block == Blocks.POLISHED_ANDESITE)      return 0x8C8C8C;
-        if (block == Blocks.DEEPSLATE || block == Blocks.COBBLED_DEEPSLATE)     return 0x5A5A6A;
-        if (block == Blocks.BEDROCK)                                             return 0x3C3C3C;
-        if (block == Blocks.TUFF)                                                return 0x7A7A60;
-        if (block == Blocks.CALCITE)                                             return 0xE0DDD8;
+            // Leaves are grayscale in the atlas, need foliage tint
+            if (state.is(net.minecraft.tags.BlockTags.LEAVES))      return 0x77AB2F;
 
-        // Ores (show as stone + slight tint)
-        if (block == Blocks.COAL_ORE || block == Blocks.DEEPSLATE_COAL_ORE)    return 0x606060;
-        if (block == Blocks.IRON_ORE || block == Blocks.DEEPSLATE_IRON_ORE)    return 0x967B6A;
-        if (block == Blocks.GOLD_ORE || block == Blocks.DEEPSLATE_GOLD_ORE)    return 0xD4B942;
-        if (block == Blocks.DIAMOND_ORE || block == Blocks.DEEPSLATE_DIAMOND_ORE) return 0x48C8D8;
-        if (block == Blocks.EMERALD_ORE || block == Blocks.DEEPSLATE_EMERALD_ORE) return 0x2DBD68;
+            // Vine / lily pad / seagrass
+            if (block == Blocks.VINE || block == Blocks.LILY_PAD)   return 0x77AB2F;
 
-        // Snow / ice
-        if (block == Blocks.SNOW || block == Blocks.SNOW_BLOCK)                return 0xEAF2FF;
-        if (block == Blocks.ICE || block == Blocks.PACKED_ICE
-                || block == Blocks.BLUE_ICE)                                     return 0xB0CCFF;
-
-        // Leaves (any leaf tag)
-        if (state.is(net.minecraft.tags.BlockTags.LEAVES))                      return 0x3A6B2A;
-
-        // Logs / wood (any log tag)
-        if (state.is(net.minecraft.tags.BlockTags.LOGS))                        return 0x6B4F2A;
-        if (state.is(net.minecraft.tags.BlockTags.PLANKS))                      return 0xAA8044;
-
-        // Nether
-        if (block == Blocks.NETHERRACK)                                          return 0x7A2020;
-        if (block == Blocks.NETHER_BRICKS || block == Blocks.CRACKED_NETHER_BRICKS) return 0x3A1A1A;
-        if (block == Blocks.SOUL_SAND || block == Blocks.SOUL_SOIL)             return 0x4A3A2A;
-        if (block == Blocks.CRIMSON_NYLIUM || block == Blocks.WARPED_NYLIUM)    return 0x7A1A3A;
-        if (block == Blocks.BASALT || block == Blocks.SMOOTH_BASALT
-                || block == Blocks.POLISHED_BASALT)                              return 0x4A4A5A;
-        if (block == Blocks.BLACKSTONE)                                          return 0x2A2A3A;
-        if (block == Blocks.GLOWSTONE)                                           return 0xD0A020;
-        if (block == Blocks.MAGMA_BLOCK)                                         return 0x8A3010;
-
-        // End
-        if (block == Blocks.END_STONE || block == Blocks.END_STONE_BRICKS)      return 0xD8D898;
-
-        // Fallback: medium grey
-        return 0x888888;
+            // Everything else: sprite texture provides the colour
+            return 0xFFFFFF;
+        } catch (Exception e) {
+            return 0xFFFFFF;
+        }
     }
 }
