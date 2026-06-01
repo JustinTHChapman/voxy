@@ -1,4 +1,4 @@
-package me.cortex.voxy.client;
+﻿package me.cortex.voxy.client;
 
 import me.cortex.voxy.client.compat.FlashbackCompat;
 import me.cortex.voxy.client.config.VoxyConfig;
@@ -69,7 +69,7 @@ public class VoxyClientInstance extends VoxyInstance {
     }
 
     @Override
-    protected SectionStorage createStorage(WorldIdentifier identifier) {
+    protected SectionStorage createStorage(WorldIdentifier ResourceLocation) {
         var ctx = new ConfigBuildCtx();
         ctx.setProperty(ConfigBuildCtx.BASE_SAVE_PATH, this.basePath.toString());
         ctx.setProperty(ConfigBuildCtx.WORLD_IDENTIFIER, identifier.getWorldId());

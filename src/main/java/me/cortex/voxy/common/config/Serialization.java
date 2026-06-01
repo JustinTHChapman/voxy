@@ -6,7 +6,7 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.fabricmc.loader.api.FabricLoader;
+import net.neoforged.fml.ModList;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -96,8 +96,11 @@ public class Serialization {
         Map<Class<?>, GsonConfigSerialization<?>> serializers = new HashMap<>();
 
         Set<String> clazzs = new LinkedHashSet<>();
-        var path = FabricLoader.getInstance().getModContainer("voxy").get().getRootPaths().get(0);
-        clazzs.addAll(collectAllClasses(path, BASE_SEARCH_PACKAGE));
+        var modContainer = ModList.get() == null ? null : ModList.get().getModContainerById("voxy").orElse(null);
+        var rootPaths = modContainer == null ? java.util.List.<Path>of() : modContainer.getModInfo().getOwningFile().getFile().getSecureJar().getRootPath() == null ? java.util.List.<Path>of() : java.util.List.of(modContainer.getModInfo().getOwningFile().getFile().getSecureJar().getRootPath());
+        if (!rootPaths.isEmpty()) {
+            clazzs.addAll(collectAllClasses(rootPaths.get(0), BASE_SEARCH_PACKAGE));
+        }
         clazzs.addAll(collectAllClasses(BASE_SEARCH_PACKAGE));
         int count = 0;
         outer:

@@ -1,7 +1,7 @@
-package me.cortex.voxy.client.core.gl.shader;
+﻿package me.cortex.voxy.client.core.gl.shader;
 
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.apache.commons.io.IOUtils;
 
 import java.io.BufferedReader;
@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 public class ShaderLoader {
     public static String parse(String id) {
         var src =  "#version 460 core\n";
-        src += String.join("\n", ShaderLoadingParser.parseRoot(Identifier.parse(id)));
+        src += String.join("\n", ShaderLoadingParser.parseRoot(ResourceLocation.parse(id)));
         return src;
     }
 
@@ -26,7 +26,7 @@ public class ShaderLoader {
 
     private static final class ShaderLoadingParser {
         private static final Pattern IMPORT_PATTERN = Pattern.compile("#import <(?<namespace>.*):(?<path>.*)>");
-        public static List<String> parseRoot(Identifier id) {
+        public static List<String> parseRoot(ResourceLocation id) {
             List<String> out = new ArrayList<>();
             for (var line : toLines(loadShaderAsset(id))) {
                 if (line.startsWith("#version")) {
@@ -50,7 +50,7 @@ public class ShaderLoader {
                 throw new RuntimeException(e);
             }
         }
-        private static String loadShaderAsset(Identifier id) {
+        private static String loadShaderAsset(ResourceLocation id) {
             String path = String.format("/assets/%s/shaders/%s", id.getNamespace(), id.getPath());
             try (InputStream in = ShaderLoadingParser.class.getResourceAsStream(path)) {
                 if (in == null) {

@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.model;
+﻿package me.cortex.voxy.client.core.model;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
@@ -22,7 +22,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.CardinalLighting;
@@ -307,7 +307,7 @@ public class ModelFactory {
         var biomeEntry = this.biomeQueue.poll();
         while (biomeEntry != null) {
             var biomeRegistry = Minecraft.getInstance().level.registryAccess().lookupOrThrow(Registries.BIOME);
-            var mcbiomeEntry = biomeRegistry.get(Identifier.parse(biomeEntry.biome));
+            var mcbiomeEntry = biomeRegistry.get(ResourceLocation.parse(biomeEntry.biome));
             if (!mcbiomeEntry.isPresent()) {
                 Logger.warn("Could not find biome: " + biomeEntry.biome + " using default");
             }
