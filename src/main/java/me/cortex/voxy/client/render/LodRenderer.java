@@ -115,10 +115,12 @@ public final class LodRenderer {
                 int cx = ci % VoxyConstants.SECTION_SIZE;
                 int cz = ci / VoxyConstants.SECTION_SIZE;
 
-                // Camera-relative position (double precision subtraction → float cast)
-                float rx = (float)(secWorldX + (double)(cx * cellSize) - camX);
-                float ry = (float)(section.heights[ci] + 1.0 - camY);
-                float rz = (float)(secWorldZ + (double)(cz * cellSize) - camZ);
+                float[] rel = cameraRelativePos(
+                        secWorldX + (double)(cx * cellSize),
+                        section.heights[ci] + 1.0,
+                        secWorldZ + (double)(cz * cellSize),
+                        camX, camY, camZ);
+                float rx = rel[0], ry = rel[1], rz = rel[2];
                 float s  = cellSize;
 
                 int color = blockColorFor(blockStateId);
@@ -144,6 +146,29 @@ public final class LodRenderer {
         }
 
         RenderSystem.enableCull();
+    }
+
+    // -------------------------------------------------------------------------
+    // Coordinate helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Converts a world-space position to camera-relative float coordinates.
+     *
+     * <p>The subtraction is performed in double precision before casting so that
+     * large world coordinates (e.g. far from origin) do not lose precision.
+     * All vertex positions fed to the GPU must be camera-relative because the
+     * PoseStack at {@code AFTER_SOLID_BLOCKS} already has the camera transform applied.
+     *
+     * <p>Package-private so unit tests can verify the math directly.
+     */
+    public static float[] cameraRelativePos(double worldX, double worldY, double worldZ,
+                                            double camX,   double camY,   double camZ) {
+        return new float[] {
+            (float)(worldX - camX),
+            (float)(worldY - camY),
+            (float)(worldZ - camZ),
+        };
     }
 
     // -------------------------------------------------------------------------
