@@ -7,3 +7,6 @@
 /logs/
 /libs/
 *.log
+
+# Local dev notes (not for upstream)
+/dev-notes/
