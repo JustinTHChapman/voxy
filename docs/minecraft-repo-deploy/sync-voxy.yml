@@ -1,16 +1,13 @@
 name: Sync Voxy NeoForge mod
 
-# Pulls the latest 'latest-neoforge-rewrite' jar from MCRcortex/voxy and
+# Pulls the latest 'latest-neoforge-rewrite' jar from JustinTHChapman/voxy and
 # commits it into mods/, replacing any existing voxy-*.jar.
 #
-# Triggers (manual only for now):
-#   - 'Run workflow' button on the Actions tab
-#   - repository_dispatch event of type 'voxy-release' (e.g. from another workflow)
+# Voxy's build.yml now pushes directly via SSH deploy key.
+# This workflow is kept as a manual fallback only.
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [voxy-release]
 
 permissions:
   contents: write
