@@ -186,15 +186,37 @@ public final class ServerLodManager implements AutoCloseable {
         java.util.List<Long> radiusKeys = LodDeliveryQueue.radiusKeys(cx, cz, radius);
         SqliteSectionStorage storage = storageManager.get(dim.toString());
 
-        // Filter to sections that actually exist on disk (DISK_ONLY mode)
-        // GENERATE mode would additionally enqueue missing chunks for generation here.
+
         java.util.List<Long> existing = new java.util.ArrayList<>();
+        java.util.List<Long> missing = new java.util.ArrayList<>();
         for (Long key : radiusKeys) {
-            if (storage.load(key).isPresent()) existing.add(key);
+            if (storage.load(key).isPresent()) {
+                existing.add(key);
+            } else {
+                missing.add(key);
+            }
         }
 
-        LOGGER.info("[Voxy] Player {} joined — queuing {} sections (radius {})",
-                player.getName().getString(), existing.size(), radius);
+        // If GENERATE mode, schedule missing LOD-0 chunks for async loading via the server
+        // tick executor — avoids blocking the event handler thread.
+        if (VoxyConfig.INSTANCE.lodGenerationMode.get() == VoxyConfig.GenerationMode.GENERATE && !missing.isEmpty()) {
+            ServerLevel level = (ServerLevel) player.level();
+            int scheduleCount = 0;
+            for (Long key : missing) {
+                if (SectionKey.lodLevel(key) != 0) continue; // only request LOD-0 (base chunks)
+                int x = SectionKey.sectionX(key);
+                int z = SectionKey.sectionZ(key);
+                // Queue on server thread so chunk loading uses the normal async machinery
+                server.execute(() -> level.getChunk(x, z));
+                scheduleCount++;
+            }
+            if (scheduleCount > 0) {
+                LOGGER.info("[Voxy] Player {} joined — scheduled {} missing chunks for generation (radius {})",
+                        player.getName().getString(), scheduleCount, radius);
+            }
+        }
+
+        LOGGER.info("[Voxy] Player {} joined — queuing {} existing sections (radius {})", player.getName().getString(), existing.size(), radius);
         deliveryQueue.enqueue(player, dim, existing);
     }
 
