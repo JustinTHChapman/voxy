@@ -5,3 +5,5 @@
 /run/
 /out/
 /logs/
+/libs/
+*.log

@@ -37,7 +37,7 @@ jobs:
           mkdir -p mods
 
           # Pull the rolling release JSON
-          RELEASE_JSON=$(gh api repos/MCRcortex/voxy/releases/tags/latest-neoforge-rewrite)
+          RELEASE_JSON=$(gh api repos/JustinTHChapman/voxy/releases/tags/latest-neoforge-rewrite)
 
           JAR_URL=$(echo "$RELEASE_JSON" \
             | jq -r '.assets[] | select(.name | test("^voxy-neoforge.*\\.jar$") and (test("sources") | not)) | .browser_download_url' \
