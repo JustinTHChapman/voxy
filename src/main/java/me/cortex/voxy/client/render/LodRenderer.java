@@ -88,12 +88,12 @@ public final class LodRenderer {
         RenderSystem.disableCull(); // render top face regardless of winding order
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
-        PoseStack poseStack = event.getPoseStack();
-        poseStack.pushPose();
-        // Translate so (0,0,0) in our coordinate space = world origin.
-        // Minecraft's PoseStack origin is already at the camera, so subtract cam.
-        poseStack.translate(-camX, -camY, -camZ);
-        Matrix4f matrix = poseStack.last().pose();
+        // The PoseStack at AFTER_SOLID_BLOCKS already has the camera transform applied
+        // (camera is at origin 0,0,0 in pose-stack space).  Emit vertices as
+        // camera-relative coordinates to place them correctly in world space.
+        // Doing the subtraction in double before casting to float also avoids float
+        // precision loss at large world coordinates.
+        Matrix4f matrix = event.getPoseStack().last().pose();
 
         Tesselator tesselator = Tesselator.getInstance();
         BufferBuilder buffer  = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
@@ -115,30 +115,28 @@ public final class LodRenderer {
                 int cx = ci % VoxyConstants.SECTION_SIZE;
                 int cz = ci / VoxyConstants.SECTION_SIZE;
 
-                float wx = (float)(secWorldX + (double)(cx * cellSize));
-                float wy = section.heights[ci] + 1.0f;       // top of block
-                float wz = (float)(secWorldZ + (double)(cz * cellSize));
+                // Camera-relative position (double precision subtraction → float cast)
+                float rx = (float)(secWorldX + (double)(cx * cellSize) - camX);
+                float ry = (float)(section.heights[ci] + 1.0 - camY);
+                float rz = (float)(secWorldZ + (double)(cz * cellSize) - camZ);
                 float s  = cellSize;
 
                 int color = blockColorFor(blockStateId);
                 float r = ((color >> 16) & 0xFF) / 255.0f;
                 float g = ((color >>  8) & 0xFF) / 255.0f;
                 float b = ( color        & 0xFF) / 255.0f;
-                // Simple AO-like brightness by height (purely cosmetic)
-                float bright = 0.7f + 0.3f * Math.min(1.0f, wy / 128.0f);
+                float bright = 0.7f + 0.3f * Math.min(1.0f, (section.heights[ci] + 1.0f) / 128.0f);
                 r *= bright;
                 g *= bright;
                 b *= bright;
 
                 // Top face (Y-up), CCW winding from above
-                buffer.addVertex(matrix, wx,     wy, wz    ).setColor(r, g, b, 1.0f);
-                buffer.addVertex(matrix, wx,     wy, wz + s).setColor(r, g, b, 1.0f);
-                buffer.addVertex(matrix, wx + s, wy, wz + s).setColor(r, g, b, 1.0f);
-                buffer.addVertex(matrix, wx + s, wy, wz    ).setColor(r, g, b, 1.0f);
+                buffer.addVertex(matrix, rx,     ry, rz    ).setColor(r, g, b, 1.0f);
+                buffer.addVertex(matrix, rx,     ry, rz + s).setColor(r, g, b, 1.0f);
+                buffer.addVertex(matrix, rx + s, ry, rz + s).setColor(r, g, b, 1.0f);
+                buffer.addVertex(matrix, rx + s, ry, rz    ).setColor(r, g, b, 1.0f);
             }
         }
-
-        poseStack.popPose();
 
         MeshData mesh = buffer.build();
         if (mesh != null) {
