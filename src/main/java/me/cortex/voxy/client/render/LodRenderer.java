@@ -22,6 +22,8 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import org.joml.Matrix4f;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +42,10 @@ import java.util.Map;
  * before a more sophisticated shader-driven renderer is built.
  */
 public final class LodRenderer {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(LodRenderer.class);
+    /** Timestamp of last per-frame diagnostic log (throttled to once per 2 s). */
+    private static volatile long lastDiagLogMs = 0;
 
     private LodRenderer() {}
 
@@ -88,25 +94,51 @@ public final class LodRenderer {
         RenderSystem.disableCull(); // render top face regardless of winding order
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
+        // -----------------------------------------------------------------------
+        // Set up shader matrices
+        // -----------------------------------------------------------------------
         // The POSITION_COLOR shader computes:
         //   gl_Position = ProjMat * ModelViewMat * Position
-        // where ModelViewMat is read from RenderSystem at draw time.
         //
-        // At AFTER_SOLID_BLOCKS, Minecraft has already loaded the correct camera-rotation
-        // matrix into RenderSystem.getModelViewMatrix() and the perspective matrix into
-        // RenderSystem.getProjectionMatrix() — we must NOT touch them.
-        //
-        // We must also NOT apply the camera rotation per-vertex in addVertex; that
-        // would double-rotate every vertex and corrupt positions.
+        // After renderChunkLayer, RenderSystem.getModelViewMatrix() may have been
+        // dirtied by chunk rendering.  We rebuild the view-rotation matrix directly
+        // from camera.rotation() — the same quaternion MC applies to its PoseStack
+        // to set up the view transform — so we are independent of RenderSystem state.
         //
         // Correct pattern:
-        //   - Position (in buffer) = raw camera-relative coords  (identity per-vertex matrix)
-        //   - ModelViewMat         = camera rotation             (already set by MC)
-        //   - ProjMat              = perspective                 (already set by MC)
+        //   - Position (in buffer) = raw camera-relative coords  (identity per-vertex)
+        //   - ModelViewMat         = camera rotation (from camera.rotation() quaternion)
+        //   - ProjMat              = perspective     (already set by MC, we leave it)
         //
-        // Doing the world-to-camera-relative subtraction in double before float cast also
-        // avoids float precision loss at large world coordinates.
-        Matrix4f identity = new Matrix4f(); // identity – camera rotation is in ModelViewMat
+        // Camera-relative subtraction is done in double precision to avoid float
+        // precision loss at large world coordinates.
+
+        // Build view-rotation from the camera quaternion (authoritative)
+        Matrix4f viewRotation = buildViewMatrix(camera.rotation());
+
+        // Diagnostic logging (throttled to once per 2 s)
+        long nowMs = System.currentTimeMillis();
+        if (nowMs - lastDiagLogMs >= 2000L) {
+            lastDiagLogMs = nowMs;
+            Matrix4f rsMV = RenderSystem.getModelViewMatrix();
+            Matrix4f evMV = event.getModelViewMatrix();
+            LOGGER.info("[LOD diag] yaw={} pitch={} sections={} | rsMV=({},{},{}) evMV=({},{},{}) viewRot=({},{},{})",
+                    String.format("%.1f", camera.getYRot()),
+                    String.format("%.1f", camera.getXRot()),
+                    toRender.size(),
+                    String.format("%.3f", rsMV.m00()), String.format("%.3f", rsMV.m11()), String.format("%.3f", rsMV.m22()),
+                    String.format("%.3f", evMV.m00()), String.format("%.3f", evMV.m11()), String.format("%.3f", evMV.m22()),
+                    String.format("%.3f", viewRotation.m00()), String.format("%.3f", viewRotation.m11()), String.format("%.3f", viewRotation.m22()));
+            LOGGER.info("[LOD diag] sameObj={} camPos=({},{},{})",
+                    rsMV == evMV,
+                    String.format("%.1f", camX), String.format("%.1f", camY), String.format("%.1f", camZ));
+        }
+
+        // Save the current RenderSystem model-view so we can restore it after our draw
+        Matrix4f savedModelView = new Matrix4f(RenderSystem.getModelViewMatrix());
+        RenderSystem.getModelViewMatrix().set(viewRotation);
+
+        Matrix4f identity = new Matrix4f(); // identity — camera rotation is in ModelViewMat above
 
         Tesselator tesselator = Tesselator.getInstance();
         BufferBuilder buffer  = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
@@ -158,6 +190,8 @@ public final class LodRenderer {
             BufferUploader.drawWithShader(mesh);
         }
 
+        // Restore RenderSystem model-view so subsequent rendering is unaffected
+        RenderSystem.getModelViewMatrix().set(savedModelView);
         RenderSystem.enableCull();
     }
 
@@ -173,7 +207,7 @@ public final class LodRenderer {
      * All vertex positions fed to the GPU must be camera-relative because the
      * PoseStack at {@code AFTER_SOLID_BLOCKS} already has the camera transform applied.
      *
-     * <p>Package-private so unit tests can verify the math directly.
+     * <p>Public for unit-test access.
      */
     public static float[] cameraRelativePos(double worldX, double worldY, double worldZ,
                                             double camX,   double camY,   double camZ) {
@@ -182,6 +216,21 @@ public final class LodRenderer {
             (float)(worldY - camY),
             (float)(worldZ - camZ),
         };
+    }
+
+    /**
+     * Builds the camera view-rotation matrix from the camera's orientation quaternion.
+     *
+     * <p>This is the same rotation Minecraft applies to its PoseStack in
+     * {@code GameRenderer.renderLevel()} via {@code poseStack.mulPose(camera.rotation())}.
+     * The resulting matrix, when stored in {@code RenderSystem.getModelViewMatrix()},
+     * transforms camera-relative world coordinates into eye space for the shader:
+     * <pre>  gl_Position = ProjMat * ModelViewMat * Position</pre>
+     *
+     * <p>Public for unit-test access.
+     */
+    public static Matrix4f buildViewMatrix(org.joml.Quaternionf cameraRotation) {
+        return new Matrix4f().rotation(cameraRotation);
     }
 
     // -------------------------------------------------------------------------

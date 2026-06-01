@@ -97,11 +97,16 @@ jobs:
       # ---- Push jar directly to .minecraft repo via SSH deploy key ----
       - name: Push jar to .minecraft
         if: github.event_name == 'push' && github.ref == 'refs/heads/neoforge-rewrite'
-        continue-on-error: true   # non-fatal if deploy key not yet set up
         env:
           MINECRAFT_DEPLOY_KEY: ${{ secrets.MINECRAFT_DEPLOY_KEY }}
         run: |
           set -euo pipefail
+
+          # Verify secret is present
+          if [ -z "${MINECRAFT_DEPLOY_KEY:-}" ]; then
+            echo "::error::MINECRAFT_DEPLOY_KEY secret is not set. Add it in Settings → Secrets → Actions."
+            exit 1
+          fi
 
           # Set up SSH agent with the deploy key
           mkdir -p ~/.ssh
@@ -110,9 +115,15 @@ jobs:
           ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/mc_deploy_key -o IdentitiesOnly=yes"
 
-          # Find the built jar (exclude sources)
-          JAR=$(find build/libs -name "voxy-neoforge-*.jar" ! -name "*sources*" | head -1)
+          # Find the built jar (exclude sources and all-jar variants)
+          JAR=$(find build/libs -name "voxy-neoforge-*.jar" ! -name "*sources*" ! -name "*all*" | head -1)
+          if [ -z "$JAR" ]; then
+            echo "::error::No matching jar found in build/libs — check archivesName in build.gradle"
+            ls -la build/libs/
+            exit 1
+          fi
           JAR_NAME=$(basename "$JAR")
+          echo "Deploying $JAR_NAME"
 
           # Clone .minecraft
           git clone git@github.com:JustinTHChapman/.minecraft.git mc-repo
