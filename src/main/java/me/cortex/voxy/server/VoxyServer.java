@@ -20,6 +20,7 @@ public final class VoxyServer {
     private static final Logger LOGGER = LoggerFactory.getLogger(VoxyServer.class);
 
     private static volatile ServerLodManager lodManager;
+    private static volatile ChunkEventHandler activeHandler;
 
     private VoxyServer() {}
 
@@ -34,10 +35,16 @@ public final class VoxyServer {
         ServerLodManager mgr = new ServerLodManager(server);
         lodManager = mgr;
         // Register chunk/level event listeners on the NeoForge bus
-        new ChunkEventHandler(mgr, NeoForge.EVENT_BUS);
+        activeHandler = new ChunkEventHandler(mgr, NeoForge.EVENT_BUS);
     }
 
     private static void onServerStopping(ServerStoppingEvent event) {
+        // Deactivate the handler FIRST so no new tasks are dispatched to the closing manager
+        ChunkEventHandler handler = activeHandler;
+        if (handler != null) {
+            activeHandler = null;
+            handler.shutdown();
+        }
         ServerLodManager mgr = lodManager;
         if (mgr != null) {
             LOGGER.info("[Voxy] Server stopping — shutting down LOD manager");

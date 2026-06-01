@@ -91,3 +91,13 @@ jobs:
             build/libs/*.jar
           fail_on_unmatched_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ---- Trigger .minecraft sync workflow ----
+      - name: Notify .minecraft repo to sync voxy
+        if: github.event_name == 'push' && github.ref == 'refs/heads/neoforge-rewrite'
+        env:
+          GH_TOKEN: ${{ secrets.MINECRAFT_REPO_DISPATCH_TOKEN }}
+        run: |
+          gh api repos/JustinTHChapman/.minecraft/dispatches \
+            -f event_type=voxy-release \
+            -f "client_payload[sha]=${{ github.sha }}"

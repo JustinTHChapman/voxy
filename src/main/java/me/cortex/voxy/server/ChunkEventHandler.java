@@ -16,6 +16,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 public final class ChunkEventHandler {
 
     private final ServerLodManager lodManager;
+    /** Set to false when the server stops so stale handlers silently no-op. */
+    private volatile boolean active = true;
 
     public ChunkEventHandler(ServerLodManager lodManager, IEventBus neoForgeBus) {
         this.lodManager = lodManager;
@@ -27,33 +29,44 @@ public final class ChunkEventHandler {
         neoForgeBus.addListener(this::onServerTickPost);
     }
 
+    /** Called by {@link VoxyServer} when the server stops to prevent stale dispatch. */
+    public void shutdown() {
+        active = false;
+    }
+
     private void onChunkLoad(ChunkEvent.Load event) {
+        if (!active) return;
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
         if (!(event.getChunk() instanceof LevelChunk chunk)) return;
         lodManager.onChunkLoaded(serverLevel, chunk);
     }
 
     private void onLevelUnload(LevelEvent.Unload event) {
+        if (!active) return;
         if (!(event.getLevel() instanceof ServerLevel serverLevel)) return;
         String dimKey = serverLevel.dimension().location().toString();
         lodManager.getStorageManager().unload(dimKey);
     }
 
     private void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!active) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         lodManager.onPlayerJoin(player);
     }
 
     private void onPlayerChangedDimension(PlayerEvent.PlayerChangedDimensionEvent event) {
+        if (!active) return;
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         lodManager.onPlayerJoin(player);
     }
 
     private void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!active) return;
         lodManager.getDeliveryQueue().clear(event.getEntity().getUUID());
     }
 
     private void onServerTickPost(ServerTickEvent.Post event) {
+        if (!active) return;
         lodManager.tickDelivery();
     }
 }
