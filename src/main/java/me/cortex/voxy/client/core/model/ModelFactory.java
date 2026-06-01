@@ -1,4 +1,4 @@
-﻿package me.cortex.voxy.client.core.model;
+package me.cortex.voxy.client.core.model;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;

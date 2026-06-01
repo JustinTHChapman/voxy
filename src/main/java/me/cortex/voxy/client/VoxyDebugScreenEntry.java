@@ -1,4 +1,4 @@
-﻿package me.cortex.voxy.client;
+package me.cortex.voxy.client;
 
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;

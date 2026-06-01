@@ -1,4 +1,4 @@
-﻿package me.cortex.voxy.client.mixin.minecraft;
+package me.cortex.voxy.client.mixin.minecraft;
 
 import me.cortex.voxy.client.DebugEntries;
 import net.minecraft.client.gui.components.debug.DebugScreenEntryList;

@@ -1,4 +1,4 @@
-﻿package me.cortex.voxy.client.core.model;
+package me.cortex.voxy.client.core.model;
 
 import me.cortex.voxy.client.core.RenderResourceReuse;
 import me.cortex.voxy.client.core.gl.GlBuffer;

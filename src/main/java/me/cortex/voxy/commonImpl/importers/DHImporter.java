@@ -1,4 +1,4 @@
-﻿package me.cortex.voxy.commonImpl.importers;
+package me.cortex.voxy.commonImpl.importers;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.Service;

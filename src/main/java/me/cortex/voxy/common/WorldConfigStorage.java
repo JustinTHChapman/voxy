@@ -1,4 +1,4 @@
-﻿package me.cortex.voxy.common;
+package me.cortex.voxy.common;
 
 import com.google.gson.*;
 import com.google.gson.stream.JsonReader;

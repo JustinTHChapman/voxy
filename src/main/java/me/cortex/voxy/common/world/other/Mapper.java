@@ -1,4 +1,4 @@
-﻿package me.cortex.voxy.common.world.other;
+package me.cortex.voxy.common.world.other;
 
 import com.mojang.serialization.Dynamic;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;

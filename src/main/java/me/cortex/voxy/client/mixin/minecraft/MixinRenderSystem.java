@@ -1,4 +1,4 @@
-﻿package me.cortex.voxy.client.mixin.minecraft;
+package me.cortex.voxy.client.mixin.minecraft;
 
 
 import com.mojang.blaze3d.shaders.ShaderSource;
