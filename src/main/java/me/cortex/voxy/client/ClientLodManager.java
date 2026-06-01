@@ -48,6 +48,11 @@ public final class ClientLodManager implements AutoCloseable {
         this.cache = new ClientCacheManager(serverAddress);
     }
 
+    /** For unit tests only. Injects a pre-built {@link ClientCacheManager}. */
+    public ClientLodManager(ClientCacheManager cacheForTest) {
+        this.cache = cacheForTest;
+    }
+
     // -------------------------------------------------------------------------
     // World lifecycle
     // -------------------------------------------------------------------------

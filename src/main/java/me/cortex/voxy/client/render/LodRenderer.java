@@ -74,31 +74,9 @@ public final class LodRenderer {
         // We need at least one quad to start the BufferBuilder.
         List<LodSection> toRender = new ArrayList<>();
         for (Map.Entry<Long, LodSection> entry : liveSections.entrySet()) {
-            long key = entry.getKey();
-            int lodLevel = SectionKey.lodLevel(key);
-            if (lodLevel == 0) continue; // vanilla renders LOD-0 territory
-
-            int cellSize = 1 << lodLevel;                     // blocks per cell side
-            int secX     = SectionKey.sectionX(key);
-            int secZ     = SectionKey.sectionZ(key);
-            int sectionBlocksWide = VoxyConstants.SECTION_SIZE * cellSize;
-
-            // World coordinates of the section's south-west corner
-            double secWorldX = (double) secX * sectionBlocksWide;
-            double secWorldZ = (double) secZ * sectionBlocksWide;
-
-            // Section centre
-            double centerX = secWorldX + sectionBlocksWide * 0.5;
-            double centerZ = secWorldZ + sectionBlocksWide * 0.5;
-            double dx = centerX - camX;
-            double dz = centerZ - camZ;
-            double dist = Math.sqrt(dx * dx + dz * dz);
-
-            // Skip if section centre is closer than the vanilla render radius
-            // (add half the section width for a bit of hysteresis at the boundary)
-            if (dist < vanillaRadiusBlocks + sectionBlocksWide * 0.5) continue;
-
-            toRender.add(entry.getValue());
+            if (shouldRender(entry.getKey(), camX, camZ, vanillaRadiusBlocks)) {
+                toRender.add(entry.getValue());
+            }
         }
 
         if (toRender.isEmpty()) return;
@@ -168,6 +146,38 @@ public final class LodRenderer {
         }
 
         RenderSystem.enableCull();
+    }
+
+    // -------------------------------------------------------------------------
+    // Section visibility filter
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns {@code true} if the given section key should be included in the render pass.
+     *
+     * <ul>
+     *   <li>LOD-0 sections are always excluded (vanilla renders those chunks).
+     *   <li>Sections whose centre is closer than {@code vanillaRadiusBlocks} plus half the
+     *       section width are excluded to avoid overdrawing vanilla terrain.
+     * </ul>
+     *
+     * <p>Package-private so unit tests can verify the culling logic directly.
+     */
+    public static boolean shouldRender(long sectionKey, double camX, double camZ, float vanillaRadiusBlocks) {
+        int lodLevel = SectionKey.lodLevel(sectionKey);
+        if (lodLevel == 0) return false; // vanilla renders LOD-0 territory
+
+        int cellSize          = 1 << lodLevel;
+        int sectionBlocksWide = VoxyConstants.SECTION_SIZE * cellSize;
+
+        double secWorldX = (double) SectionKey.sectionX(sectionKey) * sectionBlocksWide;
+        double secWorldZ = (double) SectionKey.sectionZ(sectionKey) * sectionBlocksWide;
+        double centerX   = secWorldX + sectionBlocksWide * 0.5;
+        double centerZ   = secWorldZ + sectionBlocksWide * 0.5;
+        double dist      = Math.sqrt((centerX - camX) * (centerX - camX)
+                                   + (centerZ - camZ) * (centerZ - camZ));
+
+        return dist >= vanillaRadiusBlocks + sectionBlocksWide * 0.5;
     }
 
     // -------------------------------------------------------------------------
