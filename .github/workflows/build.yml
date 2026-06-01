@@ -94,13 +94,43 @@ jobs:
           fail_on_unmatched_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # ---- Trigger .minecraft sync workflow ----
-      - name: Notify .minecraft repo to sync voxy
+      # ---- Push jar directly to .minecraft repo via SSH deploy key ----
+      - name: Push jar to .minecraft
         if: github.event_name == 'push' && github.ref == 'refs/heads/neoforge-rewrite'
-        continue-on-error: true   # non-fatal: secret may not be set
+        continue-on-error: true   # non-fatal if deploy key not yet set up
         env:
-          GH_TOKEN: ${{ secrets.MINECRAFT_REPO_DISPATCH_TOKEN }}
+          MINECRAFT_DEPLOY_KEY: ${{ secrets.MINECRAFT_DEPLOY_KEY }}
         run: |
-          gh api repos/JustinTHChapman/.minecraft/dispatches \
-            -f event_type=voxy-release \
-            -f "client_payload[sha]=${{ github.sha }}"
+          set -euo pipefail
+
+          # Set up SSH agent with the deploy key
+          mkdir -p ~/.ssh
+          printf '%s\n' "$MINECRAFT_DEPLOY_KEY" > ~/.ssh/mc_deploy_key
+          chmod 600 ~/.ssh/mc_deploy_key
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/mc_deploy_key -o IdentitiesOnly=yes"
+
+          # Find the built jar (exclude sources)
+          JAR=$(find build/libs -name "voxy-neoforge-*.jar" ! -name "*sources*" | head -1)
+          JAR_NAME=$(basename "$JAR")
+
+          # Clone .minecraft
+          git clone git@github.com:JustinTHChapman/.minecraft.git mc-repo
+
+          # Replace any existing voxy-*.jar
+          rm -f mc-repo/mods/voxy-*.jar
+          cp "$JAR" "mc-repo/mods/$JAR_NAME"
+
+          # Commit and push if changed
+          cd mc-repo
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mods/
+          if git diff --cached --quiet; then
+            echo "Already up to date, nothing to push."
+            exit 0
+          fi
+          git commit -m "chore(mods): update voxy to $JAR_NAME
+
+          Source: https://github.com/JustinTHChapman/voxy/commit/${{ github.sha }}"
+          git push
