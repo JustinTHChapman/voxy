@@ -88,12 +88,25 @@ public final class LodRenderer {
         RenderSystem.disableCull(); // render top face regardless of winding order
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
-        // The PoseStack at AFTER_SOLID_BLOCKS already has the camera transform applied
-        // (camera is at origin 0,0,0 in pose-stack space).  Emit vertices as
-        // camera-relative coordinates to place them correctly in world space.
-        // Doing the subtraction in double before casting to float also avoids float
-        // precision loss at large world coordinates.
-        Matrix4f matrix = event.getPoseStack().last().pose();
+        // The POSITION_COLOR shader computes:
+        //   gl_Position = ProjMat * ModelViewMat * Position
+        // where ModelViewMat is read from RenderSystem at draw time.
+        //
+        // At AFTER_SOLID_BLOCKS, Minecraft has already loaded the correct camera-rotation
+        // matrix into RenderSystem.getModelViewMatrix() and the perspective matrix into
+        // RenderSystem.getProjectionMatrix() — we must NOT touch them.
+        //
+        // We must also NOT apply the camera rotation per-vertex in addVertex; that
+        // would double-rotate every vertex and corrupt positions.
+        //
+        // Correct pattern:
+        //   - Position (in buffer) = raw camera-relative coords  (identity per-vertex matrix)
+        //   - ModelViewMat         = camera rotation             (already set by MC)
+        //   - ProjMat              = perspective                 (already set by MC)
+        //
+        // Doing the world-to-camera-relative subtraction in double before float cast also
+        // avoids float precision loss at large world coordinates.
+        Matrix4f identity = new Matrix4f(); // identity – camera rotation is in ModelViewMat
 
         Tesselator tesselator = Tesselator.getInstance();
         BufferBuilder buffer  = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
@@ -133,10 +146,10 @@ public final class LodRenderer {
                 b *= bright;
 
                 // Top face (Y-up), CCW winding from above
-                buffer.addVertex(matrix, rx,     ry, rz    ).setColor(r, g, b, 1.0f);
-                buffer.addVertex(matrix, rx,     ry, rz + s).setColor(r, g, b, 1.0f);
-                buffer.addVertex(matrix, rx + s, ry, rz + s).setColor(r, g, b, 1.0f);
-                buffer.addVertex(matrix, rx + s, ry, rz    ).setColor(r, g, b, 1.0f);
+                buffer.addVertex(identity, rx,     ry, rz    ).setColor(r, g, b, 1.0f);
+                buffer.addVertex(identity, rx,     ry, rz + s).setColor(r, g, b, 1.0f);
+                buffer.addVertex(identity, rx + s, ry, rz + s).setColor(r, g, b, 1.0f);
+                buffer.addVertex(identity, rx + s, ry, rz    ).setColor(r, g, b, 1.0f);
             }
         }
 
