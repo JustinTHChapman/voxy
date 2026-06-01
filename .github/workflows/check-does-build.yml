@@ -1,4 +1,4 @@
-name: check-does-build
+﻿name: check-does-build
 
 on: [ push ]
 jobs:
@@ -13,14 +13,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 25
-
-      - name: Loom Cache
-        uses: actions/cache@v4
-        with:
-          path: "**/.gradle/loom-cache"
-          key: "${{ runner.os }}-gradle-${{ hashFiles('**/libs.versions.*', '**/*.gradle*', '**/gradle-wrapper.properties') }}"
-          restore-keys: "${{ runner.os }}-gradle-"
+          java-version: 21
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -29,4 +22,7 @@ jobs:
           cache-cleanup: never
 
       - name: Gradle build
-        run: ./gradlew -I init.gradle build
+        run: ./gradlew build --no-daemon
+        env:
+          GRADLE_OPTS: "-Xmx2g"
+          CI: "true"
