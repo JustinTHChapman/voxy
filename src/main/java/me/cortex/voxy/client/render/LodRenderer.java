@@ -161,12 +161,19 @@ public final class LodRenderer {
             double secWorldX = (double) secX * sectionBlocksWide;
             double secWorldZ = (double) secZ * sectionBlocksWide;
 
-            for (int ci = 0; ci < VoxyConstants.SECTION_SIZE * VoxyConstants.SECTION_SIZE; ci++) {
+            int SIZE = VoxyConstants.SECTION_SIZE;
+            for (int ci = 0; ci < SIZE * SIZE; ci++) {
                 int blockStateId = section.blockStates[ci];
                 if (blockStateId == 0) continue; // air
 
-                int cx = ci % VoxyConstants.SECTION_SIZE;
-                int cz = ci / VoxyConstants.SECTION_SIZE;
+                int cx = ci % SIZE;
+                int cz = ci / SIZE;
+
+                int color = blockColorFor(blockStateId);
+                float r = ((color >> 16) & 0xFF) / 255.0f;
+                float g = ((color >>  8) & 0xFF) / 255.0f;
+                float b = ( color        & 0xFF) / 255.0f;
+                float bright = 0.7f + 0.3f * Math.min(1.0f, (section.heights[ci] + 1.0f) / 128.0f);
 
                 float[] rel = cameraRelativePos(
                         secWorldX + (double)(cx * cellSize),
@@ -174,22 +181,55 @@ public final class LodRenderer {
                         secWorldZ + (double)(cz * cellSize),
                         camX, camY, camZ);
                 float rx = rel[0], ry = rel[1], rz = rel[2];
-                float s  = cellSize;
+                float s = (float) cellSize;
 
-                int color = blockColorFor(blockStateId);
-                float r = ((color >> 16) & 0xFF) / 255.0f;
-                float g = ((color >>  8) & 0xFF) / 255.0f;
-                float b = ( color        & 0xFF) / 255.0f;
-                float bright = 0.7f + 0.3f * Math.min(1.0f, (section.heights[ci] + 1.0f) / 128.0f);
-                r *= bright;
-                g *= bright;
-                b *= bright;
+                // Top face — full brightness
+                float rt = r * bright, gt = g * bright, bt = b * bright;
+                buffer.addVertex(identity, rx,     ry, rz    ).setColor(rt, gt, bt, 1.0f);
+                buffer.addVertex(identity, rx,     ry, rz + s).setColor(rt, gt, bt, 1.0f);
+                buffer.addVertex(identity, rx + s, ry, rz + s).setColor(rt, gt, bt, 1.0f);
+                buffer.addVertex(identity, rx + s, ry, rz    ).setColor(rt, gt, bt, 1.0f);
 
-                // Top face (Y-up), CCW winding from above
-                buffer.addVertex(identity, rx,     ry, rz    ).setColor(r, g, b, 1.0f);
-                buffer.addVertex(identity, rx,     ry, rz + s).setColor(r, g, b, 1.0f);
-                buffer.addVertex(identity, rx + s, ry, rz + s).setColor(r, g, b, 1.0f);
-                buffer.addVertex(identity, rx + s, ry, rz    ).setColor(r, g, b, 1.0f);
+                // Side faces — darker tint for depth cue
+                float rs = r * bright * 0.65f;
+                float gs = g * bright * 0.65f;
+                float bs = b * bright * 0.65f;
+
+                // +X (east) side
+                float eny = neighborTopY(section, cx + 1, cz, SIZE, ry, s, camY);
+                if (eny < ry) {
+                    buffer.addVertex(identity, rx+s, ry,  rz    ).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx+s, eny, rz    ).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx+s, eny, rz + s).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx+s, ry,  rz + s).setColor(rs, gs, bs, 1.0f);
+                }
+
+                // -X (west) side
+                float wny = neighborTopY(section, cx - 1, cz, SIZE, ry, s, camY);
+                if (wny < ry) {
+                    buffer.addVertex(identity, rx, ry,  rz + s).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx, wny, rz + s).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx, wny, rz    ).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx, ry,  rz    ).setColor(rs, gs, bs, 1.0f);
+                }
+
+                // +Z (south) side
+                float sny = neighborTopY(section, cx, cz + 1, SIZE, ry, s, camY);
+                if (sny < ry) {
+                    buffer.addVertex(identity, rx + s, ry,  rz + s).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx + s, sny, rz + s).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx,     sny, rz + s).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx,     ry,  rz + s).setColor(rs, gs, bs, 1.0f);
+                }
+
+                // -Z (north) side
+                float nny = neighborTopY(section, cx, cz - 1, SIZE, ry, s, camY);
+                if (nny < ry) {
+                    buffer.addVertex(identity, rx,     ry,  rz).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx,     nny, rz).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx + s, nny, rz).setColor(rs, gs, bs, 1.0f);
+                    buffer.addVertex(identity, rx + s, ry,  rz).setColor(rs, gs, bs, 1.0f);
+                }
             }
         }
 
@@ -201,6 +241,28 @@ public final class LodRenderer {
         // Restore RenderSystem model-view so subsequent rendering is unaffected
         RenderSystem.getModelViewMatrix().set(savedModelView);
         RenderSystem.enableCull();
+    }
+
+    // -------------------------------------------------------------------------
+    // Geometry helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the camera-relative top-Y of a neighboring cell in the same section.
+     * If the neighbor is out of bounds or air, returns {@code currentTopY - defaultDepth}
+     * so a face is always drawn at section/air boundaries.
+     * Returns {@code currentTopY} if the neighbor is at or above the current cell
+     * (caller skips the face in that case).
+     */
+    private static float neighborTopY(LodSection section, int nx, int nz, int size,
+                                       float currentTopY, float defaultDepth, double camY) {
+        if (nx >= 0 && nx < size && nz >= 0 && nz < size) {
+            int nci = nz * size + nx;
+            if (section.blockStates[nci] != 0) {
+                return (float)(section.heights[nci] + 1.0 - camY);
+            }
+        }
+        return currentTopY - defaultDepth;
     }
 
     // -------------------------------------------------------------------------
