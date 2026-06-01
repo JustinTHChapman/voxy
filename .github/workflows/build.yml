@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write   # needed to create/update the rolling Release
+  checks: write     # needed to post JUnit test results
 
 concurrency:
   group: build-${{ github.ref }}
@@ -55,6 +56,7 @@ jobs:
       - name: Publish JUnit report
         uses: mikepenz/action-junit-report@v4
         if: always()
+        continue-on-error: true
         with:
           report_paths: 'build/test-results/test/TEST-*.xml'
           check_name: 'JUnit Test Results'
@@ -95,6 +97,7 @@ jobs:
       # ---- Trigger .minecraft sync workflow ----
       - name: Notify .minecraft repo to sync voxy
         if: github.event_name == 'push' && github.ref == 'refs/heads/neoforge-rewrite'
+        continue-on-error: true   # non-fatal: secret may not be set
         env:
           GH_TOKEN: ${{ secrets.MINECRAFT_REPO_DISPATCH_TOKEN }}
         run: |
