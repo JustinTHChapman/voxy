@@ -1,5 +1,6 @@
 package me.cortex.voxy.client;
 
+import me.cortex.voxy.client.render.LodRenderer;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -23,6 +24,7 @@ public final class VoxyClient {
         NeoForge.EVENT_BUS.addListener(VoxyClient::onPlayerJoinServer);
         NeoForge.EVENT_BUS.addListener(VoxyClient::onPlayerLoggedOut);
         NeoForge.EVENT_BUS.addListener(VoxyClient::onRespawn);
+        LodRenderer.register(modBus);
     }
 
     private static void onPlayerJoinServer(ClientPlayerNetworkEvent.LoggingIn event) {
