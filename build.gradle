@@ -66,6 +66,21 @@ repositories {
         name = 'NeoForge'
         url = 'https://maven.neoforged.net/releases'
     }
+    // Modrinth (Sodium, ModMenu, etc.)
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter { includeGroup 'maven.modrinth' }
+    }
+    // CaffeineMC (Sodium snapshots / config-api)
+    maven {
+        name = 'CaffeineMC'
+        url = 'https://maven.caffeinemc.net/releases'
+    }
 }
 
 configurations {
@@ -74,7 +89,35 @@ configurations {
 }
 
 dependencies {
-    // SQLite for LOD section caching (server + client side)
+    // ---- Upstream Voxy native/util deps ----
+    // JNA for Windows CPU affinity (CpuLayout / Taskbar) — pinned to MC's strict version
+    implementation 'net.java.dev.jna:jna:5.14.0'
+    implementation 'net.java.dev.jna:jna-platform:5.14.0'
+    // OSHI for system info (cpu count/layout) — pinned to MC's strict version
+    implementation 'com.github.oshi:oshi-core:6.4.10'
+    // LMDB native bindings (storage backend)
+    implementation 'org.lwjgl:lwjgl-lmdb:3.3.3'
+    runtimeOnly 'org.lwjgl:lwjgl-lmdb:3.3.3:natives-windows'
+    runtimeOnly 'org.lwjgl:lwjgl-lmdb:3.3.3:natives-linux'
+    runtimeOnly 'org.lwjgl:lwjgl-lmdb:3.3.3:natives-macos'
+    // ZSTD compressor (storage)
+    implementation 'com.github.luben:zstd-jni:1.5.6-4'
+    // LZ4 compressor
+    implementation 'org.lz4:lz4-java:1.8.0'
+    // XZ (lzma) compressor
+    implementation 'org.tukaani:xz:1.9'
+    // Redis client (optional storage backend) — exclude transitive slf4j to avoid MC conflict
+    implementation('redis.clients:jedis:5.1.5') { exclude group: 'org.slf4j' }
+    // RocksDB (optional storage backend)
+    implementation 'org.rocksdb:rocksdbjni:9.7.3'
+
+    // ---- Sodium for NeoForge 1.21.1 (compile-only; runtime via user pack) ----
+    // Voxy's Sodium mixins target the 0.7+ API but only 0.6.13 is stable here —
+    // the mixins will need rewriting; for now compileOnly so the rest of the
+    // codebase can build.
+    compileOnly 'maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge'
+
+    // SQLite for LOD section caching (still used by our fork's storage backend)
     implementation('org.xerial:sqlite-jdbc:3.46.1.3')
     jarJar('org.xerial:sqlite-jdbc') {
         version {
@@ -104,6 +147,7 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release = 21
     options.deprecation = true
+    options.compilerArgs += ['-Xmaxerrs', '2000', '-Xmaxwarns', '0']
 }
 
 jar {
