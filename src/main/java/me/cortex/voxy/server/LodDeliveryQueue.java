@@ -66,18 +66,28 @@ public final class LodDeliveryQueue {
      * any existing queue for that player (sections already queued are dropped).
      */
     public synchronized void enqueue(ServerPlayer player, ResourceLocation dimension, List<Long> sectionKeys) {
+        enqueue(player.getUUID(), player.getName().getString(), dimension, sectionKeys);
+    }
+
+    /** For unit tests only. Bypasses {@link ServerPlayer} dependency. */
+    public synchronized void enqueue(UUID playerId, String playerName, ResourceLocation dimension, List<Long> sectionKeys) {
         Queue<Long> q = new ArrayDeque<>(sectionKeys);
-        TASKS.put(player.getUUID(), new PlayerTask(player.getUUID(), dimension, q));
-        LOGGER.debug("[Voxy] Queued {} sections for player {}", sectionKeys.size(), player.getName().getString());
+        TASKS.put(playerId, new PlayerTask(playerId, dimension, q));
+        LOGGER.debug("[Voxy] Queued {} sections for player {}", sectionKeys.size(), playerName);
     }
 
     /**
      * Appends sections to an existing queue (or creates one if none exists).
      */
     public synchronized void enqueueAdditional(ServerPlayer player, ResourceLocation dimension, List<Long> sectionKeys) {
-        PlayerTask task = TASKS.get(player.getUUID());
+        enqueueAdditional(player.getUUID(), player.getName().getString(), dimension, sectionKeys);
+    }
+
+    /** For unit tests only. Bypasses {@link ServerPlayer} dependency. */
+    public synchronized void enqueueAdditional(UUID playerId, String playerName, ResourceLocation dimension, List<Long> sectionKeys) {
+        PlayerTask task = TASKS.get(playerId);
         if (task == null || !task.dimension.equals(dimension)) {
-            enqueue(player, dimension, sectionKeys);
+            enqueue(playerId, playerName, dimension, sectionKeys);
         } else {
             task.queue.addAll(sectionKeys);
         }

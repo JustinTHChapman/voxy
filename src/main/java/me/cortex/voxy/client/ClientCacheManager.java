@@ -36,9 +36,13 @@ public final class ClientCacheManager implements AutoCloseable {
     private final Map<ResourceLocation, Map<Long, Long>> memoryIndex = new HashMap<>();
 
     public ClientCacheManager(String serverIdentifier) {
-        Path cacheRoot = Minecraft.getInstance().gameDirectory.toPath()
+        this(Minecraft.getInstance().gameDirectory.toPath()
                 .resolve("voxy-cache")
-                .resolve(sanitize(serverIdentifier));
+                .resolve(sanitize(serverIdentifier)));
+    }
+
+    /** For unit tests only. Bypasses {@link Minecraft#getInstance()} lookup. */
+    public ClientCacheManager(Path cacheRoot) {
         this.storageManager = new SectionStorageManager(cacheRoot);
         LOGGER.info("[Voxy] Client cache initialised at {}", cacheRoot);
     }

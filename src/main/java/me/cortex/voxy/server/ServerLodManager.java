@@ -70,6 +70,18 @@ public final class ServerLodManager implements AutoCloseable {
         LOGGER.info("[Voxy] Server LOD manager started (voxelizer threads: {})", threads);
     }
 
+    /** For unit tests only. Bypasses {@link MinecraftServer} dependency. */
+    public ServerLodManager(Path worldDir) {
+        this.server = null;
+        this.storageManager = new SectionStorageManager(worldDir);
+        this.deliveryQueue  = new LodDeliveryQueue(this);
+        this.voxelizerPool  = Executors.newFixedThreadPool(1, r -> {
+            Thread t = new Thread(r, "voxy-voxelizer-test");
+            t.setDaemon(true);
+            return t;
+        });
+    }
+
     public LodDeliveryQueue getDeliveryQueue() {
         return deliveryQueue;
     }
@@ -106,8 +118,16 @@ public final class ServerLodManager implements AutoCloseable {
      * newly updated LOD-0 section.  Only stores and broadcasts levels that actually change.
      */
     private void generateHigherLods(ServerLevel level, SqliteSectionStorage storage, LodSection lod0) {
-        int maxLod = VoxyConfig.INSTANCE.serverMaxLodLevel.get();
-        String dimKey = dimensionKey(level);
+        generateHigherLods(level, storage, lod0, VoxyConfig.INSTANCE.serverMaxLodLevel.get());
+    }
+
+    /**
+     * Overload used by unit tests so callers can supply an explicit maxLod
+     * without needing the NeoForge config system to be initialised.
+     *
+     * @param level may be {@code null} in tests — broadcasting is skipped when null.
+     */
+    public void generateHigherLods(ServerLevel level, SqliteSectionStorage storage, LodSection lod0, int maxLod) {
         LodSection current = lod0;
 
         for (int lodLevel = 1; lodLevel <= maxLod; lodLevel++) {
@@ -237,6 +257,7 @@ public final class ServerLodManager implements AutoCloseable {
     // -------------------------------------------------------------------------
 
     private void broadcastSectionUpdate(ServerLevel level, LodSection section) {
+        if (level == null) return; // no-op in test context
         ResourceLocation dim = level.dimension().location();
         LodSectionDataPayload pkt = new LodSectionDataPayload(
                 dim, section.key, section.hash, section.toBytes());
