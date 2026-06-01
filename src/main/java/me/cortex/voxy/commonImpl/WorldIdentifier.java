@@ -1,4 +1,4 @@
-﻿package me.cortex.voxy.commonImpl;
+package me.cortex.voxy.commonImpl;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -24,7 +24,7 @@ public class WorldIdentifier {
 
     public final ResourceKey<Level> key;
     public final long biomeSeed;
-    public final ResourceKey<DimensionType> dimension;//Maybe?
+    public final ResourceKey<DimensionType> dimension;
     private final transient long hashCode;
     @Nullable transient WeakReference<WorldEngine> cachedEngineObject;
 
@@ -32,11 +32,11 @@ public class WorldIdentifier {
         if (key == null) {
             throw new IllegalStateException("Key cannot be null");
         }
-        dimension = dimension==null?NULL_DIM_KEY:dimension;
+        dimension = dimension == null ? NULL_DIM_KEY : dimension;
         this.key = key;
         this.biomeSeed = biomeSeed;
         this.dimension = dimension;
-        this.hashCode = mixStafford13(registryKeyHashCode(key))^mixStafford13(registryKeyHashCode(dimension))^mixStafford13(biomeSeed);
+        this.hashCode = mixStafford13(registryKeyHashCode(key)) ^ mixStafford13(registryKeyHashCode(dimension)) ^ mixStafford13(biomeSeed);
     }
 
     @Override
@@ -49,9 +49,8 @@ public class WorldIdentifier {
         if (obj instanceof WorldIdentifier other) {
             return other.hashCode == this.hashCode &&
                     other.biomeSeed == this.biomeSeed &&
-                    equal(other.key, this.key) &&//other.key.equals(this.key) &&
-                    equal(other.dimension, this.dimension)//other.dimension.equals(this.dimension)
-                    ;
+                    equal(other.key, this.key) &&
+                    equal(other.dimension, this.dimension);
         }
         return false;
     }
@@ -59,10 +58,9 @@ public class WorldIdentifier {
     private static <T> boolean equal(ResourceKey<T> a, ResourceKey<T> b) {
         if (a == b) return true;
         if (a == null || b == null) return false;
-        return a.registry().equals(b.registry()) && a.identifier().equals(b.identifier());
+        return a.registry().equals(b.registry()) && a.location().equals(b.location());
     }
 
-    //Quick access utility method to get or create a world object in the current instance
     public WorldEngine getOrCreateEngine() {
         var instance = VoxyCommon.getInstance();
         if (instance == null) {
@@ -70,7 +68,7 @@ public class WorldIdentifier {
             return null;
         }
         var engine = instance.getOrCreate(this);
-        if (engine==null) {
+        if (engine == null) {
             throw new IllegalStateException("Engine null on creation");
         }
         return engine;
@@ -86,14 +84,12 @@ public class WorldIdentifier {
     }
 
     public static WorldIdentifier of(Level level) {
-        //Gets or makes an ResourceLocation for world
         if (level == null) {
             return null;
         }
-        return ((IWorldGetIdentifier)level).voxy$getIdentifier();
+        return ((IWorldGetIdentifier) level).voxy$getIdentifier();
     }
 
-    //Common utility function to get or create a world engine
     public static WorldEngine ofEngine(Level level) {
         var id = of(level);
         if (id == null) {
@@ -123,12 +119,11 @@ public class WorldIdentifier {
 
     private static long registryKeyHashCode(ResourceKey<?> key) {
         var A = key.registry();
-        var B = key.identifier();
-        int a = A==null?0:A.hashCode();
-        int b = B==null?0:B.hashCode();
-        return (Integer.toUnsignedLong(a)<<32)|Integer.toUnsignedLong(b);
+        var B = key.location();
+        int a = A == null ? 0 : A.hashCode();
+        int b = B == null ? 0 : B.hashCode();
+        return (Integer.toUnsignedLong(a) << 32) | Integer.toUnsignedLong(b);
     }
-
 
     private static String bytesToHex(byte[] hash) {
         StringBuilder hexString = new StringBuilder(2 * hash.length);
@@ -146,12 +141,11 @@ public class WorldIdentifier {
         return getWorldId(this);
     }
 
-    public static String getWorldId(WorldIdentifier ResourceLocation) {
-        String data = identifier.biomeSeed + identifier.key.toString();
+    public static String getWorldId(WorldIdentifier id) {
+        String data = id.biomeSeed + id.key.toString();
         try {
             return bytesToHex(MessageDigest.getInstance("SHA-256").digest(data.getBytes())).substring(0, 32);
-        } catch (
-                NoSuchAlgorithmException e) {
+        } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
     }
@@ -164,34 +158,28 @@ public class WorldIdentifier {
     public static class GsonAdapter extends TypeAdapter<WorldIdentifier> {
         public static final GsonAdapter INSTANCE = new GsonAdapter();
 
-        private GsonAdapter(){}
+        private GsonAdapter() {}
 
         @Override
-        public void write(JsonWriter writer, WorldIdentifier ResourceLocation) throws IOException {
+        public void write(JsonWriter writer, WorldIdentifier id) throws IOException {
             writer.beginObject();
-
             writer.name("key");
-            writer.value(identifier.key.location().toString());
-
+            writer.value(id.key.location().toString());
             writer.name("biomeSeed");
-            writer.value(identifier.biomeSeed);
-
+            writer.value(id.biomeSeed);
             writer.name("dimension");
-            writer.value(identifier.dimension.location().toString());
-
+            writer.value(id.dimension.location().toString());
             writer.endObject();
         }
 
-
         private static final Gson GSON = new Gson();
+
         @Override
         public WorldIdentifier read(JsonReader reader) throws IOException {
             var obj = GSON.getAdapter(JsonElement.class).read(reader).getAsJsonObject();
-
             var sKey = obj.getAsJsonPrimitive("key").getAsString();
             long biomeSeed = obj.getAsJsonPrimitive("biomeSeed").getAsLong();
             var sDim = obj.getAsJsonPrimitive("dimension").getAsString();
-
             var key = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(sKey));
             var dim = ResourceKey.create(Registries.DIMENSION_TYPE, ResourceLocation.parse(sDim));
             return new WorldIdentifier(key, biomeSeed, dim);

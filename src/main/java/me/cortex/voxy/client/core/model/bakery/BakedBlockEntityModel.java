@@ -1,4 +1,4 @@
-﻿/*
+/*
 package me.cortex.voxy.client.core.model.bakery;
 
 import me.cortex.voxy.common.Logger;

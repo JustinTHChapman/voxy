@@ -1,4 +1,4 @@
-﻿package me.cortex.voxy.client.core.model.bakery;
+package me.cortex.voxy.client.core.model.bakery;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.opengl.GlTexture;
