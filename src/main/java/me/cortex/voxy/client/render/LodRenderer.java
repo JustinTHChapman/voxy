@@ -122,21 +122,29 @@ public final class LodRenderer {
             lastDiagLogMs = nowMs;
             Matrix4f rsMV = RenderSystem.getModelViewMatrix();
             Matrix4f evMV = event.getModelViewMatrix();
-            LOGGER.info("[LOD diag] yaw={} pitch={} sections={} | rsMV=({},{},{}) evMV=({},{},{}) viewRot=({},{},{})",
+            // Full equality: evMV vs viewRot — if these disagree, camera.rotation() is wrong convention
+            boolean evMatchesViewRot = evMV.equals(viewRotation, 1e-3f);
+            boolean rsMVMatchesEvMV  = rsMV.equals(evMV, 1e-3f);
+            LOGGER.info("[LOD diag] yaw={} pitch={} sections={} | evMV=rsMV={} evMV=viewRot={}",
                     String.format("%.1f", camera.getYRot()),
                     String.format("%.1f", camera.getXRot()),
                     toRender.size(),
-                    String.format("%.3f", rsMV.m00()), String.format("%.3f", rsMV.m11()), String.format("%.3f", rsMV.m22()),
-                    String.format("%.3f", evMV.m00()), String.format("%.3f", evMV.m11()), String.format("%.3f", evMV.m22()),
-                    String.format("%.3f", viewRotation.m00()), String.format("%.3f", viewRotation.m11()), String.format("%.3f", viewRotation.m22()));
-            LOGGER.info("[LOD diag] sameObj={} camPos=({},{},{})",
-                    rsMV == evMV,
+                    rsMVMatchesEvMV,
+                    evMatchesViewRot);
+            LOGGER.info("[LOD diag] evMV diag=({},{},{}) viewRot diag=({},{},{}) rsMV diag=({},{},{})",
+                    String.format("%.4f", evMV.m00()), String.format("%.4f", evMV.m11()), String.format("%.4f", evMV.m22()),
+                    String.format("%.4f", viewRotation.m00()), String.format("%.4f", viewRotation.m11()), String.format("%.4f", viewRotation.m22()),
+                    String.format("%.4f", rsMV.m00()), String.format("%.4f", rsMV.m11()), String.format("%.4f", rsMV.m22()));
+            LOGGER.info("[LOD diag] camPos=({},{},{})",
                     String.format("%.1f", camX), String.format("%.1f", camY), String.format("%.1f", camZ));
         }
 
-        // Save the current RenderSystem model-view so we can restore it after our draw
+        // Use event.getModelViewMatrix() — NeoForge explicitly provides this for mods
+        // rendering at this stage.  It is the exact matrix LevelRenderer received from
+        // GameRenderer for the current frame, independent of RenderSystem state.
+        // Save and restore so subsequent rendering is unaffected.
         Matrix4f savedModelView = new Matrix4f(RenderSystem.getModelViewMatrix());
-        RenderSystem.getModelViewMatrix().set(viewRotation);
+        RenderSystem.getModelViewMatrix().set(event.getModelViewMatrix());
 
         Matrix4f identity = new Matrix4f(); // identity — camera rotation is in ModelViewMat above
 
