@@ -1,4 +1,4 @@
-package me.cortex.voxy.commonImpl;
+﻿package me.cortex.voxy.commonImpl;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.section.SectionStorage;
@@ -96,7 +96,7 @@ public abstract class VoxyInstance {
     // have automatic world cleanup after ~1 minute of inactivity and the reference count equaling zero possibly
     // note, the reference count should be separate from the number of active chunks to prevent many issues
     // a world is no longer active once it has no reference counts and no active chunks associated with it
-    public WorldEngine getNullable(WorldIdentifier identifier) {
+    public WorldEngine getNullable(WorldIdentifier ResourceLocation) {
         if (!this.isRunning) return null;
         var cache = identifier.cachedEngineObject;
         WorldEngine world;
@@ -109,7 +109,7 @@ public abstract class VoxyInstance {
             } else {
                 if (world.isLive()) {
                     if (world.instanceIn != this) {
-                        throw new IllegalStateException("World cannot be in identifier cache, alive and not part of this instance");
+                        throw new IllegalStateException("World cannot be in ResourceLocation cache, alive and not part of this instance");
                     }
                     //Successful cache hit
                 } else {
@@ -120,7 +120,7 @@ public abstract class VoxyInstance {
         }
         if (world == null) {//If the cached world is null, try get from the active worlds
             long stamp = this.activeWorldLock.readLock();
-            world = this.activeWorlds.get(identifier);
+            world = this.activeWorlds.get(ResourceLocation);
             this.activeWorldLock.unlockRead(stamp);
             if (world != null) {//Setup cache
                 identifier.cachedEngineObject = new WeakReference<>(world);
@@ -133,7 +133,7 @@ public abstract class VoxyInstance {
         return world;
     }
 
-    public WorldEngine getOrCreate(WorldIdentifier identifier) {
+    public WorldEngine getOrCreate(WorldIdentifier ResourceLocation) {
         return this.getOrCreate(identifier, false);
     }
 
@@ -142,7 +142,7 @@ public abstract class VoxyInstance {
             Logger.error("Tried getting world object on voxy instance but its not running");
             return null;
         }
-        var world = this.getNullable(identifier);
+        var world = this.getNullable(ResourceLocation);
         if (world != null) {
             world.markActive();
             if (incrementRef) world.acquireRef();
@@ -156,10 +156,10 @@ public abstract class VoxyInstance {
             return null;
         }
 
-        world = this.activeWorlds.get(identifier);
+        world = this.activeWorlds.get(ResourceLocation);
         if (world == null) {
             //Create world here
-            world = this.createWorld(identifier);
+            world = this.createWorld(ResourceLocation);
         }
         world.markActive();
 
@@ -171,17 +171,17 @@ public abstract class VoxyInstance {
     }
 
 
-    protected abstract SectionStorage createStorage(WorldIdentifier identifier);
+    protected abstract SectionStorage createStorage(WorldIdentifier ResourceLocation);
 
-    private WorldEngine createWorld(WorldIdentifier identifier) {
+    private WorldEngine createWorld(WorldIdentifier ResourceLocation) {
         if (!this.isRunning) {
             throw new IllegalStateException("Cannot create world while not running");
         }
-        if (this.activeWorlds.containsKey(identifier)) {
+        if (this.activeWorlds.containsKey(ResourceLocation)) {
             throw new IllegalStateException("Existing world with identifier");
         }
         Logger.info("Creating new world engine: " + identifier.getLongHash() + "@" + System.identityHashCode(this));
-        var world = new WorldEngine(this.createStorage(identifier), this);
+        var world = new WorldEngine(this.createStorage(ResourceLocation), this);
         world.setSaveCallback(this.savingService::enqueueSave);
         this.activeWorlds.put(identifier, world);
         return world;

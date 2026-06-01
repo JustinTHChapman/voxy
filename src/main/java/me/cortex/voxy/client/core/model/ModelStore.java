@@ -1,11 +1,11 @@
-package me.cortex.voxy.client.core.model;
+﻿package me.cortex.voxy.client.core.model;
 
 import me.cortex.voxy.client.core.RenderResourceReuse;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL11C.GL_NEAREST;

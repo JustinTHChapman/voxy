@@ -2,34 +2,47 @@ package me.cortex.voxy.commonImpl;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.Serialization;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.ModInitializer;
-import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.api.ModContainer;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.ModList;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.neoforgespi.language.IModInfo;
 
-public class VoxyCommon implements ModInitializer {
+public class VoxyCommon {
     public static final String MOD_VERSION;
     public static final boolean IS_DEDICATED_SERVER;
     public static final boolean IS_IN_MINECRAFT;
 
     static {
-        ModContainer mod = (ModContainer) FabricLoader.getInstance().getModContainer("voxy").orElse(null);
-        if (mod == null) {
-            IS_IN_MINECRAFT = false;
-            Logger.error("Running voxy without minecraft");
-            MOD_VERSION = "<UNKNOWN>";
-            IS_DEDICATED_SERVER = false;
-        } else {
-            IS_IN_MINECRAFT = true;
-            var version = mod.getMetadata().getVersion().getFriendlyString();
-            var commit = mod.getMetadata().getCustomValue("commit").getAsString();
-            MOD_VERSION = version + "-" + commit.substring(0,7);
-            IS_DEDICATED_SERVER = FabricLoader.getInstance().getEnvironmentType() == EnvType.SERVER;
+        boolean inMc;
+        String version;
+        boolean dedicated;
+        try {
+            var modList = ModList.get();
+            IModInfo info = (modList == null) ? null : modList.getModContainerById("voxy").map(c -> c.getModInfo()).orElse(null);
+            if (info == null) {
+                inMc = false;
+                version = "<UNKNOWN>";
+                dedicated = false;
+                Logger.error("Running voxy without minecraft");
+            } else {
+                inMc = true;
+                version = info.getVersion().toString();
+                dedicated = FMLEnvironment.dist == Dist.DEDICATED_SERVER;
+            }
+        } catch (Throwable t) {
+            inMc = false;
+            version = "<UNKNOWN>";
+            dedicated = false;
+            Logger.error("Failed to query ModList: " + t.getMessage());
+        }
+        IS_IN_MINECRAFT = inMc;
+        MOD_VERSION = version;
+        IS_DEDICATED_SERVER = dedicated;
+        if (IS_IN_MINECRAFT) {
             Serialization.init();
         }
     }
 
-    //This is hardcoded like this because people do not understand what they are doing
     public static boolean isVerificationFlagOn(String name) {
         return isVerificationFlagOn(name, false);
     }
@@ -40,11 +53,6 @@ public class VoxyCommon implements ModInitializer {
 
     public static void breakpoint() {
         int breakpoint = 0;
-    }
-
-    @Override
-    public void onInitialize() {
-
     }
 
     public interface IInstanceFactory {VoxyInstance create();}
@@ -65,14 +73,13 @@ public class VoxyCommon implements ModInitializer {
     public static void shutdownInstance() {
         if (INSTANCE != null) {
             var instance = INSTANCE;
-            INSTANCE = null;//Make it null before shutdown
+            INSTANCE = null;
             instance.shutdown();
         }
     }
 
     public static void createInstance() {
         if (FACTORY == null) {
-            //Logger.info("Voxy factory");
             return;
         }
         if (INSTANCE != null) {
@@ -85,7 +92,6 @@ public class VoxyCommon implements ModInitializer {
         }
     }
 
-    //Is voxy available in any capacity
     public static boolean isAvailable() {
         return FACTORY != null;
     }

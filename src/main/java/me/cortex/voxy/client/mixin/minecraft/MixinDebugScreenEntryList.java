@@ -1,9 +1,9 @@
-package me.cortex.voxy.client.mixin.minecraft;
+﻿package me.cortex.voxy.client.mixin.minecraft;
 
 import me.cortex.voxy.client.DebugEntries;
 import net.minecraft.client.gui.components.debug.DebugScreenEntryList;
 import net.minecraft.client.gui.components.debug.DebugScreenEntryStatus;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -16,7 +16,7 @@ import java.util.Map;
 
 @Mixin(DebugScreenEntryList.class)
 public abstract class MixinDebugScreenEntryList {
-    @Shadow @Final private List<Identifier> currentlyEnabled;
+    @Shadow @Final private List<ResourceLocation> currentlyEnabled;
     @Shadow public abstract boolean isOverlayVisible();
 
     @Final

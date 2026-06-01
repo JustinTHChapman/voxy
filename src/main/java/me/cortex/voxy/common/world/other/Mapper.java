@@ -1,4 +1,4 @@
-package me.cortex.voxy.common.world.other;
+﻿package me.cortex.voxy.common.world.other;
 
 import com.mojang.serialization.Dynamic;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -260,7 +260,7 @@ public class Mapper {
     }
 
     public int getIdForBiome(Holder<Biome> biome) {
-        String biomeId = biome.unwrapKey().get().identifier().toString();
+        String biomeId = biome.unwrapKey().get().location().toString();
         var entry = this.biome2biomeEntry.get(biomeId);
         if (entry == null) {
             entry = this.registerNewBiome(biomeId);

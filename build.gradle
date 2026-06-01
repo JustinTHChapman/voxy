@@ -90,6 +90,8 @@ configurations {
 
 dependencies {
     // ---- Upstream Voxy native/util deps ----
+    // jspecify nullness annotations (compile-only, used as markers)
+    compileOnly 'org.jspecify:jspecify:1.0.0'
     // JNA for Windows CPU affinity (CpuLayout / Taskbar) — pinned to MC's strict version
     implementation 'net.java.dev.jna:jna:5.14.0'
     implementation 'net.java.dev.jna:jna-platform:5.14.0'
