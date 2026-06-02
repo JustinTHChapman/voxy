@@ -53,12 +53,11 @@ public class WorldUpdater {
                 //Note, this may be zero (this is more likely to occure at higher lod levels) if it doesnt face any neighbors
                 int neighbors = 0;
                 if (didStateChange) {
-                    neighbors |= ((section.y^(section.y-1))>>(lvl+1))==0?0:1<<0;//Down
-                    neighbors |= ((section.y^(section.y+1))>>(lvl+1))==0?0:1<<1;//Up
-                    neighbors |= ((section.x^(section.x-1))>>(lvl+1))==0?0:1<<2;//-x
-                    neighbors |= ((section.x^(section.x+1))>>(lvl+1))==0?0:1<<3;//+x
-                    neighbors |= ((section.z^(section.z-1))>>(lvl+1))==0?0:1<<4;//-z
-                    neighbors |= ((section.z^(section.z+1))>>(lvl+1))==0?0:1<<5;//+z
+                    // Always notify all 6 neighbors so their meshes are rebuilt with correct
+                    // boundary culling data.  The previous conditional logic (checking XOR of
+                    // adjacent coordinates against lvl+1) was only setting half the neighbor
+                    // bits, causing persistent chunk-side wall artifacts.
+                    neighbors = 0b111111;
                 }
 
                 into.markDirty(worldSection, (didStateChange?UPDATE_TYPE_BLOCK_BIT:0)|(emptinessStateChange!=0?UPDATE_TYPE_CHILD_EXISTENCE_BIT:0), neighbors);
