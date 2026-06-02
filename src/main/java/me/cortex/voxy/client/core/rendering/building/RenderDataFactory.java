@@ -664,6 +664,9 @@ public class RenderDataFactory {
                         long A = this.sectionData[idx * 2];
                         long Am = this.sectionData[idx * 2 + 1];
 
+                        // Save raw model ID before fluid remapping for same-fluid culling
+                        int aRawModelId = (int)((A >> 26) & 0xFFFF);
+
                         if (ModelQueries.containsFluid(Am)) {
                             int modelId = (int) ((A>>26)&0xFFFF);
                             A &= ~(0xFFFFL<<26);
@@ -677,10 +680,20 @@ public class RenderDataFactory {
 
                         //Check and test if can cull W.R.T neighbor
                         if (Mapper.getBlockId(neighborId) != 0) {//Not air
-                            int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
-                            long meta = this.modelMan.getModelMetadataFromClientId(modelId);
+                            int neighborModelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                            long meta = this.modelMan.getModelMetadataFromClientId(neighborModelId);
+
+                            // Same-fluid culling: skip face between identical adjacent fluids.
+                            // Use raw model IDs (before getFluidClientStateId remapping) because
+                            // getFluidClientStateId is a stub that returns 0 for everything.
+                            if (ModelQueries.containsFluid(meta) && neighborModelId == aRawModelId) {
+                                this.blockMesher.skip(1);
+                                continue;
+                            }
+
+                            int modelId = neighborModelId;
                             if (ModelQueries.containsFluid(meta)) {
-                                modelId = this.modelMan.getFluidClientStateId(modelId);
+                                modelId = this.modelMan.getFluidClientStateId(neighborModelId);
                             }
                             if (ModelQueries.cullsSame(Am)) {
                                 if (modelId == ((A>>26)&0xFFFF)) {
@@ -1293,6 +1306,9 @@ public class RenderDataFactory {
                     long A = this.sectionData[sidx];
                     long Am = this.sectionData[sidx + 1];
 
+                    // Save raw model ID before fluid remapping for same-fluid culling
+                    int aRawModelId = (int)((A >> 26) & 0xFFFF);
+
                     if (ModelQueries.containsFluid(Am)) {
                         int modelId = (int) ((A>>26)&0xFFFF);
                         A &= ~(0xFFFFL<<26);
@@ -1307,9 +1323,14 @@ public class RenderDataFactory {
 
                     if (Mapper.getBlockId(neighborId) != 0) {//Not air
 
-                        int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
-                        long meta = this.modelMan.getModelMetadataFromClientId(modelId);
+                        int neighborModelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                        long meta = this.modelMan.getModelMetadataFromClientId(neighborModelId);
                         if (ModelQueries.isFullyOpaque(meta)) {
+                            oki = false;
+                        }
+
+                        // Same-fluid culling using raw model IDs
+                        if (ModelQueries.containsFluid(meta) && neighborModelId == aRawModelId) {
                             oki = false;
                         }
 
@@ -1320,8 +1341,9 @@ public class RenderDataFactory {
                             }
                         }
 
+                        int modelId = neighborModelId;
                         if (ModelQueries.containsFluid(meta)) {
-                            modelId = this.modelMan.getFluidClientStateId(modelId);
+                            modelId = this.modelMan.getFluidClientStateId(neighborModelId);
                         }
 
                         if (ModelQueries.cullsSame(Am)) {
@@ -1359,6 +1381,9 @@ public class RenderDataFactory {
                     long A = this.sectionData[sidx];
                     long Am = this.sectionData[sidx + 1];
 
+                    // Save raw model ID before fluid remapping for same-fluid culling
+                    int aRawModelId = (int)((A >> 26) & 0xFFFF);
+
                     //TODO: check if must cull against next entries face
                     if (ModelQueries.containsFluid(Am)) {
                         int modelId = (int) ((A>>26)&0xFFFF);
@@ -1371,9 +1396,14 @@ public class RenderDataFactory {
 
 
                     if (Mapper.getBlockId(neighborId) != 0) {//Not air
-                        int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
-                        long meta = this.modelMan.getModelMetadataFromClientId(modelId);
+                        int neighborModelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                        long meta = this.modelMan.getModelMetadataFromClientId(neighborModelId);
                         if (ModelQueries.isFullyOpaque(meta)) {
+                            oki = false;
+                        }
+
+                        // Same-fluid culling using raw model IDs
+                        if (ModelQueries.containsFluid(meta) && neighborModelId == aRawModelId) {
                             oki = false;
                         }
 
@@ -1384,8 +1414,9 @@ public class RenderDataFactory {
                             }
                         }
 
+                        int modelId = neighborModelId;
                         if (ModelQueries.containsFluid(meta)) {
-                            modelId = this.modelMan.getFluidClientStateId(modelId);
+                            modelId = this.modelMan.getFluidClientStateId(neighborModelId);
                         }
 
                         if (ModelQueries.cullsSame(Am)) {
