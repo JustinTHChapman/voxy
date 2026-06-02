@@ -7,10 +7,16 @@ package me.cortex.voxy.client.core.util;
 public final class IrisUtil {
     private IrisUtil() {}
 
+    public static final boolean IRIS_INSTALLED = false;
+    public static final boolean SHADER_SUPPORT = false;
+
     public static boolean irisIsLoaded() { return false; }
     public static boolean irisActive() { return false; }
     public static boolean irisShadowActive() { return false; }
     public static boolean isRenderingShadowMap() { return false; }
+    public static boolean irisShaderPackEnabled() { return false; }
+    public static void disableIrisShaders() {}
+    public static void clearIrisSamplers() {}
     public static void onWorldRenderStart() {}
     public static void onWorldRenderEnd() {}
     public static void onRenderShadow() {}

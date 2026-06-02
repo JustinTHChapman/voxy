@@ -9,7 +9,7 @@
         "group": "Mod Development - voxy-neoforge",
         "order": 0
       },
-      "projectName": "voxy-neoforge",
+      "projectName": "voxy-neoforge-voxy",
       "mainClass": "net.neoforged.devlaunch.Main",
       "args": [
         "@D:\\GitHub\\voxy\\build\\moddev\\clientRunProgramArgs.txt"
@@ -31,7 +31,7 @@
         "group": "Mod Development - voxy-neoforge",
         "order": 1
       },
-      "projectName": "voxy-neoforge",
+      "projectName": "voxy-neoforge-voxy",
       "mainClass": "net.neoforged.devlaunch.Main",
       "args": [
         "@D:\\GitHub\\voxy\\build\\moddev\\dataRunProgramArgs.txt"
@@ -53,7 +53,7 @@
         "group": "Mod Development - voxy-neoforge",
         "order": 2
       },
-      "projectName": "voxy-neoforge",
+      "projectName": "voxy-neoforge-voxy",
       "mainClass": "net.neoforged.devlaunch.Main",
       "args": [
         "@D:\\GitHub\\voxy\\build\\moddev\\serverRunProgramArgs.txt"

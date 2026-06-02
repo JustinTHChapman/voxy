@@ -126,8 +126,30 @@ public class RenderGenerationService {
         return WorldEngine.getLevel(pos) > 2;
     }
 
+    public static volatile long diag$processJobCalls = 0;
+    public static volatile long diag$processJobNullSection = 0;
+    public static volatile long diag$processJobMeshOk = 0;
+    public static volatile long diag$processJobMeshNull = 0;
+    public static volatile long diag$processJobIdNotReady = 0;
+    public static volatile long diag$enqueueCalls = 0;
+    public static volatile long diag$enqueueOurs = 0;
+    private static long diag$lastLog = 0L;
+    private static void diag$maybeLog() {
+        long n = System.currentTimeMillis();
+        if (n - diag$lastLog > 2000) {
+            diag$lastLog = n;
+            org.slf4j.LoggerFactory.getLogger("VoxyDiag").info(
+                "RenderGen: enq={} ours={} jobs={} nullSec={} ok={} meshNull={} idNotReady={} failed={}",
+                diag$enqueueCalls, diag$enqueueOurs, diag$processJobCalls,
+                diag$processJobNullSection, diag$processJobMeshOk, diag$processJobMeshNull,
+                diag$processJobIdNotReady, MESH_FAILED_COUNTER.get());
+        }
+    }
+
     //TODO: add a generated render data cache
     private void processJob(RenderDataFactory factory, IntOpenHashSet seenMissedIds) {
+        diag$processJobCalls++;
+        diag$maybeLog();
         BuildTask task = this.taskQueue.poll();
         this.taskQueueCount.decrementAndGet();
 
@@ -153,6 +175,7 @@ public class RenderGenerationService {
         }
 
         if (section == null) {
+            diag$processJobNullSection++;
             if (this.resultConsumer != null) {
                 this.resultConsumer.accept(BuiltSection.empty(task.position));
             }
@@ -164,7 +187,9 @@ public class RenderGenerationService {
 
         try {
             mesh = factory.generateMesh(section);
+            if (mesh != null) diag$processJobMeshOk++; else diag$processJobMeshNull++;
         } catch (IdNotYetComputedException e) {
+            diag$processJobIdNotReady++;
             {
                 long stamp = this.taskMapLock.writeLock();
                 BuildTask other = this.taskMap.putIfAbsent(task.position, task);
@@ -277,6 +302,7 @@ public class RenderGenerationService {
 
 
     public void enqueueTask(long pos) {
+        diag$enqueueCalls++;
         if (!this.service.isLive()) {
             return;
         }
@@ -289,6 +315,7 @@ public class RenderGenerationService {
         this.taskMapLock.unlockWrite(stamp);
 
         if (isOurs[0]) {//If its not ours we dont care about it
+            diag$enqueueOurs++;
             //Set priority and insert into queue and execute
             task.updatePriority();
             this.taskQueue.add(task);

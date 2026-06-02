@@ -1,9 +1,6 @@
 package me.cortex.voxy.client.core;
 
-import com.mojang.blaze3d.opengl.GlConst;
-import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.pipeline.DepthStencilState;
-import com.mojang.blaze3d.platform.CompareOp;
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.VoxyClient;
@@ -17,6 +14,7 @@ import me.cortex.voxy.client.core.rendering.ChunkBoundRenderer;
 import me.cortex.voxy.client.core.rendering.RenderDistanceTracker;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.ViewportSelector;
+import me.cortex.voxy.client.core.rendering.VoxyFogParameters;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.hierachical.AsyncNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
@@ -35,7 +33,6 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceManager;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import org.joml.Matrix4f;
@@ -137,8 +134,8 @@ public class VoxyRenderSystem {
             this.viewportSelector = new ViewportSelector<>(sectionRenderer::createViewport);
 
             {
-                int minSec = Minecraft.getInstance().level.getMinSectionY() >> 5;
-                int maxSec = (Minecraft.getInstance().level.getMaxSectionY() - 1) >> 5;
+                int minSec = Minecraft.getInstance().level.getMinSection() >> 5;
+                int maxSec = (Minecraft.getInstance().level.getMaxSection() - 1) >> 5;
 
                 //Do some very cheeky stuff for MiB
                 if (VoxyCommon.IS_MINE_IN_ABYSS) {//TODO: make this somehow configurable
@@ -146,11 +143,23 @@ public class VoxyRenderSystem {
                     maxSec = 7;
                 }
 
+                final org.slf4j.Logger __diag = org.slf4j.LoggerFactory.getLogger("VoxyDiag");
+                final int[] __addCount = {0};
+                final int[] __remCount = {0};
+                final long[] __lastLog = {0L};
                 this.renderDistanceTracker = new RenderDistanceTracker(40,
                         minSec,
                         maxSec,
-                        this.nodeManager::addTopLevel,
-                        this.nodeManager::removeTopLevel);
+                        id -> {
+                            __addCount[0]++;
+                            this.nodeManager.addTopLevel(id);
+                            long now = System.currentTimeMillis();
+                            if (now - __lastLog[0] > 2000) { __lastLog[0] = now; __diag.info("TopLevel nodes: add={} rem={}", __addCount[0], __remCount[0]); }
+                        },
+                        id -> {
+                            __remCount[0]++;
+                            this.nodeManager.removeTopLevel(id);
+                        });
 
                 this.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
             }
@@ -168,14 +177,14 @@ public class VoxyRenderSystem {
         }
 
         for (int i = 0; i < 12; i++) {
-            GlStateManager._activeTexture(GlConst.GL_TEXTURE0+i);
+            GlStateManager._activeTexture(org.lwjgl.opengl.GL13.GL_TEXTURE0+i);
             GlStateManager._bindTexture(0);
             glBindSampler(i, 0);
         }
     }
 
 
-    public Viewport<?> setupViewport(Matrix4fc vanillaProjection, Matrix4fc modelView, FogParameters fogParameters, double cameraX, double cameraY, double cameraZ) {
+    public Viewport<?> setupViewport(Matrix4fc vanillaProjection, Matrix4fc modelView, VoxyFogParameters fogParameters, double cameraX, double cameraY, double cameraZ) {
         var viewport = this.getViewport();
         if (viewport == null) {
             return null;
@@ -225,14 +234,33 @@ public class VoxyRenderSystem {
         return viewport;
     }
 
+    private static long voxy$ropLastLog = 0L;
+    private static long voxy$ropEnterCount = 0L;
+    private static long voxy$ropNullViewport = 0L;
+    private static long voxy$ropBadDim = 0L;
+    private static long voxy$ropProceeded = 0L;
+    private static long voxy$ropProcessedTrue = 0L;
+    private static long voxy$ropException = 0L;
+
     public void renderOpaque(Viewport<?> viewport) {
+        voxy$ropEnterCount++;
+        long __now = System.currentTimeMillis();
+        if (__now - voxy$ropLastLog > 2000) {
+            voxy$ropLastLog = __now;
+            org.slf4j.LoggerFactory.getLogger("VoxyDiag").info(
+                "renderOpaque: enter={} nullVp={} badDim={} proceeded={} processedTrue={} except={}",
+                voxy$ropEnterCount, voxy$ropNullViewport, voxy$ropBadDim, voxy$ropProceeded, voxy$ropProcessedTrue, voxy$ropException);
+        }
         if (viewport == null) {
+            voxy$ropNullViewport++;
             return;
         }
         if (viewport.width <= 0 || viewport.height <= 0) {
+            voxy$ropBadDim++;
             Logger.error("Viewport width or height was zero, this is bad bad bad, exiting frame");
             return;//Only render on valid viewport
         }
+        voxy$ropProceeded++;
 
         TimingStatistics.resetSamplers();
 
@@ -291,6 +319,8 @@ public class VoxyRenderSystem {
             UploadStream.INSTANCE.tick();
 
             while (this.renderDistanceTracker.setCenterAndProcess(viewport.cameraX, viewport.cameraZ) && VoxyClient.isFrexActive());//While FF is active, run until everything is processed
+            // Force at least one process call even when frex inactive (the while-loop short-circuits otherwise the check is only done once)
+            if (this.renderDistanceTracker.setCenterAndProcess(viewport.cameraX, viewport.cameraZ)) voxy$ropProcessedTrue++;
             TimingStatistics.H.start();
             //Done here as is allows less gl state resetup
             do { this.modelService.tick(900_000); } while (VoxyClient.isFrexActive() && !this.modelService.areQueuesEmpty());
@@ -301,7 +331,7 @@ public class VoxyRenderSystem {
 
         GPUTiming.INSTANCE.tick();
 
-        glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
+        glBindFramebuffer(org.lwjgl.opengl.GL30.GL_FRAMEBUFFER, oldFB);
         glViewport(dims[0], dims[1], dims[2], dims[3]);
 
         {//Reset state manager stuffs
@@ -311,9 +341,9 @@ public class VoxyRenderSystem {
 
             GlStateManager._glBindVertexArray(0);//Clear binding
 
-            GlStateManager._activeTexture(GlConst.GL_TEXTURE1);
+            GlStateManager._activeTexture(org.lwjgl.opengl.GL13.GL_TEXTURE1);
             for (int i = 0; i < 12; i++) {
-                GlStateManager._activeTexture(GlConst.GL_TEXTURE0+i);
+                GlStateManager._activeTexture(org.lwjgl.opengl.GL13.GL_TEXTURE0+i);
                 GlStateManager._bindTexture(0);
                 glBindSampler(i, 0);
             }
@@ -420,7 +450,7 @@ public class VoxyRenderSystem {
     private static Matrix4f computeProjectionMat(RenderProperties properties, Matrix4fc base) {
 
         //this jank is to capture the extra crap they inject like viewbobbing
-        var rawMCProj = Minecraft.getInstance().gameRenderer.getGameRenderState().levelRenderState.cameraRenderState.projectionMatrix;
+        var rawMCProj = Minecraft.getInstance().gameRenderer.getProjectionMatrix(Minecraft.getInstance().options.fov().get());
         var extraProjection = rawMCProj.invert(new Matrix4f()).mul(base);
 
         float near = getRenderDistance()<=32.0f?8f:16f;

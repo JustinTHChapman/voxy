@@ -116,13 +116,26 @@ public class WorldEngine {
         this.markDirty(section, DEFAULT_UPDATE_FLAGS, 0);
     }
 
+    private static long voxy$dirtyLastLog = 0L;
+    private static long voxy$dirtyCalls = 0L;
+    private static long voxy$dirtyFired = 0L;
+
     public void markDirty(WorldSection section, int changeState, int neighborMsk) {
         if (!this.isLive) throw new IllegalStateException("World is not live");
         if (section.tracker != this.sectionTracker) {
             throw new IllegalStateException("Section is not from here");
         }
+        voxy$dirtyCalls++;
         if (this.dirtyCallback != null) {
             this.dirtyCallback.accept(section, changeState, neighborMsk);
+            voxy$dirtyFired++;
+        }
+        long __now = System.currentTimeMillis();
+        if (__now - voxy$dirtyLastLog > 2000) {
+            voxy$dirtyLastLog = __now;
+            org.slf4j.LoggerFactory.getLogger("VoxyDiag").info(
+                "WorldEngine.markDirty: calls={} fired={} (callback={})",
+                voxy$dirtyCalls, voxy$dirtyFired, this.dirtyCallback == null ? "null" : "set");
         }
         if ((changeState&UPDATE_TYPE_DONT_SAVE)==0) {
             section.markDirty();

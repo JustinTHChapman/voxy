@@ -1,1 +1,1 @@
-Voxy is an LoD rendering mod for minecraft
+This is my extremely semi-lazy port to 1.21.1 neoforge so I can play with create aeronautics. I provide no support , this is for personal use and provided as is. feel free to do what you will with this.

@@ -28,3 +28,18 @@ issueTrackerURL = "https://github.com/MCRcortex/voxy/issues"
     versionRange = "[${mc_version},1.22)"
     ordering = "NONE"
     side = "BOTH"
+
+[[mixins]]
+    config = "common.voxy.mixins.json"
+
+[[mixins]]
+    config = "client.voxy.mixins.json"
+
+[[mixins]]
+    config = "voxy.compat.moreculling.mixins.json"
+
+[[mixins]]
+    config = "voxy.compat.sodium.mixins.json"
+
+[[accessTransformers]]
+    file = "META-INF/accesstransformer.cfg"

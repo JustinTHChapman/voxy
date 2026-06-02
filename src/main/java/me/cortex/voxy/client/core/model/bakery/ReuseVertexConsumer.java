@@ -2,14 +2,13 @@ package me.cortex.voxy.client.core.model.bakery;
 
 
 import me.cortex.voxy.common.util.MemoryBuffer;
-import net.minecraft.client.model.geom.builders.UVPair;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.renderer.texture.MipmapStrategy;
-import net.minecraft.client.resources.model.geometry.BakedQuad;
 import org.lwjgl.system.MemoryUtil;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 
+// MC 1.21.1 port: BakedQuad-handling methods removed; they used MC 1.26 APIs
+// (quad.materialInfo, ChunkSectionLayer, MipmapStrategy.DARK_CUTOUT, UVPair) that don't exist here.
+// TODO(voxy-port-1.21.1): reimplement against 1.21.1 BakedQuad once SoftwareModelTextureBakery is ported.
 public final class ReuseVertexConsumer implements VertexConsumer {
     public static final int VERTEX_FORMAT_SIZE = 24;
     private MemoryBuffer buffer = new MemoryBuffer(8192);
@@ -88,34 +87,19 @@ public final class ReuseVertexConsumer implements VertexConsumer {
         return this;
     }
 
-    @Override
     public VertexConsumer setLineWidth(float f) {
         return null;
     }
 
-    public ReuseVertexConsumer quad(BakedQuad quad) {
-        return this.quad(quad, false);
+    public ReuseVertexConsumer quad(Object quad) {
+        return this;
     }
 
-    public ReuseVertexConsumer quad(BakedQuad quad, boolean forceSolid) {
-        int meta = 0;
-        meta |= forceSolid?0:(quad.materialInfo().layer()!=ChunkSectionLayer.SOLID?1:0);//has discard
-        meta |= quad.materialInfo().isTinted()?4:0;//has tinting
-        return this.quad(quad, meta);
+    public ReuseVertexConsumer quad(Object quad, boolean forceSolid) {
+        return this;
     }
 
-    public ReuseVertexConsumer quad(BakedQuad quad, int metadata) {
-        this.anyShaded |= quad.materialInfo().shade();
-        this.anyDarkendTex |= quad.materialInfo().sprite().contents().mipmapStrategy == MipmapStrategy.DARK_CUTOUT;
-        this.ensureCanPut();
-        for (int i = 0; i < 4; i++) {
-            var pos = quad.position(i);
-            this.addVertex(pos.x(), pos.y(), pos.z());
-            long puv = quad.packedUV(i);
-            this.setUv(UVPair.unpackU(puv),UVPair.unpackV(puv));
-
-            this.meta(metadata|this.globalOrMetadata);
-        }
+    public ReuseVertexConsumer quad(Object quad, int metadata) {
         return this;
     }
 

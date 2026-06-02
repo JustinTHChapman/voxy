@@ -2,7 +2,8 @@ package me.cortex.voxy.client.core.model;
 
 import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
 import net.minecraft.client.renderer.texture.MipmapGenerator;
-import net.minecraft.util.ARGB;
+// linearToSrgbChannel from net.minecraft.util.ARGB does not exist in 1.21.1
+// (it is 1.21.5+). Alpha gamma path is approximated below.
 
 import java.util.Arrays;
 
@@ -279,7 +280,7 @@ public class TextureUtils {
                 r / 4,
                 g / 4,
                 b / 4,
-                darkend ? ((int) a) / 4 : ARGB.linearToSrgbChannel(a / 4)
+                darkend ? ((int) a) / 4 : (int)(a / 4) // ARGB.linearToSrgbChannel not in 1.21.1; alpha gamma-correction skipped
         );
     }
 

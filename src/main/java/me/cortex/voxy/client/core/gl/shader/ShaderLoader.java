@@ -34,7 +34,7 @@ public class ShaderLoader {
                 } else if (line.startsWith("#import")) {
                     var match = IMPORT_PATTERN.matcher(line);
                     if (!match.matches()) throw new IllegalArgumentException("Unknown import: " + line);
-                    var iid = Identifier.fromNamespaceAndPath(match.group("namespace"), match.group("path"));
+                    var iid = ResourceLocation.fromNamespaceAndPath(match.group("namespace"), match.group("path"));
                     out.addAll(parseRoot(iid));
                 } else {
                     out.add(line);
@@ -44,11 +44,7 @@ public class ShaderLoader {
         }
 
         private static List<String> toLines(String src) {
-            try {
-                return new BufferedReader(new StringReader(src)).readAllLines();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            return new BufferedReader(new StringReader(src)).lines().toList();
         }
         private static String loadShaderAsset(ResourceLocation id) {
             String path = String.format("/assets/%s/shaders/%s", id.getNamespace(), id.getPath());

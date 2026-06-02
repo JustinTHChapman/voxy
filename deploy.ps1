@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 $MC = "$env:APPDATA\PrismLauncher\instances\World of Titans\.minecraft"
 
 Write-Host "Building jar..."
-& .\gradlew.bat build --no-daemon | Select-Object -Last 5
+& .\gradlew.bat build -x test -x compileTestJava --no-daemon | Select-Object -Last 5
 if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 
 $jar = Get-ChildItem "build\libs" -Filter "voxy-neoforge-*.jar" |

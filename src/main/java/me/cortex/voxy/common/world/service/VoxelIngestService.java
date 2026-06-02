@@ -27,6 +27,29 @@ public class VoxelIngestService {
     private record IngestSection(int cx, int cy, int cz, WorldEngine world, LevelChunkSection section, DataLayer blockLight, DataLayer skyLight){}
     private final ConcurrentLinkedDeque<IngestSection> ingestQueue = new ConcurrentLinkedDeque<>();
 
+    private static final org.slf4j.Logger DIAG = org.slf4j.LoggerFactory.getLogger("VoxyDiag");
+    private static int diag$enqueueCalls = 0;
+    private static int diag$enqueueServiceDown = 0;
+    private static int diag$enqueueNoLighting = 0;
+    private static int diag$enqueueAllEmpty = 0;
+    private static int diag$enqueueOk = 0;
+    private static int diag$sectionsQueued = 0;
+    private static int diag$tryAutoCalls = 0;
+    private static int diag$tryAutoNullWorldId = 0;
+    private static int diag$tryAutoNullInstance = 0;
+    private static int diag$tryAutoIngestDisabled = 0;
+    private static int diag$tryAutoNullEngine = 0;
+    private static long diag$lastLog = 0L;
+    private static void diag$maybeLog() {
+        long now = System.currentTimeMillis();
+        if (now - diag$lastLog > 2000) {
+            diag$lastLog = now;
+            DIAG.info("Ingest service: tryAuto={} nullWid={} nullInst={} disabled={} nullEng={} | enq={} serviceDown={} allEmpty={} noLight={} ok={} sectionsQueued={} queueSize={}",
+                    diag$tryAutoCalls, diag$tryAutoNullWorldId, diag$tryAutoNullInstance, diag$tryAutoIngestDisabled, diag$tryAutoNullEngine,
+                    diag$enqueueCalls, diag$enqueueServiceDown, diag$enqueueAllEmpty, diag$enqueueNoLighting, diag$enqueueOk, diag$sectionsQueued, 0);
+        }
+    }
+
     public VoxelIngestService(ServiceManager pool) {
         this.service = pool.createServiceNoCleanup(()->this::processJob, 5000, "Ingest service");
     }
@@ -89,7 +112,10 @@ public class VoxelIngestService {
     }
 
     public boolean enqueueIngest(WorldEngine engine, LevelChunk chunk) {
+        diag$enqueueCalls++;
+        diag$maybeLog();
         if (!this.service.isLive()) {
+            diag$enqueueServiceDown++;
             return false;
         }
         if (!engine.isLive()) {
@@ -101,11 +127,11 @@ public class VoxelIngestService {
         var lightingProvider = chunk.getLevel().getLightEngine();
         boolean gotLighting = false;
 
-        int i = chunk.getMinSectionY() - 1;
+        int i = chunk.getMinSection() - 1;
         boolean allEmpty = true;
         for (var section : chunk.getSections()) {
             i++;
-            if (section == null || !shouldIngestSection(section, chunk.getPos().x(), i, chunk.getPos().z())) continue;
+            if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
             allEmpty&=section.hasOnlyAir();
             //if (section.isEmpty()) continue;
             var pos = SectionPos.of(chunk.getPos(), i);
@@ -115,13 +141,14 @@ public class VoxelIngestService {
         }
 
         if (allEmpty&&!gotLighting) {
+            diag$enqueueAllEmpty++;
             //Special case all empty chunk columns, we need to clear it out
-            i = chunk.getMinSectionY() - 1;
+            i = chunk.getMinSection() - 1;
             for (var section : chunk.getSections()) {
                 i++;
-                if (section == null || !shouldIngestSection(section, chunk.getPos().x(), i, chunk.getPos().z())) continue;
+                if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
                 engine.markActive();
-                this.ingestQueue.add(new IngestSection(chunk.getPos().x(), i, chunk.getPos().z(), engine, section, null, null));
+                this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, null, null));
                 try {
                     this.service.execute();
                 } catch (Exception e) {
@@ -132,17 +159,19 @@ public class VoxelIngestService {
         }
 
         if (!gotLighting) {
+            diag$enqueueNoLighting++;
             return false;
         }
+        diag$enqueueOk++;
 
         var blp = lightingProvider.getLayerListener(LightLayer.BLOCK);
         var slp = lightingProvider.getLayerListener(LightLayer.SKY);
 
 
-        i = chunk.getMinSectionY() - 1;
+        i = chunk.getMinSection() - 1;
         for (var section : chunk.getSections()) {
             i++;
-            if (section == null || !shouldIngestSection(section, chunk.getPos().x(), i, chunk.getPos().z())) continue;
+            if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
             //if (section.isEmpty()) continue;
             var pos = SectionPos.of(chunk.getPos(), i);
 
@@ -161,7 +190,8 @@ public class VoxelIngestService {
             //    continue;
             //}
             engine.markActive();
-            this.ingestQueue.add(new IngestSection(chunk.getPos().x(), i, chunk.getPos().z(), engine, section, bl, sl));//TODO: fixme, this is technically not safe todo on the chunk load ingest, we need to copy the section data so it cant be modified while being read
+            diag$sectionsQueued++;
+            this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));//TODO: fixme, this is technically not safe todo on the chunk load ingest, we need to copy the section data so it cant be modified while being read
             try {
                 this.service.execute();
             } catch (Exception e) {
@@ -182,12 +212,14 @@ public class VoxelIngestService {
 
     //Utility method to ingest a chunk into the given WorldIdentifier or world
     public static boolean tryIngestChunk(WorldIdentifier worldId, LevelChunk chunk) {
-        if (worldId == null) return false;
+        diag$tryAutoCalls++;
+        diag$maybeLog();
+        if (worldId == null) { diag$tryAutoNullWorldId++; return false; }
         var instance = VoxyCommon.getInstance();
-        if (instance == null) return false;
-        if (!instance.isIngestEnabled(worldId)) return false;
+        if (instance == null) { diag$tryAutoNullInstance++; return false; }
+        if (!instance.isIngestEnabled(worldId)) { diag$tryAutoIngestDisabled++; return false; }
         var engine = instance.getOrCreate(worldId);
-        if (engine == null) return false;
+        if (engine == null) { diag$tryAutoNullEngine++; return false; }
         return instance.getIngestService().enqueueIngest(engine, chunk);
     }
 

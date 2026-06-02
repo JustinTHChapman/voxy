@@ -3,8 +3,6 @@ package me.cortex.voxy.common.voxelization;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.other.Mipper;
-import net.caffeinemc.mods.lithium.common.world.chunk.LithiumHashPalette;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.util.LinearCongruentialGenerator;
@@ -23,7 +21,8 @@ import net.minecraft.world.level.chunk.SingleValuePalette;
 import java.util.WeakHashMap;
 
 public class WorldConversionFactory {
-    private static final boolean LITHIUM_INSTALLED = FabricLoader.getInstance().isModLoaded("lithium");
+    // Lithium for NeoForge 1.21.1 does not expose LithiumHashPalette; back-port disabled.
+    private static final boolean LITHIUM_INSTALLED = false;
 
     private static final class Cache {
         private final int[] biomeCache = new int[4*4*4];
@@ -45,22 +44,7 @@ public class WorldConversionFactory {
     private static final ThreadLocal<Cache> THREAD_LOCAL = ThreadLocal.withInitial(Cache::new);
 
     private static boolean setupLithiumLocalPallet(Palette<BlockState> vp, Reference2IntOpenHashMap<BlockState> blockCache, Mapper mapper, int[] pc)  {
-        if (vp instanceof LithiumHashPalette<BlockState>) {
-            for (int i = 0; i < vp.getSize(); i++) {
-                BlockState state = null;
-                int blockId = -1;
-                try { state = vp.valueFor(i); } catch (Exception e) {}
-                if (state != null) {
-                    blockId = blockCache.getOrDefault(state, -1);
-                    if (blockId == -1) {
-                        blockId = mapper.getIdForBlockState(state);
-                        blockCache.put(state, blockId);
-                    }
-                }
-                pc[i] = blockId;
-            }
-            return true;
-        }
+        // Lithium back-port not wired on NeoForge 1.21.1
         return false;
     }
     private static int setupLocalPalette(Palette<BlockState> vp, Reference2IntOpenHashMap<BlockState> blockCache, Mapper mapper, int[] pc) {
@@ -138,12 +122,12 @@ public class WorldConversionFactory {
         var data = section.section;
         var zoomCells = cache.zoomCellCache;
 
-        var vp = blockContainer.data.palette;
+        var vp = blockContainer.data.palette();
         var pc = cache.getPaletteCache(vp.getSize());
         GlobalPalette<BlockState> bps = null;
 
         int pcc = 0;
-        if (blockContainer.data.palette instanceof GlobalPalette<BlockState> _bps) {
+        if (blockContainer.data.palette() instanceof GlobalPalette<BlockState> _bps) {
             bps = _bps;
             pcc = bps.getSize();
         } else {
@@ -172,7 +156,7 @@ public class WorldConversionFactory {
 
 
         int nonZeroCnt = 0;
-        if (blockContainer.data.storage instanceof SimpleBitStorage bStor) {
+        if (blockContainer.data.storage() instanceof SimpleBitStorage bStor) {
             var bDat = bStor.getRaw();
             int iterPerLong = (64 / bStor.getBits()) - 1;
 
@@ -200,7 +184,7 @@ public class WorldConversionFactory {
                 data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
             }
         } else {
-            if (!(blockContainer.data.storage instanceof ZeroBitStorage)) {
+            if (!(blockContainer.data.storage() instanceof ZeroBitStorage)) {
                 throw new IllegalStateException();
             }
             int bId = pc[0];

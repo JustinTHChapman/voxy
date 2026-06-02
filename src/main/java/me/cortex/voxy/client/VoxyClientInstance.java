@@ -1,9 +1,7 @@
 package me.cortex.voxy.client;
 
-import me.cortex.voxy.client.compat.FlashbackCompat;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.RenderResourceReuse;
-import me.cortex.voxy.client.mixin.sodium.AccessorSodiumWorldRenderer;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.StorageConfigUtil;
 import me.cortex.voxy.common.config.ConfigBuildCtx;
@@ -17,50 +15,49 @@ import me.cortex.voxy.common.config.storage.rocksdb.RocksDBStorageBackend;
 import me.cortex.voxy.commonImpl.ImportManager;
 import me.cortex.voxy.commonImpl.VoxyInstance;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
-import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.level.storage.LevelResource;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class VoxyClientInstance extends VoxyInstance {
+    private static Config PENDING_CONFIG;
+    private static Path PENDING_BASE_PATH;
+
     private final Config config;
     private final Path basePath;
     private final boolean noIngestOverride;
 
     public VoxyClientInstance() {
-        {
-            var path = FlashbackCompat.getReplayStoragePath();
-            this.noIngestOverride = path != null;
-            if (path == null) {
-                path = getBasePath();
-            }
-            var basePath = this.basePath = path.normalize();
-            this.config = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==1&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, basePath);
-        }
+        this(loadPending());
+    }
+
+    private VoxyClientInstance(Void preLoad) {
         super();
+        this.noIngestOverride = false;
+        this.basePath = PENDING_BASE_PATH;
+        this.config = PENDING_CONFIG;
+        PENDING_BASE_PATH = null;
+        PENDING_CONFIG = null;
         this.updateDedicatedThreads();
+    }
+
+    private static Void loadPending() {
+        PENDING_BASE_PATH = getBasePath().normalize();
+        PENDING_CONFIG = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==2&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, PENDING_BASE_PATH);
+        return null;
     }
 
     @Override
     protected boolean shouldCreateInstance() {
-        return !this.config.disabled;
+        Config cfg = this.config != null ? this.config : PENDING_CONFIG;
+        return cfg != null && !cfg.disabled;
     }
 
     @Override
     public void updateDedicatedThreads() {
-        int target = VoxyConfig.CONFIG.serviceThreads;
-        if (!VoxyConfig.CONFIG.dontUseSodiumBuilderThreads) {
-            var swr = SodiumWorldRenderer.instanceNullable();
-            if (swr != null) {
-                var rsm = ((AccessorSodiumWorldRenderer) swr).getRenderSectionManager();
-                if (rsm != null) {
-                    this.setNumThreads(Math.max(1, target - rsm.getBuilder().getTotalThreadCount()));
-                    return;
-                }
-            }
-        }
-        this.setNumThreads(target);
+        // Sodium 0.6.13 builder-thread accessor mixin not yet ported; use full configured count.
+        this.setNumThreads(VoxyConfig.CONFIG.serviceThreads);
     }
 
     @Override
@@ -95,7 +92,7 @@ public class VoxyClientInstance extends VoxyInstance {
     }
 
     private static class Config {
-        public int version = 1;
+        public int version = 2; // v2: switched default from Memory to SQLite
         public boolean disabled = false;
         public SectionStorageConfig sectionStorageConfig;
     }
@@ -113,12 +110,12 @@ public class VoxyClientInstance extends VoxyInstance {
         if (iserver != null) {
             basePath = iserver.getWorldPath(LevelResource.ROOT).resolve("voxy");
         } else {
-            var netHandle = Minecraft.getInstance().gameMode;
+            var netHandle = Minecraft.getInstance().getConnection();
             if (netHandle == null) {
                 Logger.error("Network handle null");
                 basePath = basePath.resolve("UNKNOWN");
             } else {
-                var info = netHandle.connection.getServerData();
+                var info = netHandle.getServerData();
                 if (info == null) {
                     Logger.error("Server info null");
                     basePath = basePath.resolve("UNKNOWN");
