@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "package": "me.cortex.voxy.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "client": [
+    "minecraft.MixinBlockableEventLoop",
+    "minecraft.MixinClientChunkCache",
+    "minecraft.MixinClientCommonPacketListenerImpl",
+    "minecraft.MixinClientLevel",
+    "minecraft.MixinClientPacketListener",
+    "minecraft.MixinFogRenderer",
+    "minecraft.MixinGPUSelect",
+    "minecraft.MixinLevelRenderer",
+    "minecraft.MixinMinecraft",
+    "minecraft.MixinLightTexture"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

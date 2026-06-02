@@ -117,7 +117,14 @@ public class Mapper {
             int entryType = entry.getIntKey()>>>30;
             int id = entry.getIntKey() & ((1<<30)-1);
             if (entryType == BLOCK_STATE_TYPE) {
-                var sentry = StateEntry.deserialize(id, entry.getValue(), forceResave);
+                StateEntry sentry;
+                try {
+                    sentry = StateEntry.deserialize(id, entry.getValue(), forceResave);
+                } catch (Exception e) {
+                    Logger.error("Failed to deserialize block state entry id=" + id + " (" + e.getMessage() + "), using replacement block");
+                    sentryErrors.add(new Pair<>(entry.getValue(), id));
+                    continue;
+                }
                 if (sentry.state.isAir()) {
                     Logger.error("Deserialization was air, removed block");
                     sentryErrors.add(new Pair<>(entry.getValue(), id));
@@ -130,13 +137,21 @@ public class Mapper {
                     Logger.warn("Multiple mappings for blockstate, using old state, expect things to possibly go really badly. " + oldEntry.id + ":" + sentry.id + ":" + sentry.state );
                 }
             } else if (entryType == BIOME_TYPE) {
-                var bentry = BiomeEntry.deserialize(id, entry.getValue());
+                BiomeEntry bentry;
+                try {
+                    bentry = BiomeEntry.deserialize(id, entry.getValue());
+                } catch (Exception e) {
+                    Logger.error("Failed to deserialize biome entry id=" + id + " (" + e.getMessage() + "), skipping");
+                    forceResave[0] = true;
+                    continue;
+                }
                 bentries.add(bentry);
                 if (this.biome2biomeEntry.put(bentry.biome, bentry) != null) {
-                    throw new IllegalStateException("Multiple mappings for biome entry");
+                    Logger.warn("Multiple mappings for biome entry, continuing. biome=" + bentry.biome + " id=" + bentry.id);
+                    forceResave[0] = true;
                 }
             } else {
-                throw new IllegalStateException("Unknown entryType");
+                Logger.warn("Unknown entryType=" + entryType + " for id=" + id + ", skipping");
             }
         }
 
@@ -157,15 +172,29 @@ public class Mapper {
 
         //Insert into the arrays
         sentries.stream().sorted(Comparator.comparing(a->a.id)).forEach(entry -> {
+            // Fill any ID gaps caused by corrupted/skipped entries
+            while (this.blockId2stateEntry.size() < entry.id) {
+                int gapId = this.blockId2stateEntry.size();
+                Logger.warn("Gap in block state IDs at position=" + gapId + ", filling with air placeholder");
+                this.blockId2stateEntry.add(new StateEntry(gapId, Blocks.AIR.defaultBlockState()));
+            }
             if (this.blockId2stateEntry.size() != entry.id) {
-                throw new IllegalStateException("Block entry not ordered");
+                Logger.error("Duplicate or out-of-order block entry id=" + entry.id + " at size=" + this.blockId2stateEntry.size() + ", skipping");
+                return;
             }
             this.blockId2stateEntry.add(entry);
         });
 
         bentries.stream().sorted(Comparator.comparing(a->a.id)).forEach(entry -> {
+            // Fill any ID gaps caused by corrupted/skipped entries
+            while (this.biomeId2biomeEntry.size() < entry.id) {
+                int gapId = this.biomeId2biomeEntry.size();
+                Logger.warn("Gap in biome IDs at position=" + gapId + ", filling with plains placeholder");
+                this.biomeId2biomeEntry.add(new BiomeEntry(gapId, "minecraft:plains"));
+            }
             if (this.biomeId2biomeEntry.size() != entry.id) {
-                throw new IllegalStateException("Biome entry not ordered. got " + entry.biome + " with id " + entry.id + " expected id " + this.biomeId2biomeEntry.size());
+                Logger.error("Duplicate or out-of-order biome entry id=" + entry.id + " at size=" + this.biomeId2biomeEntry.size() + ", skipping");
+                return;
             }
             this.biomeId2biomeEntry.add(entry);
         });
@@ -359,7 +388,7 @@ public class Mapper {
             if (state.getBlock() instanceof LeavesBlock) {
                 this.opacity = 15;
             } else {
-                this.opacity = state.getLightDampening();
+                this.opacity = state.getLightBlock(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, net.minecraft.core.BlockPos.ZERO);
             }
         }
 
@@ -379,14 +408,14 @@ public class Mapper {
         public static StateEntry deserialize(int id, byte[] data, boolean[] forceResave) {
             try {
                 var compound = NbtIo.readCompressed(new ByteArrayInputStream(data), NbtAccounter.unlimitedHeap());
-                if (compound.getIntOr("id", -1) != id) {
+                if (!compound.contains("id") || compound.getInt("id") != id) {
                     throw new IllegalStateException("Encoded id != expected id");
                 }
-                var bsc = compound.getCompound("block_state").orElseThrow();
+                var bsc = compound.getCompound("block_state");
                 var state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
                 if (state.isError()) {
                     Logger.info("Could not decode blockstate, attempting fixes, error: "+ state.error().get().message());
-                    bsc = (CompoundTag) DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc),0, SharedConstants.getCurrentVersion().dataVersion().version()).getValue();
+                    bsc = (CompoundTag) DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc),0, SharedConstants.getCurrentVersion().getDataVersion().getVersion()).getValue();
                     state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
                     if (state.isError()) {
                         Logger.error("Could not decode blockstate setting to air. id:" + id + " error: " + state.error().get().message());
@@ -430,10 +459,10 @@ public class Mapper {
         public static BiomeEntry deserialize(int id, byte[] data) {
             try {
                 var compound = NbtIo.readCompressed(new ByteArrayInputStream(data), NbtAccounter.unlimitedHeap());
-                if (compound.getIntOr("id", -1) != id) {
+                if (!compound.contains("id") || compound.getInt("id") != id) {
                     throw new IllegalStateException("Encoded id != expected id");
                 }
-                String biome = compound.getStringOr("biome_id", null);
+                String biome = compound.contains("biome_id") ? compound.getString("biome_id") : null;
                 return new BiomeEntry(id, biome);
             } catch (IOException e) {
                 throw new RuntimeException(e);

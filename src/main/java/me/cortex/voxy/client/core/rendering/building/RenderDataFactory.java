@@ -213,7 +213,11 @@ public class RenderDataFactory {
         return quadData;
     }
 
+    public static volatile long voxy$prepCalls = 0, voxy$prepNotEmptyBits = 0, voxy$prepOpaqueBits = 0, voxy$prepFluidBits = 0, voxy$prepIdMissing = 0, voxy$prepSampleMeta = 0, voxy$prepSampleModelId = -1, voxy$prepSampleBlockId = -1;
+    private static long voxy$prepLastLog = 0;
+
     private int prepareSectionData(final long[] rawSectionData) {
+        voxy$prepCalls++;
         final var sectionData = this.sectionData;
         final var rawModelIds = this.modelMan._unsafeRawAccess();
         long opaque = 0;
@@ -232,6 +236,7 @@ public class RenderDataFactory {
                 } else {
                     int modelId = rawModelIds[Mapper.getBlockId(block)];
                     if (modelId == -1) {//Failed, so just return error
+                        voxy$prepIdMissing++;
                         return Mapper.getBlockId(block) | (1 << 31);
                     }
                     if (modelId == 0) {//modelId == 0, its basicly air so set it as air
@@ -249,12 +254,20 @@ public class RenderDataFactory {
                         opaque |= ModelQueries._isFullyOpaque(modelMetadata)<<j;
                         pureFluid |= ModelQueries._isFluid(modelMetadata)<<j;
                         partialFluid |= ModelQueries._containsFluid(modelMetadata)<<j;
+                        if (voxy$prepSampleModelId == -1) {
+                            voxy$prepSampleModelId = modelId;
+                            voxy$prepSampleBlockId = Mapper.getBlockId(block);
+                            voxy$prepSampleMeta = modelMetadata;
+                        }
                     }
                 }
             }
             if (notEmpty != 0) {
                 long nonOpaque = (notEmpty^opaque)&~pureFluid;
                 long fluid = pureFluid|partialFluid;
+                voxy$prepNotEmptyBits += Long.bitCount(notEmpty);
+                voxy$prepOpaqueBits += Long.bitCount(opaque);
+                voxy$prepFluidBits += Long.bitCount(fluid);
                 this.opaqueMasks[(i >> 5) - 2] = (int) opaque;
                 this.opaqueMasks[(i >> 5) - 1] = (int) (opaque>>>32);
                 this.nonOpaqueMasks[(i >> 5) - 2] = (int) nonOpaque;
@@ -1681,8 +1694,44 @@ public class RenderDataFactory {
         }
     }
 
+    public static volatile long voxy$genCalls = 0, voxy$genEmptyData = 0, voxy$genHasData = 0, voxy$genQuadsZero = 0, voxy$genQuadsNonZero = 0, voxy$genIdNotReady = 0;
+    public static volatile long voxy$lastNonAirCount = 0;
+    private static long voxy$lastLog = 0;
+    private static void voxy$maybeLog(int lvl, int nonAir, int qc) {
+        long n = System.currentTimeMillis();
+        if (n - voxy$lastLog > 2000) {
+            voxy$lastLog = n;
+            org.slf4j.LoggerFactory.getLogger("VoxyDiag").info(
+                "RenderFactory: calls={} emptyData={} hasData={} qZero={} qNonZero={} idNotReady={} (last lvl={} nonAir={} qc={}) prep[calls={} ne={} op={} fl={} idMiss={} sample bId={} mId={} meta=0x{}]",
+                voxy$genCalls, voxy$genEmptyData, voxy$genHasData, voxy$genQuadsZero, voxy$genQuadsNonZero, voxy$genIdNotReady, lvl, nonAir, qc,
+                voxy$prepCalls, voxy$prepNotEmptyBits, voxy$prepOpaqueBits, voxy$prepFluidBits, voxy$prepIdMissing,
+                voxy$prepSampleBlockId, voxy$prepSampleModelId, Long.toHexString(voxy$prepSampleMeta));
+        }
+    }
+
     //section is already acquired and gets released by the parent
     public BuiltSection generateMesh(WorldSection section) {
+        voxy$genCalls++;
+        int __nonAir = 0;
+        int __sampleBlockId = -1;
+        long __sampleState = 0;
+        {
+            long[] __d = section._unsafeGetRawDataArray();
+            for (int __i = 0; __i < __d.length; __i++) {
+                if (!me.cortex.voxy.common.world.other.Mapper.isAir(__d[__i])) {
+                    if (__nonAir == 0) { __sampleBlockId = me.cortex.voxy.common.world.other.Mapper.getBlockId(__d[__i]); __sampleState = __d[__i]; }
+                    __nonAir++;
+                }
+            }
+        }
+        if (__nonAir == 0) voxy$genEmptyData++; else voxy$genHasData++;
+        voxy$lastNonAirCount = __nonAir;
+        if (voxy$genHasData < 5 && __nonAir > 0) {
+            org.slf4j.LoggerFactory.getLogger("VoxyDiag").info(
+                "RenderFactory sample: lvl={} pos=({},{},{}) nonAir={} sampleBlockId={} sampleState=0x{} factoryHasModel={}",
+                section.lvl, section.x, section.y, section.z, __nonAir, __sampleBlockId, Long.toHexString(__sampleState),
+                this.modelMan == null ? "?" : this.modelMan.hasModelForBlockId(__sampleBlockId));
+        }
         //TODO: FIXME: because of the exceptions that are thrown when aquiring modelId
         // this can result in the state of all block meshes and well _everything_ from being incorrect
         //THE EXCEPTION THAT THIS THROWS CAUSES MAJOR ISSUES
@@ -1729,6 +1778,7 @@ public class RenderDataFactory {
         //Prepare everything
         int neighborMskAndFlags = this.prepareSectionData(section._unsafeGetRawDataArray());
         if ((neighborMskAndFlags&(1<<31))!=0) {//We failed to get everything so throw exception
+            voxy$genIdNotReady++;
             throw new IdNotYetComputedException(neighborMskAndFlags&((1<<20)-1), true);
         }
         int neighborMsk = neighborMskAndFlags&0b11_11_11;
@@ -1755,8 +1805,12 @@ public class RenderDataFactory {
         // if the connecting type of the translucent block is the same AND the face is full, discard it
         // this stops e.g. multiple layers of glass (and ocean) from having 3000 layers of quads etc
         if (this.quadCount == 0) {
+            voxy$genQuadsZero++;
+            voxy$maybeLog(section.lvl, __nonAir, 0);
             return BuiltSection.emptyWithChildren(section.key, section.getNonEmptyChildren());
         }
+        voxy$genQuadsNonZero++;
+        voxy$maybeLog(section.lvl, __nonAir, this.quadCount);
 
         if (this.quadCount >= 1<<16) {
             Logger.warn("Large quad count for section " + WorldEngine.pprintPos(section.key) + " is " + this.quadCount);

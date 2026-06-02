@@ -183,10 +183,26 @@ public class NodeManager {
 
     //==================================================================================================================
 
+    public static volatile long voxy$pgrCalls = 0, voxy$pgrNotInMap = 0, voxy$pgrReqSingle = 0, voxy$pgrReqChild = 0, voxy$pgrLeafInner = 0, voxy$pgrLeafSkip = 0;
+    public static volatile long voxy$uploadEmpty = 0, voxy$uploadReal = 0, voxy$reqSatisfied = 0;
+    private static long voxy$lastLog = 0L;
+    private static void voxy$maybeLog() {
+        long n = System.currentTimeMillis();
+        if (n - voxy$lastLog > 2000) {
+            voxy$lastLog = n;
+            org.slf4j.LoggerFactory.getLogger("VoxyDiag").info(
+                "NodeMgr.pgr: calls={} notInMap={} reqSingle={} reqChild={} leaf={} leafSkip={} | upEmpty={} upReal={} satisfied={}",
+                voxy$pgrCalls, voxy$pgrNotInMap, voxy$pgrReqSingle, voxy$pgrReqChild, voxy$pgrLeafInner, voxy$pgrLeafSkip, voxy$uploadEmpty, voxy$uploadReal, voxy$reqSatisfied);
+        }
+    }
+
     public void processGeometryResult(BuiltSection sectionResult) {
+        voxy$pgrCalls++;
+        voxy$maybeLog();
         long pos = sectionResult.position;
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
+            voxy$pgrNotInMap++;
             //Logger.warn("Got geometry update for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, discarding!");
             sectionResult.free();
             return;
@@ -195,6 +211,7 @@ public class NodeManager {
         if ((nodeId&NODE_TYPE_MSK)==NODE_TYPE_REQUEST) {
             //For a request
             if ((nodeId&REQUEST_TYPE_MSK)==REQUEST_TYPE_SINGLE) {
+                voxy$pgrReqSingle++;
                 var request = this.singleRequests.get(nodeId&NODE_ID_MSK);
                 request.setMesh(this.uploadReplaceSection(request.getMesh(), sectionResult));
 
@@ -206,10 +223,12 @@ public class NodeManager {
                 }
 
                 if (request.isSatisfied()) {
+                    voxy$reqSatisfied++;
                     this.singleRequests.release(nodeId&NODE_ID_MSK);
                     this.finishRequest(request);
                 }
             } else if ((nodeId&REQUEST_TYPE_MSK)==REQUEST_TYPE_CHILD) {
+                voxy$pgrReqChild++;
                 var request = this.childRequests.get(nodeId&NODE_ID_MSK);
                 int childId = getChildIdx(pos);
                 request.setChildMesh(childId, this.uploadReplaceSection(request.getChildMesh(childId), sectionResult));
@@ -255,12 +274,14 @@ public class NodeManager {
 
     private int uploadReplaceSection(int meshId, BuiltSection section) {
         if (section.isEmpty()) {
+            voxy$uploadEmpty++;
             if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
                 this.geometryManager.removeSection(meshId);
             }
             section.free();
             return EMPTY_GEOMETRY_ID;
         }
+        voxy$uploadReal++;
         if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
             return this.geometryManager.uploadReplaceSection(meshId, section);
         }

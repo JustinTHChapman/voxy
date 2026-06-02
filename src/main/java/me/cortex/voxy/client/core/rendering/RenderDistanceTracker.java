@@ -35,17 +35,33 @@ public class RenderDistanceTracker {
         this.tracker = new RingTracker(this.tracker, renderDistance, ((int)this.posX)>>9, ((int)this.posZ)>>9, true);//Steal from previous tracker
     }
 
+    private static long voxy$diagLast = 0L;
+    private static long voxy$diagCalls = 0L;
+    private static long voxy$diagMoved = 0L;
+    private static long voxy$diagProcessed = 0L;
+
     public boolean setCenterAndProcess(double x, double z) {
+        voxy$diagCalls++;
         double dx = this.posX-x;
         double dz = this.posZ-z;
         if (CHECK_DISTANCE_BLOCKS*CHECK_DISTANCE_BLOCKS<dx*dx+dz*dz) {
+            voxy$diagMoved++;
             this.posX = x;
             this.posZ = z;
             this.tracker.moveCenter(((int)x)>>9, ((int)z)>>9);
         }
 
         //TODO: make process rate in terms of updatesPerSecond not updates per frame
-        return this.tracker.process(this.processRate, this::add, this::rem)!=0;
+        int processed = this.tracker.process(this.processRate, this::add, this::rem);
+        voxy$diagProcessed += processed;
+        long __now = System.currentTimeMillis();
+        if (__now - voxy$diagLast > 2000) {
+            voxy$diagLast = __now;
+            org.slf4j.LoggerFactory.getLogger("VoxyDiag").info(
+                "RDT: calls={} moved={} totalProcessed={} rd={} center=({},{}) cam=({},{}) thisProcessed={}",
+                voxy$diagCalls, voxy$diagMoved, voxy$diagProcessed, this.renderDistance, ((int)x)>>9, ((int)z)>>9, x, z, processed);
+        }
+        return processed!=0;
     }
 
     private void add(int x, int z) {

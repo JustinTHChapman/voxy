@@ -14,4 +14,9 @@ public record VoxyFogParameters(
         int shape
 ) {
     public static final VoxyFogParameters NONE = new VoxyFogParameters(0f, 0f, 0f, 0f, Float.POSITIVE_INFINITY, 0);
+
+    // Aliases matching Voxy upstream / MC 1.26 FogParameters method names.
+    public float environmentalStart() { return start; }
+    public float environmentalEnd() { return end; }
+    public float alpha() { return 1.0f; }
 }

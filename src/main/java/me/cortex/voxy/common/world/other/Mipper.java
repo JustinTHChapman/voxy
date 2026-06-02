@@ -25,13 +25,11 @@ public class Mipper {
 
         int max = -1;
 
-        //TODO: mip with respect to all the variables, what that means is take whatever has the highest count and return that
-        //TODO: also average out the light level and set that as the new light level
-        //For now just take the most top corner
-
-        //TODO: i think it needs to compute the _max_ light level, since e.g. if a point is bright irl
-        // you can see it from really really damn far away.
-        // it could be a heavily weighted average with a huge preference to the top most lighting value
+        // Prefer upper Y layer (idx1=1, i.e. bit1 set in the index) over lower Y layer.
+        // This ensures fluid/translucent surface blocks (e.g. water) are preserved in the
+        // mipped LOD even though their opacity is lower than solid blocks beneath them.
+        // Within the same Y layer, pick by highest opacity.
+        // Bit encoding: index = (idx0) | (idx1<<1) | (idx2<<2), so Y = bit1.
         if (!Mapper.isAir(I111)) {
             max = (mapper.getBlockStateOpacity(I111)<<4)|0b111;
         }
@@ -44,17 +42,21 @@ public class Mipper {
         if (!Mapper.isAir(I010)) {
             max = Math.max((mapper.getBlockStateOpacity(I010)<<4)|0b010, max);
         }
-        if (!Mapper.isAir(I101)) {
-            max = Math.max((mapper.getBlockStateOpacity(I101)<<4)|0b101, max);
-        }
-        if (!Mapper.isAir(I100)) {
-            max = Math.max((mapper.getBlockStateOpacity(I100)<<4)|0b100, max);
-        }
-        if (!Mapper.isAir(I001)) {
-            max = Math.max((mapper.getBlockStateOpacity(I001)<<4)|0b001, max);
-        }
-        if (!Mapper.isAir(I000)) {
-            max = Math.max((mapper.getBlockStateOpacity(I000)<<4), max);
+
+        // Only fall back to lower Y layer if upper Y layer is entirely air
+        if (max == -1) {
+            if (!Mapper.isAir(I101)) {
+                max = (mapper.getBlockStateOpacity(I101)<<4)|0b101;
+            }
+            if (!Mapper.isAir(I100)) {
+                max = Math.max((mapper.getBlockStateOpacity(I100)<<4)|0b100, max);
+            }
+            if (!Mapper.isAir(I001)) {
+                max = Math.max((mapper.getBlockStateOpacity(I001)<<4)|0b001, max);
+            }
+            if (!Mapper.isAir(I000)) {
+                max = Math.max((mapper.getBlockStateOpacity(I000)<<4), max);
+            }
         }
 
         if (max != -1) {

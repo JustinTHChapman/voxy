@@ -2,11 +2,13 @@
 /.gradle/
 /.idea/
 /build/
+/bin/
 /run/
 /out/
 /logs/
 /libs/
 *.log
+*.bak
 
 # Local dev notes (not for upstream)
 /dev-notes/

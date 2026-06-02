@@ -268,6 +268,7 @@ public class AsyncNodeManager {
             if (job == null)
                 break;
             workDone++;
+            voxy$processGeoCalls++;
             this.manager.processGeometryResult(job);
             if (job.geometryBuffer!=null) {
                 estimatedGeometryUploadAmount += job.geometryBuffer.size;
@@ -503,6 +504,8 @@ public class AsyncNodeManager {
         if (!RESULT_HANDLE.compareAndSet(this, null, results)) {
             throw new IllegalArgumentException("Should always have null");
         }
+        voxy$resultPublishes++;
+        voxy$logGeo("pub", this);
 
         if (VERIFY_NODE_MANAGER) {
             this.manager.verifyIntegrity();
@@ -512,13 +515,18 @@ public class AsyncNodeManager {
     private IntConsumer tlnAddCallback; private IntConsumer tlnRemoveCallback;
     //Render thread synchronization
     public void tick(GlBuffer nodeBuffer, NodeCleaner cleaner) {//TODO: dont pass nodeBuffer here??, do something else thats better
+        voxy$tickCalls++;
         if (this.uncaughtException != null) {
             throw new RuntimeException(this.uncaughtException);//Propagate internal exception
         }
         var results = (SyncResults)RESULT_HANDLE.getAndSet(this, null);//Acquire the results
         if (results == null) {//There are no new results to process, return
+            voxy$tickNullResults++;
+            voxy$logGeo("tickNull", this);
             return;
         }
+        voxy$tickUploads += results.geometryUpload.currentElemCopyAmount;
+        voxy$logGeo("tickGot", this);
 
         //top level node add/remove
         if (!results.tlnDelta.isEmpty()) {
@@ -526,8 +534,10 @@ public class AsyncNodeManager {
             while (iter.hasNext()) {
                 int val = iter.nextInt();
                 if ((val&(1<<31))!=0) {//Add node
+                    voxy$tickTlnAdd++;
                     this.tlnAddCallback.accept(val&(-1>>>1));
                 } else {
+                    voxy$tickTlnRem++;
                     this.tlnRemoveCallback.accept(val);
                 }
             }
@@ -669,7 +679,30 @@ public class AsyncNodeManager {
         this.addWork();
     }
 
+    public static volatile long voxy$submitGeoCalls = 0;
+    public static volatile long voxy$processGeoCalls = 0;
+    public static volatile long voxy$tickCalls = 0;
+    public static volatile long voxy$tickNullResults = 0;
+    public static volatile long voxy$tickTlnAdd = 0;
+    public static volatile long voxy$tickTlnRem = 0;
+    public static volatile long voxy$tickUploads = 0;
+    public static volatile long voxy$resultPublishes = 0;
+    private static long voxy$lastGeoLog = 0L;
+    private static void voxy$logGeo(String tag, AsyncNodeManager self) {
+        long n = System.currentTimeMillis();
+        if (n - voxy$lastGeoLog > 2000) {
+            voxy$lastGeoLog = n;
+            org.slf4j.LoggerFactory.getLogger("VoxyDiag").info(
+                "Geo[{}]: submit={} processGeo={} resPub={} tick={} tickNull={} tlnAdd={} tlnRem={} uploads={} qLen={} secCnt={}",
+                tag, voxy$submitGeoCalls, voxy$processGeoCalls, voxy$resultPublishes,
+                voxy$tickCalls, voxy$tickNullResults, voxy$tickTlnAdd, voxy$tickTlnRem, voxy$tickUploads,
+                self.geometryUpdateQueue.size(), ((BasicSectionGeometryData)self.geometryData).getSectionCount());
+        }
+    }
+
     private void submitGeometryResult(BuiltSection geometry) {
+        voxy$submitGeoCalls++;
+        voxy$logGeo("submit", this);
         if (!this.running) {
             geometry.free();
             return;
@@ -794,7 +827,18 @@ public class AsyncNodeManager {
         return this.workCounter.get()!=0 || RESULT_HANDLE.get(this) != null;
     }
 
+    private static long voxy$weLastLog = 0L;
+    private static long voxy$weCalls = 0L;
     public void worldEvent(WorldSection section, int flags, int neighborMask) {
+        voxy$weCalls++;
+        long __now = System.currentTimeMillis();
+        if (__now - voxy$weLastLog > 2000) {
+            voxy$weLastLog = __now;
+            org.slf4j.LoggerFactory.getLogger("VoxyDiag").info(
+                "AsyncNodeManager.worldEvent: calls={} workCounter={} usedGeom={}/{}MB sections={}",
+                voxy$weCalls, this.workCounter.get(), this.getUsedGeometryCapacity()/(1<<20),
+                this.getGeometryCapacity()/(1<<20), this.geometryData.getSectionCount());
+        }
         //If there is any change, we need to clear the geometry cache before emitting update
         this.geometryCache.clear(section.key);
 

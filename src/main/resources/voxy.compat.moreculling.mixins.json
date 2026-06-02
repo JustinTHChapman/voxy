@@ -1,0 +1,12 @@
+{
+  "required": false,
+  "package": "me.cortex.voxy.client.compat.moreculling.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "client": [
+    "MixinMoreCullingCullingUtils"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

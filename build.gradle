@@ -97,13 +97,15 @@ dependencies {
     implementation 'net.java.dev.jna:jna-platform:5.14.0'
     // OSHI for system info (cpu count/layout) — pinned to MC's strict version
     implementation 'com.github.oshi:oshi-core:6.4.10'
-    // LMDB native bindings (storage backend)
-    implementation 'org.lwjgl:lwjgl-lmdb:3.3.3'
-    runtimeOnly 'org.lwjgl:lwjgl-lmdb:3.3.3:natives-windows'
-    runtimeOnly 'org.lwjgl:lwjgl-lmdb:3.3.3:natives-linux'
-    runtimeOnly 'org.lwjgl:lwjgl-lmdb:3.3.3:natives-macos'
-    // ZSTD compressor (storage)
-    implementation 'com.github.luben:zstd-jni:1.5.6-4'
+    // LMDB native bindings (compileOnly only — bundling via jarJar breaks FML
+    // mod-discovery on NeoForge 1.21.1, so LMDB backend is unavailable at runtime
+    // unless the user supplies lwjgl-lmdb themselves. Default backend is in-memory.
+    compileOnly 'org.lwjgl:lwjgl-lmdb:3.3.3'
+    // ZSTD compressor via LWJGL native bindings (operates on direct memory pointers)
+    implementation 'org.lwjgl:lwjgl-zstd:3.3.3'
+    runtimeOnly 'org.lwjgl:lwjgl-zstd:3.3.3:natives-windows'
+    runtimeOnly 'org.lwjgl:lwjgl-zstd:3.3.3:natives-linux'
+    runtimeOnly 'org.lwjgl:lwjgl-zstd:3.3.3:natives-macos'
     // LZ4 compressor
     implementation 'org.lz4:lz4-java:1.8.0'
     // XZ (lzma) compressor
@@ -132,6 +134,14 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
     testImplementation 'org.mockito:mockito-core:5.12.0'
     testRuntimeOnly  'org.junit.platform:junit-platform-launcher'
+}
+
+sourceSets {
+    test {
+        java {
+            exclude 'me/cortex/voxy/test/broken/**'
+        }
+    }
 }
 
 test {

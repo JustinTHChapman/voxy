@@ -53,18 +53,11 @@ public class StorageConfigUtil {
     }
 
     public static SectionSerializationStorage.Config createDefaultSerializer() {
-        //Create the default config
-        var baseDB = new RocksDBStorageBackend.Config();
-
-        var compressor = new ZSTDCompressor.Config();
-        compressor.compressionLevel = 1;
-
-        var compression = new CompressionStorageAdaptor.Config();
-        compression.delegate = baseDB;
-        compression.compressor = compressor;
+        // Use SQLite backend — sqlite-jdbc is bundled via jarJar and persists data across world loads.
+        var baseDB = new me.cortex.voxy.common.config.storage.sqlite.SQLiteStorageBackend.Config();
 
         var serializer = new SectionSerializationStorage.Config();
-        serializer.storage = compression;
+        serializer.storage = baseDB;
 
         return serializer;
     }
