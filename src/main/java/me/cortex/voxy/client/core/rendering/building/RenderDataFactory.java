@@ -684,9 +684,11 @@ public class RenderDataFactory {
                             long meta = this.modelMan.getModelMetadataFromClientId(neighborModelId);
 
                             // Same-fluid culling: skip face between identical adjacent fluids.
-                            // Use raw model IDs (before getFluidClientStateId remapping) because
-                            // getFluidClientStateId is a stub that returns 0 for everything.
-                            if (ModelQueries.containsFluid(meta) && neighborModelId == aRawModelId) {
+                            // Use raw model IDs (before getFluidClientStateId remapping which is a stub).
+                            // Must check BOTH isFluid (pure water/lava) and containsFluid (waterlogged)
+                            // because pure fluid blocks have isFluid set, not containsFluid.
+                            boolean neighborHasFluid = ModelQueries.containsFluid(meta) || ModelQueries.isFluid(meta);
+                            if (neighborHasFluid && neighborModelId == aRawModelId) {
                                 this.blockMesher.skip(1);
                                 continue;
                             }
@@ -1329,8 +1331,10 @@ public class RenderDataFactory {
                             oki = false;
                         }
 
-                        // Same-fluid culling using raw model IDs
-                        if (ModelQueries.containsFluid(meta) && neighborModelId == aRawModelId) {
+                        // Same-fluid culling using raw model IDs.
+                        // Check isFluid||containsFluid: pure fluids use isFluid, waterlogged use containsFluid.
+                        boolean neighborHasFluid = ModelQueries.containsFluid(meta) || ModelQueries.isFluid(meta);
+                        if (neighborHasFluid && neighborModelId == aRawModelId) {
                             oki = false;
                         }
 
@@ -1402,8 +1406,10 @@ public class RenderDataFactory {
                             oki = false;
                         }
 
-                        // Same-fluid culling using raw model IDs
-                        if (ModelQueries.containsFluid(meta) && neighborModelId == aRawModelId) {
+                        // Same-fluid culling using raw model IDs.
+                        // Check isFluid||containsFluid: pure fluids use isFluid, waterlogged use containsFluid.
+                        boolean neighborHasFluid = ModelQueries.containsFluid(meta) || ModelQueries.isFluid(meta);
+                        if (neighborHasFluid && neighborModelId == aRawModelId) {
                             oki = false;
                         }
 
