@@ -15,7 +15,10 @@ import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.SectionPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
@@ -27,6 +30,7 @@ import java.util.Deque;
 import java.util.HashSet;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Background LOD auto-generation service.
@@ -49,7 +53,12 @@ public final class AutoGenerationService {
 
     private final PriorityQueue<long[]> candidateQueue =
             new PriorityQueue<>(Comparator.comparingLong(e -> e[0]));
-    private final Set<Long> submitted = new HashSet<>();
+    private final Set<Long> submitted    = new HashSet<>();
+    private final Set<Long> pendingLoad  = new HashSet<>();   // requested from server thread, not yet back
+
+    /** Chunks loaded by the server thread and ready to ingest on the client tick. */
+    private final ConcurrentLinkedDeque<LevelChunk> serverReadyChunks = new ConcurrentLinkedDeque<>();
+
     /** Chunks pending upload to server after local generation. */
     private final Deque<LevelChunk> uploadQueue = new ArrayDeque<>();
 
@@ -64,6 +73,8 @@ public final class AutoGenerationService {
     public void reset() {
         candidateQueue.clear();
         submitted.clear();
+        pendingLoad.clear();
+        serverReadyChunks.clear();
         uploadQueue.clear();
         lastPlayerCX = Integer.MIN_VALUE;
         lastPlayerCZ = Integer.MIN_VALUE;
@@ -93,29 +104,81 @@ public final class AutoGenerationService {
             rebuildQueue(playerCX, playerCZ);
         }
 
+        // Drain any chunks the server thread has finished loading
+        int drained = 0;
+        LevelChunk ready;
+        while ((ready = serverReadyChunks.poll()) != null) {
+            long k = colKey(ready.getPos().x, ready.getPos().z);
+            pendingLoad.remove(k);
+            if (!submitted.contains(k)) {
+                boolean ok = instance.getIngestService().enqueueIngest(engine, ready);
+                if (ok) {
+                    submitted.add(k);
+                    uploadQueue.addLast(ready);
+                    drained++;
+                }
+            }
+        }
+        if (drained > 0) {
+            Logger.info("[AutoGen] Ingested " + drained + " server-loaded chunk(s) near (" + playerCX + "," + playerCZ + ")");
+        }
+
+        // Integrated-server reference (null on dedicated server or when not yet ready)
+        var iServer = mc.getSingleplayerServer();
+
         int rate = ServerConfigOverride.INSTANCE.effectiveGenerationRate();
         int generated = 0;
-        while (generated < rate && !candidateQueue.isEmpty()) {
+        int requested = 0;
+        while ((generated + requested) < rate && !candidateQueue.isEmpty()) {
             long[] entry = candidateQueue.poll();
             int cx = (int) entry[1];
             int cz = (int) entry[2];
             long colKey = colKey(cx, cz);
 
-            if (submitted.contains(colKey)) continue;
+            if (submitted.contains(colKey) || pendingLoad.contains(colKey)) continue;
 
+            // 1. Try client chunk cache first (chunks within vanilla render distance)
             LevelChunk chunk = mc.level.getChunkSource().getChunk(cx, cz, false);
-            if (chunk == null) continue;  // not loaded — skip for now, will retry next pass
+
+            if (chunk == null && iServer != null) {
+                // 2. Singleplayer: request the chunk from the integrated server asynchronously.
+                //    The server thread will force-load the chunk and put it in serverReadyChunks.
+                pendingLoad.add(colKey);
+                final int fcx = cx, fcz = cz;
+                final var dim = mc.level.dimension();
+                iServer.execute(() -> {
+                    try {
+                        ServerLevel sl = iServer.getLevel(dim);
+                        if (sl == null) { pendingLoad.remove(colKey(fcx, fcz)); return; }
+                        // getChunk with ChunkStatus.FULL and create=true forces the chunk to load.
+                        // On an already-generated world this is fast (just reads region file).
+                        var c = sl.getChunkSource().getChunk(fcx, fcz, ChunkStatus.FULL, true);
+                        if (c instanceof LevelChunk lc) {
+                            serverReadyChunks.addLast(lc);
+                        } else {
+                            pendingLoad.remove(colKey(fcx, fcz));
+                        }
+                    } catch (Exception e) {
+                        pendingLoad.remove(colKey(fcx, fcz));
+                    }
+                });
+                requested++;
+                continue;
+            }
+
+            if (chunk == null) continue; // dedicated server — nothing we can do client-side
 
             boolean ok = instance.getIngestService().enqueueIngest(engine, chunk);
             if (ok) {
                 submitted.add(colKey);
                 generated++;
-                uploadQueue.addLast(chunk);  // queue for server upload
+                uploadQueue.addLast(chunk);
             }
         }
 
-        if (generated > 0) {
-            Logger.info("[AutoGen] Generated " + generated + " chunk(s) near (" + playerCX + "," + playerCZ + ")");
+        if (generated > 0 || requested > 0) {
+            Logger.info("[AutoGen] generated=" + generated + " requested=" + requested
+                    + " pending=" + pendingLoad.size() + " near (" + playerCX + "," + playerCZ + ")");
         }
 
         // Upload client-generated sections to server (rate-limited)
