@@ -51,6 +51,7 @@ public record S2CLodSectionPacket(
         int sectionX,
         int sectionY,
         int sectionZ,
+        int contentHash,
         short lutSize,
         int[] vanillaBlockStateIds,
         String[] biomeRls,
@@ -73,6 +74,7 @@ public record S2CLodSectionPacket(
         buf.writeVarInt(pkt.sectionX());
         buf.writeVarInt(pkt.sectionY());
         buf.writeVarInt(pkt.sectionZ());
+        buf.writeInt(pkt.contentHash());
         buf.writeShort(pkt.lutSize());
         for (int i = 0; i < (pkt.lutSize() & 0xFFFF); i++) {
             buf.writeInt(pkt.vanillaBlockStateIds()[i]);
@@ -90,6 +92,7 @@ public record S2CLodSectionPacket(
         int x = buf.readVarInt();
         int y = buf.readVarInt();
         int z = buf.readVarInt();
+        int hash = buf.readInt();
         int lutSize = buf.readShort() & 0xFFFF;
         int[] vsIds = new int[lutSize];
         String[] brls = new String[lutSize];
@@ -103,7 +106,7 @@ public record S2CLodSectionPacket(
         for (int i = 0; i < DATA_SIZE; i++) {
             indices[i] = buf.readShort();
         }
-        return new S2CLodSectionPacket(dimId, x, y, z, (short) lutSize, vsIds, brls, lts, indices);
+        return new S2CLodSectionPacket(dimId, x, y, z, hash, (short) lutSize, vsIds, brls, lts, indices);
     }
 
     // ---- factory (server-side) ------------------------------------------
@@ -160,7 +163,17 @@ public record S2CLodSectionPacket(
             lts[ei] = (byte) light;
             ei++;
         }
-        return new S2CLodSectionPacket(dimensionId, vs.x, vs.y, vs.z, (short) lutSize, vsIds, brls, lts, indices);
+        // Compute a wire-stable hash over the LUT + indices so manifest comparison works
+        // cross-server (both sides encode via vanilla block-state IDs, so hash is stable).
+        int hash = 1;
+        for (int i = 0; i < lutSize; i++) {
+            hash = 31 * hash + vsIds[i];
+            hash = 31 * hash + brls[i].hashCode();
+            hash = 31 * hash + (lts[i] & 0xFF);
+        }
+        for (short idx : indices) hash = 31 * hash + Short.toUnsignedInt(idx);
+
+        return new S2CLodSectionPacket(dimensionId, vs.x, vs.y, vs.z, hash, (short) lutSize, vsIds, brls, lts, indices);
     }
 
     // ---- handler (client-side) ------------------------------------------

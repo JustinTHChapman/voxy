@@ -50,7 +50,9 @@ public class SaveLoadSystem3 {
         long blockPtr = ptr; ptr += WorldSection.SECTION_VOLUME*2;
         long prev = data[0]; MemoryUtil.memPutLong(ptr, prev); ptr+=8; LUT.put(prev, (short) 0);
         short mapping = 0;
+        int hash = 1;
         for (long block : data) {
+            hash = 31 * hash + (int)(block ^ (block >>> 32));
             if (prev != block) {
                 prev = block;
                 mapping = LUT.putIfAbsent(block, (short) LUT.size());
@@ -65,14 +67,13 @@ public class SaveLoadSystem3 {
             throw new IllegalStateException();
         }
 
-        //TODO: note! can actually have the first (last?) byte of metadata be the storage version!
         long metadata = 0;
-        metadata |= Integer.toUnsignedLong(LUT.size());//Bottom 2 bytes
-        metadata |= Byte.toUnsignedLong(section.getNonEmptyChildren())<<16;//Next byte
-        //5 bytes free
+        metadata |= Integer.toUnsignedLong(LUT.size());                    // bits 0-15:  LUT entry count
+        metadata |= Byte.toUnsignedLong(section.getNonEmptyChildren())<<16;// bits 16-23: nonEmptyChildren
+        metadata |= Integer.toUnsignedLong(hash) << 24;                    // bits 24-55: content hash
+        section.contentHash = hash;
 
         MemoryUtil.memPutLong(metadataPtr, metadata);
-        //TODO: do hash
 
         return buffer.subSize(ptr-buffer.address);//Does not get freed
     }
@@ -89,6 +90,7 @@ public class SaveLoadSystem3 {
 
         final long metadata = MemoryUtil.memGetLong(ptr); ptr += 8;
         section.nonEmptyChildren = (byte) ((metadata>>>16)&0xFF);
+        section.contentHash = (int)(metadata >>> 24);
         final long lutBasePtr = ptr + WorldSection.SECTION_VOLUME * 2;
 
         final var blockData = section.data;

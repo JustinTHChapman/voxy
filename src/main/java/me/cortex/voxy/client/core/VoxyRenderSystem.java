@@ -321,6 +321,8 @@ public class VoxyRenderSystem {
             while (this.renderDistanceTracker.setCenterAndProcess(viewport.cameraX, viewport.cameraZ) && VoxyClient.isFrexActive());//While FF is active, run until everything is processed
             // Force at least one process call even when frex inactive (the while-loop short-circuits otherwise the check is only done once)
             if (this.renderDistanceTracker.setCenterAndProcess(viewport.cameraX, viewport.cameraZ)) voxy$ropProcessedTrue++;
+            // Update render-gen priority with current player position (level-4 section coords = 512-block units)
+            this.renderGen.setPlayerCenter(((int) viewport.cameraX) >> 9, ((int) viewport.cameraZ) >> 9);
             TimingStatistics.H.start();
             //Done here as is allows less gl state resetup
             do { this.modelService.tick(900_000); } while (VoxyClient.isFrexActive() && !this.modelService.areQueuesEmpty());

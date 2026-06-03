@@ -1,9 +1,17 @@
 package me.cortex.voxy.server;
 
+import me.cortex.voxy.common.config.VoxyCommonConfig;
+import me.cortex.voxy.common.network.C2SLodSectionPacket;
+import me.cortex.voxy.common.network.C2SRequestSectionsPacket;
 import me.cortex.voxy.common.network.S2CLodSectionPacket;
+import me.cortex.voxy.common.network.S2CManifestPacket;
+import me.cortex.voxy.common.network.S2CServerConfigPacket;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.neoforged.neoforge.event.level.ChunkWatchEvent;
@@ -27,7 +35,8 @@ public class VoxyServer {
 
     private static final ServerLodTracker TRACKER = new ServerLodTracker();
 
-    public VoxyServer(IEventBus modBus) {
+    public VoxyServer(IEventBus modBus, ModContainer modContainer) {
+        modContainer.registerConfig(ModConfig.Type.SERVER, VoxyCommonConfig.SERVER_SPEC);
         // Register the network payload on the server side so it can be sent
         modBus.addListener(VoxyServer::registerPayloads);
 
@@ -42,6 +51,22 @@ public class VoxyServer {
         final PayloadRegistrar registrar = event.registrar("voxy");
         registrar.playToClient(S2CLodSectionPacket.TYPE, S2CLodSectionPacket.STREAM_CODEC,
                 (pkt, ctx) -> { /* server never receives this packet */ });
+        registrar.playToClient(S2CServerConfigPacket.TYPE, S2CServerConfigPacket.STREAM_CODEC,
+                (pkt, ctx) -> { /* server never receives this packet */ });
+        registrar.playToClient(S2CManifestPacket.TYPE, S2CManifestPacket.STREAM_CODEC,
+                (pkt, ctx) -> { /* server never receives this packet */ });
+        registrar.playToServer(C2SRequestSectionsPacket.TYPE, C2SRequestSectionsPacket.STREAM_CODEC,
+                (pkt, ctx) -> {
+                    if (ctx.player() instanceof net.minecraft.server.level.ServerPlayer sp) {
+                        TRACKER.onClientRequest(sp, pkt.sectionPositions());
+                    }
+                });
+        registrar.playToServer(C2SLodSectionPacket.TYPE, C2SLodSectionPacket.STREAM_CODEC,
+                (pkt, ctx) -> {
+                    if (ctx.player() instanceof net.minecraft.server.level.ServerPlayer sp) {
+                        TRACKER.onClientUpload(sp, pkt);
+                    }
+                });
     }
 
     private static void onChunkSent(ChunkWatchEvent.Sent event) {
@@ -54,6 +79,12 @@ public class VoxyServer {
 
     private static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer sp) {
+            PacketDistributor.sendToPlayer(sp, new S2CServerConfigPacket(
+                    VoxyCommonConfig.LOD_CHUNKS_PER_TICK.get(),
+                    VoxyCommonConfig.LOD_GENERATION_RATE_CAP.get(),
+                    VoxyCommonConfig.AUTO_GENERATION_ENABLED_SERVER.get(),
+                    VoxyCommonConfig.LOD_RADIUS_MAX.get()
+            ));
             TRACKER.onPlayerJoin(sp);
         }
     }

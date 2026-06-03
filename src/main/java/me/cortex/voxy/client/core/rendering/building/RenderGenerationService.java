@@ -27,6 +27,16 @@ public class RenderGenerationService {
 
     public static final AtomicInteger MESH_FAILED_COUNTER = new AtomicInteger();
     private static final AtomicInteger COUNTER = new AtomicInteger();
+    /** Player center in level-4 section coordinates (512-block units). Updated each frame. */
+    private volatile int playerCX = 0;
+    private volatile int playerCZ = 0;
+
+    /** Update the player position used for distance-based priority (level-4 section coords). */
+    public void setPlayerCenter(int cx, int cz) {
+        this.playerCX = cx;
+        this.playerCZ = cz;
+    }
+
     private static final class BuildTask {
         WorldSection section;
         final long position;
@@ -38,11 +48,21 @@ public class RenderGenerationService {
         private BuildTask(long position) {
             this.position = position;
         }
-        private void updatePriority() {
+        private void updatePriority(int playerCX, int playerCZ) {
             int unique = COUNTER.incrementAndGet();
-            int lvl = WorldEngine.MAX_LOD_LAYER-WorldEngine.getLevel(this.position);
-            lvl = Math.min(lvl, 3);//Make the 2 highest quality have equal priority
-            this.priority = (((lvl*3L + Math.min(this.attempts, 3))*2 + this.addin) <<32) + Integer.toUnsignedLong(unique);
+            int rawLvl = WorldEngine.getLevel(this.position);
+            int lvl = WorldEngine.MAX_LOD_LAYER - rawLvl;
+            lvl = Math.min(lvl, 3); // make the 2 highest-quality levels share the same bucket
+
+            // Convert section coords to level-4 equivalent for distance comparison
+            int secX = WorldEngine.getX(this.position) >> (4 - rawLvl);
+            int secZ = WorldEngine.getZ(this.position) >> (4 - rawLvl);
+            int cheb = Math.max(Math.abs(secX - playerCX), Math.abs(secZ - playerCZ));
+            // 8 distance buckets: 0 = right next to player, 7 = far away
+            int distBucket = Math.min(cheb >> 2, 7);
+
+            // Closer sections beat farther ones; within same distance, higher quality beats lower
+            this.priority = (((long) distBucket * 4 + (3 - lvl) * 1L) << 32) + Integer.toUnsignedLong(unique);
             this.addin = 0;
         }
     }
@@ -274,7 +294,7 @@ public class RenderGenerationService {
                     shouldFreeSection = false;
                 }
 
-                task.updatePriority();
+                task.updatePriority(this.playerCX, this.playerCZ);
                 this.taskQueue.add(task);
                 this.taskQueueCount.incrementAndGet();
 
@@ -317,7 +337,7 @@ public class RenderGenerationService {
         if (isOurs[0]) {//If its not ours we dont care about it
             diag$enqueueOurs++;
             //Set priority and insert into queue and execute
-            task.updatePriority();
+            task.updatePriority(this.playerCX, this.playerCZ);
             this.taskQueue.add(task);
             this.taskQueueCount.incrementAndGet();
             this.service.execute();

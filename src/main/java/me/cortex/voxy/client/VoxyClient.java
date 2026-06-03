@@ -1,15 +1,25 @@
 package me.cortex.voxy.client;
 
+import me.cortex.voxy.client.core.generation.AutoGenerationService;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.config.VoxyCommonConfig;
+import me.cortex.voxy.common.network.C2SLodSectionPacket;
+import me.cortex.voxy.common.network.C2SRequestSectionsPacket;
 import me.cortex.voxy.common.network.S2CLodSectionPacket;
+import me.cortex.voxy.common.network.S2CManifestPacket;
+import me.cortex.voxy.common.network.S2CServerConfigPacket;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
@@ -24,15 +34,29 @@ public class VoxyClient {
     private static final HashSet<String> FREX = new HashSet<>();
     private static FileLock EXCLUSIVE_LOCK;
 
-    public VoxyClient(IEventBus modBus) {
+    public VoxyClient(IEventBus modBus, ModContainer modContainer) {
+        modContainer.registerConfig(ModConfig.Type.CLIENT, VoxyCommonConfig.CLIENT_SPEC);
         modBus.addListener(this::onClientSetup);
         modBus.addListener(VoxyClient::registerPayloads);
+        NeoForge.EVENT_BUS.addListener(VoxyClient::onClientTick);
+    }
+
+    private static void onClientTick(ClientTickEvent.Post event) {
+        AutoGenerationService.INSTANCE.tick();
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
         final PayloadRegistrar registrar = event.registrar("voxy");
         registrar.playToClient(S2CLodSectionPacket.TYPE, S2CLodSectionPacket.STREAM_CODEC,
                 S2CLodSectionPacket::handle);
+        registrar.playToClient(S2CServerConfigPacket.TYPE, S2CServerConfigPacket.STREAM_CODEC,
+                S2CServerConfigPacket::handle);
+        registrar.playToClient(S2CManifestPacket.TYPE, S2CManifestPacket.STREAM_CODEC,
+                S2CManifestPacket::handle);
+        registrar.playToServer(C2SRequestSectionsPacket.TYPE, C2SRequestSectionsPacket.STREAM_CODEC,
+                (pkt, ctx) -> { /* clients never receive this packet */ });
+        registrar.playToServer(C2SLodSectionPacket.TYPE, C2SLodSectionPacket.STREAM_CODEC,
+                (pkt, ctx) -> { /* clients never receive this packet */ });
     }
 
     private void onClientSetup(FMLClientSetupEvent event) {

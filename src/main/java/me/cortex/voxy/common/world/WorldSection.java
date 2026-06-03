@@ -58,6 +58,12 @@ public final class WorldSection {
     final ActiveSectionTracker tracker;
     volatile boolean inSaveQueue;
     volatile boolean isDirty;
+    // CRC-style hash of the voxel data array, computed by SaveLoadSystem3 on serialize/deserialize.
+    // 0 means "not yet hashed". Used to skip saves when data is unchanged and for network deduplication.
+    public volatile int contentHash;
+    // True when the local player has modified this section (placed/broke blocks).
+    // Server-pushed updates must not overwrite a user-modified section.
+    public volatile boolean userModified;
 
     //When the first bit is set it means its loaded
     @SuppressWarnings("all")
