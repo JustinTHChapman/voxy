@@ -1,6 +1,9 @@
 package me.cortex.voxy.client;
 
+import me.cortex.voxy.client.config.ServerConfigOverride;
 import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.client.core.generation.AutoGenerationService;
+import me.cortex.voxy.client.sync.ManifestSyncHandler;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 
 public class ClientSessionEvents {
@@ -24,6 +27,9 @@ public class ClientSessionEvents {
         if (!inSession) throw new IllegalStateException("Cannot end a session while not in a session");
         inSession = false;
 
+        ServerConfigOverride.INSTANCE.reset();
+        ManifestSyncHandler.INSTANCE.reset();
+        AutoGenerationService.INSTANCE.reset();
         VoxyCommon.shutdownInstance();
     }
 }

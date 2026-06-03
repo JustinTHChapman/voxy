@@ -2,7 +2,10 @@ package me.cortex.voxy.server;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.InMemoryMappingStorage;
+import me.cortex.voxy.common.config.VoxyCommonConfig;
+import me.cortex.voxy.common.network.C2SLodSectionPacket;
 import me.cortex.voxy.common.network.S2CLodSectionPacket;
+import me.cortex.voxy.common.network.S2CManifestPacket;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
@@ -32,8 +35,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class ServerLodTracker {
 
-    /** Maximum LOD section packets sent to a single player per server tick. */
-    private static final int SECTIONS_PER_TICK = 16;
+    private static int sectionsPerTick() {
+        return VoxyCommonConfig.LOD_CHUNKS_PER_TICK.get();
+    }
 
     // Per-dimension state
     private static final class DimState {
@@ -52,18 +56,69 @@ public class ServerLodTracker {
 
     public void onPlayerJoin(ServerPlayer player) {
         playerQueues.put(player, new ArrayDeque<>());
-        // Queue all already-voxelized sections for this player
+
+        if (!VoxyCommonConfig.LOD_SEND_ON_JOIN.get()) return;
+
+        // Send a manifest so the client can do delta sync (only request what it's missing)
         String dimId = player.serverLevel().dimension().location().toString();
         DimState state = dims.get(dimId);
-        if (state != null) {
-            Deque<S2CLodSectionPacket> q = playerQueues.get(player);
-            if (q != null) {
-                for (S2CLodSectionPacket[] pkts : state.sectionCache.values()) {
-                    for (S2CLodSectionPacket p : pkts) {
-                        if (p != null) q.addLast(p);
-                    }
+        if (state == null) return;
+
+        // Collect (position, hash) for all cached sections
+        var positions = new java.util.ArrayList<Long>();
+        var hashes    = new java.util.ArrayList<Integer>();
+        for (var entry : state.sectionCache.entrySet()) {
+            S2CLodSectionPacket[] pkts = entry.getValue();
+            if (pkts == null) continue;
+            for (S2CLodSectionPacket p : pkts) {
+                if (p == null) continue;
+                // Encode the section position as a WorldEngine key for the manifest
+                long posKey = me.cortex.voxy.common.world.WorldEngine.getWorldSectionId(
+                        0, p.sectionX(), p.sectionY(), p.sectionZ());
+                positions.add(posKey);
+                hashes.add(p.contentHash());
+            }
+        }
+
+        // Send in batches
+        int total = positions.size();
+        for (int start = 0; start < Math.max(total, 1); start += S2CManifestPacket.MAX_ENTRIES_PER_PACKET) {
+            int end     = Math.min(start + S2CManifestPacket.MAX_ENTRIES_PER_PACKET, total);
+            boolean fin = end >= total;
+            long[] posArr  = new long[end - start];
+            int[]  hashArr = new int[end - start];
+            for (int i = 0; i < posArr.length; i++) {
+                posArr[i]  = positions.get(start + i);
+                hashArr[i] = hashes.get(start + i);
+            }
+            PacketDistributor.sendToPlayer(player, new S2CManifestPacket(fin, posArr, hashArr));
+            if (fin) break;
+        }
+        Logger.info("[VoxyServer] Sent manifest of " + total + " sections to " + player.getGameProfile().getName());
+    }
+
+    /** Called when a client requests specific sections by position key. */
+    public void onClientRequest(ServerPlayer player, long[] sectionPositions) {
+        String dimId = player.serverLevel().dimension().location().toString();
+        DimState state = dims.get(dimId);
+        if (state == null) return;
+        Deque<S2CLodSectionPacket> q = playerQueues.get(player);
+        if (q == null) return;
+
+        int maxQueue = VoxyCommonConfig.MAX_TRANSFER_QUEUE_PER_CLIENT.get();
+        for (long posKey : sectionPositions) {
+            if (q.size() >= maxQueue) break;
+            int lvl = me.cortex.voxy.common.world.WorldEngine.getLevel(posKey);
+            int cx  = me.cortex.voxy.common.world.WorldEngine.getX(posKey);
+            int cy  = me.cortex.voxy.common.world.WorldEngine.getY(posKey);
+            int cz  = me.cortex.voxy.common.world.WorldEngine.getZ(posKey);
+            // Find matching cached packets for this chunk column
+            long colKey = columnKey(cx, cz);
+            S2CLodSectionPacket[] pkts = state.sectionCache.get(colKey);
+            if (pkts != null) {
+                for (S2CLodSectionPacket p : pkts) {
+                    if (p != null && p.sectionY() == cy) q.addLast(p);
                 }
-                Logger.info("[VoxyServer] Queued " + q.size() + " LOD sections for " + player.getGameProfile().getName());
             }
         }
     }
@@ -78,7 +133,7 @@ public class ServerLodTracker {
             ServerPlayer player = entry.getKey();
             Deque<S2CLodSectionPacket> queue = entry.getValue();
             int sent = 0;
-            while (sent < SECTIONS_PER_TICK && !queue.isEmpty()) {
+            while (sent < sectionsPerTick() && !queue.isEmpty()) {
                 S2CLodSectionPacket pkt = queue.pollFirst();
                 if (pkt != null) {
                     PacketDistributor.sendToPlayer(player, pkt);
@@ -155,6 +210,66 @@ public class ServerLodTracker {
         } catch (Exception e) {
             Logger.warn("[VoxyServer] Failed to voxelize chunk " + chunk.getPos() + ": " + e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Called when a client uploads a client-generated LOD section.
+     * Deduplicates by contentHash, stores in the cache if new, and
+     * queues the update for all other players in the same dimension.
+     */
+    public void onClientUpload(ServerPlayer uploader, C2SLodSectionPacket pkt) {
+        if (!VoxyCommonConfig.AUTO_GENERATION_ENABLED_SERVER.get()) return;
+
+        String dimId = uploader.serverLevel().dimension().location().toString();
+        DimState state = dims.computeIfAbsent(dimId, k -> new DimState());
+        long colKey = columnKey(pkt.sectionX(), pkt.sectionZ());
+
+        // Build an equivalent S2C packet so it can slot into the existing cache/queue system
+        S2CLodSectionPacket s2c = new S2CLodSectionPacket(
+                pkt.dimensionId(), pkt.sectionX(), pkt.sectionY(), pkt.sectionZ(),
+                pkt.contentHash(), pkt.lutSize(), pkt.vanillaBlockStateIds(),
+                pkt.biomeRls(), pkt.lights(), pkt.indices());
+
+        S2CLodSectionPacket[] cached = state.sectionCache.get(colKey);
+        if (cached != null) {
+            // Check if any section at this Y already has the same hash — if so, discard
+            for (S2CLodSectionPacket existing : cached) {
+                if (existing != null && existing.sectionY() == pkt.sectionY()
+                        && existing.contentHash() == pkt.contentHash()) {
+                    return; // identical — discard
+                }
+            }
+        }
+
+        // Store the new section in the cache (replace the entry for this Y level)
+        if (cached == null) {
+            cached = new S2CLodSectionPacket[]{s2c};
+        } else {
+            var list = new java.util.ArrayList<S2CLodSectionPacket>(java.util.Arrays.asList(cached));
+            boolean replaced = false;
+            for (int i = 0; i < list.size(); i++) {
+                if (list.get(i) != null && list.get(i).sectionY() == pkt.sectionY()) {
+                    list.set(i, s2c);
+                    replaced = true;
+                    break;
+                }
+            }
+            if (!replaced) list.add(s2c);
+            cached = list.toArray(new S2CLodSectionPacket[0]);
+        }
+        state.sectionCache.put(colKey, cached);
+
+        // Broadcast to all other players in this dimension
+        final S2CLodSectionPacket toSend = s2c;
+        for (var entry : playerQueues.entrySet()) {
+            ServerPlayer other = entry.getKey();
+            if (other == uploader) continue;
+            if (!other.serverLevel().dimension().location().toString().equals(dimId)) continue;
+            Deque<S2CLodSectionPacket> q = entry.getValue();
+            if (q != null && q.size() < VoxyCommonConfig.MAX_TRANSFER_QUEUE_PER_CLIENT.get()) {
+                q.addLast(toSend);
+            }
         }
     }
 
