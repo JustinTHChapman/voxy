@@ -8,9 +8,15 @@ import net.minecraft.client.renderer.block.BlockModelShaper;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.BakedModel;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -91,6 +97,9 @@ public class ModelFactory {
     // Pending biome colour GPU uploads (queued from any thread, drained on render thread)
     private record BiomePendingUpdate(int biomeModelIndex, int voxyBiomeId, int argbColor) {}
     private final ConcurrentLinkedDeque<BiomePendingUpdate> pendingBiomeUploads = new ConcurrentLinkedDeque<>();
+    // Biomes whose registry lookup failed (connection not yet ready); retried each frame.
+    private record PendingBiome(String name, int id) {}
+    private final ConcurrentLinkedDeque<PendingBiome> pendingBiomeLookups = new ConcurrentLinkedDeque<>();
 
     private int nextModelId = 1;
     private int bakedCount = 0;
@@ -136,9 +145,18 @@ public class ModelFactory {
     public void addBiome(Mapper.BiomeEntry biome) {
         if (biome == null || biome.biome == null) return;
         Biome mcBiome = lookupBiome(biome.biome);
-        if (mcBiome == null) return;
-        int voxyBiomeId = biome.id;
+        if (mcBiome == null) {
+            // Connection not ready yet — retry on the render thread via processUploads().
+            this.pendingBiomeLookups.add(new PendingBiome(biome.biome, biome.id));
+            return;
+        }
+        registerBiome(biome.biome, biome.id, mcBiome);
+    }
+
+    private void registerBiome(String name, int voxyBiomeId, Biome mcBiome) {
+        if (this.registeredBiomes.containsKey(voxyBiomeId)) return;
         this.registeredBiomes.put(voxyBiomeId, mcBiome);
+        DIAG.info("addBiome: registered biome='{}' id={} totalRegistered={}", name, voxyBiomeId, this.registeredBiomes.size());
         // Queue GPU colour uploads for all already-baked biome-dependent models.
         for (int modelId = 1; modelId < this.nextModelId; modelId++) {
             int biomeIdx = this.modelBiomeIndex[modelId];
@@ -159,6 +177,21 @@ public class ModelFactory {
 
     /** Render-thread: drains the bake queue and uploads textures to the GPU atlas. */
     public void processUploads() {
+        // Retry biomes whose lookup failed earlier (connection was not ready at addBiome time).
+        if (!this.pendingBiomeLookups.isEmpty()) {
+            var retry = new java.util.ArrayList<PendingBiome>();
+            PendingBiome pb;
+            while ((pb = this.pendingBiomeLookups.poll()) != null) retry.add(pb);
+            for (PendingBiome p : retry) {
+                Biome mcBiome = lookupBiome(p.name());
+                if (mcBiome != null) {
+                    registerBiome(p.name(), p.id(), mcBiome);
+                } else {
+                    this.pendingBiomeLookups.add(p); // still not ready; try again next frame
+                }
+            }
+        }
+
         // Drain pending biome colour uploads (queued from addBiome on any thread).
         BiomePendingUpdate biomeUpdate;
         while ((biomeUpdate = this.pendingBiomeUploads.poll()) != null) {
@@ -194,8 +227,9 @@ public class ModelFactory {
         long now = System.currentTimeMillis();
         if (now - this.diagLastLog > 2000) {
             this.diagLastLog = now;
-            DIAG.info("ModelFactory: totalBaked={} failed={} queueSize={} nextModelId={} bakedCount={} sampleMeta(1)=0x{} sampleMeta(23)=0x{}",
+            DIAG.info("ModelFactory: totalBaked={} failed={} queueSize={} nextModelId={} bakedCount={} biomeModels={} registeredBiomes={} sampleMeta(1)=0x{} sampleMeta(23)=0x{}",
                     this.diagTotalBaked, this.diagFailed, this.bakeQueue.size(), this.nextModelId, this.bakedCount,
+                    this.nextBiomeModelIndex, this.registeredBiomes.size(),
                     Long.toHexString(this.metadataCache.length>1?this.metadataCache[1]:0L),
                     Long.toHexString(this.metadataCache.length>23?this.metadataCache[23]:0L));
         }
@@ -268,12 +302,32 @@ public class ModelFactory {
                 if (!anyTinted) {
                     anyTinted = true;
                     try {
-                        int rgb = mc.getBlockColors().getColor(state, null, null, picked.getTintIndex());
-                        if (rgb == -1) {
-                            // -1 = biome-dependent colour (grass, foliage, etc.)
+                        // Use a sentinel BlockAndTintGetter: if getBlockTint() is called,
+                        // the block's color is biome-dependent (grass, foliage, etc.).
+                        boolean[] biomeDep = {false};
+                        final BlockState capturedState = state;
+                        int rgb = mc.getBlockColors().getColor(state, new BlockAndTintGetter() {
+                            @Override public float getShade(Direction dir, boolean shade) { return 1.0f; }
+                            @Override public LevelLightEngine getLightEngine() { return null; }
+                            @Override public int getBlockTint(BlockPos p, ColorResolver resolver) {
+                                biomeDep[0] = true;
+                                return 0;
+                            }
+                            @Override public BlockEntity getBlockEntity(BlockPos p) { return null; }
+                            @Override public BlockState getBlockState(BlockPos p) { return capturedState; }
+                            @Override public FluidState getFluidState(BlockPos p) { return capturedState.getFluidState(); }
+                            @Override public int getHeight() { return 384; }
+                            @Override public int getMinBuildHeight() { return -64; }
+                        }, BlockPos.ZERO, picked.getTintIndex());
+                        if (biomeDep[0]) {
+                            // getBlockTint was invoked → color varies by biome
                             tintIsBiomeDependent = true;
                             tint = 0xFFFFFFFF; // overridden by biome LUT
-                        } else {
+                            if (this.nextBiomeModelIndex < 10) {
+                                DIAG.info("bakeBlock: BIOME-DEP detected block={} modelId={} registeredBiomes={}",
+                                        state.getBlock().getDescriptionId(), modelId, this.registeredBiomes.size());
+                            }
+                        } else if (rgb != -1) {
                             tint = 0xFF000000 | (rgb & 0xFFFFFF);
                         }
                     } catch (Throwable t) {
@@ -480,12 +534,20 @@ public class ModelFactory {
     /** Looks up the MC Biome from a voxy biome resource-location string. */
     private static Biome lookupBiome(String biomeName) {
         try {
-            var conn = Minecraft.getInstance().getConnection();
-            if (conn == null) return null;
-            var registry = conn.registryAccess().registry(Registries.BIOME).orElse(null);
-            if (registry == null) return null;
-            var rl = ResourceLocation.tryParse(biomeName);
-            return rl == null ? null : registry.get(rl);
+            ResourceLocation rl = ResourceLocation.tryParse(biomeName);
+            if (rl == null) return null;
+            Minecraft mc = Minecraft.getInstance();
+            // Try connection registry (multiplayer / integrated server).
+            if (mc.getConnection() != null) {
+                var reg = mc.getConnection().registryAccess().registry(Registries.BIOME).orElse(null);
+                if (reg != null) { Biome b = reg.get(rl); if (b != null) return b; }
+            }
+            // Fallback: level registry (available once world is loaded).
+            if (mc.level != null) {
+                var reg = mc.level.registryAccess().registry(Registries.BIOME).orElse(null);
+                if (reg != null) { Biome b = reg.get(rl); if (b != null) return b; }
+            }
+            return null;
         } catch (Throwable t) {
             return null;
         }
