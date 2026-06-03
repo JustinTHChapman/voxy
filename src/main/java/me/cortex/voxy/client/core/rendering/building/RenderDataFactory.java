@@ -45,6 +45,12 @@ public class RenderDataFactory {
     private final int[] fluidMasks = new int[32*32];//Used to separately mesh fluids, allowing for fluid + blockstate
 
 
+    // Tracks which neighbor sections have no LOD data (empty/ungenerated).
+    // Index: 0=-x, 1=+x, 2=-y, 3=+y, 4=-z, 5=+z
+    // Used to cull horizontal boundary faces so underground terrain isn't visible
+    // across the border between loaded and unloaded LOD sections.
+    private final boolean[] neighborSectionEmpty = new boolean[6];
+
     //TODO: emit directly to memory buffer instead of long arrays
 
     //Each axis gets a max quad count of 2^16 (65536 quads) since that is the max the basic geometry manager can handle
@@ -305,8 +311,10 @@ public class RenderDataFactory {
 
     private void acquireNeighborData(WorldSection section, int msk) {
         //TODO: fixme!!! its probably more efficent to just access the raw section array on demand instead of copying it
+        Arrays.fill(this.neighborSectionEmpty, false);
         if ((msk&1)!=0) {//-x
             var sec = this.world.acquire(section.lvl, section.x - 1, section.y, section.z);
+            this.neighborSectionEmpty[0] = sec.getNonEmptyBlockCount() == 0;
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
@@ -316,6 +324,7 @@ public class RenderDataFactory {
         }
         if ((msk&2)!=0) {//+x
             var sec = this.world.acquire(section.lvl, section.x + 1, section.y, section.z);
+            this.neighborSectionEmpty[1] = sec.getNonEmptyBlockCount() == 0;
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
@@ -345,6 +354,7 @@ public class RenderDataFactory {
 
         if ((msk&16)!=0) {//-z
             var sec = this.world.acquire(section.lvl, section.x, section.y, section.z - 1);
+            this.neighborSectionEmpty[4] = sec.getNonEmptyBlockCount() == 0;
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
@@ -354,6 +364,7 @@ public class RenderDataFactory {
         }
         if ((msk&32)!=0) {//+z
             var sec = this.world.acquire(section.lvl, section.x, section.y, section.z + 1);
+            this.neighborSectionEmpty[5] = sec.getNonEmptyBlockCount() == 0;
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
@@ -497,6 +508,15 @@ public class RenderDataFactory {
 
                         int neighborIdx = ((axis+1)*32*32 * 2)+(side)*32*32;
                         long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
+
+                        // Cull Z-side faces when the neighboring section has no LOD data,
+                        // preventing underground terrain from being visible at LOD boundaries.
+                        int neighborDir = neighborIdx / (32*32);
+                        if (neighborDir >= 4 && neighborSectionEmpty[neighborDir]) {
+                            this.blockMesher.skip(1);
+                            continue;
+                        }
+
                         long A = this.sectionData[idx * 2];
                         long selfMeta = this.sectionData[idx * 2 +1];
 
@@ -661,6 +681,12 @@ public class RenderDataFactory {
                         int neighborIdx = ((axis+1)*32*32 * 2)+(side)*32*32;
                         long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
 
+                        int neighborDir = neighborIdx / (32*32);
+                        if (neighborDir >= 4 && neighborSectionEmpty[neighborDir]) {
+                            this.blockMesher.skip(1);
+                            continue;
+                        }
+
                         long A = this.sectionData[idx * 2];
                         long Am = this.sectionData[idx * 2 + 1];
 
@@ -820,6 +846,13 @@ public class RenderDataFactory {
 
                         int neighborIdx = ((axis+1)*32*32 * 2)+(side)*32*32;
                         long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
+
+                        int neighborDir = neighborIdx / (32*32);
+                        if (neighborDir >= 4 && neighborSectionEmpty[neighborDir]) {
+                            this.blockMesher.skip(1);
+                            this.seondaryblockMesher.skip(1);
+                            continue;
+                        }
 
                         long A = this.sectionData[idx * 2];
                         long Am = this.sectionData[idx * 2 + 1];
@@ -1080,8 +1113,8 @@ public class RenderDataFactory {
                 int msk = this.opaqueMasks[i];
                 if ((msk & 1) != 0) {//-x
                     long neighborId = this.neighboringFaces[i];
-                    boolean oki = true;
-                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                    boolean oki = !neighborSectionEmpty[0];
+                    if (oki && Mapper.getBlockId(neighborId) != 0) {//Not air
                         long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
                         if (ModelQueries.isFullyOpaque(meta)) {
                             oki = false;
@@ -1106,8 +1139,8 @@ public class RenderDataFactory {
 
                 if ((msk & (1<<31)) != 0) {//+x
                     long neighborId = this.neighboringFaces[i+32*32];
-                    boolean oki = true;
-                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                    boolean oki = !neighborSectionEmpty[1];
+                    if (oki && Mapper.getBlockId(neighborId) != 0) {//Not air
                         long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
                         if (ModelQueries.isFullyOpaque(meta)) {
                             oki = false;
@@ -1302,7 +1335,7 @@ public class RenderDataFactory {
                 int msk = this.fluidMasks[i];
                 if ((msk & 1) != 0) {//-x
                     long neighborId = this.neighboringFaces[i];
-                    boolean oki = true;
+                    boolean oki = !neighborSectionEmpty[0];
 
                     int sidx = (i<<5) * 2;
                     long A = this.sectionData[sidx];
@@ -1378,7 +1411,7 @@ public class RenderDataFactory {
 
                 if ((msk & (1<<31)) != 0) {//+x
                     long neighborId = this.neighboringFaces[i+32*32];
-                    boolean oki = true;
+                    boolean oki = !neighborSectionEmpty[1];
 
 
                     int sidx = (i*32+31) * 2;
@@ -1609,46 +1642,53 @@ public class RenderDataFactory {
                 int i = y*32+z;
                 int msk = this.nonOpaqueMasks[i];
                 if ((msk & 1) != 0) {//-x
-                    long neighborId = this.neighboringFaces[i];
-                    //TODO also check self occlusion
+                    if (neighborSectionEmpty[0]) {
+                        skipA++;
+                    } else {
+                        long neighborId = this.neighboringFaces[i];
+                        //TODO also check self occlusion
 
-                    int sidx = (i<<5) * 2;
-                    long A = this.sectionData[sidx];
-                    long Am = this.sectionData[sidx + 1];
+                        int sidx = (i<<5) * 2;
+                        long A = this.sectionData[sidx];
+                        long Am = this.sectionData[sidx + 1];
 
-                    int modelId = 0;
-                    long nM = 0;
-                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
-                        modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
-                        nM = this.modelMan.getModelMetadataFromClientId(modelId);
+                        int modelId = 0;
+                        long nM = 0;
+                        if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                            modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                            nM = this.modelMan.getModelMetadataFromClientId(modelId);
+                        }
+
+                        nnx.skip(skipA);
+                        npx.skip(skipA); skipA = 0;
+
+                        dualMeshNonOpaqueOuterX(0, A, Am, modelId, Mapper.getLightId(neighborId), nM, this.sectionData[sidx+2], this.sectionData[sidx+3], nnx, npx);
                     }
-
-                    nnx.skip(skipA);
-                    npx.skip(skipA); skipA = 0;
-
-                    dualMeshNonOpaqueOuterX(0, A, Am, modelId, Mapper.getLightId(neighborId), nM, this.sectionData[sidx+2], this.sectionData[sidx+3], nnx, npx);
                 } else {skipA++;}
 
                 if ((msk & (1<<31)) != 0) {//+x
-                    long neighborId = this.neighboringFaces[i+32*32];
-                    //TODO also check self occlusion
+                    if (neighborSectionEmpty[1]) {
+                        skipB++;
+                    } else {
+                        long neighborId = this.neighboringFaces[i+32*32];
+                        //TODO also check self occlusion
 
+                        int sidx = (i*32+31) * 2;
+                        long A = this.sectionData[sidx];
+                        long Am = this.sectionData[sidx + 1];
 
-                    int sidx = (i*32+31) * 2;
-                    long A = this.sectionData[sidx];
-                    long Am = this.sectionData[sidx + 1];
+                        int modelId = 0;
+                        long nM = 0;
+                        if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                            modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
+                            nM = this.modelMan.getModelMetadataFromClientId(modelId);
+                        }
 
-                    int modelId = 0;
-                    long nM = 0;
-                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
-                        modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
-                        nM = this.modelMan.getModelMetadataFromClientId(modelId);
+                        pnx.skip(skipB);
+                        ppx.skip(skipB); skipB = 0;
+
+                        dualMeshNonOpaqueOuterX(1, A, Am, modelId, Mapper.getLightId(neighborId), nM, this.sectionData[sidx-2], this.sectionData[sidx-1], ppx, pnx);
                     }
-
-                    pnx.skip(skipB);
-                    ppx.skip(skipB); skipB = 0;
-
-                    dualMeshNonOpaqueOuterX(1, A, Am, modelId, Mapper.getLightId(neighborId), nM, this.sectionData[sidx-2], this.sectionData[sidx-1], ppx, pnx);
                 } else {skipB++;}
             }
             nnx.skip(skipA);
