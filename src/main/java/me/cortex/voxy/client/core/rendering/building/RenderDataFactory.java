@@ -681,12 +681,6 @@ public class RenderDataFactory {
                         int neighborIdx = ((axis+1)*32*32 * 2)+(side)*32*32;
                         long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
 
-                        int neighborDir = neighborIdx / (32*32);
-                        if (neighborDir >= 4 && neighborSectionEmpty[neighborDir]) {
-                            this.blockMesher.skip(1);
-                            continue;
-                        }
-
                         long A = this.sectionData[idx * 2];
                         long Am = this.sectionData[idx * 2 + 1];
 
@@ -1335,7 +1329,7 @@ public class RenderDataFactory {
                 int msk = this.fluidMasks[i];
                 if ((msk & 1) != 0) {//-x
                     long neighborId = this.neighboringFaces[i];
-                    boolean oki = !neighborSectionEmpty[0];
+                    boolean oki = true;
 
                     int sidx = (i<<5) * 2;
                     long A = this.sectionData[sidx];
@@ -1411,7 +1405,7 @@ public class RenderDataFactory {
 
                 if ((msk & (1<<31)) != 0) {//+x
                     long neighborId = this.neighboringFaces[i+32*32];
-                    boolean oki = !neighborSectionEmpty[1];
+                    boolean oki = true;
 
 
                     int sidx = (i*32+31) * 2;
