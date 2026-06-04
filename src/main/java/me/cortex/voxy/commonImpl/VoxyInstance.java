@@ -224,6 +224,7 @@ public abstract class VoxyInstance {
     public void shutdown() {
         Logger.info("Shutting down voxy instance");
         this.isRunning = false;
+        this.worldCleaner.interrupt(); // wake immediately instead of waiting up to 1 s
         try {
             this.worldCleaner.join();
         } catch (InterruptedException e) {
