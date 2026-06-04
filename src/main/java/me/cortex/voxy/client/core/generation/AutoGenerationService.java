@@ -131,6 +131,10 @@ public final class AutoGenerationService {
         int rate = ServerConfigOverride.INSTANCE.effectiveGenerationRate();
         int generated = 0;
         int requested = 0;
+        // Entries that couldn't be processed this tick (server-load cap) are deferred and
+        // re-added after the loop so they don't get polled again in the same iteration.
+        java.util.List<long[]> deferred = null;
+
         while ((generated + requested) < rate && !candidateQueue.isEmpty()) {
             long[] entry = candidateQueue.poll();
             int cx = (int) entry[1];
@@ -146,8 +150,10 @@ public final class AutoGenerationService {
                 // 2. Singleplayer: request the chunk from the integrated server asynchronously.
                 //    Cap outstanding requests so we don't flood the server thread with disk I/O.
                 if (pendingLoad.size() >= MAX_PENDING_SERVER_LOADS) {
-                    candidateQueue.add(entry); // return to queue before stopping
-                    break;
+                    // Defer this entry; continue scanning for client-cache candidates.
+                    if (deferred == null) deferred = new java.util.ArrayList<>();
+                    deferred.add(entry);
+                    continue;
                 }
                 pendingLoad.add(colKey);
                 final int fcx = cx, fcz = cz;
@@ -179,8 +185,16 @@ public final class AutoGenerationService {
                 submitted.add(colKey);
                 generated++;
                 uploadQueue.addLast(chunk);
+            } else {
+                // Lighting not ready yet; defer to end of loop so this tick can still
+                // process other candidates.  Don't add to submitted — no LOD data yet.
+                if (deferred == null) deferred = new java.util.ArrayList<>();
+                deferred.add(entry);
             }
         }
+
+        // Return server-load-capped entries to the queue after the loop.
+        if (deferred != null) deferred.forEach(candidateQueue::add);
 
         if (generated > 0 || requested > 0) {
             Logger.info("[AutoGen] generated=" + generated + " requested=" + requested
