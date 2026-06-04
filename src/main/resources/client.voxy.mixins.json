@@ -12,8 +12,7 @@
     "minecraft.MixinFogRenderer",
     "minecraft.MixinGPUSelect",
     "minecraft.MixinLevelRenderer",
-    "minecraft.MixinMinecraft",
-    "minecraft.MixinLightTexture"
+    "minecraft.MixinMinecraft"
   ],
   "injectors": {
     "defaultRequire": 1
