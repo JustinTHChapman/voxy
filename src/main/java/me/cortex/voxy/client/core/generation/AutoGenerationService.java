@@ -47,7 +47,7 @@ public final class AutoGenerationService {
     public static final AutoGenerationService INSTANCE = new AutoGenerationService();
 
     /** How many chunks to scan ahead into the pending queue each rebuild. */
-    private static final int SCAN_BATCH = 512;
+    private static final int SCAN_BATCH = 16;
     /** Rebuild the candidate queue when the player moves more than this many chunks. */
     private static final int REBUILD_THRESHOLD_CHUNKS = 4;
     /** Max outstanding server-thread chunk requests. Prevents flooding the integrated server. */
@@ -70,6 +70,9 @@ public final class AutoGenerationService {
     private int lastPlayerCX = Integer.MIN_VALUE;
     private int lastPlayerCZ = Integer.MIN_VALUE;
 
+    /** Chebyshev chunk radius of farthest successfully submitted chunk — used for fog. */
+    private volatile int estimatedLoadedChunkRadius = 0;
+
     private AutoGenerationService() {}
 
     public void reset() {
@@ -80,6 +83,12 @@ public final class AutoGenerationService {
         uploadQueue.clear();
         lastPlayerCX = Integer.MIN_VALUE;
         lastPlayerCZ = Integer.MIN_VALUE;
+        estimatedLoadedChunkRadius = 0;
+    }
+
+    /** Block radius (in world units) of the farthest successfully generated chunk from the player. */
+    public float getEstimatedLoadedBlockRadius() {
+        return estimatedLoadedChunkRadius * 16f;
     }
 
     /** Called once per client tick from the NeoForge ClientTickEvent listener. */
@@ -121,6 +130,8 @@ public final class AutoGenerationService {
                     submitted.add(k);
                     uploadQueue.addLast(ready);
                     drained++;
+                    int d = Math.max(Math.abs(ready.getPos().x - playerCX), Math.abs(ready.getPos().z - playerCZ));
+                    if (d > estimatedLoadedChunkRadius) estimatedLoadedChunkRadius = d;
                 }
             }
         }
@@ -186,6 +197,8 @@ public final class AutoGenerationService {
                 submitted.add(colKey);
                 generated++;
                 uploadQueue.addLast(chunk);
+                int d = Math.max(Math.abs(cx - playerCX), Math.abs(cz - playerCZ));
+                if (d > estimatedLoadedChunkRadius) estimatedLoadedChunkRadius = d;
             }
             // If enqueueIngest returns false (lighting not ready), the entry is dropped
             // from the queue.  It will be re-added on the next rebuildQueue() call when
