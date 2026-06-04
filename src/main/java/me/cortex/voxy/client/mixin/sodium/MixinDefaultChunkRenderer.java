@@ -3,6 +3,7 @@ package me.cortex.voxy.client.mixin.sodium;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
+import me.cortex.voxy.client.core.generation.AutoGenerationService;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.VoxyFogParameters;
 import me.cortex.voxy.client.core.util.IrisUtil;
@@ -57,10 +58,12 @@ public abstract class MixinDefaultChunkRenderer {
             viewport = renderer.getViewport();
         } else {
             float[] fogColor = RenderSystem.getShaderFogColor();
-            // start = vanilla render distance so nearby LOD sections have no fog;
-            // end   = Voxy LOD distance so the far edge fades out completely.
-            float fogStart = VoxyRenderSystem.getRenderDistance();
-            float fogEnd   = me.cortex.voxy.client.config.VoxyConfig.CONFIG.sectionRenderDistance * 32f * 16f;
+            float vanillaRD = VoxyRenderSystem.getRenderDistance();
+            // Fog end tracks the farthest generated chunk, so it always sits right at
+            // the actual LOD frontier rather than the theoretical max LOD distance.
+            float loadedBlockRadius = AutoGenerationService.INSTANCE.getEstimatedLoadedBlockRadius();
+            float fogEnd   = Math.max(vanillaRD * 1.5f, loadedBlockRadius);
+            float fogStart = Math.max(vanillaRD, fogEnd * 0.7f);
             var fogParams = new VoxyFogParameters(fogColor[0], fogColor[1], fogColor[2], fogStart, fogEnd, 0);
             viewport = renderer.setupViewport(matrices.projection(), matrices.modelView(), fogParams, camera.x, camera.y, camera.z);
         }
