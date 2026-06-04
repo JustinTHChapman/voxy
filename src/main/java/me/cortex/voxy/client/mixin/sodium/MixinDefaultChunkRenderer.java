@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.mixin.sodium;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.client.core.rendering.Viewport;
@@ -55,7 +56,10 @@ public abstract class MixinDefaultChunkRenderer {
         if (IrisUtil.irisShaderPackEnabled()) {
             viewport = renderer.getViewport();
         } else {
-            viewport = renderer.setupViewport(matrices.projection(), matrices.modelView(), VoxyFogParameters.NONE, camera.x, camera.y, camera.z);
+            var fogColor = RenderSystem.getShaderFogColor();
+            var fogParams = new VoxyFogParameters(fogColor.x, fogColor.y, fogColor.z,
+                    RenderSystem.getShaderFogStart(), RenderSystem.getShaderFogEnd(), 0);
+            viewport = renderer.setupViewport(matrices.projection(), matrices.modelView(), fogParams, camera.x, camera.y, camera.z);
         }
         renderer.renderOpaque(viewport);
         voxy$renderCount++;
