@@ -29,7 +29,7 @@ public class ModelStore {
     public ModelStore() {
         // GL_DYNAMIC_STORAGE_BIT is required to allow glNamedBufferSubData updates at runtime.
         this.modelBuffer = new GlBuffer(MODEL_SIZE * (1<<16), GL_DYNAMIC_STORAGE_BIT).name("ModelData");
-        this.modelColourBuffer = new GlBuffer(4 * (1<<16), GL_DYNAMIC_STORAGE_BIT).name("ModelColour");
+        this.modelColourBuffer = new GlBuffer(4 * 512 * 512, GL_DYNAMIC_STORAGE_BIT).name("ModelColour");
         this.textures = RenderResourceReuse.getOrCreateModelStoreTextureAtlas();
 
         //Limit the mips of the texture to match that of the terrain atlas
