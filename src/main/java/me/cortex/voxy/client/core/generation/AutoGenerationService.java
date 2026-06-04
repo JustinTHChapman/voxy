@@ -50,6 +50,8 @@ public final class AutoGenerationService {
     private static final int SCAN_BATCH = 512;
     /** Rebuild the candidate queue when the player moves more than this many chunks. */
     private static final int REBUILD_THRESHOLD_CHUNKS = 4;
+    /** Max outstanding server-thread chunk requests. Prevents flooding the integrated server. */
+    private static final int MAX_PENDING_SERVER_LOADS = 4;
 
     private final PriorityQueue<long[]> candidateQueue =
             new PriorityQueue<>(Comparator.comparingLong(e -> e[0]));
@@ -142,7 +144,11 @@ public final class AutoGenerationService {
 
             if (chunk == null && iServer != null) {
                 // 2. Singleplayer: request the chunk from the integrated server asynchronously.
-                //    The server thread will force-load the chunk and put it in serverReadyChunks.
+                //    Cap outstanding requests so we don't flood the server thread with disk I/O.
+                if (pendingLoad.size() >= MAX_PENDING_SERVER_LOADS) {
+                    candidateQueue.add(entry); // return to queue before stopping
+                    break;
+                }
                 pendingLoad.add(colKey);
                 final int fcx = cx, fcz = cz;
                 final var dim = mc.level.dimension();
