@@ -155,6 +155,21 @@ test {
     }
 }
 
+// Copies the built jar into your local Prism instance mods folder.
+// Usage: ./gradlew deployLocal
+// Override path with -Pprism_instance_mods="C:/path/to/mods"
+tasks.register('deployLocal', Copy) {
+    def modsDir = project.findProperty('prism_instance_mods') ?:
+        "${System.getenv('APPDATA')}/PrismLauncher/instances/World of Titans/.minecraft/mods"
+    dependsOn jar
+    from(jar.archiveFile)
+    into(modsDir)
+    rename { 'voxy.jar' }
+    doLast {
+        println "Deployed to: ${modsDir}/voxy.jar"
+    }
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release = 21
