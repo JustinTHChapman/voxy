@@ -269,6 +269,7 @@ public class ModelFactory {
         boolean[] facePresent   = new boolean[6];
         boolean[] faceAllOpaque = new boolean[6];
         boolean[] faceTinted    = new boolean[6];
+        float[]   faceDepths    = new float[6];   // depth indentation per face (0 = no offset)
 
         for (int faceIdx = 0; faceIdx < 6; faceIdx++) {
             Direction dir = FACE_DIRS[faceIdx];
@@ -282,19 +283,35 @@ public class ModelFactory {
             } else {
                 this.random.setSeed(42L);
                 List<BakedQuad> nullQuads = model.getQuads(state, null, this.random);
-                if (nullQuads != null && (hasAnyDirectionalQuad || isPureFluid)) {
-                    // Cross-plant/sprite-only models have no directional quads.
-                    // Their null quads are diagonal geometry (e.g. Direction.NORTH on a fern)
-                    // that must not map to cube faces — guard both loops with this check.
+                if (nullQuads != null) {
                     for (BakedQuad q : nullQuads) {
                         if (q.getDirection() == dir) { picked = q; break; }
                     }
-                    if (picked == null && !nullQuads.isEmpty())
+                    // Only fall back to the first null quad for non-cross-plant models.
+                    // Cross-plant quads have N/S/E/W directions but no UP/DOWN, so those
+                    // faces end up blank naturally — exactly what we want (sides show, top doesn't).
+                    if (picked == null && !nullQuads.isEmpty() && (hasAnyDirectionalQuad || isPureFluid))
                         picked = nullQuads.get(0);
                 }
             }
 
-            if (picked != null) sprite = picked.getSprite();
+            if (picked != null) {
+                sprite = picked.getSprite();
+                // Extract face depth from vertex positions (for partial-height blocks like snow/slabs).
+                // DefaultVertexFormat.BLOCK: 8 ints/vertex, position at offsets 0(x),1(y),2(z).
+                try {
+                    int[] verts = picked.getVertices();
+                    if (verts.length == 32) {
+                        int coordIdx = (faceIdx >> 1) == 0 ? 1 : ((faceIdx >> 1) == 1 ? 2 : 0); // Y, Z, X
+                        float sum = 0;
+                        for (int v = 0; v < 4; v++) sum += Float.intBitsToFloat(verts[v * 8 + coordIdx]);
+                        float coord = sum / 4.0f;
+                        // Positive-normal faces (UP/SOUTH/EAST, face&1==1): depth = 1-coord.
+                        // Negative-normal faces (DOWN/NORTH/WEST, face&1==0): depth = coord.
+                        faceDepths[faceIdx] = ((faceIdx & 1) == 1) ? (1.0f - coord) : coord;
+                    }
+                } catch (Exception ignored) {}
+            }
             // Don't fall back to particle icon for cross-plant/sprite-only models;
             // they should be invisible in LOD rather than rendered as solid cubes.
             if (sprite == null && (hasAnyDirectionalQuad || isPureFluid)) {
@@ -425,7 +442,7 @@ public class ModelFactory {
         this.tintCache[modelId] = resolvedColourTint;
 
         // Upload BlockModel struct to modelBuffer (SSBO binding 3).
-        uploadBlockModelStruct(modelId, state, facePresent, faceAllOpaque, faceTinted, resolvedColourTint, biomeLUTFlag);
+        uploadBlockModelStruct(modelId, state, facePresent, faceAllOpaque, faceTinted, faceDepths, resolvedColourTint, biomeLUTFlag);
     }
 
     /**
@@ -449,13 +466,14 @@ public class ModelFactory {
      *   bits[24..25] = tintState (0=none, 1=partial, 2=always)
      */
     private void uploadBlockModelStruct(int modelId, BlockState state,
-            boolean[] facePresent, boolean[] faceAllOpaque, boolean[] faceTinted, int colourTint, int extraFlagsA) {
+            boolean[] facePresent, boolean[] faceAllOpaque, boolean[] faceTinted, float[] faceDepths,
+            int colourTint, int extraFlagsA) {
         this.modelBuf.clear();
 
         // faceData[6] — 24 bytes
         for (int i = 0; i < 6; i++) {
             if (facePresent[i]) {
-                // Full-face bounds: start=0, end=15 for both axes.
+                // Full-face UV bounds: start=0, end=15 for both axes.
                 int faceData = 0x0000F0F0;
                 if (!faceAllOpaque[i]) {
                     // Has semi-transparent pixels: enable alpha cutout.
@@ -463,6 +481,10 @@ public class ModelFactory {
                 }
                 int tintState = faceTinted[i] ? 2 : 0; // 2 = always tint
                 faceData |= (tintState << 24);
+                // Depth indentation (bits 16-21): encodes face position for partial-height blocks.
+                // 0 = face flush with block edge; higher values push the face inward.
+                int encDepth = Math.min((int) Math.round(faceDepths[i] * 64.0f), 63);
+                faceData |= (encDepth << 16);
                 this.modelBuf.putInt(faceData);
             } else {
                 // Face missing: shader won't generate quads for it (metadata byte = 0xFF).
