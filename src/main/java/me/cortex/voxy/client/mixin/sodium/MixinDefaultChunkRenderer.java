@@ -56,9 +56,12 @@ public abstract class MixinDefaultChunkRenderer {
         if (IrisUtil.irisShaderPackEnabled()) {
             viewport = renderer.getViewport();
         } else {
-            var fogColor = RenderSystem.getShaderFogColor();
-            var fogParams = new VoxyFogParameters(fogColor.x, fogColor.y, fogColor.z,
-                    RenderSystem.getShaderFogStart(), RenderSystem.getShaderFogEnd(), 0);
+            float[] fogColor = RenderSystem.getShaderFogColor();
+            // start = vanilla render distance so nearby LOD sections have no fog;
+            // end   = Voxy LOD distance so the far edge fades out completely.
+            float fogStart = VoxyRenderSystem.getRenderDistance();
+            float fogEnd   = me.cortex.voxy.client.config.VoxyConfig.CONFIG.sectionRenderDistance * 32f * 16f;
+            var fogParams = new VoxyFogParameters(fogColor[0], fogColor[1], fogColor[2], fogStart, fogEnd, 0);
             viewport = renderer.setupViewport(matrices.projection(), matrices.modelView(), fogParams, camera.x, camera.y, camera.z);
         }
         renderer.renderOpaque(viewport);

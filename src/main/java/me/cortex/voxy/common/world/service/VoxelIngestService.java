@@ -202,6 +202,43 @@ public class VoxelIngestService {
         return true;
     }
 
+    /**
+     * Ingest a server-side LevelChunk without the LIGHT_AND_DATA gate.
+     * The normal enqueueIngest() checks getDebugSectionType() on the chunk's light engine;
+     * for chunks loaded from the integrated server and accessed on the client thread, the
+     * server's LightingProvider may not report LIGHT_AND_DATA even for properly-lit chunks,
+     * causing all server-loaded sections to be silently dropped.  This method bypasses that
+     * gate and directly reads whatever lighting data the server has.
+     */
+    public boolean enqueueIngestServer(WorldEngine engine, LevelChunk chunk) {
+        if (!this.service.isLive()) return false;
+        if (!engine.isLive()) throw new IllegalStateException("Tried inserting chunk into WorldEngine that was not alive");
+        engine.markActive();
+
+        var blp = chunk.getLevel().getLightEngine().getLayerListener(LightLayer.BLOCK);
+        var slp = chunk.getLevel().getLightEngine().getLayerListener(LightLayer.SKY);
+
+        int i = chunk.getMinSection() - 1;
+        for (var section : chunk.getSections()) {
+            i++;
+            if (section == null) continue;
+            var pos = SectionPos.of(chunk.getPos(), i);
+            DataLayer bl = blp.getDataLayerData(pos);
+            DataLayer sl = slp.getDataLayerData(pos);
+            if (bl != null) bl = bl.copy();
+            if (sl != null) sl = sl.copy();
+            engine.markActive();
+            this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));
+            try {
+                this.service.execute();
+            } catch (Exception e) {
+                Logger.error("Executing had an error: assume shutting down, aborting", e);
+                break;
+            }
+        }
+        return true;
+    }
+
     public int getTaskCount() {
         return this.service.numJobs();
     }
