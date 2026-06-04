@@ -84,9 +84,9 @@ public class ModelFactory {
     private final int[] tintCache = new int[1 << 16];
 
     // Biome colour LUT: modelColourBuffer layout is [biomeModelIndex * BIOME_STRIDE + voxyBiomeId] = ARGB.
-    // BIOME_STRIDE=512 matches the 9-bit biome field; MAX_BIOME_MODELS * 512 = 65536 = full colourBuffer.
+    // BIOME_STRIDE=512 matches the 9-bit biome field; MAX_BIOME_MODELS * 512 * 4 bytes = 1MB colourBuffer.
     private static final int BIOME_STRIDE = 512;
-    private static final int MAX_BIOME_MODELS = 128;
+    private static final int MAX_BIOME_MODELS = 512;
     // modelId -> index into the biome table (-1 = not biome-dependent)
     private final int[] modelBiomeIndex = new int[1 << 16];
     // modelId -> color type: 1=grass, 2=foliage, 3=water
@@ -282,14 +282,14 @@ public class ModelFactory {
             } else {
                 this.random.setSeed(42L);
                 List<BakedQuad> nullQuads = model.getQuads(state, null, this.random);
-                if (nullQuads != null) {
+                if (nullQuads != null && (hasAnyDirectionalQuad || isPureFluid)) {
+                    // Cross-plant/sprite-only models have no directional quads.
+                    // Their null quads are diagonal geometry (e.g. Direction.NORTH on a fern)
+                    // that must not map to cube faces — guard both loops with this check.
                     for (BakedQuad q : nullQuads) {
                         if (q.getDirection() == dir) { picked = q; break; }
                     }
-                    // Only fall back to the first null quad if this block actually has
-                    // directional quads (i.e. is not a cross-plant model). Cross-plant
-                    // null quads are diagonal geometry that maps to no real cube face.
-                    if (picked == null && !nullQuads.isEmpty() && (hasAnyDirectionalQuad || isPureFluid))
+                    if (picked == null && !nullQuads.isEmpty())
                         picked = nullQuads.get(0);
                 }
             }

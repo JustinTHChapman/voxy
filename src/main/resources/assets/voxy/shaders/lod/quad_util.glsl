@@ -39,7 +39,11 @@ uint makeQuadFlags(uint faceData, uint modelId, ivec2 quadSize, const in BlockMo
     uint flags = 0;
 
     flags |= modelId<<16;//Model id
-    flags |= (uint(quadSize.x-1)<<8)|(uint(quadSize.y-1)<<12);//quad size
+    // For axis==2 (EAST/WEST, face>>1==2), quadSize.x=Y-span and .y=Z-span.
+    // Our UV maps U→Z-direction (using .y span) and V→Y-direction (using .x span),
+    // so swap the tile counts here to keep the fragment bounds-check consistent.
+    ivec2 quadSizeForFlags = ((face>>1u)==2u) ? quadSize.yx : quadSize;
+    flags |= (uint(quadSizeForFlags.x-1)<<8)|(uint(quadSizeForFlags.y-1)<<12);//quad size
 
     {//Cuttout
         flags |= faceHasAlphaCuttout(faceData);
@@ -89,7 +93,9 @@ uvec3 makeRemainingAttributes(const in BlockModel model, const in Quad quad, uin
 
     vec4 tinting = getLighting(lighting);
 
-    uint conditionalTinting = 0;
+    // Default to 0xFFFFFFFF (white multiply = no tint). If we leave it as 0 (black),
+    // blocks whose biome LUT slot ran out (colourTint==uint(-1)) render completely black.
+    uint conditionalTinting = 0xFFFFFFFFu;
     if (tintColour != uint(-1)) {
         conditionalTinting = tintColour;
     }
@@ -160,6 +166,11 @@ vec4 getQuadCornerPos(in QuadData quad, uint cornerId) {
 
 #ifndef USE_NV_BARRY
 vec2 getCornerUV(const in QuadData quad, uint cornerId) {
+    if (quad.axis == 2u) {
+        // axis==2 (EAST/WEST): swizzelDataAxis returns data.zxy, so cornerMask.x→world Y, cornerMask.y→world Z.
+        // U must map to Z (horizontal) with the Z-span size (.y), V to Y (vertical) with the Y-span size (.x).
+        return quad.uvCorner + vec2(quad.quadSizeAddin.y * (cornerId&1u), quad.quadSizeAddin.x * ((cornerId>>1)&1u));
+    }
     return quad.uvCorner + quad.quadSizeAddin*vec2((cornerId>>1)&1u, cornerId&1u);
 }
 #endif
