@@ -252,6 +252,19 @@ public class ModelFactory {
         boolean canOcclude = state.canOcclude();
         int lightEmission = Math.min(15, state.getLightEmission());
 
+        // Fluid detection needed before the face loop for sprite-selection guards.
+        boolean isPureFluid = state.getBlock() instanceof LiquidBlock;
+
+        // Pre-scan: does this model have ANY directional (face-culled) quads?
+        // Cross-plant / sprite-only models (flowers, short grass, etc.) have none.
+        // Those must not be rendered as solid cubes — all faces must be marked missing.
+        boolean hasAnyDirectionalQuad = false;
+        for (int fIdx = 0; fIdx < 6; fIdx++) {
+            this.random.setSeed(42L);
+            List<BakedQuad> fq = model.getQuads(state, FACE_DIRS[fIdx], this.random);
+            if (fq != null && !fq.isEmpty()) { hasAnyDirectionalQuad = true; break; }
+        }
+
         // Per-face tracking for modelBuffer upload.
         boolean[] facePresent   = new boolean[6];
         boolean[] faceAllOpaque = new boolean[6];
@@ -273,12 +286,18 @@ public class ModelFactory {
                     for (BakedQuad q : nullQuads) {
                         if (q.getDirection() == dir) { picked = q; break; }
                     }
-                    if (picked == null && !nullQuads.isEmpty()) picked = nullQuads.get(0);
+                    // Only fall back to the first null quad if this block actually has
+                    // directional quads (i.e. is not a cross-plant model). Cross-plant
+                    // null quads are diagonal geometry that maps to no real cube face.
+                    if (picked == null && !nullQuads.isEmpty() && (hasAnyDirectionalQuad || isPureFluid))
+                        picked = nullQuads.get(0);
                 }
             }
 
             if (picked != null) sprite = picked.getSprite();
-            if (sprite == null) {
+            // Don't fall back to particle icon for cross-plant/sprite-only models;
+            // they should be invisible in LOD rather than rendered as solid cubes.
+            if (sprite == null && (hasAnyDirectionalQuad || isPureFluid)) {
                 try { sprite = model.getParticleIcon(); } catch (Throwable ignored) {}
             }
 
@@ -353,7 +372,6 @@ public class ModelFactory {
         if (anyTinted)  modelFlags |= 0b00000001; // biomeColoured (we don't have a LUT; just const tint)
 
         // Fluid detection: pure fluid block (water, lava) vs waterlogged block
-        boolean isPureFluid = state.getBlock() instanceof LiquidBlock;
         boolean isWaterlogged = (!isPureFluid)
                 && state.hasProperty(BlockStateProperties.WATERLOGGED)
                 && state.getValue(BlockStateProperties.WATERLOGGED);
@@ -501,7 +519,9 @@ public class ModelFactory {
         boolean allOpaque = true;
         this.faceBuf.clear();
         for (int y = 0; y < MODEL_TEXTURE_SIZE; y++) {
-            int srcY = (y * sh) / MODEL_TEXTURE_SIZE;
+            // Flip Y: GL textures have row 0 at the bottom, MC sprites have row 0 at the top.
+            // Without the flip, side-face textures (e.g. grass_block_side) appear upside-down.
+            int srcY = ((MODEL_TEXTURE_SIZE - 1 - y) * sh) / MODEL_TEXTURE_SIZE;
             for (int x = 0; x < MODEL_TEXTURE_SIZE; x++) {
                 int srcX = (x * sw) / MODEL_TEXTURE_SIZE;
                 int abgr;
