@@ -92,7 +92,7 @@ public class VoxyCommonConfig {
 
         AUTO_GENERATION_RATE = cb
                 .comment("Target LOD sections to auto-generate per tick. Server may enforce a lower cap.")
-                .defineInRange("auto_generation_rate", 4, 1, 32);
+                .defineInRange("auto_generation_rate", 2, 1, 32);
 
         LOD_RADIUS = cb
                 .comment("LOD render radius in sections. Server may enforce a lower maximum.")
