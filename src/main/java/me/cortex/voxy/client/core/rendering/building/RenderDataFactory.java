@@ -377,8 +377,10 @@ public class RenderDataFactory {
     private static final long LM = (0xFFL<<55);
 
     private static boolean shouldMeshNonOpaqueBlockFace(int face, long quad, long meta, long neighborQuad, long neighborMeta) {
-        // Always cull faces between same-model blocks (removes Z-fighting on ice, stained glass, etc.)
-        if (!DISABLE_CULL_SAME_OCCLUDES && ((quad^neighborQuad)&(0xFFFFL<<26))==0) return false;
+        // Cull same-model faces only for translucent blocks (ice, glass, stained glass).
+        // Non-translucent partial-height blocks (snow layers, slabs) must keep their faces
+        // so the block visible through the height gap above them isn't missing.
+        if (!DISABLE_CULL_SAME_OCCLUDES && ModelQueries.isTranslucent(meta) && ((quad^neighborQuad)&(0xFFFFL<<26))==0) return false;
         if (!ModelQueries.faceExists(meta, face)) return false;//Dont mesh if no face
         if (ModelQueries.faceCanBeOccluded(meta, face)) //TODO: maybe enable this
           if (ModelQueries.faceOccludes(neighborMeta, face^1)) return false;
@@ -857,8 +859,8 @@ public class RenderDataFactory {
                         if (Mapper.getBlockId(neighborId) != 0) {//Not air
                             int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
 
-                            if (modelId == ((A>>26)&0xFFFF)) {
-                                // Same block model at section boundary — cull outward face (prevents Z-fighting on ice etc.)
+                            if (ModelQueries.isTranslucent(Am) && modelId == ((A>>26)&0xFFFF)) {
+                                // Cull same-model outward face for translucent blocks (ice/glass Z-fighting at section boundary).
                                 fail = true;
                             } else {
                                 long meta = this.modelMan.getModelMetadataFromClientId(modelId);
@@ -872,8 +874,8 @@ public class RenderDataFactory {
                         long nB = this.sectionData[(idx+skipAmount) * 2 + 1];
                         boolean failB = false;
 
-                        if ((nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {
-                            // Same block model on interior side — cull inward face
+                        if (ModelQueries.isTranslucent(Am) && (nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {
+                            // Cull same-model inward face for translucent blocks (ice/glass) at section boundary.
                             failB = true;
                         } else if (ModelQueries.faceOccludes(nB, (axis << 1) | (side))) {
                             failB = true;
