@@ -21,9 +21,6 @@ import net.minecraft.world.level.chunk.SingleValuePalette;
 import java.util.WeakHashMap;
 
 public class WorldConversionFactory {
-    // Lithium for NeoForge 1.21.1 does not expose LithiumHashPalette; back-port disabled.
-    private static final boolean LITHIUM_INSTALLED = false;
-
     private static final class Cache {
         private final int[] biomeCache = new int[4*4*4];
         private final WeakHashMap<Mapper, Reference2IntOpenHashMap<BlockState>> localMapping = new WeakHashMap<>();
@@ -43,10 +40,6 @@ public class WorldConversionFactory {
     //TODO: create a mapping for world/mapper -> local mapping
     private static final ThreadLocal<Cache> THREAD_LOCAL = ThreadLocal.withInitial(Cache::new);
 
-    private static boolean setupLithiumLocalPallet(Palette<BlockState> vp, Reference2IntOpenHashMap<BlockState> blockCache, Mapper mapper, int[] pc)  {
-        // Lithium back-port not wired on NeoForge 1.21.1
-        return false;
-    }
     private static int setupLocalPalette(Palette<BlockState> vp, Reference2IntOpenHashMap<BlockState> blockCache, Mapper mapper, int[] pc) {
         int c = vp.getSize();
         if (vp instanceof LinearPalette<BlockState>) {
@@ -92,8 +85,20 @@ public class WorldConversionFactory {
             }
             pc[0] = blockId;
         } else {
-            if (!(LITHIUM_INSTALLED && setupLithiumLocalPallet(vp, blockCache, mapper, pc))) {
-                throw new IllegalStateException("Unknown palette type: " + vp);
+            // Generic fallback for mod-replaced palettes (e.g. Lithium's LithiumHashPalette).
+            // All Palette implementations expose getSize() + valueFor(int), so we use those directly.
+            for (int i = 0; i < vp.getSize(); i++) {
+                BlockState state = null;
+                int blockId = -1;
+                try { state = vp.valueFor(i); } catch (Exception ignored) {}
+                if (state != null) {
+                    blockId = blockCache.getOrDefault(state, -1);
+                    if (blockId == -1) {
+                        blockId = mapper.getIdForBlockState(state);
+                        blockCache.put(state, blockId);
+                    }
+                }
+                pc[i] = blockId;
             }
         }
         return c;
