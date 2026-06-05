@@ -10,6 +10,8 @@ import me.cortex.voxy.common.util.cpu.CpuLayout;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.neoforged.fml.loading.FMLPaths;
 
+import com.google.gson.JsonObject;
+
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Modifier;
@@ -53,10 +55,22 @@ public class VoxyConfig {
             var path = getConfigPath();
             if (Files.exists(path)) {
                 try (FileReader reader = new FileReader(path.toFile())) {
-                    var conf = GSON.fromJson(reader, VoxyConfig.class);
-                    if (conf != null) {
-                        conf.save();
-                        return conf;
+                    // Load as JsonObject so we can fill in defaults for any fields
+                    // that are absent in the file (e.g. newly-added fields).  Gson
+                    // may use Unsafe allocation, which bypasses field-initialiser
+                    // defaults; merging against a freshly-constructed default config
+                    // ensures every field gets its intended value.
+                    JsonObject fileJson = GSON.fromJson(reader, JsonObject.class);
+                    if (fileJson != null) {
+                        JsonObject merged = GSON.toJsonTree(new VoxyConfig()).getAsJsonObject();
+                        for (var entry : fileJson.entrySet()) {
+                            merged.add(entry.getKey(), entry.getValue());
+                        }
+                        var conf = GSON.fromJson(merged, VoxyConfig.class);
+                        if (conf != null) {
+                            conf.save();
+                            return conf;
+                        }
                     } else {
                         Logger.error("Failed to load voxy config, resetting");
                     }
