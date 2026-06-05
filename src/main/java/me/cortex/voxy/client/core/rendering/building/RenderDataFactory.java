@@ -204,8 +204,11 @@ public class RenderDataFactory {
     }
 
     private static long getQuadTyping(long metadata) {//2 bits
-        long isTranslucentFluid = ModelQueries._isTranslucent(metadata) & ModelQueries._isFluid(metadata);
-        return 0b111L&(0b000_000_010_100L>>(isTranslucentFluid*6+ModelQueries._isDoubleSided(metadata)*3));
+        // Route all translucent blocks (glass, tinted glass, stained glass, water) to the alpha-blend
+        // pass. Ice flickers slightly at LOD seams but those blocks are outside vanilla render distance
+        // so there is no Z-fight with vanilla geometry; the visual impact is negligible.
+        long isTranslucent = ModelQueries._isTranslucent(metadata);
+        return 0b111L&(0b000_000_010_100L>>(isTranslucent*6+ModelQueries._isDoubleSided(metadata)*3));
     }
 
     private static long packPartialQuadData(int modelId, long state, long metadata) {

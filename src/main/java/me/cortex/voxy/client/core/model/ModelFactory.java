@@ -41,10 +41,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import org.lwjgl.system.MemoryStack;
+
 import static org.lwjgl.opengl.ARBDirectStateAccess.glGenerateTextureMipmap;
 import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureSubImage2D;
 import static org.lwjgl.opengl.GL11.GL_RGBA;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL11C.glGetTexLevelParameteriv;
+import static org.lwjgl.opengl.GL11C.glBindTexture;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_WIDTH;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_HEIGHT;
+import static org.lwjgl.opengl.GL45C.glGetTextureSubImage;
 import static org.lwjgl.opengl.GL45C.glNamedBufferSubData;
 
 /**
@@ -573,6 +582,15 @@ public class ModelFactory {
         }
         if (sw <= 0 || sh <= 0) return false;
 
+        // Sodium/Embeddium frees the CPU-side NativeImage after GPU upload.
+        // Detect this by probing the first pixel; if it throws, fall back to reading
+        // directly from the block atlas GL texture.
+        boolean cpuAccessible = true;
+        try { sprite.getPixelRGBA(0, 0, 0); } catch (Throwable t) { cpuAccessible = false; }
+        if (!cpuAccessible) {
+            return uploadFaceTextureFromAtlas(modelId, faceIdx, sprite, sw, sh);
+        }
+
         boolean allOpaque = true;
         this.faceBuf.clear();
         for (int y = 0; y < MODEL_TEXTURE_SIZE; y++) {
@@ -595,6 +613,66 @@ public class ModelFactory {
         this.faceBuf.flip();
         uploadFaceBuffer(modelId, faceIdx);
         return allOpaque;
+    }
+
+    // Cached atlas dimensions; populated lazily on first GL-fallback call.
+    private int cachedAtlasId = -1;
+    private int cachedAtlasW = -1;
+    private int cachedAtlasH = -1;
+
+    private boolean uploadFaceTextureFromAtlas(int modelId, int faceIdx, TextureAtlasSprite sprite, int sw, int sh) {
+        try {
+            if (cachedAtlasId < 0) {
+                var atlas = (TextureAtlas) Minecraft.getInstance().getTextureManager()
+                        .getTexture(ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png"));
+                cachedAtlasId = atlas.getId();
+                try (MemoryStack stack = MemoryStack.stackPush()) {
+                    var dim = stack.mallocInt(1);
+                    glBindTexture(GL_TEXTURE_2D, cachedAtlasId);
+                    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, dim);
+                    cachedAtlasW = dim.get(0);
+                    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, dim);
+                    cachedAtlasH = dim.get(0);
+                }
+            }
+            if (cachedAtlasW <= 0 || cachedAtlasH <= 0) return false;
+
+            int sprX = Math.round(sprite.getU0() * cachedAtlasW);
+            int sprY = Math.round(sprite.getV0() * cachedAtlasH);
+            int sprW = Math.max(1, Math.round(sprite.getU1() * cachedAtlasW) - sprX);
+            int sprH = Math.max(1, Math.round(sprite.getV1() * cachedAtlasH) - sprY);
+
+            ByteBuffer atlasPix = MemoryUtil.memAlloc(sprW * sprH * 4);
+            try {
+                glGetTextureSubImage(cachedAtlasId, 0, sprX, sprY, 0, sprW, sprH, 1, GL_RGBA, GL_UNSIGNED_BYTE, atlasPix);
+                boolean allOpaque = true;
+                this.faceBuf.clear();
+                for (int y = 0; y < MODEL_TEXTURE_SIZE; y++) {
+                    // Flip Y (same as CPU path above)
+                    int srcY = ((MODEL_TEXTURE_SIZE - 1 - y) * sprH) / MODEL_TEXTURE_SIZE;
+                    for (int x = 0; x < MODEL_TEXTURE_SIZE; x++) {
+                        int srcX = (x * sprW) / MODEL_TEXTURE_SIZE;
+                        int pOff = (srcY * sprW + srcX) * 4;
+                        int r = atlasPix.get(pOff) & 0xFF;
+                        int g = atlasPix.get(pOff + 1) & 0xFF;
+                        int b = atlasPix.get(pOff + 2) & 0xFF;
+                        int a = atlasPix.get(pOff + 3) & 0xFF;
+                        // Pack as ABGR to match the CPU path (putInt expects ABGR byte order)
+                        int abgr = (a << 24) | (b << 16) | (g << 8) | r;
+                        this.faceBuf.putInt(abgr);
+                        if (a < 250) allOpaque = false;
+                    }
+                }
+                this.faceBuf.flip();
+                uploadFaceBuffer(modelId, faceIdx);
+                return allOpaque;
+            } finally {
+                MemoryUtil.memFree(atlasPix);
+            }
+        } catch (Throwable t) {
+            Logger.warn("Sprite GL-atlas fallback failed for face " + faceIdx + ": " + t);
+            return false;
+        }
     }
 
     private void uploadFaceBuffer(int modelId, int faceIdx) {

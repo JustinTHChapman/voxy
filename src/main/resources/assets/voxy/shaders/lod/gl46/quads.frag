@@ -163,21 +163,24 @@ void main() {
     }
 
 
-    //Also, small quad is really fking over the mipping level somehow
+    // Use the mipmapped alpha (colour.a from textureGrad above) for the discard check.
+    // textureLod(..., 0) sampled full-res, which causes large greedy-merged quads
+    // (e.g. leaf canopies) to discard ~50% of fragments randomly because each screen
+    // pixel lands on a different leaf/transparent texel. The mip-averaged alpha (~0.5
+    // for typical leaf textures) correctly passes the 0.1 threshold so canopies look solid.
     #ifndef TRANSLUCENT
-    colour.a = 1.0f;
-    if (useDiscard() && (textureLod(blockModelAtlas, texPos, 0).a <= 0.1f)) {
-    //if (useDiscard() && (colour.a <= 0.1f)) {
+    if (useDiscard() && (colour.a <= 0.1f)) {
     #else
     if (textureLod(blockModelAtlas, texPos, 0).a == 0.0f) {
     #endif
-        //This is stupidly stupidly bad for divergence
-        //TODO: FIXME, basicly what this do is sample the exact pixel (no lod) for discarding, this stops mipmapping fucking it over
         #ifndef DEBUG_RENDER
         discard;
         return;
         #endif
     }
+    #ifndef TRANSLUCENT
+    colour.a = 1.0f;
+    #endif
 
     #ifndef PATCHED_SHADER_ALLOW_DERIVATIVES
     if (gl_HelperInvocation) {
