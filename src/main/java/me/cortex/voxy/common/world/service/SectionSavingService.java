@@ -99,9 +99,19 @@ public class SectionSavingService {
             }
         }
         this.service.shutdown();
-        // Don't manually drain saveQueue on shutdown — unsaved LOD sections are
-        // re-generated automatically next session.  Draining here caused multi-
-        // minute hangs when thousands of sections were queued.
+        // Release any sections still in the queue so their refcounts reach zero.
+        // This prevents the world.isWorldUsed() loop in VoxyInstance.shutdown() from
+        // spinning forever when the 3 s drain deadline was hit with pending saves.
+        // Unsaved sections regenerate automatically next session.
+        SaveEntry entry;
+        int released = 0;
+        while ((entry = this.saveQueue.poll()) != null) {
+            entry.section().release();
+            released++;
+        }
+        if (released > 0) {
+            Logger.warn("Voxy section saving: force-released " + released + " unreleased section refs to allow clean shutdown.");
+        }
     }
 
     public int getTaskCount() {
