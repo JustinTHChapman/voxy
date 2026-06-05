@@ -80,16 +80,28 @@ public class SectionSavingService {
         return false;
     }
 
+    /** Milliseconds to drain the save queue before aborting on shutdown. */
+    private static final long SHUTDOWN_DRAIN_MS = 3_000;
+
     public void shutdown() {
-        if (this.service.numJobs() != 0) {
-            Logger.error("Voxy section saving still in progress, estimated " + this.service.numJobs() + " sections remaining.");
-            this.service.blockTillEmpty();
+        int pending = this.service.numJobs();
+        if (pending != 0) {
+            Logger.info("Voxy section saving: flushing " + pending + " pending sections (3 s budget)…");
+            long deadline = System.currentTimeMillis() + SHUTDOWN_DRAIN_MS;
+            while (this.service.numJobs() > 0 && this.service.isLive()
+                    && System.currentTimeMillis() < deadline) {
+                try { Thread.sleep(10); } catch (InterruptedException e) { break; }
+            }
+            int dropped = this.service.numJobs();
+            if (dropped > 0) {
+                Logger.warn("Voxy section saving timed out; " + dropped
+                        + " sections not persisted (will regenerate next session).");
+            }
         }
         this.service.shutdown();
-        //Manually save any remaining entries
-        while (!this.saveQueue.isEmpty()) {
-            this.processJob();
-        }
+        // Don't manually drain saveQueue on shutdown — unsaved LOD sections are
+        // re-generated automatically next session.  Draining here caused multi-
+        // minute hangs when thousands of sections were queued.
     }
 
     public int getTaskCount() {
