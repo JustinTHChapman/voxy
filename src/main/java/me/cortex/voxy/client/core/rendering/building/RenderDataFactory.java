@@ -204,7 +204,8 @@ public class RenderDataFactory {
     }
 
     private static long getQuadTyping(long metadata) {//2 bits
-        return 0b111L&(0b000_000_010_100L>>(ModelQueries._isTranslucent(metadata)*6+ModelQueries._isDoubleSided(metadata)*3));
+        long isTranslucentFluid = ModelQueries._isTranslucent(metadata) & ModelQueries._isFluid(metadata);
+        return 0b111L&(0b000_000_010_100L>>(isTranslucentFluid*6+ModelQueries._isDoubleSided(metadata)*3));
     }
 
     private static long packPartialQuadData(int modelId, long state, long metadata) {

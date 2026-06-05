@@ -384,8 +384,21 @@ public class ModelFactory {
             }
         }
 
+        // Partial-height blocks (snow layers, slabs, etc.) must not occlude adjacent faces.
+        // Detect via the UP/DOWN face depth values already computed above.
+        float blockTopY    = facePresent[1] ? (1.0f - faceDepths[1]) : 1.0f;
+        float blockBottomY = facePresent[0] ? faceDepths[0]          : 0.0f;
+        boolean isPartialHeight = (blockTopY < 0.999f || blockBottomY > 0.001f);
+        if (isPartialHeight) {
+            // Clear bit0 (occludes neighbor) for every face so faceOccludes() returns false.
+            for (int fi = 0; fi < 6; fi++) {
+                meta &= ~(1L << (fi * 8));
+            }
+        }
+
         int modelFlags = 0;
-        if (canOcclude) modelFlags |= 0b01100000; // fullyOpaque + cullsSame
+        if (canOcclude && !isPartialHeight) modelFlags |= 0b01100000; // fullyOpaque + cullsSame
+        else if (canOcclude)                modelFlags |= 0b00100000; // cullsSame only
         if (anyTinted)  modelFlags |= 0b00000001; // biomeColoured (we don't have a LUT; just const tint)
 
         // Fluid detection: pure fluid block (water, lava) vs waterlogged block
@@ -400,7 +413,7 @@ public class ModelFactory {
         for (int i = 0; i < 6; i++) {
             if (facePresent[i] && !faceAllOpaque[i]) { anyFaceTransparent = true; break; }
         }
-        if (isPureFluid || anyFaceTransparent) modelFlags |= 0b00000010; // isTranslucent
+        if (anyFaceTransparent) modelFlags |= 0b00000010; // isTranslucent
 
         meta |= ((long)(modelFlags & 0xFF)) << 48;
         meta |= ((long)(lightEmission & 0xF)) << 55; // lightEmission nibble at bits[55..58]

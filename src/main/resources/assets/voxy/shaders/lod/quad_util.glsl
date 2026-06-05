@@ -149,9 +149,9 @@ void setupQuad(out QuadData quad, const in Quad rawQuad, uvec2 sPos, bool genera
     quad.axis = face>>1;
     quad.basePoint = (quadStart*lodScale)+vec3(baseSection<<5);
     #ifdef USE_SINGLE_TRI
-    quad.quadSizeAddin = (faceSize.yw + (quadSize - 1)*2);
+    quad.quadSizeAddin = faceSize.yw * vec2(quadSize);
     #else
-    quad.quadSizeAddin = faceSize.yw + quadSize - 1;
+    quad.quadSizeAddin = faceSize.yw * vec2(quadSize);
     #endif
     quad.uvCorner = faceSize.xz;
 }
