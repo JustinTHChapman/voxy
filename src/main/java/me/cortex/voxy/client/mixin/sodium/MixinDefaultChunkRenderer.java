@@ -14,7 +14,9 @@ import net.caffeinemc.mods.sodium.client.render.chunk.lists.ChunkRenderListItera
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
+import me.cortex.voxy.client.config.VoxyConfig;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -59,11 +61,20 @@ public abstract class MixinDefaultChunkRenderer {
         } else {
             float[] fogColor = RenderSystem.getShaderFogColor();
             float vanillaRD = VoxyRenderSystem.getRenderDistance();
-            // Fog end tracks the farthest generated chunk, so it always sits right at
-            // the actual LOD frontier rather than the theoretical max LOD distance.
-            float loadedBlockRadius = AutoGenerationService.INSTANCE.getEstimatedLoadedBlockRadius();
-            float fogEnd   = Math.max(vanillaRD * 1.5f, loadedBlockRadius);
-            float fogStart = Math.max(vanillaRD, fogEnd * 0.7f);
+            // Fog end is capped at the nearest ungenerated LOD chunk so empty sections
+            // are always hidden.  getFogFrontierBlockRadius() shrinks as the player
+            // approaches the LOD edge and grows as new chunks are generated.
+            float fogEnd, fogStart;
+            if (VoxyConfig.CONFIG.useEnvironmentalFog) {
+                float frontier = AutoGenerationService.INSTANCE.getFogFrontierBlockRadius();
+                fogEnd = Math.max(vanillaRD * 1.5f, frontier);
+                // Same transition formula as vanilla terrain fog: clamp(fogEnd/10, 4, 64)
+                float fogTransition = Mth.clamp(fogEnd / 10.0f, 4.0f, 64.0f);
+                fogStart = Math.max(vanillaRD, fogEnd - fogTransition);
+            } else {
+                fogEnd = Float.MAX_VALUE;
+                fogStart = Float.MAX_VALUE;
+            }
             var fogParams = new VoxyFogParameters(fogColor[0], fogColor[1], fogColor[2], fogStart, fogEnd, 0);
             viewport = renderer.setupViewport(matrices.projection(), matrices.modelView(), fogParams, camera.x, camera.y, camera.z);
         }

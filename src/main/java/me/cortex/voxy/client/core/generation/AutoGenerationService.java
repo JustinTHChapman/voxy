@@ -70,8 +70,30 @@ public final class AutoGenerationService {
     private int lastPlayerCX = Integer.MIN_VALUE;
     private int lastPlayerCZ = Integer.MIN_VALUE;
 
-    /** Chebyshev chunk radius of farthest successfully submitted chunk — used for fog. */
+    /** Chebyshev chunk radius of farthest successfully submitted chunk — used for far-plane extension. */
     private volatile int estimatedLoadedChunkRadius = 0;
+
+    /**
+     * Chebyshev chunk radius of the nearest unsubmitted chunk as of the last rebuildQueue call,
+     * measured from the player position at that call (lastPlayerCX/CZ).
+     */
+    private volatile int fogFrontierChunks = 0;
+
+    /** Current player chunk position, updated every tick for inter-rebuild fog adjustment. */
+    private volatile int currentPlayerCX = 0;
+    private volatile int currentPlayerCZ = 0;
+
+    /**
+     * Smoothed fog frontier in blocks, lerped toward the raw frontier each tick so
+     * fog transitions are gradual rather than discrete jumps.
+     * Shrinks faster than it grows so empty LOD sections are covered promptly.
+     */
+    private volatile float smoothedFogFrontierBlocks = 0f;
+
+    /** Per-tick lerp factor when fog needs to shrink (approach edge). */
+    private static final float FOG_LERP_SHRINK = 0.15f;
+    /** Per-tick lerp factor when fog needs to grow (new chunks generated). */
+    private static final float FOG_LERP_GROW   = 0.05f;
 
     private AutoGenerationService() {}
 
@@ -84,11 +106,28 @@ public final class AutoGenerationService {
         lastPlayerCX = Integer.MIN_VALUE;
         lastPlayerCZ = Integer.MIN_VALUE;
         estimatedLoadedChunkRadius = 0;
+        fogFrontierChunks = 0;
+        currentPlayerCX = 0;
+        currentPlayerCZ = 0;
+        smoothedFogFrontierBlocks = 0f;
     }
 
     /** Block radius (in world units) of the farthest successfully generated chunk from the player. */
     public float getEstimatedLoadedBlockRadius() {
         return estimatedLoadedChunkRadius * 16f;
+    }
+
+    /** Smoothed block radius to the LOD generation frontier, for use as fog end distance. */
+    public float getFogFrontierBlockRadius() {
+        return smoothedFogFrontierBlocks;
+    }
+
+    /** Raw (unsmoothed) frontier distance, accounting for movement since last rebuild. */
+    private float computeRawFrontierBlocks() {
+        int dx = currentPlayerCX - lastPlayerCX;
+        int dz = currentPlayerCZ - lastPlayerCZ;
+        int moved = Math.max(Math.abs(dx), Math.abs(dz));
+        return Math.max(0, fogFrontierChunks - moved) * 16f;
     }
 
     /** Called once per client tick from the NeoForge ClientTickEvent listener. */
@@ -107,6 +146,8 @@ public final class AutoGenerationService {
 
         int playerCX = (int) mc.player.getX() >> 4;
         int playerCZ = (int) mc.player.getZ() >> 4;
+        currentPlayerCX = playerCX;
+        currentPlayerCZ = playerCZ;
 
         // Rebuild the candidate queue when the player has moved significantly
         int dcx = playerCX - lastPlayerCX;
@@ -114,6 +155,13 @@ public final class AutoGenerationService {
         if (candidateQueue.isEmpty() || dcx * dcx + dcz * dcz >= REBUILD_THRESHOLD_CHUNKS * REBUILD_THRESHOLD_CHUNKS) {
             rebuildQueue(playerCX, playerCZ);
         }
+
+        // Smoothly lerp the fog frontier toward the raw value each tick.
+        // Shrink faster than grow so empty LOD sections are hidden promptly.
+        float rawFrontier = computeRawFrontierBlocks();
+        float current = smoothedFogFrontierBlocks;
+        float factor = rawFrontier < current ? FOG_LERP_SHRINK : FOG_LERP_GROW;
+        smoothedFogFrontierBlocks = current + (rawFrontier - current) * factor;
 
         // Drain any chunks the server thread has finished loading
         int drained = 0;
@@ -281,6 +329,24 @@ public final class AutoGenerationService {
                     long dist = (long) dx * dx + (long) dz * dz;
                     candidateQueue.add(new long[]{dist, cx, cz});
                     count++;
+                }
+            }
+        }
+
+        // Compute fog frontier: Chebyshev radius of the nearest unsubmitted chunk.
+        // Scans from r=0 outward and stops at the first gap so unloaded LOD edges
+        // can be hidden behind fog.  Worst-case O(scanRadius²) hash lookups but
+        // rebuildQueue only runs on significant player movement or queue drain.
+        this.fogFrontierChunks = scanRadius; // default: everything within scan radius is submitted
+        fogScan:
+        for (int r = 0; r <= scanRadius; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (Math.abs(dx) != r && Math.abs(dz) != r) continue;
+                    if (!submitted.contains(colKey(playerCX + dx, playerCZ + dz))) {
+                        this.fogFrontierChunks = r;
+                        break fogScan;
+                    }
                 }
             }
         }
