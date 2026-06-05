@@ -25,6 +25,7 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashSet;
@@ -46,8 +47,29 @@ public final class AutoGenerationService {
 
     public static final AutoGenerationService INSTANCE = new AutoGenerationService();
 
-    /** How many chunks to scan ahead into the pending queue each rebuild. */
-    private static final int SCAN_BATCH = 16;
+    /**
+     * All (dx, dz) offsets within the max scan radius, sorted by Euclidean distance squared.
+     * Iterating this array produces a true circular expansion from the player outward.
+     */
+    private static final int[][] SORTED_OFFSETS;
+    static {
+        int r = 256;
+        int count = 0;
+        for (int dx = -r; dx <= r; dx++)
+            for (int dz = -r; dz <= r; dz++)
+                if (dx * dx + dz * dz <= r * r) count++;
+        SORTED_OFFSETS = new int[count][2];
+        int i = 0;
+        for (int dx = -r; dx <= r; dx++)
+            for (int dz = -r; dz <= r; dz++)
+                if (dx * dx + dz * dz <= r * r) { SORTED_OFFSETS[i][0] = dx; SORTED_OFFSETS[i++][1] = dz; }
+        Arrays.sort(SORTED_OFFSETS, (a, b) -> Integer.compare(a[0]*a[0]+a[1]*a[1], b[0]*b[0]+b[1]*b[1]));
+    }
+
+    /** Minimum candidate queue size per rebuild (used when frontier is very close). */
+    private static final int SCAN_BATCH_MIN = 16;
+    /** Maximum candidate queue size per rebuild. */
+    private static final int SCAN_BATCH_MAX = 1024;
     /** Rebuild the candidate queue when the player moves more than this many chunks. */
     private static final int REBUILD_THRESHOLD_CHUNKS = 4;
     /** Max outstanding server-thread chunk requests. Prevents flooding the integrated server. */
@@ -314,42 +336,33 @@ public final class AutoGenerationService {
         lastPlayerCZ = playerCZ;
 
         int radius = ServerConfigOverride.INSTANCE.effectiveLodRadius();
-        // Clamp scan radius to avoid extremely large queues
         int scanRadius = Math.min(radius, 256);
+        int scanRadiusSq = scanRadius * scanRadius;
 
+        // Dynamic batch: grow with the frontier so early ticks stay cheap.
+        int scanBatch = Math.max(SCAN_BATCH_MIN, Math.min(SCAN_BATCH_MAX, this.fogFrontierChunks * 8));
+
+        // SORTED_OFFSETS is pre-sorted by Euclidean distance — iterating it produces
+        // a true circle expanding outward, not a square.
         int count = 0;
-        for (int r = 0; r <= scanRadius && count < SCAN_BATCH; r++) {
-            // Iterate the perimeter of the square at Chebyshev distance r
-            for (int dx = -r; dx <= r && count < SCAN_BATCH; dx++) {
-                for (int dz = -r; dz <= r && count < SCAN_BATCH; dz++) {
-                    if (Math.abs(dx) != r && Math.abs(dz) != r) continue; // only perimeter
-                    int cx = playerCX + dx;
-                    int cz = playerCZ + dz;
-                    if (submitted.contains(colKey(cx, cz))) continue;
-                    long dist = (long) dx * dx + (long) dz * dz;
-                    candidateQueue.add(new long[]{dist, cx, cz});
-                    count++;
-                }
+        int fogFrontier = scanRadius; // default: everything within radius is submitted
+        boolean fogFrontierFound = false;
+        for (int[] off : SORTED_OFFSETS) {
+            int dx = off[0], dz = off[1];
+            int distSq = dx * dx + dz * dz;
+            if (distSq > scanRadiusSq) break; // SORTED_OFFSETS is sorted, so we can stop early
+            long key = colKey(playerCX + dx, playerCZ + dz);
+            if (!fogFrontierFound && !submitted.contains(key)) {
+                fogFrontier = (int) Math.ceil(Math.sqrt(distSq));
+                fogFrontierFound = true;
+            }
+            if (count < scanBatch && !submitted.contains(key)) {
+                long dist = (long) distSq;
+                candidateQueue.add(new long[]{dist, playerCX + dx, playerCZ + dz});
+                count++;
             }
         }
-
-        // Compute fog frontier: Chebyshev radius of the nearest unsubmitted chunk.
-        // Scans from r=0 outward and stops at the first gap so unloaded LOD edges
-        // can be hidden behind fog.  Worst-case O(scanRadius²) hash lookups but
-        // rebuildQueue only runs on significant player movement or queue drain.
-        this.fogFrontierChunks = scanRadius; // default: everything within scan radius is submitted
-        fogScan:
-        for (int r = 0; r <= scanRadius; r++) {
-            for (int dx = -r; dx <= r; dx++) {
-                for (int dz = -r; dz <= r; dz++) {
-                    if (Math.abs(dx) != r && Math.abs(dz) != r) continue;
-                    if (!submitted.contains(colKey(playerCX + dx, playerCZ + dz))) {
-                        this.fogFrontierChunks = r;
-                        break fogScan;
-                    }
-                }
-            }
-        }
+        this.fogFrontierChunks = fogFrontier;
     }
 
     private static long colKey(int cx, int cz) {
