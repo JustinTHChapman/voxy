@@ -470,11 +470,33 @@ public class ModelFactory {
             int colourTint, int extraFlagsA) {
         this.modelBuf.clear();
 
+        // Detect partial-height block from UP (faceIdx=1) and DOWN (faceIdx=0) face depths.
+        // blockTopY   = Y of the top surface in [0,1]; blockBottomY = Y of the bottom.
+        float blockTopY    = facePresent[1] ? (1.0f - faceDepths[1]) : 1.0f;
+        float blockBottomY = facePresent[0] ? faceDepths[0]          : 0.0f;
+        boolean isPartialHeight = (blockTopY < 0.999f || blockBottomY > 0.001f);
+
         // faceData[6] — 24 bytes
         for (int i = 0; i < 6; i++) {
             if (facePresent[i]) {
                 // Full-face UV bounds: start=0, end=15 for both axes.
                 int faceData = 0x0000F0F0;
+
+                // Side-face height clipping for partial-height blocks (snow layers, slabs, etc.).
+                // UP/DOWN faces (axis 0) use depth indentation; side faces encode the actual height.
+                // NORTH/SOUTH (axis 1): world-Y controlled by start_z (bits 8-11) / end_z (bits 12-15).
+                // EAST/WEST   (axis 2): world-Y controlled by start_x (bits 0-3)  / end_x (bits 4-7).
+                if (isPartialHeight && (i >> 1) != 0) {
+                    int startH = Math.max(0, Math.round(blockBottomY * 16));
+                    int spanH  = Math.max(1, Math.round((blockTopY - blockBottomY) * 16));
+                    int endH   = Math.min(15, startH + spanH - 1);
+                    if ((i >> 1) == 1) { // NORTH/SOUTH
+                        faceData = (faceData & 0xFFFF00FF) | (startH << 8) | (endH << 12);
+                    } else {             // EAST/WEST
+                        faceData = (faceData & 0xFFFFFF00) | startH | (endH << 4);
+                    }
+                }
+
                 if (!faceAllOpaque[i]) {
                     // Has semi-transparent pixels: enable alpha cutout.
                     faceData |= (1 << 22) | (1 << 23);

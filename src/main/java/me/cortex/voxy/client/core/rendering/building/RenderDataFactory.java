@@ -377,7 +377,8 @@ public class RenderDataFactory {
     private static final long LM = (0xFFL<<55);
 
     private static boolean shouldMeshNonOpaqueBlockFace(int face, long quad, long meta, long neighborQuad, long neighborMeta) {
-        if (((quad^neighborQuad)&(0xFFFFL<<26))==0 && (DISABLE_CULL_SAME_OCCLUDES || ModelQueries.cullsSame(meta))) return false;//This is a hack, if the neigbor and this are the same, dont mesh the face// TODO: FIXME
+        // Always cull faces between same-model blocks (removes Z-fighting on ice, stained glass, etc.)
+        if (!DISABLE_CULL_SAME_OCCLUDES && ((quad^neighborQuad)&(0xFFFFL<<26))==0) return false;
         if (!ModelQueries.faceExists(meta, face)) return false;//Dont mesh if no face
         if (ModelQueries.faceCanBeOccluded(meta, face)) //TODO: maybe enable this
           if (ModelQueries.faceOccludes(neighborMeta, face^1)) return false;
@@ -856,13 +857,11 @@ public class RenderDataFactory {
                         if (Mapper.getBlockId(neighborId) != 0) {//Not air
                             int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
 
-
-                            if (ModelQueries.cullsSame(Am) && modelId == ((A>>26)&0xFFFF)) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
-                                //TODO: check self occlsuion in the if statment
+                            if (modelId == ((A>>26)&0xFFFF)) {
+                                // Same block model at section boundary — cull outward face (prevents Z-fighting on ice etc.)
                                 fail = true;
                             } else {
                                 long meta = this.modelMan.getModelMetadataFromClientId(modelId);
-
                                 if (ModelQueries.faceOccludes(meta, (axis << 1) | (1 - side))) {
                                     fail = true;
                                 }
@@ -872,15 +871,12 @@ public class RenderDataFactory {
                         long nA = this.sectionData[(idx+skipAmount) * 2];
                         long nB = this.sectionData[(idx+skipAmount) * 2 + 1];
                         boolean failB = false;
-                        //TODO: check self occlusion
 
-                        if (ModelQueries.cullsSame(nB) && (nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
-                            //TODO: check self occlsuion in the if statment
+                        if ((nA&(0xFFFFL<<26)) == (A&(0xFFFFL<<26))) {
+                            // Same block model on interior side — cull inward face
                             failB = true;
-                        } else {
-                            if (ModelQueries.faceOccludes(nB, (axis << 1) | (side))) {
-                                failB = true;
-                            }
+                        } else if (ModelQueries.faceOccludes(nB, (axis << 1) | (side))) {
+                            failB = true;
                         }
 
 

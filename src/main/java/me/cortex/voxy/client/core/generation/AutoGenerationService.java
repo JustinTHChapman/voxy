@@ -139,10 +139,6 @@ public final class AutoGenerationService {
             Logger.info("[AutoGen] Ingested " + drained + " server-loaded chunk(s) near (" + playerCX + "," + playerCZ + ")");
         }
 
-        // Back-pressure: skip generation this tick if the save queue is backed up.
-        // This keeps the pending-save count bounded so shutdown flushes quickly.
-        if (!instance.savingServiceRateLimiter.getAsBoolean()) return;
-
         // Integrated-server reference (null on dedicated server or when not yet ready)
         var iServer = mc.getSingleplayerServer();
 
