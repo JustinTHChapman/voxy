@@ -150,11 +150,22 @@ public class ModelFactory {
         }
         int modelId = this.nextModelId++;
         this.blockIdToModelId[blockId] = modelId;
-        // Pre-set bubble column to all-faces-absent+isFluid so the mesh builder never
-        // sees FALLBACK_OPAQUE_META before bakeBlock finishes remapping it to water.
+        // For bubble column: pre-set its metadata to water's already-baked metadata so
+        // sections meshed before bakeBlock runs use water faces, not invisible+isFluid.
+        // Water blocks are encountered before bubble columns (they fill the whole ocean),
+        // so water's metadata is almost always available by the time bubble columns appear.
         BlockState preState = this.mapper.getBlockStateFromBlockId(blockId);
         if (preState != null && preState.getBlock() == Blocks.BUBBLE_COLUMN) {
-            this.metadataCache[modelId] = 0x0010FFFFFFFFFFFFL;
+            int waterStateId = this.mapper.getIdForBlockState(Blocks.WATER.defaultBlockState());
+            long waterMeta = 0L;
+            if (waterStateId >= 0 && waterStateId < this.blockIdToModelId.length) {
+                int waterModelId = this.blockIdToModelId[waterStateId];
+                if (waterModelId > 0 && waterModelId < this.metadataCache.length) {
+                    waterMeta = this.metadataCache[waterModelId];
+                }
+            }
+            // Use water's metadata if available, else fall back to all-faces-absent+isFluid.
+            this.metadataCache[modelId] = waterMeta != 0L ? waterMeta : 0x0010FFFFFFFFFFFFL;
         }
         this.bakeQueue.add(blockId);
         this.inflight.incrementAndGet();
