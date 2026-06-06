@@ -87,7 +87,6 @@ public final class AutoGenerationService {
      */
     private volatile int fogFrontierChunks = 0;
 
-
     /** Current player chunk position, updated every tick for inter-rebuild fog adjustment. */
     private volatile int currentPlayerCX = 0;
     private volatile int currentPlayerCZ = 0;
@@ -95,9 +94,11 @@ public final class AutoGenerationService {
     /**
      * Smoothed fog frontier in blocks, lerped toward the raw frontier each tick.
      * Shrinks faster than it grows so empty LOD sections are hidden promptly.
-     * Starts at max scan radius so fog begins far out and only tightens when gaps are confirmed.
      */
-    private volatile float smoothedFogFrontierBlocks = 256f * 16f;
+    private volatile float smoothedFogFrontierBlocks = 0f;
+
+    /** True once submitted has been pre-populated from sections.db for the current session. */
+    private boolean dbPopulated = false;
 
     private AutoGenerationService() {}
 
@@ -113,9 +114,10 @@ public final class AutoGenerationService {
         fogFrontierChunks = 0;
         currentPlayerCX = 0;
         currentPlayerCZ = 0;
-        smoothedFogFrontierBlocks = 256f * 16f;
+        smoothedFogFrontierBlocks = 0f;
         smoothedMspt = 50f;
         lastTickNano = 0;
+        dbPopulated = false;
     }
 
     /** Block radius (in world units) of the farthest successfully generated chunk from the player. */
@@ -129,14 +131,25 @@ public final class AutoGenerationService {
     }
 
     /**
-     * Raw fog distance adjusted for player movement since the last rebuildQueue call.
-     *
-     * Uses min(frontier, farthest):
-     *  - frontier = nearest unsubmitted chunk → shrinks as player approaches an ungenerated edge
-     *  - farthest = farthest submitted chunk  → caps fog at the actual generated extent
-     *
-     * Movement correction subtracts chunks moved since the last rebuild.
+     * One-time population of the submitted set from sections.db so the fog frontier reflects
+     * chunks with actual stored LOD data, not just chunks ingested this session.
+     * Called on the first tick after a world join.
      */
+    private void populateSubmittedFromDB(WorldEngine engine, int playerCX, int playerCZ) {
+        int scanRadius = Math.min(ServerConfigOverride.INSTANCE.effectiveLodRadius(), 256);
+        long scanRadiusSq = (long) scanRadius * scanRadius;
+        engine.storage.iteratePositions(0, pos -> {
+            int x = WorldEngine.getX(pos);
+            int z = WorldEngine.getZ(pos);
+            long dx = x - playerCX;
+            long dz = z - playerCZ;
+            if (dx * dx + dz * dz <= scanRadiusSq) {
+                submitted.add(colKey(x, z));
+            }
+        });
+    }
+
+    /** Raw fog distance adjusted for player movement since the last rebuildQueue call. */
     private float computeRawFogBlocks() {
         int dx = currentPlayerCX - lastPlayerCX;
         int dz = currentPlayerCZ - lastPlayerCZ;
@@ -163,6 +176,13 @@ public final class AutoGenerationService {
 
         currentPlayerCX = playerCX;
         currentPlayerCZ = playerCZ;
+
+        // On first tick after world join, pre-populate submitted from sections.db so the
+        // fog frontier reflects actual stored LOD data, not just chunks re-ingested this session.
+        if (!dbPopulated) {
+            populateSubmittedFromDB(engine, playerCX, playerCZ);
+            dbPopulated = true;
+        }
 
         // Rebuild the candidate queue when the player has moved significantly
         int dcx = playerCX - lastPlayerCX;
