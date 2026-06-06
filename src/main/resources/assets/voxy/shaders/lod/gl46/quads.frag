@@ -69,9 +69,12 @@ layout(location = 0) out vec4 outColour;
 
 #endif
 
-#import <voxy:lod/gl46/bindings.glsl>   // global UBOs (camera, etc.)
-#import <voxy:lod/lighting.glsl>         // getLightmapUv()
-#import <voxy:util/depthutils.glsl>      // DEPTH_SCALAR_COMPARE macro
+// global UBOs (camera matrices, fog params)
+#import <voxy:lod/gl46/bindings.glsl>
+// getLightmapUv() — converts packed light value to UV for the MC lightmap texture
+#import <voxy:lod/lighting.glsl>
+// DEPTH_SCALAR_COMPARE macro — adjusts depth comparison for the downscaled depthTex
+#import <voxy:util/depthutils.glsl>
 
 
 // ── Utility helpers ───────────────────────────────────────────────────────────
