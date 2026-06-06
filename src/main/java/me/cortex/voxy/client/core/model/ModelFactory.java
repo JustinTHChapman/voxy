@@ -150,12 +150,11 @@ public class ModelFactory {
         }
         int modelId = this.nextModelId++;
         this.blockIdToModelId[blockId] = modelId;
-        // For blocks that must be invisible (bubble column, etc.) pre-set the metadata
-        // to all-faces-absent BEFORE the mesh builder reads it, so the FALLBACK_OPAQUE_META
-        // path is never used for these blocks even if bakeBlock runs after the first mesh build.
+        // Pre-set bubble column to all-faces-absent+isFluid so the mesh builder never
+        // sees FALLBACK_OPAQUE_META before bakeBlock finishes remapping it to water.
         BlockState preState = this.mapper.getBlockStateFromBlockId(blockId);
         if (preState != null && preState.getBlock() == Blocks.BUBBLE_COLUMN) {
-            this.metadataCache[modelId] = 0x0000FFFFFFFFFFFFL;
+            this.metadataCache[modelId] = 0x0010FFFFFFFFFFFFL;
         }
         this.bakeQueue.add(blockId);
         this.inflight.incrementAndGet();
@@ -268,12 +267,10 @@ public class ModelFactory {
 
         BlockState state = this.mapper.getBlockStateFromBlockId(blockId);
 
-        // Bubble columns exist inside water and have no visible surface in LOD.
-        // Rendering them produces visible column artifacts inside water bodies.
+        // Bubble columns exist inside water — remap to water so they render as water
+        // (seamless ocean surface) rather than as invisible air (which creates holes).
         if (state.getBlock() == Blocks.BUBBLE_COLUMN) {
-            // All faces absent; block is invisible at LOD distance.
-            this.metadataCache[modelId] = 0x0000FFFFFFFFFFFFL;
-            return;
+            state = Blocks.WATER.defaultBlockState();
         }
 
         Minecraft mc = Minecraft.getInstance();
