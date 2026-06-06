@@ -16,7 +16,6 @@ import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
@@ -225,11 +224,6 @@ public final class AutoGenerationService {
             // If enqueueIngest returns false (lighting not ready), the entry is dropped
             // from the queue.  It will be re-added on the next rebuildQueue() call when
             // the player moves or the current batch empties.
-        }
-
-        if (generated > 0 || requested > 0) {
-            Logger.info("[AutoGen] generated=" + generated + " requested=" + requested
-                    + " pending=" + pendingLoad.size() + " near (" + playerCX + "," + playerCZ + ")");
         }
 
         // Upload client-generated sections to server (rate-limited)
