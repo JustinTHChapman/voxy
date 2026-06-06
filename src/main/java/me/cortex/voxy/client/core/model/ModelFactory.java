@@ -396,12 +396,10 @@ public class ModelFactory {
         // Leaves: force all faces opaque in LOD to avoid the "sparse canopy" look.
         // Leaf textures have many transparent pixels; at LOD distance the cutout alpha test
         // (useDiscard) on large greedy-merged quads discards ~50% of fragments even with the
-        // textureGrad fix, leaving the canopy looking like scattered pixels.  Making leaves
-        // opaque in LOD is a reasonable trade-off — you lose the see-through effect but get
-        // a solid, believable canopy at distance.  Vines and lily pads get the same treatment.
-        if (state.getBlock() instanceof LeavesBlock
-                || state.getBlock() instanceof VineBlock
-                || state.getBlock() == Blocks.LILY_PAD) {
+        // textureGrad mip fix, leaving the canopy looking like scattered pixels.  Making
+        // leaves opaque is a reasonable LOD trade-off — the see-through effect is only
+        // visible up close where vanilla rendering takes over anyway.
+        if (state.getBlock() instanceof LeavesBlock) {
             for (int fi = 0; fi < 6; fi++) {
                 faceAllOpaque[fi] = true;
             }
