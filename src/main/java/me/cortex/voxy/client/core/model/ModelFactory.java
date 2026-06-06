@@ -393,6 +393,20 @@ public class ModelFactory {
             }
         }
 
+        // Leaves: force all faces opaque in LOD to avoid the "sparse canopy" look.
+        // Leaf textures have many transparent pixels; at LOD distance the cutout alpha test
+        // (useDiscard) on large greedy-merged quads discards ~50% of fragments even with the
+        // textureGrad fix, leaving the canopy looking like scattered pixels.  Making leaves
+        // opaque in LOD is a reasonable trade-off — you lose the see-through effect but get
+        // a solid, believable canopy at distance.  Vines and lily pads get the same treatment.
+        if (state.getBlock() instanceof LeavesBlock
+                || state.getBlock() instanceof VineBlock
+                || state.getBlock() == Blocks.LILY_PAD) {
+            for (int fi = 0; fi < 6; fi++) {
+                faceAllOpaque[fi] = true;
+            }
+        }
+
         // Partial-height blocks (snow layers, slabs, etc.) must not occlude adjacent faces.
         // Detect via the UP/DOWN face depth values already computed above.
         float blockTopY    = facePresent[1] ? (1.0f - faceDepths[1]) : 1.0f;
@@ -572,6 +586,27 @@ public class ModelFactory {
         uploadFaceBuffer(modelId, faceIdx);
     }
 
+    /**
+     * Bake a single face texture for a model into the voxy atlas.
+     *
+     * Sodium/Embeddium (and its NeoForge port) frees the CPU-side NativeImage backing a
+     * TextureAtlasSprite after uploading it to the GPU, to reclaim memory. This breaks
+     * the standard sprite.getPixelRGBA() API which reads from the NativeImage.
+     *
+     * Fix: probe getPixelRGBA(0,0,0) first. If it throws, fall back to uploadFaceTextureFromAtlas()
+     * which reads the sprite region directly from the OpenGL block atlas texture.
+     *
+     * Y-flip rationale (applies to BOTH paths):
+     *   Minecraft uploads atlas textures from Java images where row 0 is the VISUAL TOP.
+     *   OpenGL stores textures with y=0 at the VISUAL TOP (matching Java image convention in
+     *   this case because Minecraft doesn't flip on upload). The voxy atlas is uploaded the
+     *   same way. So both the CPU and GPU paths preserve top→top orientation — no flip needed
+     *   here. But the old CPU path DID flip, which was harmless because the shader's UV mapping
+     *   compensated. We keep the same flip for both paths for consistency.
+     *
+     * @return true if all sampled pixels are fully opaque (a ≥ 250), false if semi-transparent.
+     *         The return value controls whether the face sets the 'occludes' metadata bit.
+     */
     private boolean uploadFaceTexture(int modelId, int faceIdx, TextureAtlasSprite sprite) {
         int sw, sh;
         try {
@@ -594,8 +629,10 @@ public class ModelFactory {
         boolean allOpaque = true;
         this.faceBuf.clear();
         for (int y = 0; y < MODEL_TEXTURE_SIZE; y++) {
-            // Flip Y: GL textures have row 0 at the bottom, MC sprites have row 0 at the top.
-            // Without the flip, side-face textures (e.g. grass_block_side) appear upside-down.
+            // Y-flip: Minecraft's sprite has row 0 at the top; the voxy atlas is uploaded
+            // with the same convention (top-to-bottom). We flip here to match the Y ordering
+            // that uploadFaceBuffer expects (the upload goes to slotY which is GL y=0 = bottom
+            // for a right-side-up atlas, so we need visual bottom in faceBuf[0]).
             int srcY = ((MODEL_TEXTURE_SIZE - 1 - y) * sh) / MODEL_TEXTURE_SIZE;
             for (int x = 0; x < MODEL_TEXTURE_SIZE; x++) {
                 int srcX = (x * sw) / MODEL_TEXTURE_SIZE;
@@ -603,7 +640,7 @@ public class ModelFactory {
                 try {
                     abgr = sprite.getPixelRGBA(0, srcX, srcY);
                 } catch (Throwable t) {
-                    abgr = 0xFFFF00FF; // magenta marker
+                    abgr = 0xFFFF00FF; // magenta marker for debug
                 }
                 // ABGR int (A high) -> little-endian bytes R,G,B,A which GL_RGBA/UBYTE expects.
                 this.faceBuf.putInt(abgr);
@@ -615,49 +652,93 @@ public class ModelFactory {
         return allOpaque;
     }
 
-    // Cached atlas dimensions; populated lazily on first GL-fallback call.
+    // Cached atlas GL texture id and pixel dimensions (populated lazily on first fallback call).
+    // We cache these because querying them via GL on every bake would be slow.
+    // Invalidated by resource reloads, but baking only happens at session start before any reload.
     private int cachedAtlasId = -1;
     private int cachedAtlasW = -1;
     private int cachedAtlasH = -1;
 
+    /**
+     * GL-atlas fallback for when Sodium/Embeddium has freed the sprite's CPU NativeImage.
+     *
+     * Reads the sprite's pixel region directly from the GL block atlas texture using
+     * glGetTextureSubImage, then rescales it to MODEL_TEXTURE_SIZE×MODEL_TEXTURE_SIZE.
+     *
+     * Atlas dimension query note:
+     *   Two separate IntBuffer slots (wBuf, hBuf) are used for the two glGetTexLevelParameteriv
+     *   calls rather than a single mallocInt(1) buffer reused twice.  LWJGL3's nglGetTexLevelParameteriv
+     *   writes at memAddress(buf) = buf.address() + buf.position()*4.  If the implementation
+     *   advances the position after writing, a single buffer reused for the second call would
+     *   write past its capacity (position=1, capacity=1) and dim.get(0) would return the stale
+     *   first value — meaning cachedAtlasH would equal cachedAtlasW.  For a non-square atlas
+     *   (common with large modpacks), this doubles sprH, making the extracted sprite look
+     *   vertically compressed (every other row sub-sampled) with adjacent atlas content below.
+     *
+     * Animated sprite capping:
+     *   sprite.getV1() - sprite.getV0() covers ALL animation frames stacked vertically in
+     *   the atlas.  We cap sprH to sh (the single-frame height from sprite.contents()) so we
+     *   only sample the first animation frame.  For non-animated sprites this is a no-op.
+     *
+     * @param sw  Sprite frame width  (from sprite.contents().width())
+     * @param sh  Sprite frame height (from sprite.contents().height())
+     */
     private boolean uploadFaceTextureFromAtlas(int modelId, int faceIdx, TextureAtlasSprite sprite, int sw, int sh) {
         try {
             if (cachedAtlasId < 0) {
                 var atlas = (TextureAtlas) Minecraft.getInstance().getTextureManager()
                         .getTexture(ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png"));
                 cachedAtlasId = atlas.getId();
+                // Use TWO separate IntBuffer slots to avoid the LWJGL position-advancement bug
+                // (see Javadoc above) that would cause cachedAtlasH to equal cachedAtlasW for
+                // non-square atlases.
                 try (MemoryStack stack = MemoryStack.stackPush()) {
-                    var dim = stack.mallocInt(1);
+                    var wBuf = stack.mallocInt(1);
+                    var hBuf = stack.mallocInt(1);
                     glBindTexture(GL_TEXTURE_2D, cachedAtlasId);
-                    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, dim);
-                    cachedAtlasW = dim.get(0);
-                    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, dim);
-                    cachedAtlasH = dim.get(0);
+                    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  wBuf);
+                    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, hBuf);
+                    cachedAtlasW = wBuf.get(0);
+                    cachedAtlasH = hBuf.get(0);
+                    Logger.info("[ModelFactory] Block atlas GL id=" + cachedAtlasId
+                            + " size=" + cachedAtlasW + "x" + cachedAtlasH);
                 }
             }
             if (cachedAtlasW <= 0 || cachedAtlasH <= 0) return false;
 
+            // Compute the sprite's pixel rectangle in the atlas.
+            // sprite.getU0/V0 are normalized [0,1] coords for the sprite's top-left corner.
+            // sprite.getU1/V1 are the bottom-right corner of the FULL animation strip.
+            // We cap sprW/sprH to the single-frame dimensions (sw, sh) so animated textures
+            // only sample one frame rather than the full strip.
             int sprX = Math.round(sprite.getU0() * cachedAtlasW);
             int sprY = Math.round(sprite.getV0() * cachedAtlasH);
-            int sprW = Math.max(1, Math.round(sprite.getU1() * cachedAtlasW) - sprX);
-            int sprH = Math.max(1, Math.round(sprite.getV1() * cachedAtlasH) - sprY);
+            int sprW = Math.max(1, Math.min(Math.round(sprite.getU1() * cachedAtlasW) - sprX, sw));
+            int sprH = Math.max(1, Math.min(Math.round(sprite.getV1() * cachedAtlasH) - sprY, sh));
 
             ByteBuffer atlasPix = MemoryUtil.memAlloc(sprW * sprH * 4);
             try {
+                // Read the sprite rectangle from the GL atlas.
+                // zoffset=0 and depth=1 work for both GL_TEXTURE_2D and the first layer of
+                // GL_TEXTURE_2D_ARRAY (Sodium may use array textures for atlas storage).
                 glGetTextureSubImage(cachedAtlasId, 0, sprX, sprY, 0, sprW, sprH, 1, GL_RGBA, GL_UNSIGNED_BYTE, atlasPix);
                 boolean allOpaque = true;
                 this.faceBuf.clear();
                 for (int y = 0; y < MODEL_TEXTURE_SIZE; y++) {
-                    // Flip Y (same as CPU path above)
-                    int srcY = ((MODEL_TEXTURE_SIZE - 1 - y) * sprH) / MODEL_TEXTURE_SIZE;
+                    // Same Y-flip as the CPU path: the atlas data has visual top at low GL y
+                    // (Minecraft stores textures upside-down from standard GL), so we flip to
+                    // place the visual bottom in faceBuf[0] which maps to slotY (GL bottom of slot).
+                    int srcY2 = ((MODEL_TEXTURE_SIZE - 1 - y) * sprH) / MODEL_TEXTURE_SIZE;
                     for (int x = 0; x < MODEL_TEXTURE_SIZE; x++) {
                         int srcX = (x * sprW) / MODEL_TEXTURE_SIZE;
-                        int pOff = (srcY * sprW + srcX) * 4;
-                        int r = atlasPix.get(pOff) & 0xFF;
+                        int pOff = (srcY2 * sprW + srcX) * 4;
+                        int r = atlasPix.get(pOff)     & 0xFF;
                         int g = atlasPix.get(pOff + 1) & 0xFF;
                         int b = atlasPix.get(pOff + 2) & 0xFF;
                         int a = atlasPix.get(pOff + 3) & 0xFF;
-                        // Pack as ABGR to match the CPU path (putInt expects ABGR byte order)
+                        // Pack as ABGR: A high byte, then B, G, R.
+                        // When this int is written as 4 little-endian bytes: R,G,B,A — the
+                        // layout that GL_RGBA / GL_UNSIGNED_BYTE expects on upload.
                         int abgr = (a << 24) | (b << 16) | (g << 8) | r;
                         this.faceBuf.putInt(abgr);
                         if (a < 250) allOpaque = false;
