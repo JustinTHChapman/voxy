@@ -45,8 +45,6 @@ public final class AutoGenerationService {
 
     public static final AutoGenerationService INSTANCE = new AutoGenerationService();
 
-    /** How many chunks to scan ahead into the pending queue each rebuild. */
-    private static final int SCAN_BATCH = 16;
     /** Rebuild the candidate queue when the player moves more than this many chunks. */
     private static final int REBUILD_THRESHOLD_CHUNKS = 4;
     /** Max outstanding server-thread chunk requests. Prevents flooding the integrated server. */
@@ -285,19 +283,18 @@ public final class AutoGenerationService {
         // Clamp scan radius to avoid extremely large queues
         int scanRadius = Math.min(radius, 256);
 
-        int count = 0;
-        for (int r = 0; r <= scanRadius && count < SCAN_BATCH; r++) {
-            // Iterate the perimeter of the square at Chebyshev distance r
-            for (int dx = -r; dx <= r && count < SCAN_BATCH; dx++) {
-                for (int dz = -r; dz <= r && count < SCAN_BATCH; dz++) {
-                    if (Math.abs(dx) != r && Math.abs(dz) != r) continue; // only perimeter
-                    int cx = playerCX + dx;
-                    int cz = playerCZ + dz;
-                    if (submitted.contains(colKey(cx, cz))) continue;
-                    long dist = (long) dx * dx + (long) dz * dz;
-                    candidateQueue.add(new long[]{dist, cx, cz});
-                    count++;
-                }
+        // Scan the full radius in one pass. The priority queue sorts by Euclidean
+        // distance squared so chunks are popped closest-first, giving a circular
+        // generation front rather than the square front that a Chebyshev-ordered
+        // scan would produce. Chunks already submitted are skipped.
+        for (int dx = -scanRadius; dx <= scanRadius; dx++) {
+            for (int dz = -scanRadius; dz <= scanRadius; dz++) {
+                long dist = (long) dx * dx + (long) dz * dz;
+                if (dist > (long) scanRadius * scanRadius) continue; // circular clip
+                int cx = playerCX + dx;
+                int cz = playerCZ + dz;
+                if (submitted.contains(colKey(cx, cz))) continue;
+                candidateQueue.add(new long[]{dist, cx, cz});
             }
         }
     }
