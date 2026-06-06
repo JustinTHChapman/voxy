@@ -76,9 +76,8 @@ public abstract class MixinDefaultChunkRenderer {
         }
         float fogR = fogColor[0], fogG = fogColor[1], fogB = fogColor[2];
 
-        // When the camera is submerged, extend the fluid tint through the full LOD distance.
-        // We check the camera fluid type directly rather than relying on RenderSystem fog end
-        // because Sodium manages its own fog state and getShaderFogEnd() may be stale.
+        // When the camera is submerged, match vanilla's short fog distance so LOD terrain
+        // doesn't appear unnaturally clear at depths that should be opaque with fluid fog.
         var mc2 = Minecraft.getInstance();
         var fluidInCamera = mc2.gameRenderer.getMainCamera().getFluidInCamera();
         if (fluidInCamera == FogType.WATER) {
@@ -90,8 +89,14 @@ public abstract class MixinDefaultChunkRenderer {
                 fogB =  (wfc        & 0xFF) / 255.0f;
             }
             fogStart = 0.0f;
+            // Use vanilla's underwater fog end; fall back to 32 blocks if Sodium's terrain
+            // fog state is stale (returns a value as large as the render distance).
+            float vanillaFogEnd = RenderSystem.getShaderFogEnd();
+            fogEnd = (vanillaFogEnd < vanillaRD) ? vanillaFogEnd : 32.0f;
         } else if (fluidInCamera == FogType.LAVA) {
             fogStart = 0.0f;
+            float vanillaFogEnd = RenderSystem.getShaderFogEnd();
+            fogEnd = (vanillaFogEnd < vanillaRD) ? vanillaFogEnd : 4.0f;
         }
 
         var fogParams = new VoxyFogParameters(fogR, fogG, fogB, fogStart, fogEnd, 0);
