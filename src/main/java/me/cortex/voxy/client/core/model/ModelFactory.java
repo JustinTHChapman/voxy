@@ -150,22 +150,13 @@ public class ModelFactory {
         }
         int modelId = this.nextModelId++;
         this.blockIdToModelId[blockId] = modelId;
-        // For bubble column: pre-set its metadata to water's already-baked metadata so
-        // sections meshed before bakeBlock runs use water faces, not invisible+isFluid.
-        // Water blocks are encountered before bubble columns (they fill the whole ocean),
-        // so water's metadata is almost always available by the time bubble columns appear.
+        // Bubble columns: treat as fully absent (no faces, no isFluid flag) so they are
+        // invisible to the renderer and adjacent water blocks render all their faces normally.
+        // isFluid=0 is critical — without it adjacent water would cull its faces toward the
+        // bubble column position, creating holes in the ocean floor.
         BlockState preState = this.mapper.getBlockStateFromBlockId(blockId);
         if (preState != null && preState.getBlock() == Blocks.BUBBLE_COLUMN) {
-            int waterStateId = this.mapper.getIdForBlockState(Blocks.WATER.defaultBlockState());
-            long waterMeta = 0L;
-            if (waterStateId >= 0 && waterStateId < this.blockIdToModelId.length) {
-                int waterModelId = this.blockIdToModelId[waterStateId];
-                if (waterModelId > 0 && waterModelId < this.metadataCache.length) {
-                    waterMeta = this.metadataCache[waterModelId];
-                }
-            }
-            // Use water's metadata if available, else fall back to all-faces-absent+isFluid.
-            this.metadataCache[modelId] = waterMeta != 0L ? waterMeta : 0x0010FFFFFFFFFFFFL;
+            this.metadataCache[modelId] = 0x0000FFFFFFFFFFFFL;
         }
         this.bakeQueue.add(blockId);
         this.inflight.incrementAndGet();
@@ -278,10 +269,12 @@ public class ModelFactory {
 
         BlockState state = this.mapper.getBlockStateFromBlockId(blockId);
 
-        // Bubble columns exist inside water — remap to water so they render as water
-        // (seamless ocean surface) rather than as invisible air (which creates holes).
+        // Bubble columns: emit no geometry and no isFluid flag so adjacent water renders
+        // all its faces normally. The pre-set in addEntry() already wrote this value; the
+        // early return here ensures bakeBlock() never overwrites it with a real model.
         if (state.getBlock() == Blocks.BUBBLE_COLUMN) {
-            state = Blocks.WATER.defaultBlockState();
+            this.metadataCache[modelId] = 0x0000FFFFFFFFFFFFL;
+            return;
         }
 
         Minecraft mc = Minecraft.getInstance();

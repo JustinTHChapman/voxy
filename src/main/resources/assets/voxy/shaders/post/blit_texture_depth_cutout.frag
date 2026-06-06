@@ -50,7 +50,7 @@ void main() {
     }
     #ifdef USE_ENV_FOG
     if (fogColour.a>0.0){
-        float fogLerp = clamp(fma(length(point.xyz),endParams.x,endParams.y),0,endParams.z);//512 is 32*16 which is the render distance in blocks
+        float fogLerp = clamp(fma(length(point.xz),endParams.x,endParams.y),0,endParams.z);//horizontal XZ distance — Y excluded so player altitude doesn't affect LOD fog distance
         colour.rgb = mix(colour.rgb, fogColour.rgb, fogLerp*fogColour.a);
     }
     #endif
