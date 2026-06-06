@@ -148,16 +148,23 @@ public class ModelFactory {
             this.blockIdToModelId[blockId] = 0;
             return false;
         }
-        int modelId = this.nextModelId++;
-        this.blockIdToModelId[blockId] = modelId;
-        // Bubble columns: treat like kelp — all faces absent + containsFluid (0x08).
-        // containsFluid tells adjacent water to cull its shared face, so no water face
-        // renders into the bubble column position. The column has no geometry of its own.
-        // This matches how kelp/seagrass behave inside water (invisible, no holes).
+        // Bubble column: alias directly to water's model so they share identical metadata.
+        // This is race-condition-free — no pre-set needed, no bakeBlock remapping.
+        // If water hasn't been registered yet, fall through to normal path (bakeBlock remaps).
         BlockState preState = this.mapper.getBlockStateFromBlockId(blockId);
         if (preState != null && preState.getBlock() == Blocks.BUBBLE_COLUMN) {
-            this.metadataCache[modelId] = 0x0008FFFFFFFFFFFFL;
+            int waterBlockId = this.mapper.getIdForBlockState(Blocks.WATER.defaultBlockState());
+            if (waterBlockId >= 0 && waterBlockId < this.blockIdToModelId.length) {
+                int waterModelId = this.blockIdToModelId[waterBlockId];
+                if (waterModelId >= 0) {
+                    this.blockIdToModelId[blockId] = waterModelId; // alias: share water's model
+                    return true; // no new model slot or bake needed
+                }
+            }
         }
+
+        int modelId = this.nextModelId++;
+        this.blockIdToModelId[blockId] = modelId;
         this.bakeQueue.add(blockId);
         this.inflight.incrementAndGet();
         this.bakedCount++;
