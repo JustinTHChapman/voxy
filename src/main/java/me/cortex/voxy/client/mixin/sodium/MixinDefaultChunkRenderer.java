@@ -3,6 +3,7 @@ package me.cortex.voxy.client.mixin.sodium;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.generation.AutoGenerationService;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.VoxyFogParameters;
@@ -15,6 +16,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRend
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.material.FogType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
@@ -60,11 +62,18 @@ public abstract class MixinDefaultChunkRenderer {
         } else {
             float[] fogColor = RenderSystem.getShaderFogColor();
             float vanillaRD = VoxyRenderSystem.getRenderDistance();
-            // Fog end tracks the actual generation frontier so it expands out as
-            // auto-generation fills in chunks — hiding the unloaded boundary dynamically.
-            float loadedBlockRadius = AutoGenerationService.INSTANCE.getEstimatedLoadedBlockRadius();
-            float fogEnd   = Math.max(vanillaRD * 1.5f, loadedBlockRadius);
-            float fogStart = Math.max(vanillaRD, fogEnd * 0.7f);
+            float fogEnd, fogStart;
+            if (VoxyConfig.CONFIG.useEnvironmentalFog) {
+                // Frontier shrinks as player approaches ungenerated LOD edge, grows as
+                // chunks are generated — smoothed each tick so the transition is gradual.
+                float frontier = AutoGenerationService.INSTANCE.getFogFrontierBlockRadius();
+                fogEnd = Math.max(vanillaRD * 1.5f, frontier);
+                float fogTransition = Mth.clamp(fogEnd / 10.0f, 4.0f, 64.0f);
+                fogStart = Math.max(vanillaRD, fogEnd - fogTransition);
+            } else {
+                fogEnd   = Float.MAX_VALUE;
+                fogStart = Float.MAX_VALUE;
+            }
             float fogR = fogColor[0], fogG = fogColor[1], fogB = fogColor[2];
 
             // When the camera is submerged, extend the fluid tint through the full LOD distance.
