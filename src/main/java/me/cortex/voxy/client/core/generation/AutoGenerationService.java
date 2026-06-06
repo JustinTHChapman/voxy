@@ -94,8 +94,9 @@ public final class AutoGenerationService {
     /**
      * Smoothed fog frontier in blocks, lerped toward the raw frontier each tick.
      * Shrinks faster than it grows so empty LOD sections are hidden promptly.
+     * Starts at max scan radius so fog begins far out and only tightens when gaps are confirmed.
      */
-    private volatile float smoothedFogFrontierBlocks = 0f;
+    private volatile float smoothedFogFrontierBlocks = 256f * 16f;
 
     private AutoGenerationService() {}
 
@@ -111,7 +112,7 @@ public final class AutoGenerationService {
         fogFrontierChunks = 0;
         currentPlayerCX = 0;
         currentPlayerCZ = 0;
-        smoothedFogFrontierBlocks = 0f;
+        smoothedFogFrontierBlocks = 256f * 16f;
         smoothedMspt = 50f;
         lastTickNano = 0;
     }
@@ -334,7 +335,9 @@ public final class AutoGenerationService {
         // Scan the full radius in one pass. The priority queue sorts by Euclidean
         // distance squared so chunks are popped closest-first, giving a circular
         // generation front rather than the square front that a Chebyshev-ordered
-        // scan would produce. Track the nearest unsubmitted chunk for fog frontier.
+        // scan would produce. Track the nearest fully-unloaded chunk for fog frontier.
+        // pendingLoad chunks are mid-flight — treat them as loaded for fog purposes
+        // so "partially loaded" chunks don't pull the fog boundary inward.
         long fogFrontierDistSq = (long) scanRadius * scanRadius + 1;
         for (int dx = -scanRadius; dx <= scanRadius; dx++) {
             for (int dz = -scanRadius; dz <= scanRadius; dz++) {
@@ -342,7 +345,8 @@ public final class AutoGenerationService {
                 if (dist > (long) scanRadius * scanRadius) continue; // circular clip
                 int cx = playerCX + dx;
                 int cz = playerCZ + dz;
-                if (submitted.contains(colKey(cx, cz))) continue;
+                long key = colKey(cx, cz);
+                if (submitted.contains(key) || pendingLoad.contains(key)) continue;
                 if (dist < fogFrontierDistSq) fogFrontierDistSq = dist;
                 candidateQueue.add(new long[]{dist, cx, cz});
             }
