@@ -273,6 +273,11 @@ public class Mapper {
         if (state.isAir()) {
             return 0;
         }
+        // Bubble columns are water with an animation effect. Store them as still water
+        // so LOD renders seamless ocean with no column artifacts.
+        if (state.getBlock() == Blocks.BUBBLE_COLUMN) {
+            return this.getIdForBlockState(Blocks.WATER.defaultBlockState());
+        }
         var mapping = this.block2stateEntry.get(state);
         if (mapping == null) {
             mapping = this.registerNewBlockState(state);

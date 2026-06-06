@@ -203,11 +203,60 @@ public class RenderDataFactory {
         }
     }
 
+    /**
+     * Maps block metadata to a 2-bit render-pass routing value, pre-shifted into bits[2:1]
+     * of the quad word to match the auxData layout that Mesher.emitQuad() expects.
+     *
+     * Render passes:
+     *   0b000 → alpha-blend buffer (water, ice, stained/tinted glass, any isTranslucent block)
+     *   0b010 → double-sided buffer (grass, cross-plants, anything isDoubleSided)
+     *   0b100 → opaque buffer (standard solid blocks)
+     *
+     * Lookup table 0b000_000_010_100 encodes all four (isTranslucent, isDoubleSided) combinations
+     * as 3-bit fields packed into a single constant:
+     *   bits[2:0]  = (notTranslucent, notDouble) → 0b100 → opaque
+     *   bits[5:3]  = (notTranslucent, double)    → 0b010 → double-sided
+     *   bits[8:6]  = (translucent, notDouble)    → 0b000 → alpha-blend
+     *   bits[11:9] = (translucent, double)       → 0b000 → alpha-blend (double-sided ignored)
+     * The shift amount is (isTranslucent*6 + isDoubleSided*3), selecting the correct 3-bit slot.
+     *
+     * Pre-fix history: the old version gated on (isFluid && isTranslucent), so only water
+     * reached alpha-blend.  Tinted glass and stained glass are isTranslucent but NOT isFluid;
+     * they fell through to the opaque pass where colour.a = 1.0f is forced in the shader,
+     * making them render as fully solid.  This fix routes ALL isTranslucent blocks to alpha-blend.
+     */
     private static long getQuadTyping(long metadata) {//2 bits
-        long isTranslucentFluid = ModelQueries._isTranslucent(metadata) & ModelQueries._isFluid(metadata);
-        return 0b111L&(0b000_000_010_100L>>(isTranslucentFluid*6+ModelQueries._isDoubleSided(metadata)*3));
+        long isTranslucent = ModelQueries._isTranslucent(metadata);
+        return 0b111L&(0b000_000_010_100L>>(isTranslucent*6+ModelQueries._isDoubleSided(metadata)*3));
     }
 
+    /**
+     * Packs the per-block light, biome colour, modelId and render-pass routing into the lower
+     * 62 bits of a quad word that the Mesher can later merge into a final quad long.
+     *
+     * Bit layout of the returned quadData (bits numbered from LSB):
+     *   [2:1]    render-pass type   (from getQuadTyping — 00=alpha, 01=double-sided, 10=opaque)
+     *   [25:10]  modelId            (16 bits, shifted 26 is WRONG — see below; its actually 26)
+     *   [25:0]   model id packed at bits[25:10] — no wait this isnt right...
+     *
+     * Actually, bit layout from emitQuad perspective (where auxData occupies bits[25:0]):
+     *   bits[0]   = face direction (axisSide — set later by emitQuad)
+     *   bits[2:1] = quad type (from getQuadTyping)
+     *   bits[25:3]= unused lower bits (position data added by emitQuad)
+     * And in the upper bits:
+     *   bits[41:26] = modelId (16 bits)
+     *   bits[62:42] = lightAndBiome (sky+block light nibbles + biome colour flag)
+     *
+     * lightAndBiome extraction:
+     *   The raw block state long (from Mapper.composeMappingId) has:
+     *     bits[54:47] = sky-light nibble (9 bits)
+     *     bits[63:56] = block-light nibble (8 bits)
+     *   We shift right by 1 to pack into the quad word's light field.
+     *   If the block is biome-coloured, the biome field (bits[54:46] after shift) stays.
+     *   If NOT biome-coloured (_notIsBiomeColoured returns 1), we zero out those bits.
+     *   If fully opaque, block-light comes from the neighbor, not the block itself — zeroed here
+     *   so the Mesher can OR in the neighbor's light.
+     */
     private static long packPartialQuadData(int modelId, long state, long metadata) {
         //This uses hardcoded data to shuffle things
         long lightAndBiome =  (state&((0x1FFL<<47)|(0xFFL<<56)))>>>1;
@@ -375,8 +424,23 @@ public class RenderDataFactory {
         }
     }
 
+    // Light mask: bits[62:55] hold the packed block+sky light value in the quad word.
     private static final long LM = (0xFFL<<55);
 
+    /**
+     * Decides whether a non-opaque block face should be meshed given its neighbor.
+     *
+     * Same-model culling for translucent blocks:
+     *   Adjacent panes/glass of the same type (same modelId) should not have faces between them.
+     *   We cull ONLY for isTranslucent blocks, not for all non-opaque blocks.  A partial-height
+     *   block (snow layer, slab) might sit next to an identical block but there IS a visible
+     *   gap above the first block — removing that face would cause the sky to leak through.
+     *   Non-translucent blocks that fail the same-model check keep their faces.
+     *
+     * Occlusion culling:
+     *   If faceCanBeOccluded is set and the neighbor's opposite face has faceOccludes set,
+     *   the face is hidden by the neighbor and can be skipped.
+     */
     private static boolean shouldMeshNonOpaqueBlockFace(int face, long quad, long meta, long neighborQuad, long neighborMeta) {
         // Cull same-model faces only for translucent blocks (ice, glass, stained glass).
         // Non-translucent partial-height blocks (snow layers, slabs) must keep their faces
@@ -388,6 +452,13 @@ public class RenderDataFactory {
         return true;
     }
 
+    /**
+     * Emits a non-opaque face quad into the Mesher, or skips it if culled.
+     *
+     * Lighting: if faceUsesSelfLighting is set, the face uses the block's own light value.
+     * Otherwise it uses the neighbor's light (lighting comes through transparent faces from
+     * the adjacent block, which is the physically correct behaviour for glass etc.).
+     */
     private static void meshNonOpaqueFace(int face, long quad, long meta, long neighborQuad, long neighborMeta, Mesher mesher) {
         if (shouldMeshNonOpaqueBlockFace(face, quad, meta, neighborQuad, neighborMeta)) {
             mesher.putNext(applyQuadLight(
@@ -400,6 +471,11 @@ public class RenderDataFactory {
         }
     }
 
+    /**
+     * Clamps the block-light field in the quad word to at least the block's self-emission.
+     * This ensures emissive blocks (glowstone, sea lantern, etc.) are never darker than their
+     * emission level regardless of what light value the neighbor section provides.
+     */
     private static long applyQuadLight(long quad, long selfmeta) {
         final long BLMSK = 0xFL<<(55+4);//block light mask
         long bl = quad&BLMSK;

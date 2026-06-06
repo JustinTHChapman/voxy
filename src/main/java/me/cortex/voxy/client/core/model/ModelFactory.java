@@ -19,7 +19,6 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import org.lwjgl.system.MemoryUtil;
 
 import net.minecraft.core.registries.Registries;
@@ -29,7 +28,8 @@ import net.minecraft.world.level.FoliageColor;
 import net.minecraft.world.level.GrassColor;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.block.VineBlock;
 
 import java.nio.ByteBuffer;
@@ -41,10 +41,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import org.lwjgl.system.MemoryStack;
+
 import static org.lwjgl.opengl.ARBDirectStateAccess.glGenerateTextureMipmap;
 import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureSubImage2D;
 import static org.lwjgl.opengl.GL11.GL_RGBA;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL11C.glGetTexLevelParameteriv;
+import static org.lwjgl.opengl.GL11C.glBindTexture;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_WIDTH;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_HEIGHT;
+import static org.lwjgl.opengl.GL45C.glGetTextureSubImage;
 import static org.lwjgl.opengl.GL45C.glNamedBufferSubData;
 
 /**
@@ -89,8 +98,13 @@ public class ModelFactory {
     private static final int MAX_BIOME_MODELS = 512;
     // modelId -> index into the biome table (-1 = not biome-dependent)
     private final int[] modelBiomeIndex = new int[1 << 16];
-    // modelId -> color type: 1=grass, 2=foliage, 3=water
+    // modelId -> color type: 1=grass, 2=foliage, 3=water (fallback when no resolver)
     private final byte[] modelColorType = new byte[1 << 16];
+    // biomeModelIndex -> the ColorResolver captured from BlockColors for this block type.
+    // Null for water (handled via getWaterColor) and blocks that don't call getBlockTint.
+    // When non-null, resolver.getColor(biome, 0, 0) is used instead of the vanilla
+    // GrassColor/FoliageColor formula, so mod-replaced resolvers (Quark, Aether, etc.) work.
+    private final ColorResolver[] biomeIndexResolver = new ColorResolver[MAX_BIOME_MODELS];
     private int nextBiomeModelIndex = 0;
     // voxyBiomeId -> MC Biome (populated on addBiome calls)
     private final ConcurrentHashMap<Integer, Biome> registeredBiomes = new ConcurrentHashMap<>();
@@ -107,6 +121,11 @@ public class ModelFactory {
 
     private final ConcurrentLinkedDeque<Integer> bakeQueue = new ConcurrentLinkedDeque<>();
     private final AtomicInteger inflight = new AtomicInteger();
+
+    // Bubble-column → water aliasing: bubble columns must share water's model ID so the
+    // mesh builder treats them as the same fluid and culls shared faces seamlessly.
+    private volatile int waterBlockId = -1;
+    private final ConcurrentLinkedDeque<Integer> pendingBubbleColumnBlockIds = new ConcurrentLinkedDeque<>();
 
     // Reusable 16x16 RGBA scratch buffer.
     private final ByteBuffer faceBuf = MemoryUtil.memAlloc(MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE * 4)
@@ -134,8 +153,37 @@ public class ModelFactory {
             this.blockIdToModelId[blockId] = 0;
             return false;
         }
+        BlockState preState = this.mapper.getBlockStateFromBlockId(blockId);
+
+        // Bubble columns must share water's exact model ID so the mesh builder treats
+        // them as the same fluid and culls shared faces, making columns invisible.
+        if (preState != null && preState.getBlock() == Blocks.BUBBLE_COLUMN) {
+            if (this.waterBlockId >= 0) {
+                // Water already registered — alias directly.
+                this.blockIdToModelId[blockId] = this.blockIdToModelId[this.waterBlockId];
+            } else {
+                // Water not registered yet — park as 0 (air) and fix up when water arrives.
+                this.blockIdToModelId[blockId] = 0;
+                this.pendingBubbleColumnBlockIds.add(blockId);
+            }
+            return true;
+        }
+
+        // Track water's block ID so bubble columns can alias to it.
+        boolean isWater = (preState != null && preState.getBlock() == Blocks.WATER);
+
         int modelId = this.nextModelId++;
         this.blockIdToModelId[blockId] = modelId;
+
+        if (isWater) {
+            this.waterBlockId = blockId;
+            // Fix up any bubble columns that registered before water.
+            Integer pendingBcId;
+            while ((pendingBcId = this.pendingBubbleColumnBlockIds.poll()) != null) {
+                this.blockIdToModelId[pendingBcId] = modelId;
+            }
+        }
+
         this.bakeQueue.add(blockId);
         this.inflight.incrementAndGet();
         this.bakedCount++;
@@ -162,7 +210,8 @@ public class ModelFactory {
             int biomeIdx = this.modelBiomeIndex[modelId];
             if (biomeIdx < 0) continue;
             byte colorType = this.modelColorType[modelId];
-            int argb = 0xFF000000 | getColorForBiome(mcBiome, colorType);
+            ColorResolver resolver = this.biomeIndexResolver[biomeIdx];
+            int argb = 0xFF000000 | getColorForBiome(mcBiome, colorType, resolver);
             this.pendingBiomeUploads.add(new BiomePendingUpdate(biomeIdx, voxyBiomeId, argb));
         }
     }
@@ -221,7 +270,12 @@ public class ModelFactory {
         }
         if (did) this.atlasDirty = true;
         if (this.bakeQueue.isEmpty() && this.atlasDirty) {
-            try { glGenerateTextureMipmap(this.storage.textures.id); } catch (Throwable ignored) {}
+            try {
+                glGenerateTextureMipmap(this.storage.textures.id);
+                DIAG.info("[ModelFactory] glGenerateTextureMipmap done (texId={})", this.storage.textures.id);
+            } catch (Throwable t) {
+                DIAG.warn("[ModelFactory] glGenerateTextureMipmap failed: {}", t.toString());
+            }
             this.atlasDirty = false;
         }
         long now = System.currentTimeMillis();
@@ -240,6 +294,7 @@ public class ModelFactory {
         if (modelId <= 0) return;
 
         BlockState state = this.mapper.getBlockStateFromBlockId(blockId);
+
         Minecraft mc = Minecraft.getInstance();
         BlockModelShaper shaper = mc.getBlockRenderer().getBlockModelShaper();
         BakedModel model = shaper.getBlockModel(state);
@@ -249,6 +304,7 @@ public class ModelFactory {
         int tint = 0xFFFFFFFF;
         boolean anyTinted = false;
         boolean tintIsBiomeDependent = false;
+        ColorResolver capturedColorResolver = null; // set when a mod-replaced resolver is detected
         boolean canOcclude = state.canOcclude();
         int lightEmission = Math.min(15, state.getLightEmission());
 
@@ -270,6 +326,7 @@ public class ModelFactory {
         boolean[] faceAllOpaque = new boolean[6];
         boolean[] faceTinted    = new boolean[6];
         float[]   faceDepths    = new float[6];   // depth indentation per face (0 = no offset)
+        String[]  faceSpriteName = new String[6]; // sprite resource name per face, for variation detection
 
         for (int faceIdx = 0; faceIdx < 6; faceIdx++) {
             Direction dir = FACE_DIRS[faceIdx];
@@ -325,11 +382,18 @@ public class ModelFactory {
                 faceByte = 0xFF;
                 facePresent[faceIdx] = false;
             } else {
-                boolean opaque = uploadFaceTexture(modelId, faceIdx, sprite);
+                boolean opaque = uploadFaceTexture(modelId, faceIdx, sprite, picked);
                 // bit0 = occludes neighbor face; bit2 = can be occluded by neighbor.
                 faceByte = (opaque && canOcclude) ? 0b00000101 : 0b00000100;
                 facePresent[faceIdx] = true;
                 faceAllOpaque[faceIdx] = opaque;
+                faceSpriteName[faceIdx] = sprite.contents().name().toString();
+                if (state.is(BlockTags.LEAVES) && this.diagTotalBaked < 200) {
+                    String[] faceNames = {"DOWN","UP","NORTH","SOUTH","WEST","EAST"};
+                    DIAG.info("[LEAF-FACE] block={} face={} sprite={} opaque={}",
+                            state.getBlock().getDescriptionId(), faceNames[faceIdx],
+                            sprite.contents().name(), opaque);
+                }
             }
             meta |= ((long)(faceByte & 0xFF)) << (faceIdx * 8);
 
@@ -340,13 +404,19 @@ public class ModelFactory {
                     try {
                         // Use a sentinel BlockAndTintGetter: if getBlockTint() is called,
                         // the block's color is biome-dependent (grass, foliage, etc.).
+                        // We also capture the ColorResolver so we can call it directly with
+                        // any registered biome — this makes mod-replaced resolvers (Quark
+                        // GreenerGrass, Aether, etc.) work automatically instead of falling
+                        // back to the vanilla GrassColor/FoliageColor formulas.
                         boolean[] biomeDep = {false};
+                        ColorResolver[] resolverCapture = {null};
                         final BlockState capturedState = state;
                         int rgb = mc.getBlockColors().getColor(state, new BlockAndTintGetter() {
                             @Override public float getShade(Direction dir, boolean shade) { return 1.0f; }
                             @Override public LevelLightEngine getLightEngine() { return null; }
                             @Override public int getBlockTint(BlockPos p, ColorResolver resolver) {
                                 biomeDep[0] = true;
+                                if (resolverCapture[0] == null) resolverCapture[0] = resolver;
                                 return 0;
                             }
                             @Override public BlockEntity getBlockEntity(BlockPos p) { return null; }
@@ -359,9 +429,11 @@ public class ModelFactory {
                             // getBlockTint was invoked → color varies by biome
                             tintIsBiomeDependent = true;
                             tint = 0xFFFFFFFF; // overridden by biome LUT
+                            capturedColorResolver = resolverCapture[0];
                             if (this.nextBiomeModelIndex < 10) {
-                                DIAG.info("bakeBlock: BIOME-DEP detected block={} modelId={} registeredBiomes={}",
-                                        state.getBlock().getDescriptionId(), modelId, this.registeredBiomes.size());
+                                DIAG.info("bakeBlock: BIOME-DEP detected block={} modelId={} registeredBiomes={} resolver={}",
+                                        state.getBlock().getDescriptionId(), modelId, this.registeredBiomes.size(),
+                                        capturedColorResolver != null ? capturedColorResolver.getClass().getSimpleName() : "null");
                             }
                         } else if (rgb != -1) {
                             tint = 0xFF000000 | (rgb & 0xFFFFFF);
@@ -401,19 +473,52 @@ public class ModelFactory {
         else if (canOcclude)                modelFlags |= 0b00100000; // cullsSame only
         if (anyTinted)  modelFlags |= 0b00000001; // biomeColoured (we don't have a LUT; just const tint)
 
-        // Fluid detection: pure fluid block (water, lava) vs waterlogged block
-        boolean isWaterlogged = (!isPureFluid)
-                && state.hasProperty(BlockStateProperties.WATERLOGGED)
-                && state.getValue(BlockStateProperties.WATERLOGGED);
+        // Fluid detection: pure fluid block (water, lava) vs waterlogged / water-immersed block.
+        // Use fluid state rather than the WATERLOGGED property so kelp, seagrass, and other
+        // water-immersed plants (which lack WATERLOGGED but always have a WATER fluid state)
+        // also get the containsFluid flag, causing adjacent water faces to cull correctly.
+        boolean isWaterlogged = (!isPureFluid) && state.getFluidState().is(FluidTags.WATER);
         if (isPureFluid)    modelFlags |= 0b00010000; // isFluid
         if (isWaterlogged)  modelFlags |= 0b00001000; // containsFluid
 
-        // Translucency: water, ice, stained glass, etc. — any present face that is not fully opaque
+        // Translucency: water, ice, stained glass, etc. — any present face that is not fully opaque.
+        // Leaves are excluded: their per-face hasAlphaCutout bit handles transparency via the
+        // opaque-pass cutout discard (textureGrad mip-averaged alpha ~0.5 > 0.1 threshold),
+        // so they must NOT go to the alpha-blend translucent pass (which would make them semi-transparent).
         boolean anyFaceTransparent = false;
         for (int i = 0; i < 6; i++) {
             if (facePresent[i] && !faceAllOpaque[i]) { anyFaceTransparent = true; break; }
         }
+        if (state.is(BlockTags.LEAVES)) anyFaceTransparent = false;
         if (anyFaceTransparent) modelFlags |= 0b00000010; // isTranslucent
+
+        // Detect if this block uses different sprites for different face directions.
+        // Blocks like "Better Leaves" models use a dense top texture on UP and a
+        // sparse individual-leaf texture on the sides.  At LOD distance the side
+        // texture's average alpha is what matters, not the per-pixel detail, so we
+        // flag these blocks so the shader uses the mip-averaged alpha for discard.
+        boolean spritesVaryPerFace = false;
+        String firstPresentSprite = null;
+        for (int i = 0; i < 6; i++) {
+            if (!facePresent[i] || faceSpriteName[i] == null) continue;
+            if (firstPresentSprite == null) firstPresentSprite = faceSpriteName[i];
+            else if (!faceSpriteName[i].equals(firstPresentSprite)) { spritesVaryPerFace = true; break; }
+        }
+
+        if ((state.is(BlockTags.LEAVES) || state.getBlock() == Blocks.BIRCH_LOG) && this.diagTotalBaked < 200) {
+            String[] faceNames = {"DOWN","UP","NORTH","SOUTH","WEST","EAST"};
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 6; i++) {
+                sb.append(faceNames[i]).append("=present:").append(facePresent[i])
+                  .append("/opaque:").append(faceAllOpaque[i])
+                  .append("/tinted:").append(faceTinted[i])
+                  .append("/sprite:").append(faceSpriteName[i]).append("  ");
+            }
+            DIAG.info("[BLOCKDIAG] block={} modelId={} anyFaceTransparent={} spritesVary={} anyTinted={} biomeDep={} tint=0x{} translucent={} faces: {}",
+                    state.getBlock().getDescriptionId(), modelId, anyFaceTransparent, spritesVaryPerFace,
+                    anyTinted, tintIsBiomeDependent, Integer.toHexString(tint),
+                    (modelFlags & 0b10) != 0, sb);
+        }
 
         meta |= ((long)(modelFlags & 0xFF)) << 48;
         meta |= ((long)(lightEmission & 0xF)) << 55; // lightEmission nibble at bits[55..58]
@@ -428,6 +533,7 @@ public class ModelFactory {
             int biomeIdx = this.nextBiomeModelIndex++;
             this.modelBiomeIndex[modelId] = biomeIdx;
             this.modelColorType[modelId] = colorType;
+            this.biomeIndexResolver[biomeIdx] = capturedColorResolver; // may be null for water
             // Pre-fill all 512 slots with the default plains colour.
             int defaultColor = 0xFF000000 | switch (colorType) {
                 case 1 -> GrassColor.get(0.8, 0.4);
@@ -439,11 +545,12 @@ public class ModelFactory {
             Arrays.fill(defaultSlot, defaultColor);
             glNamedBufferSubData(this.storage.modelColourBuffer.id,
                     (long) biomeIdx * BIOME_STRIDE * 4, defaultSlot);
-            // Overwrite slots for already-registered biomes.
+            // Overwrite slots for already-registered biomes using the captured resolver.
+            final ColorResolver resolverForFill = capturedColorResolver;
             for (Map.Entry<Integer, Biome> e : this.registeredBiomes.entrySet()) {
                 glNamedBufferSubData(this.storage.modelColourBuffer.id,
                         (long)(biomeIdx * BIOME_STRIDE + e.getKey()) * 4,
-                        new int[]{0xFF000000 | getColorForBiome(e.getValue(), colorType)});
+                        new int[]{0xFF000000 | getColorForBiome(e.getValue(), colorType, resolverForFill)});
             }
             resolvedColourTint = biomeIdx * BIOME_STRIDE;
             biomeLUTFlag = 2; // modelHasBiomeLUT
@@ -455,7 +562,7 @@ public class ModelFactory {
         this.tintCache[modelId] = resolvedColourTint;
 
         // Upload BlockModel struct to modelBuffer (SSBO binding 3).
-        uploadBlockModelStruct(modelId, state, facePresent, faceAllOpaque, faceTinted, faceDepths, resolvedColourTint, biomeLUTFlag);
+        uploadBlockModelStruct(modelId, facePresent, faceAllOpaque, faceTinted, faceDepths, resolvedColourTint, biomeLUTFlag, spritesVaryPerFace);
     }
 
     /**
@@ -475,12 +582,12 @@ public class ModelFactory {
      *   bits[12..15] = end_z   (0-15)
      *   bits[16..21] = depth indentation (0 = flat)
      *   bit22        = hasAlphaCutout
-     *   bit23        = hasAlphaCutoutOverride
+     *   bit23        = hasAlphaCutoutOverride / useAveragedMipDiscard
      *   bits[24..25] = tintState (0=none, 1=partial, 2=always)
      */
-    private void uploadBlockModelStruct(int modelId, BlockState state,
+    private void uploadBlockModelStruct(int modelId,
             boolean[] facePresent, boolean[] faceAllOpaque, boolean[] faceTinted, float[] faceDepths,
-            int colourTint, int extraFlagsA) {
+            int colourTint, int extraFlagsA, boolean useAveragedMipDiscard) {
         this.modelBuf.clear();
 
         // Detect partial-height block from UP (faceIdx=1) and DOWN (faceIdx=0) face depths.
@@ -511,8 +618,14 @@ public class ModelFactory {
                 }
 
                 if (!faceAllOpaque[i]) {
-                    // Has semi-transparent pixels: enable alpha cutout.
-                    faceData |= (1 << 22) | (1 << 23);
+                    // bit22 = hasAlphaCutout: enable per-fragment discard for this face.
+                    // bit23 = useAveragedMipDiscard: for leaf blocks, force the discard test
+                    //         to use the tile's mip-averaged alpha instead of the raw
+                    //         textureGrad sample.  This makes "Better Leaves" style models
+                    //         (which use a sparse side texture) appear solid at LOD distance,
+                    //         matching the intended canopy appearance.
+                    faceData |= (1 << 22);
+                    if (useAveragedMipDiscard) faceData |= (1 << 23);
                 }
                 int tintState = faceTinted[i] ? 2 : 0; // 2 = always tint
                 faceData |= (tintState << 24);
@@ -563,7 +676,28 @@ public class ModelFactory {
         uploadFaceBuffer(modelId, faceIdx);
     }
 
-    private boolean uploadFaceTexture(int modelId, int faceIdx, TextureAtlasSprite sprite) {
+    /**
+     * Bake a single face texture for a model into the voxy atlas.
+     *
+     * Sodium/Embeddium (and its NeoForge port) frees the CPU-side NativeImage backing a
+     * TextureAtlasSprite after uploading it to the GPU, to reclaim memory. This breaks
+     * the standard sprite.getPixelRGBA() API which reads from the NativeImage.
+     *
+     * Fix: probe getPixelRGBA(0,0,0) first. If it throws, fall back to uploadFaceTextureFromAtlas()
+     * which reads the sprite region directly from the OpenGL block atlas texture.
+     *
+     * Y-flip rationale (applies to BOTH paths):
+     *   Minecraft uploads atlas textures from Java images where row 0 is the VISUAL TOP.
+     *   OpenGL stores textures with y=0 at the VISUAL TOP (matching Java image convention in
+     *   this case because Minecraft doesn't flip on upload). The voxy atlas is uploaded the
+     *   same way. So both the CPU and GPU paths preserve top→top orientation — no flip needed
+     *   here. But the old CPU path DID flip, which was harmless because the shader's UV mapping
+     *   compensated. We keep the same flip for both paths for consistency.
+     *
+     * @return true if all sampled pixels are fully opaque (a ≥ 250), false if semi-transparent.
+     *         The return value controls whether the face sets the 'occludes' metadata bit.
+     */
+    private boolean uploadFaceTexture(int modelId, int faceIdx, TextureAtlasSprite sprite, BakedQuad quad) {
         int sw, sh;
         try {
             sw = sprite.contents().width();
@@ -573,19 +707,59 @@ public class ModelFactory {
         }
         if (sw <= 0 || sh <= 0) return false;
 
+        // Some resource packs use composite "atlas" sprites wider than 16px (e.g. Reimagined's
+        // birch_log_side_atlas is 48x48 — three 16x16 variants side by side). Each model variant
+        // samples a different UV sub-tile via the baked quad's vertex UVs. Extract that sub-region
+        // so we only copy the correct 16x16 portion rather than the whole composite texture.
+        int px0 = 0, py0 = 0, pxW = sw, pyH = sh;
+        if (quad != null) {
+            int[] verts = quad.getVertices();
+            // DefaultVertexFormat.BLOCK: 8 ints per vertex; UV0 at offsets 4 (u) and 5 (v).
+            if (verts.length == 32) {
+                float uMin = Float.MAX_VALUE, uMax = -Float.MAX_VALUE;
+                float vMin = Float.MAX_VALUE, vMax = -Float.MAX_VALUE;
+                for (int v = 0; v < 4; v++) {
+                    float u  = Float.intBitsToFloat(verts[v * 8 + 4]);
+                    float vc = Float.intBitsToFloat(verts[v * 8 + 5]);
+                    if (u  < uMin) uMin = u;  if (u  > uMax) uMax = u;
+                    if (vc < vMin) vMin = vc; if (vc > vMax) vMax = vc;
+                }
+                float uRange = sprite.getU1() - sprite.getU0();
+                float vRange = sprite.getV1() - sprite.getV0();
+                if (uRange > 0 && vRange > 0) {
+                    int x0 = Math.max(0, Math.round((uMin - sprite.getU0()) / uRange * sw));
+                    int x1 = Math.min(sw, Math.round((uMax - sprite.getU0()) / uRange * sw));
+                    int y0 = Math.max(0, Math.round((vMin - sprite.getV0()) / vRange * sh));
+                    int y1 = Math.min(sh, Math.round((vMax - sprite.getV0()) / vRange * sh));
+                    if (x1 > x0 && y1 > y0) { px0 = x0; py0 = y0; pxW = x1 - x0; pyH = y1 - y0; }
+                }
+            }
+        }
+
+        // Sodium/Embeddium frees the CPU-side NativeImage after GPU upload.
+        // Detect this by probing the first pixel; if it throws, fall back to reading
+        // directly from the block atlas GL texture.
+        boolean cpuAccessible = true;
+        try { sprite.getPixelRGBA(0, 0, 0); } catch (Throwable t) { cpuAccessible = false; }
+        if (!cpuAccessible) {
+            return uploadFaceTextureFromAtlas(modelId, faceIdx, sprite, sw, sh, px0, py0, pxW, pyH);
+        }
+
         boolean allOpaque = true;
         this.faceBuf.clear();
         for (int y = 0; y < MODEL_TEXTURE_SIZE; y++) {
-            // Flip Y: GL textures have row 0 at the bottom, MC sprites have row 0 at the top.
-            // Without the flip, side-face textures (e.g. grass_block_side) appear upside-down.
-            int srcY = ((MODEL_TEXTURE_SIZE - 1 - y) * sh) / MODEL_TEXTURE_SIZE;
+            // Y-flip: Minecraft's sprite has row 0 at the top; the voxy atlas is uploaded
+            // with the same convention (top-to-bottom). We flip here to match the Y ordering
+            // that uploadFaceBuffer expects (the upload goes to slotY which is GL y=0 = bottom
+            // for a right-side-up atlas, so we need visual bottom in faceBuf[0]).
+            int srcY = py0 + ((MODEL_TEXTURE_SIZE - 1 - y) * pyH) / MODEL_TEXTURE_SIZE;
             for (int x = 0; x < MODEL_TEXTURE_SIZE; x++) {
-                int srcX = (x * sw) / MODEL_TEXTURE_SIZE;
+                int srcX = px0 + (x * pxW) / MODEL_TEXTURE_SIZE;
                 int abgr;
                 try {
                     abgr = sprite.getPixelRGBA(0, srcX, srcY);
                 } catch (Throwable t) {
-                    abgr = 0xFFFF00FF; // magenta marker
+                    abgr = 0xFFFF00FF; // magenta marker for debug
                 }
                 // ABGR int (A high) -> little-endian bytes R,G,B,A which GL_RGBA/UBYTE expects.
                 this.faceBuf.putInt(abgr);
@@ -595,6 +769,111 @@ public class ModelFactory {
         this.faceBuf.flip();
         uploadFaceBuffer(modelId, faceIdx);
         return allOpaque;
+    }
+
+    // Cached atlas GL texture id and pixel dimensions (populated lazily on first fallback call).
+    // We cache these because querying them via GL on every bake would be slow.
+    // Invalidated by resource reloads, but baking only happens at session start before any reload.
+    private int cachedAtlasId = -1;
+    private int cachedAtlasW = -1;
+    private int cachedAtlasH = -1;
+
+    /**
+     * GL-atlas fallback for when Sodium/Embeddium has freed the sprite's CPU NativeImage.
+     *
+     * Reads the sprite's pixel region directly from the GL block atlas texture using
+     * glGetTextureSubImage, then rescales it to MODEL_TEXTURE_SIZE×MODEL_TEXTURE_SIZE.
+     *
+     * Atlas dimension query note:
+     *   Two separate IntBuffer slots (wBuf, hBuf) are used for the two glGetTexLevelParameteriv
+     *   calls rather than a single mallocInt(1) buffer reused twice.  LWJGL3's nglGetTexLevelParameteriv
+     *   writes at memAddress(buf) = buf.address() + buf.position()*4.  If the implementation
+     *   advances the position after writing, a single buffer reused for the second call would
+     *   write past its capacity (position=1, capacity=1) and dim.get(0) would return the stale
+     *   first value — meaning cachedAtlasH would equal cachedAtlasW.  For a non-square atlas
+     *   (common with large modpacks), this doubles sprH, making the extracted sprite look
+     *   vertically compressed (every other row sub-sampled) with adjacent atlas content below.
+     *
+     * Animated sprite capping:
+     *   sprite.getV1() - sprite.getV0() covers ALL animation frames stacked vertically in
+     *   the atlas.  We cap sprH to sh (the single-frame height from sprite.contents()) so we
+     *   only sample the first animation frame.  For non-animated sprites this is a no-op.
+     *
+     * @param sw  Sprite frame width  (from sprite.contents().width())
+     * @param sh  Sprite frame height (from sprite.contents().height())
+     */
+    private boolean uploadFaceTextureFromAtlas(int modelId, int faceIdx, TextureAtlasSprite sprite, int sw, int sh, int px0, int py0, int pxW, int pyH) {
+        try {
+            if (cachedAtlasId < 0) {
+                var atlas = (TextureAtlas) Minecraft.getInstance().getTextureManager()
+                        .getTexture(ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png"));
+                cachedAtlasId = atlas.getId();
+                // Use TWO separate IntBuffer slots to avoid the LWJGL position-advancement bug
+                // (see Javadoc above) that would cause cachedAtlasH to equal cachedAtlasW for
+                // non-square atlases.
+                try (MemoryStack stack = MemoryStack.stackPush()) {
+                    var wBuf = stack.mallocInt(1);
+                    var hBuf = stack.mallocInt(1);
+                    glBindTexture(GL_TEXTURE_2D, cachedAtlasId);
+                    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  wBuf);
+                    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, hBuf);
+                    cachedAtlasW = wBuf.get(0);
+                    cachedAtlasH = hBuf.get(0);
+                    Logger.info("[ModelFactory] Block atlas GL id=" + cachedAtlasId
+                            + " size=" + cachedAtlasW + "x" + cachedAtlasH);
+                }
+            }
+            if (cachedAtlasW <= 0 || cachedAtlasH <= 0) return false;
+
+            // Compute the sprite's pixel rectangle in the atlas.
+            // sprite.getU0/V0 are normalized [0,1] coords for the sprite's top-left corner.
+            // sprite.getU1/V1 are the bottom-right corner of the FULL animation strip.
+            // We cap sprW/sprH to the single-frame dimensions (sw, sh) so animated textures
+            // only sample one frame rather than the full strip.
+            int sprX = Math.round(sprite.getU0() * cachedAtlasW);
+            int sprY = Math.round(sprite.getV0() * cachedAtlasH);
+            int sprW = Math.max(1, Math.min(Math.round(sprite.getU1() * cachedAtlasW) - sprX, sw));
+            int sprH = Math.max(1, Math.min(Math.round(sprite.getV1() * cachedAtlasH) - sprY, sh));
+
+            ByteBuffer atlasPix = MemoryUtil.memAlloc(sprW * sprH * 4);
+            try {
+                // Read the sprite rectangle from the GL atlas.
+                // zoffset=0 and depth=1 work for both GL_TEXTURE_2D and the first layer of
+                // GL_TEXTURE_2D_ARRAY (Sodium may use array textures for atlas storage).
+                glGetTextureSubImage(cachedAtlasId, 0, sprX, sprY, 0, sprW, sprH, 1, GL_RGBA, GL_UNSIGNED_BYTE, atlasPix);
+                boolean allOpaque = true;
+                this.faceBuf.clear();
+                for (int y = 0; y < MODEL_TEXTURE_SIZE; y++) {
+                    // Same Y-flip as the CPU path: the atlas data has visual top at low GL y
+                    // (Minecraft stores textures upside-down from standard GL), so we flip to
+                    // place the visual bottom in faceBuf[0] which maps to slotY (GL bottom of slot).
+                    // Use px0/py0/pxW/pyH to sample only the UV sub-tile of a composite sprite.
+                    int srcY2 = py0 + ((MODEL_TEXTURE_SIZE - 1 - y) * pyH) / MODEL_TEXTURE_SIZE;
+                    for (int x = 0; x < MODEL_TEXTURE_SIZE; x++) {
+                        int srcX = px0 + (x * pxW) / MODEL_TEXTURE_SIZE;
+                        int pOff = (srcY2 * sprW + srcX) * 4;
+                        int r = atlasPix.get(pOff)     & 0xFF;
+                        int g = atlasPix.get(pOff + 1) & 0xFF;
+                        int b = atlasPix.get(pOff + 2) & 0xFF;
+                        int a = atlasPix.get(pOff + 3) & 0xFF;
+                        // Pack as ABGR: A high byte, then B, G, R.
+                        // When this int is written as 4 little-endian bytes: R,G,B,A — the
+                        // layout that GL_RGBA / GL_UNSIGNED_BYTE expects on upload.
+                        int abgr = (a << 24) | (b << 16) | (g << 8) | r;
+                        this.faceBuf.putInt(abgr);
+                        if (a < 250) allOpaque = false;
+                    }
+                }
+                this.faceBuf.flip();
+                uploadFaceBuffer(modelId, faceIdx);
+                return allOpaque;
+            } finally {
+                MemoryUtil.memFree(atlasPix);
+            }
+        } catch (Throwable t) {
+            Logger.warn("Sprite GL-atlas fallback failed for face " + faceIdx + ": " + t);
+            return false;
+        }
     }
 
     private void uploadFaceBuffer(int modelId, int faceIdx) {
@@ -630,9 +909,21 @@ public class ModelFactory {
         }
     }
 
-    /** Returns the grass/foliage/water RGB colour for a given biome and colour type. */
-    private static int getColorForBiome(Biome biome, byte colorType) {
+    /**
+     * Returns the RGB colour for a given biome and colour type.
+     *
+     * If a non-null {@code resolver} is provided (captured from the block's registered
+     * BlockColors handler), it is called as {@code resolver.getColor(biome, 0, 0)}.  This
+     * honours any mod-replaced color provider (Quark GreenerGrass, Aether, etc.) instead of
+     * falling back to the vanilla GrassColor/FoliageColor formula.
+     *
+     * Falls back to the vanilla formula when resolver is null (water special-case) or throws.
+     */
+    private static int getColorForBiome(Biome biome, byte colorType, ColorResolver resolver) {
         try {
+            if (resolver != null) {
+                return resolver.getColor(biome, 0.0, 0.0) & 0xFFFFFF;
+            }
             var effects = biome.getSpecialEffects();
             return switch (colorType) {
                 case 1 -> {  // grass
@@ -668,7 +959,7 @@ public class ModelFactory {
     private static byte detectColorType(BlockState state) {
         Block block = state.getBlock();
         if (block instanceof LiquidBlock) return 3;                                // water
-        if (block instanceof LeavesBlock
+        if (state.is(BlockTags.LEAVES)
                 || block instanceof VineBlock
                 || block == Blocks.LILY_PAD) return 2;                             // foliage
         return 1;                                                                   // grass

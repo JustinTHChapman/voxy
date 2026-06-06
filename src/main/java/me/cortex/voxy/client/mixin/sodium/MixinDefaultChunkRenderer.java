@@ -3,6 +3,7 @@ package me.cortex.voxy.client.mixin.sodium;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.generation.AutoGenerationService;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.VoxyFogParameters;
@@ -14,9 +15,9 @@ import net.caffeinemc.mods.sodium.client.render.chunk.lists.ChunkRenderListItera
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
-import me.cortex.voxy.client.config.VoxyConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.material.FogType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -61,21 +62,39 @@ public abstract class MixinDefaultChunkRenderer {
         } else {
             float[] fogColor = RenderSystem.getShaderFogColor();
             float vanillaRD = VoxyRenderSystem.getRenderDistance();
-            // Fog end is capped at the nearest ungenerated LOD chunk so empty sections
-            // are always hidden.  getFogFrontierBlockRadius() shrinks as the player
-            // approaches the LOD edge and grows as new chunks are generated.
             float fogEnd, fogStart;
             if (VoxyConfig.CONFIG.useEnvironmentalFog) {
+                // Frontier shrinks as player approaches ungenerated LOD edge, grows as
+                // chunks are generated — smoothed each tick so the transition is gradual.
                 float frontier = AutoGenerationService.INSTANCE.getFogFrontierBlockRadius();
                 fogEnd = Math.max(vanillaRD * 1.5f, frontier);
-                // Same transition formula as vanilla terrain fog: clamp(fogEnd/10, 4, 64)
                 float fogTransition = Mth.clamp(fogEnd / 10.0f, 4.0f, 64.0f);
                 fogStart = Math.max(vanillaRD, fogEnd - fogTransition);
             } else {
-                fogEnd = Float.MAX_VALUE;
+                fogEnd   = Float.MAX_VALUE;
                 fogStart = Float.MAX_VALUE;
             }
-            var fogParams = new VoxyFogParameters(fogColor[0], fogColor[1], fogColor[2], fogStart, fogEnd, 0);
+            float fogR = fogColor[0], fogG = fogColor[1], fogB = fogColor[2];
+
+            // When the camera is submerged, extend the fluid tint through the full LOD distance.
+            // We check the camera fluid type directly rather than relying on RenderSystem fog end
+            // because Sodium manages its own fog state and getShaderFogEnd() may be stale.
+            var mc2 = Minecraft.getInstance();
+            var fluidInCamera = mc2.gameRenderer.getMainCamera().getFluidInCamera();
+            if (fluidInCamera == FogType.WATER) {
+                // Use biome water fog colour (not the shader fog colour which Sodium may override).
+                if (mc2.level != null && mc2.player != null) {
+                    int wfc = mc2.level.getBiome(mc2.player.blockPosition()).value().getWaterFogColor();
+                    fogR = ((wfc >> 16) & 0xFF) / 255.0f;
+                    fogG = ((wfc >>  8) & 0xFF) / 255.0f;
+                    fogB =  (wfc        & 0xFF) / 255.0f;
+                }
+                fogStart = 0.0f;
+            } else if (fluidInCamera == FogType.LAVA) {
+                fogStart = 0.0f;
+            }
+
+            var fogParams = new VoxyFogParameters(fogR, fogG, fogB, fogStart, fogEnd, 0);
             viewport = renderer.setupViewport(matrices.projection(), matrices.modelView(), fogParams, camera.x, camera.y, camera.z);
         }
         renderer.renderOpaque(viewport);
