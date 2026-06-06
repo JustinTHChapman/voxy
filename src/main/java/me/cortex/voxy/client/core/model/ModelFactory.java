@@ -148,19 +148,20 @@ public class ModelFactory {
             this.blockIdToModelId[blockId] = 0;
             return false;
         }
-        // Bubble column: alias directly to water's model so they share identical metadata.
-        // This is race-condition-free — no pre-set needed, no bakeBlock remapping.
-        // If water hasn't been registered yet, fall through to normal path (bakeBlock remaps).
+        // Bubble columns: treat as fully absent / transparent.
+        // The mapper already redirects new ingestion to air (block ID 0), but existing
+        // sections.db entries may still carry the old bubble_column block ID.  Give them
+        // a dedicated model slot that has all faces absent and NO fluid flags so that
+        // adjacent water renders its faces into that space — making the column invisible.
+        // (isFluid/containsFluid both cause adjacent water to cull its faces, creating a
+        //  void column; no-flags lets water fill the space visually.)
         BlockState preState = this.mapper.getBlockStateFromBlockId(blockId);
         if (preState != null && preState.getBlock() == Blocks.BUBBLE_COLUMN) {
-            int waterBlockId = this.mapper.getIdForBlockState(Blocks.WATER.defaultBlockState());
-            if (waterBlockId >= 0 && waterBlockId < this.blockIdToModelId.length) {
-                int waterModelId = this.blockIdToModelId[waterBlockId];
-                if (waterModelId >= 0) {
-                    this.blockIdToModelId[blockId] = waterModelId; // alias: share water's model
-                    return true; // no new model slot or bake needed
-                }
-            }
+            int modelId = this.nextModelId++;
+            this.blockIdToModelId[blockId] = modelId;
+            this.metadataCache[modelId] = 0x0000FFFFFFFFFFFFL; // all faces absent, no flags
+            this.bakedCount++;
+            return true; // no bakeBlock needed
         }
 
         int modelId = this.nextModelId++;
@@ -275,13 +276,6 @@ public class ModelFactory {
         if (modelId <= 0) return;
 
         BlockState state = this.mapper.getBlockStateFromBlockId(blockId);
-
-        // Bubble columns: all faces absent + containsFluid, same as the pre-set in addEntry().
-        // Early return prevents the normal bake path from overwriting with real geometry.
-        if (state.getBlock() == Blocks.BUBBLE_COLUMN) {
-            this.metadataCache[modelId] = 0x0008FFFFFFFFFFFFL;
-            return;
-        }
 
         Minecraft mc = Minecraft.getInstance();
         BlockModelShaper shaper = mc.getBlockRenderer().getBlockModelShaper();
