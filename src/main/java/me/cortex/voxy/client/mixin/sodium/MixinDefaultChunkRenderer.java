@@ -3,7 +3,7 @@ package me.cortex.voxy.client.mixin.sodium;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
-import me.cortex.voxy.client.core.generation.AutoGenerationService;
+import me.cortex.voxy.client.config.ServerConfigOverride;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.VoxyFogParameters;
 import me.cortex.voxy.client.core.util.IrisUtil;
@@ -15,6 +15,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRend
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.level.material.FogType;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
@@ -59,22 +60,33 @@ public abstract class MixinDefaultChunkRenderer {
         } else {
             float[] fogColor = RenderSystem.getShaderFogColor();
             float vanillaRD = VoxyRenderSystem.getRenderDistance();
-            // Fog end tracks the farthest generated chunk, so it always sits right at
-            // the actual LOD frontier rather than the theoretical max LOD distance.
-            float loadedBlockRadius = AutoGenerationService.INSTANCE.getEstimatedLoadedBlockRadius();
-            float fogEnd   = Math.max(vanillaRD * 1.5f, loadedBlockRadius);
-            float fogStart = Math.max(vanillaRD, fogEnd * 0.7f);
+            // Use the configured LOD generation radius (player-relative) so the fog
+            // transition zone is always near the LOD boundary regardless of where the
+            // player is or how much has been generated.
+            float lodBlockRadius = ServerConfigOverride.INSTANCE.effectiveLodRadius() * 16f;
+            float fogEnd   = Math.max(vanillaRD * 1.5f, lodBlockRadius);
+            float fogStart = Math.max(vanillaRD, fogEnd * 0.85f);
+            float fogR = fogColor[0], fogG = fogColor[1], fogB = fogColor[2];
 
-            // When vanilla applies short-range fog (underwater, lava) the shader fog end is
-            // much shorter than the render distance.  Keep the vanilla fog START so the color
-            // gradient begins at the same depth, but leave fog END at the LOD distance so the
-            // tint extends continuously through LOD terrain with no sharp cutoff.
-            float vanillaFogEnd = RenderSystem.getShaderFogEnd();
-            if (vanillaFogEnd > 0 && vanillaFogEnd < vanillaRD) {
-                fogStart = RenderSystem.getShaderFogStart();
+            // When the camera is submerged, extend the fluid tint through the full LOD distance.
+            // We check the camera fluid type directly rather than relying on RenderSystem fog end
+            // because Sodium manages its own fog state and getShaderFogEnd() may be stale.
+            var mc2 = Minecraft.getInstance();
+            var fluidInCamera = mc2.gameRenderer.getMainCamera().getFluidInCamera();
+            if (fluidInCamera == FogType.WATER) {
+                // Use biome water fog colour (not the shader fog colour which Sodium may override).
+                if (mc2.level != null && mc2.player != null) {
+                    int wfc = mc2.level.getBiome(mc2.player.blockPosition()).value().getWaterFogColor();
+                    fogR = ((wfc >> 16) & 0xFF) / 255.0f;
+                    fogG = ((wfc >>  8) & 0xFF) / 255.0f;
+                    fogB =  (wfc        & 0xFF) / 255.0f;
+                }
+                fogStart = 0.0f;
+            } else if (fluidInCamera == FogType.LAVA) {
+                fogStart = 0.0f;
             }
 
-            var fogParams = new VoxyFogParameters(fogColor[0], fogColor[1], fogColor[2], fogStart, fogEnd, 0);
+            var fogParams = new VoxyFogParameters(fogR, fogG, fogB, fogStart, fogEnd, 0);
             viewport = renderer.setupViewport(matrices.projection(), matrices.modelView(), fogParams, camera.x, camera.y, camera.z);
         }
         renderer.renderOpaque(viewport);
