@@ -149,12 +149,9 @@ public final class AutoGenerationService {
         });
     }
 
-    /** Raw fog distance adjusted for player movement since the last rebuildQueue call. */
+    /** Raw fog distance in blocks from the frontier (distance to nearest unsubmitted chunk). */
     private float computeRawFogBlocks() {
-        int dx = currentPlayerCX - lastPlayerCX;
-        int dz = currentPlayerCZ - lastPlayerCZ;
-        int moved = Math.max(Math.abs(dx), Math.abs(dz));
-        return Math.max(0, fogFrontierChunks - moved) * 16f;
+        return fogFrontierChunks * 16f;
     }
 
     /** Called once per client tick from the NeoForge ClientTickEvent listener. */
@@ -191,12 +188,16 @@ public final class AutoGenerationService {
             rebuildQueue(playerCX, playerCZ);
         }
 
-        // Smoothly lerp the fog frontier toward the raw value each tick.
-        // Shrink faster than grow so empty LOD sections are hidden promptly.
+        // When the frontier grows (new chunks confirmed), snap immediately so the fog
+        // always reaches the actual data edge.  When it shrinks (player approaching a gap),
+        // lerp so the fog fades in smoothly rather than jumping to opaque.
         float rawFrontier = computeRawFogBlocks();
         float current = smoothedFogFrontierBlocks;
-        float factor = rawFrontier < current ? FOG_LERP_SHRINK : FOG_LERP_GROW;
-        smoothedFogFrontierBlocks = current + (rawFrontier - current) * factor;
+        if (rawFrontier < current) {
+            smoothedFogFrontierBlocks = current + (rawFrontier - current) * FOG_LERP_SHRINK;
+        } else {
+            smoothedFogFrontierBlocks = rawFrontier;
+        }
 
         // Drain any chunks the server thread has finished loading
         int drained = 0;
