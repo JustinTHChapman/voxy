@@ -67,6 +67,12 @@ public final class AutoGenerationService {
     /** Max C2S section uploads per tick (separate budget from generation). */
     private static final int MAX_UPLOADS_PER_TICK = 4;
 
+    // Dynamic throttle: reduce generation when the game is struggling.
+    // Measures wall-clock time between successive tick() calls and smooths it
+    // with an EWMA (α=0.1). Works on both singleplayer and dedicated server.
+    private float smoothedMspt = 50f;  // starts at 50 ms (20 TPS) — no pre-throttle before data arrives
+    private long lastTickNano = 0;
+
     private int lastPlayerCX = Integer.MIN_VALUE;
     private int lastPlayerCZ = Integer.MIN_VALUE;
 
@@ -84,6 +90,8 @@ public final class AutoGenerationService {
         lastPlayerCX = Integer.MIN_VALUE;
         lastPlayerCZ = Integer.MIN_VALUE;
         estimatedLoadedChunkRadius = 0;
+        smoothedMspt = 50f;
+        lastTickNano = 0;
     }
 
     /** Block radius (in world units) of the farthest successfully generated chunk from the player. */
@@ -142,7 +150,21 @@ public final class AutoGenerationService {
         // Integrated-server reference (null on dedicated server or when not yet ready)
         var iServer = mc.getSingleplayerServer();
 
-        int rate = ServerConfigOverride.INSTANCE.effectiveGenerationRate();
+        // Measure wall-clock time between ticks (EWMA α=0.1, ~10 tick window).
+        // Capped at 200 ms so a single GC pause does not permanently crater the rate.
+        long now = System.nanoTime();
+        if (lastTickNano > 0) {
+            float tickMs = Math.min((now - lastTickNano) / 1_000_000f, 200f);
+            smoothedMspt = 0.9f * smoothedMspt + 0.1f * tickMs;
+        }
+        lastTickNano = now;
+
+        // Throttle factor: 1.0 at ≤40 ms/tick (≥25 TPS effective), 0.0 at ≥100 ms/tick (≤10 TPS).
+        // Linear ramp between those bounds so generation backs off smoothly before the
+        // server completely bogs down. We clamp to a minimum of 1 so generation never
+        // stops entirely (the player still needs nearby chunks).
+        float throttle = Math.max(0f, Math.min(1f, (100f - smoothedMspt) / 60f));
+        int rate = Math.max(1, Math.round(ServerConfigOverride.INSTANCE.effectiveGenerationRate() * throttle));
         int generated = 0;
         int requested = 0;
 
