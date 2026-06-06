@@ -138,13 +138,24 @@ public final class AutoGenerationService {
     private void populateSubmittedFromDB(WorldEngine engine, int playerCX, int playerCZ) {
         int scanRadius = Math.min(ServerConfigOverride.INSTANCE.effectiveLodRadius(), 256);
         long scanRadiusSq = (long) scanRadius * scanRadius;
+        // WorldEngine stores level-N sections at position chunkX >> (N+1) in each axis.
+        // Level-0 section x = chunkX / 2, so one level-0 section covers 2 chunk columns
+        // per axis (a 2×2 chunk area).  Multiply back by 2 to recover chunk coordinates.
+        // Without this correction, the submitted keys were at half the chunk scale and
+        // never matched the colKey(chunkX, chunkZ) entries checked in rebuildQueue.
         engine.storage.iteratePositions(0, pos -> {
-            int x = WorldEngine.getX(pos);
-            int z = WorldEngine.getZ(pos);
-            long dx = x - playerCX;
-            long dz = z - playerCZ;
-            if (dx * dx + dz * dz <= scanRadiusSq) {
-                submitted.add(colKey(x, z));
+            int sx = WorldEngine.getX(pos); // level-0 section x  = chunkX / 2
+            int sz = WorldEngine.getZ(pos); // level-0 section z  = chunkZ / 2
+            for (int dcx = 0; dcx < 2; dcx++) {
+                for (int dcz = 0; dcz < 2; dcz++) {
+                    int cx = sx * 2 + dcx;
+                    int cz = sz * 2 + dcz;
+                    long dx = cx - playerCX;
+                    long dz = cz - playerCZ;
+                    if (dx * dx + dz * dz <= scanRadiusSq) {
+                        submitted.add(colKey(cx, cz));
+                    }
+                }
             }
         });
     }

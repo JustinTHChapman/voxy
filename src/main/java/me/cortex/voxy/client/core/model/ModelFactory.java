@@ -122,6 +122,11 @@ public class ModelFactory {
     private final ConcurrentLinkedDeque<Integer> bakeQueue = new ConcurrentLinkedDeque<>();
     private final AtomicInteger inflight = new AtomicInteger();
 
+    // Bubble-column → water aliasing: bubble columns must share water's model ID so the
+    // mesh builder treats them as the same fluid and culls shared faces seamlessly.
+    private volatile int waterBlockId = -1;
+    private final ConcurrentLinkedDeque<Integer> pendingBubbleColumnBlockIds = new ConcurrentLinkedDeque<>();
+
     // Reusable 16x16 RGBA scratch buffer.
     private final ByteBuffer faceBuf = MemoryUtil.memAlloc(MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE * 4)
             .order(ByteOrder.LITTLE_ENDIAN);
@@ -148,24 +153,37 @@ public class ModelFactory {
             this.blockIdToModelId[blockId] = 0;
             return false;
         }
-        // Bubble columns: treat as fully absent / transparent.
-        // The mapper already redirects new ingestion to air (block ID 0), but existing
-        // sections.db entries may still carry the old bubble_column block ID.  Give them
-        // a dedicated model slot that has all faces absent and NO fluid flags so that
-        // adjacent water renders its faces into that space — making the column invisible.
-        // (isFluid/containsFluid both cause adjacent water to cull its faces, creating a
-        //  void column; no-flags lets water fill the space visually.)
         BlockState preState = this.mapper.getBlockStateFromBlockId(blockId);
+
+        // Bubble columns must share water's exact model ID so the mesh builder treats
+        // them as the same fluid and culls shared faces, making columns invisible.
         if (preState != null && preState.getBlock() == Blocks.BUBBLE_COLUMN) {
-            int modelId = this.nextModelId++;
-            this.blockIdToModelId[blockId] = modelId;
-            this.metadataCache[modelId] = 0x0000FFFFFFFFFFFFL; // all faces absent, no flags
-            this.bakedCount++;
-            return true; // no bakeBlock needed
+            if (this.waterBlockId >= 0) {
+                // Water already registered — alias directly.
+                this.blockIdToModelId[blockId] = this.blockIdToModelId[this.waterBlockId];
+            } else {
+                // Water not registered yet — park as 0 (air) and fix up when water arrives.
+                this.blockIdToModelId[blockId] = 0;
+                this.pendingBubbleColumnBlockIds.add(blockId);
+            }
+            return true;
         }
+
+        // Track water's block ID so bubble columns can alias to it.
+        boolean isWater = (preState != null && preState.getBlock() == Blocks.WATER);
 
         int modelId = this.nextModelId++;
         this.blockIdToModelId[blockId] = modelId;
+
+        if (isWater) {
+            this.waterBlockId = blockId;
+            // Fix up any bubble columns that registered before water.
+            Integer pendingBcId;
+            while ((pendingBcId = this.pendingBubbleColumnBlockIds.poll()) != null) {
+                this.blockIdToModelId[pendingBcId] = modelId;
+            }
+        }
+
         this.bakeQueue.add(blockId);
         this.inflight.incrementAndGet();
         this.bakedCount++;
