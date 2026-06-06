@@ -15,9 +15,7 @@ import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.SectionPos;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
@@ -29,7 +27,6 @@ import java.util.Deque;
 import java.util.HashSet;
 import java.util.PriorityQueue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Background LOD auto-generation service.
@@ -47,8 +44,6 @@ public final class AutoGenerationService {
 
     /** Rebuild the candidate queue when the player moves more than this many chunks. */
     private static final int REBUILD_THRESHOLD_CHUNKS = 4;
-    /** Max outstanding server-thread chunk requests. Prevents flooding the integrated server. */
-    private static final int MAX_PENDING_SERVER_LOADS = 4;
 
     /** Lerp factor when fog frontier needs to shrink (player approaching edge). */
     private static final float FOG_LERP_SHRINK = 0.15f;
@@ -57,11 +52,7 @@ public final class AutoGenerationService {
 
     private final PriorityQueue<long[]> candidateQueue =
             new PriorityQueue<>(Comparator.comparingLong(e -> e[0]));
-    private final Set<Long> submitted    = new HashSet<>();
-    private final Set<Long> pendingLoad  = new HashSet<>();   // requested from server thread, not yet back
-
-    /** Chunks loaded by the server thread and ready to ingest on the client tick. */
-    private final ConcurrentLinkedDeque<LevelChunk> serverReadyChunks = new ConcurrentLinkedDeque<>();
+    private final Set<Long> submitted = new HashSet<>();
 
     /** Chunks pending upload to server after local generation. */
     private final Deque<LevelChunk> uploadQueue = new ArrayDeque<>();
@@ -69,10 +60,11 @@ public final class AutoGenerationService {
     /** Max C2S section uploads per tick (separate budget from generation). */
     private static final int MAX_UPLOADS_PER_TICK = 4;
 
-    // Dynamic throttle: reduce generation when the game is struggling.
-    // Measures wall-clock time between successive tick() calls and smooths it
-    // with an EWMA (α=0.1). Works on both singleplayer and dedicated server.
-    private float smoothedMspt = 50f;  // starts at 50 ms (20 TPS) — no pre-throttle before data arrives
+    // Dynamic throttle (dedicated-server fallback only).
+    // On integrated server we use iServer.getAverageTickTime() directly.
+    // This EWMA is only consulted on a dedicated server where we have no direct
+    // server-side timing and must proxy through client-tick interval.
+    private float smoothedMspt = 50f;
     private long lastTickNano = 0;
 
     private int lastPlayerCX = Integer.MIN_VALUE;
@@ -105,8 +97,6 @@ public final class AutoGenerationService {
     public void reset() {
         candidateQueue.clear();
         submitted.clear();
-        pendingLoad.clear();
-        serverReadyChunks.clear();
         uploadQueue.clear();
         lastPlayerCX = Integer.MIN_VALUE;
         lastPlayerCZ = Integer.MIN_VALUE;
@@ -210,96 +200,44 @@ public final class AutoGenerationService {
             smoothedFogFrontierBlocks = rawFrontier;
         }
 
-        // Drain any chunks the server thread has finished loading
-        int drained = 0;
-        LevelChunk ready;
-        while ((ready = serverReadyChunks.poll()) != null) {
-            long k = colKey(ready.getPos().x, ready.getPos().z);
-            pendingLoad.remove(k);
-            if (!submitted.contains(k)) {
-                // Use enqueueIngestServer: bypasses the LIGHT_AND_DATA gate that
-                // causes server-side chunks to be silently dropped when accessed
-                // from the client thread.
-                boolean ok = instance.getIngestService().enqueueIngestServer(engine, ready);
-                if (ok) {
-                    submitted.add(k);
-                    uploadQueue.addLast(ready);
-                    drained++;
-                    int d = Math.max(Math.abs(ready.getPos().x - playerCX), Math.abs(ready.getPos().z - playerCZ));
-                    if (d > estimatedLoadedChunkRadius) estimatedLoadedChunkRadius = d;
-                }
-            }
-        }
-        if (drained > 0) {
-            Logger.info("[AutoGen] Ingested " + drained + " server-loaded chunk(s) near (" + playerCX + "," + playerCZ + ")");
-        }
-
-        // Integrated-server reference (null on dedicated server or when not yet ready)
+        // Integrated-server reference — used only for throttle MSPT, no longer for chunk loading
         var iServer = mc.getSingleplayerServer();
 
-        // Measure wall-clock time between ticks (EWMA α=0.1, ~10 tick window).
-        // Capped at 200 ms so a single GC pause does not permanently crater the rate.
-        long now = System.nanoTime();
-        if (lastTickNano > 0) {
-            float tickMs = Math.min((now - lastTickNano) / 1_000_000f, 200f);
-            smoothedMspt = 0.9f * smoothedMspt + 0.1f * tickMs;
+        // Determine effective server MSPT for throttling.
+        // Singleplayer: use the integrated server's own rolling average (accurate).
+        // Dedicated server: fall back to client-side EWMA as a proxy.
+        float effectiveMspt;
+        if (iServer != null) {
+            effectiveMspt = iServer.getAverageTickTimeNanos() / 1_000_000f;
+        } else {
+            long now = System.nanoTime();
+            if (lastTickNano > 0) {
+                float tickMs = Math.min((now - lastTickNano) / 1_000_000f, 200f);
+                smoothedMspt = 0.9f * smoothedMspt + 0.1f * tickMs;
+            }
+            lastTickNano = now;
+            effectiveMspt = smoothedMspt;
         }
-        lastTickNano = now;
 
-        // Throttle factor: 1.0 at ≤40 ms/tick (≥25 TPS effective), 0.0 at ≥100 ms/tick (≤10 TPS).
-        // Linear ramp between those bounds so generation backs off smoothly before the
-        // server completely bogs down. We clamp to a minimum of 1 so generation never
-        // stops entirely (the player still needs nearby chunks).
-        float throttle = Math.max(0f, Math.min(1f, (100f - smoothedMspt) / 60f));
+        // Throttle factor: 1.0 at ≤30 ms/tick (≥33 TPS), 0.0 at ≥80 ms/tick (≤12.5 TPS).
+        // Tighter bounds than before: we start backing off earlier so the server never
+        // reaches the 37%-of-tick situation seen in the profiler.
+        float throttle = Math.max(0f, Math.min(1f, (80f - effectiveMspt) / 50f));
         int rate = Math.max(1, Math.round(ServerConfigOverride.INSTANCE.effectiveGenerationRate() * throttle));
         int generated = 0;
-        int requested = 0;
 
-        while ((generated + requested) < rate && !candidateQueue.isEmpty()) {
+        while (generated < rate && !candidateQueue.isEmpty()) {
             long[] entry = candidateQueue.poll();
             int cx = (int) entry[1];
             int cz = (int) entry[2];
             long colKey = colKey(cx, cz);
 
-            if (submitted.contains(colKey) || pendingLoad.contains(colKey)) continue;
+            if (submitted.contains(colKey)) continue;
 
             // 1. Try client chunk cache first (chunks within vanilla render distance)
             LevelChunk chunk = mc.level.getChunkSource().getChunk(cx, cz, false);
 
-            if (chunk == null && iServer != null) {
-                // 2. Singleplayer: request the chunk from the integrated server asynchronously.
-                //    Cap outstanding requests so we don't flood the server thread with disk I/O.
-                if (pendingLoad.size() >= MAX_PENDING_SERVER_LOADS) {
-                    // Server load slots full; put this entry back and stop for this tick.
-                    // The entry stays at the front of the queue (minimum distance), so it
-                    // is the very next thing processed once a slot frees up.
-                    candidateQueue.add(entry);
-                    break;
-                }
-                pendingLoad.add(colKey);
-                final int fcx = cx, fcz = cz;
-                final var dim = mc.level.dimension();
-                iServer.execute(() -> {
-                    try {
-                        ServerLevel sl = iServer.getLevel(dim);
-                        if (sl == null) { pendingLoad.remove(colKey(fcx, fcz)); return; }
-                        // getChunk with ChunkStatus.FULL and create=true forces the chunk to load.
-                        // On an already-generated world this is fast (just reads region file).
-                        var c = sl.getChunkSource().getChunk(fcx, fcz, ChunkStatus.FULL, true);
-                        if (c instanceof LevelChunk lc) {
-                            serverReadyChunks.addLast(lc);
-                        } else {
-                            pendingLoad.remove(colKey(fcx, fcz));
-                        }
-                    } catch (Exception e) {
-                        pendingLoad.remove(colKey(fcx, fcz));
-                    }
-                });
-                requested++;
-                continue;
-            }
-
-            if (chunk == null) continue; // dedicated server — nothing we can do client-side
+            if (chunk == null) continue; // not in client cache — skip
 
             boolean ok = instance.getIngestService().enqueueIngest(engine, chunk);
             if (ok) {
@@ -314,9 +252,13 @@ public final class AutoGenerationService {
             // the player moves or the current batch empties.
         }
 
-        // Upload client-generated sections to server (rate-limited)
-        if (!uploadQueue.isEmpty() && ServerConfigOverride.INSTANCE.autoGenerationEnabled()) {
+        // Upload client-generated sections to server (rate-limited, dedicated server only).
+        // In singleplayer the integrated server already owns the chunk data — uploading it
+        // back would be a complete no-op that wastes convert + mip + packet-serialize time.
+        if (iServer == null && !uploadQueue.isEmpty() && ServerConfigOverride.INSTANCE.autoGenerationEnabled()) {
             drainUploads(mc, engine);
+        } else {
+            uploadQueue.clear(); // singleplayer: discard immediately, no upload needed
         }
     }
 
@@ -387,7 +329,7 @@ public final class AutoGenerationService {
                 int cx = playerCX + dx;
                 int cz = playerCZ + dz;
                 long key = colKey(cx, cz);
-                if (submitted.contains(key) || pendingLoad.contains(key)) continue;
+                if (submitted.contains(key)) continue;
                 if (dist < fogFrontierDistSq) fogFrontierDistSq = dist;
                 candidateQueue.add(new long[]{dist, cx, cz});
             }
