@@ -47,7 +47,10 @@ uint makeQuadFlags(uint faceData, uint modelId, ivec2 quadSize, const in BlockMo
 
     {//Cuttout
         flags |= faceHasAlphaCuttout(faceData);
-        flags |= uint(any(greaterThan(quadSize, ivec2(1)))) & faceHasAlphaCuttoutOverride(faceData);
+        // bit1 = useAveragedMipDiscard (set for leaf blocks via hasAlphaCutoutOverride).
+        // No merged-quad gate: even single-block leaf quads must use the averaged alpha
+        // so that "Better Leaves" sparse side textures render solid at LOD distance.
+        flags |= faceHasAlphaCuttoutOverride(faceData) << 1u;
     }
 
     //TODO: remove, there is no non mip code path anymore
