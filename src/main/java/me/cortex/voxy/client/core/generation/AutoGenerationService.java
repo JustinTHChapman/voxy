@@ -87,11 +87,6 @@ public final class AutoGenerationService {
      */
     private volatile int fogFrontierChunks = 0;
 
-    /**
-     * Euclidean chunk radius to the FARTHEST submitted chunk as of the last rebuildQueue call.
-     * Represents the actual generated extent from the player's current position.
-     */
-    private volatile int fogFarthestChunks = 0;
 
     /** Current player chunk position, updated every tick for inter-rebuild fog adjustment. */
     private volatile int currentPlayerCX = 0;
@@ -116,7 +111,6 @@ public final class AutoGenerationService {
         lastPlayerCZ = Integer.MIN_VALUE;
         estimatedLoadedChunkRadius = 0;
         fogFrontierChunks = 0;
-        fogFarthestChunks = 0;
         currentPlayerCX = 0;
         currentPlayerCZ = 0;
         smoothedFogFrontierBlocks = 256f * 16f;
@@ -141,16 +135,13 @@ public final class AutoGenerationService {
      *  - frontier = nearest unsubmitted chunk → shrinks as player approaches an ungenerated edge
      *  - farthest = farthest submitted chunk  → caps fog at the actual generated extent
      *
-     * Movement correction subtracts chunks moved since the last rebuild (conservative: assumes
-     * the player is walking toward the nearest gap and the farthest submitted point).
+     * Movement correction subtracts chunks moved since the last rebuild.
      */
     private float computeRawFogBlocks() {
         int dx = currentPlayerCX - lastPlayerCX;
         int dz = currentPlayerCZ - lastPlayerCZ;
         int moved = Math.max(Math.abs(dx), Math.abs(dz));
-        int effectiveFrontier = Math.max(0, fogFrontierChunks - moved);
-        int effectiveFarthest = Math.max(0, fogFarthestChunks - moved);
-        return Math.min(effectiveFrontier, effectiveFarthest) * 16f;
+        return Math.max(0, fogFrontierChunks - moved) * 16f;
     }
 
     /** Called once per client tick from the NeoForge ClientTickEvent listener. */
@@ -354,14 +345,9 @@ public final class AutoGenerationService {
         // distance squared so chunks are popped closest-first, giving a circular
         // generation front rather than the square front that a Chebyshev-ordered
         // scan would produce.
-        //
-        // Two fog values are tracked:
-        //   fogFrontierDistSq — nearest unsubmitted chunk (shrinks when approaching ungenerated edge)
-        //   fogFarthestDistSq — farthest submitted/pending chunk (actual generated extent from player)
-        //
-        // The fog end is min(frontier, farthest): bounded by both the nearest gap AND the real extent.
+        // Frontier = nearest unsubmitted chunk (Euclidean distance from player).
+        // Shrinks when the player approaches an ungenerated edge, grows as generation progresses.
         long fogFrontierDistSq = (long) scanRadius * scanRadius + 1;
-        long fogFarthestDistSq = 0;
         for (int dx = -scanRadius; dx <= scanRadius; dx++) {
             for (int dz = -scanRadius; dz <= scanRadius; dz++) {
                 long dist = (long) dx * dx + (long) dz * dz;
@@ -369,16 +355,12 @@ public final class AutoGenerationService {
                 int cx = playerCX + dx;
                 int cz = playerCZ + dz;
                 long key = colKey(cx, cz);
-                if (submitted.contains(key) || pendingLoad.contains(key)) {
-                    if (dist > fogFarthestDistSq) fogFarthestDistSq = dist;
-                    continue;
-                }
+                if (submitted.contains(key) || pendingLoad.contains(key)) continue;
                 if (dist < fogFrontierDistSq) fogFrontierDistSq = dist;
                 candidateQueue.add(new long[]{dist, cx, cz});
             }
         }
         this.fogFrontierChunks = (int) Math.ceil(Math.sqrt(fogFrontierDistSq));
-        this.fogFarthestChunks = (int) Math.floor(Math.sqrt(fogFarthestDistSq));
     }
 
     private static long colKey(int cx, int cz) {
