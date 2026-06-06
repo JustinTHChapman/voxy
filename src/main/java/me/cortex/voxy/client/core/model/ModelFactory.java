@@ -150,13 +150,13 @@ public class ModelFactory {
         }
         int modelId = this.nextModelId++;
         this.blockIdToModelId[blockId] = modelId;
-        // Bubble columns: treat as fully absent (no faces, no isFluid flag) so they are
-        // invisible to the renderer and adjacent water blocks render all their faces normally.
-        // isFluid=0 is critical — without it adjacent water would cull its faces toward the
-        // bubble column position, creating holes in the ocean floor.
+        // Bubble columns: treat like kelp — all faces absent + containsFluid (0x08).
+        // containsFluid tells adjacent water to cull its shared face, so no water face
+        // renders into the bubble column position. The column has no geometry of its own.
+        // This matches how kelp/seagrass behave inside water (invisible, no holes).
         BlockState preState = this.mapper.getBlockStateFromBlockId(blockId);
         if (preState != null && preState.getBlock() == Blocks.BUBBLE_COLUMN) {
-            this.metadataCache[modelId] = 0x0000FFFFFFFFFFFFL;
+            this.metadataCache[modelId] = 0x0008FFFFFFFFFFFFL;
         }
         this.bakeQueue.add(blockId);
         this.inflight.incrementAndGet();
@@ -269,11 +269,10 @@ public class ModelFactory {
 
         BlockState state = this.mapper.getBlockStateFromBlockId(blockId);
 
-        // Bubble columns: emit no geometry and no isFluid flag so adjacent water renders
-        // all its faces normally. The pre-set in addEntry() already wrote this value; the
-        // early return here ensures bakeBlock() never overwrites it with a real model.
+        // Bubble columns: all faces absent + containsFluid, same as the pre-set in addEntry().
+        // Early return prevents the normal bake path from overwriting with real geometry.
         if (state.getBlock() == Blocks.BUBBLE_COLUMN) {
-            this.metadataCache[modelId] = 0x0000FFFFFFFFFFFFL;
+            this.metadataCache[modelId] = 0x0008FFFFFFFFFFFFL;
             return;
         }
 
