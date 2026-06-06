@@ -3,7 +3,7 @@ package me.cortex.voxy.client.mixin.sodium;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
-import me.cortex.voxy.client.config.ServerConfigOverride;
+import me.cortex.voxy.client.core.generation.AutoGenerationService;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.VoxyFogParameters;
 import me.cortex.voxy.client.core.util.IrisUtil;
@@ -60,12 +60,11 @@ public abstract class MixinDefaultChunkRenderer {
         } else {
             float[] fogColor = RenderSystem.getShaderFogColor();
             float vanillaRD = VoxyRenderSystem.getRenderDistance();
-            // Use the configured LOD generation radius (player-relative) so the fog
-            // transition zone is always near the LOD boundary regardless of where the
-            // player is or how much has been generated.
-            float lodBlockRadius = ServerConfigOverride.INSTANCE.effectiveLodRadius() * 16f;
-            float fogEnd   = Math.max(vanillaRD * 1.5f, lodBlockRadius);
-            float fogStart = Math.max(vanillaRD, fogEnd * 0.85f);
+            // Fog end tracks the actual generation frontier so it expands out as
+            // auto-generation fills in chunks — hiding the unloaded boundary dynamically.
+            float loadedBlockRadius = AutoGenerationService.INSTANCE.getEstimatedLoadedBlockRadius();
+            float fogEnd   = Math.max(vanillaRD * 1.5f, loadedBlockRadius);
+            float fogStart = Math.max(vanillaRD, fogEnd * 0.7f);
             float fogR = fogColor[0], fogG = fogColor[1], fogB = fogColor[2];
 
             // When the camera is submerged, extend the fluid tint through the full LOD distance.
