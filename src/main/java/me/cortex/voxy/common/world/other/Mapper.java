@@ -273,6 +273,11 @@ public class Mapper {
         if (state.isAir()) {
             return 0;
         }
+        // Bubble columns are visual-only water animation effects that produce column
+        // artifacts in LOD rendering — treat them as air so no geometry is stored.
+        if (state.getBlock() == Blocks.BUBBLE_COLUMN) {
+            return 0;
+        }
         var mapping = this.block2stateEntry.get(state);
         if (mapping == null) {
             mapping = this.registerNewBlockState(state);

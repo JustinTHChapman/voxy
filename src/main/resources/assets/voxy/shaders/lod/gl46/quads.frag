@@ -273,7 +273,15 @@ void main() {
     //   We sample mip-0 here for an exact per-pixel decision because the block's
     //   opaque border pixels must not be discarded at the borders of the pane.
     #ifndef TRANSLUCENT
-    if (useDiscard() && (colour.a <= 0.1f)) {
+    // For leaf blocks (bit1 set), use the tile's mip-averaged alpha for the discard test.
+    // This ensures "Better Leaves" sparse side textures (individual leaf silhouettes on a
+    // transparent background) average out to solid at LOD distance, matching the canopy look.
+    // For all other cutout blocks, use the textureGrad alpha which preserves detail.
+    float cutoutAlpha = colour.a;
+    if ((interData.x & 2u) == 2u) {
+        cutoutAlpha = textureLod(blockModelAtlas, texPos, 3.0).a;
+    }
+    if (useDiscard() && (cutoutAlpha <= 0.1f)) {
     #else
     if (textureLod(blockModelAtlas, texPos, 0).a == 0.0f) {
     #endif

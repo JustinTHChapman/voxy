@@ -64,6 +64,16 @@ public abstract class MixinDefaultChunkRenderer {
             float loadedBlockRadius = AutoGenerationService.INSTANCE.getEstimatedLoadedBlockRadius();
             float fogEnd   = Math.max(vanillaRD * 1.5f, loadedBlockRadius);
             float fogStart = Math.max(vanillaRD, fogEnd * 0.7f);
+
+            // When vanilla applies short-range fog (underwater, lava) the shader fog end is
+            // much shorter than the render distance.  Keep the vanilla fog START so the color
+            // gradient begins at the same depth, but leave fog END at the LOD distance so the
+            // tint extends continuously through LOD terrain with no sharp cutoff.
+            float vanillaFogEnd = RenderSystem.getShaderFogEnd();
+            if (vanillaFogEnd > 0 && vanillaFogEnd < vanillaRD) {
+                fogStart = RenderSystem.getShaderFogStart();
+            }
+
             var fogParams = new VoxyFogParameters(fogColor[0], fogColor[1], fogColor[2], fogStart, fogEnd, 0);
             viewport = renderer.setupViewport(matrices.projection(), matrices.modelView(), fogParams, camera.x, camera.y, camera.z);
         }
