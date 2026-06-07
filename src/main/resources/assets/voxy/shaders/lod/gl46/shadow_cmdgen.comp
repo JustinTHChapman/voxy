@@ -46,32 +46,30 @@ void main() {
     if ((counts.x | counts.y | counts.z | counts.w) == 0u) return;
 
     uint ptr = extractQuadStart(meta);
-    ivec3 ipos = extractPosition(meta);
     uint detail = extractDetail(meta);
 
-    // Camera-relative section position for adjacency face culling —
-    // same as the regular cmdgen so shared LOD faces are not rendered twice.
-    ivec3 relative = ipos - (baseSectionPos >> detail);
-
-    // Distance cull: 5 section-widths per LOD level.
-    // LOD 1 → 320m, LOD 2 → 640m, LOD 3 → 1280m — sufficient for any
-    // shadow distance while avoiding the full LOD hemisphere (~km) per cascade.
-    ivec3 absRel = abs(relative);
-    if (absRel.x > 5 || absRel.y > 5 || absRel.z > 5) return;
+    // Skip LOD 0 — vanilla terrain already casts shadows at that resolution and the
+    // coarser LOD 0 mesh doesn't match vanilla geometry exactly, causing ghost shadows.
+    if (detail == 0u) return;
 
     // Allocate a unique position-buffer slot for this section.
     uint drawId = atomicAdd(shadowPosCount, 1u);
     positionBuffer[drawId] = extractRawPos(meta);
 
-    // Build the same face-group mask as cmdgen.comp, minus translucents.
+    // Include all non-empty face groups — no player-position distance cull and no
+    // player-relative face-direction filter.  The regular cmdgen uses camera-relative
+    // culling to avoid double-drawing shared faces, but in the shadow pass the sun
+    // direction drives visibility, not the player camera.  Omitting that cull keeps the
+    // shadow map stable as the player moves; minor coplanar overdraw in the depth buffer
+    // is harmless (both fragments write identical depth).
     uint msk = 0u;
-    msk |= uint(((counts.y       & 0xFFFFu) != 0u) && (relative.y > -1)) << 0; // down
-    msk |= uint((((counts.y>>16) & 0xFFFFu) != 0u) && (relative.y <  1)) << 1; // up
-    msk |= uint(((counts.z       & 0xFFFFu) != 0u) && (relative.z > -1)) << 2; // north
-    msk |= uint((((counts.z>>16) & 0xFFFFu) != 0u) && (relative.z <  1)) << 3; // south
-    msk |= uint(((counts.w       & 0xFFFFu) != 0u) && (relative.x > -1)) << 4; // west
-    msk |= uint((((counts.w>>16) & 0xFFFFu) != 0u) && (relative.x <  1)) << 5; // east
-    msk |= uint(((counts.x>>16)  & 0xFFFFu) != 0u) << 6;                       // double-sided
+    msk |= uint((counts.y        & 0xFFFFu) != 0u) << 0; // down
+    msk |= uint(((counts.y>>16)  & 0xFFFFu) != 0u) << 1; // up
+    msk |= uint((counts.z        & 0xFFFFu) != 0u) << 2; // north
+    msk |= uint(((counts.z>>16)  & 0xFFFFu) != 0u) << 3; // south
+    msk |= uint((counts.w        & 0xFFFFu) != 0u) << 4; // west
+    msk |= uint(((counts.w>>16)  & 0xFFFFu) != 0u) << 5; // east
+    msk |= uint(((counts.x>>16)  & 0xFFFFu) != 0u) << 6; // double-sided
 
     uint cmdCnt = bitCount(msk);
     if (cmdCnt == 0u) return;
