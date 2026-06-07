@@ -54,6 +54,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private static final int STATISTICS_BUFFER_BINDING = 8;
     private final Shader terrainShader;
     private final Shader translucentTerrainShader;
+    private final Shader shadowTerrainShader;
 
     // Set to true to skip LOD shadow casting entirely (for perf diagnosis).
     private static final boolean DISABLE_SHADOW_CASTING = true;
@@ -147,6 +148,17 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         translucentFrag = translucentFrag==null?frag:translucentFrag;
 
         this.translucentTerrainShader = tryCompilePatchedOrNormal(builder.define("TRANSLUCENT"), translucentFrag, frag);
+
+        {
+            var shadowBuilder = Shader.make()
+                    .apply(this.properties::apply)
+                    .define("SHADOW_PASS")
+                    .addSource(ShaderType.VERTEX, vertex);
+            addDirectionalFaceTint(shadowBuilder, Minecraft.getInstance().level);
+            this.shadowTerrainShader = shadowBuilder
+                    .add(ShaderType.FRAGMENT, "voxy:lod/gl46/quads.frag")
+                    .compile();
+        }
 
         if (this.pipeline.hasTAA()) {
             this.cullShader = Shader.make()
@@ -485,6 +497,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.shadowPositionScratchBuffer.free();
         this.shadowDrawCountBuffer.free();
         this.translucentTerrainShader.free();
+        this.shadowTerrainShader.free();
         this.terrainShader.free();
         this.commandGenShader.free();
         this.shadowCmdgenShader.free();

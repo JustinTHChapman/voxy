@@ -23,7 +23,9 @@
 //   opaque geometry pass.  Used to early-out LOD fragments that sit behind
 //   already-drawn solid geometry, saving fillrate on occluded terrain.
 layout(binding = 0) uniform sampler2D blockModelAtlas;
+#ifndef SHADOW_PASS
 layout(binding = 2) uniform sampler2D depthTex;
+#endif
 
 //#define DEBUG_RENDER   // enable to colour each quad by a unique hash (debugging)
 
@@ -250,10 +252,12 @@ void main() {
     // LOD pass.  If this fragment is behind that geometry it would be invisible,
     // so we discard it here to save fill-rate and avoid z-fighting with vanilla
     // chunks that overlap the LOD region near the render-distance border.
+#ifndef SHADOW_PASS
     if (DEPTH_SCALAR_COMPARE(gl_FragCoord.z, texelFetch(depthTex, ivec2(gl_FragCoord.xy), 0).r)) {
         discard;
         return;
     }
+#endif
 
     // ── Step 6: alpha discard / translucent setup ─────────────────────────────
     // Opaque / cutout path (#ifndef TRANSLUCENT):
