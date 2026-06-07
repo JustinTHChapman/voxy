@@ -548,6 +548,7 @@ public class AsyncNodeManager {
             var store = (BasicSectionGeometryData)this.geometryData;
 
             store.setSectionCount(results.geometrySectionCount);
+            store.updateMaxUsedNodeId(results.currentMaxNodeId);
 
             var upload = results.geometryUpload;
             if (!upload.dataUploadPoints.isEmpty()) {

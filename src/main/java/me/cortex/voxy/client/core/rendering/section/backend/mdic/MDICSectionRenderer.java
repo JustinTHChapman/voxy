@@ -54,6 +54,22 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private static final int STATISTICS_BUFFER_BINDING = 8;
     private final Shader terrainShader;
     private final Shader translucentTerrainShader;
+    private final Shader shadowTerrainShader;
+
+    // Set to true to skip LOD shadow casting entirely (for perf diagnosis).
+    private static final boolean DISABLE_SHADOW_CASTING = false;
+
+    // Shadow-specific buffers, populated once per frame during buildDrawCalls.
+    // renderShadow reads from these instead of the camera-frustum-culled viewport buffers.
+    private static final int SHADOW_DRAW_COUNT = OPAQUE_DRAW_COUNT; // cap shadow draw calls at same limit
+    private final GlBuffer shadowDrawCallBuffer = new GlBuffer(5L * 4 * SHADOW_DRAW_COUNT).zero();
+    private final GlBuffer shadowPositionScratchBuffer = new GlBuffer(8L * SHADOW_DRAW_COUNT).zero();
+    // Layout: [0]=shadowDrawCount (GL_PARAMETER_BUFFER), [1]=shadowPosCount, [2]=totalSections
+    private final GlBuffer shadowDrawCountBuffer = new GlBuffer(16).zero();
+
+    private final Shader shadowCmdgenShader = Shader.make()
+            .add(ShaderType.COMPUTE, "voxy:lod/gl46/shadow_cmdgen.comp")
+            .compile();
 
     private final Shader commandGenShader = Shader.make()
             .define("TRANSLUCENT_WRITE_BASE", 1024)
@@ -132,6 +148,17 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         translucentFrag = translucentFrag==null?frag:translucentFrag;
 
         this.translucentTerrainShader = tryCompilePatchedOrNormal(builder.define("TRANSLUCENT"), translucentFrag, frag);
+
+        {
+            var shadowBuilder = Shader.make()
+                    .apply(this.properties::apply)
+                    .define("SHADOW_PASS")
+                    .addSource(ShaderType.VERTEX, vertex);
+            addDirectionalFaceTint(shadowBuilder, Minecraft.getInstance().level);
+            this.shadowTerrainShader = shadowBuilder
+                    .add(ShaderType.FRAGMENT, "voxy:lod/gl46/quads.frag")
+                    .compile();
+        }
 
         if (this.pipeline.hasTAA()) {
             this.cullShader = Shader.make()
@@ -224,6 +251,59 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.uploadUniformBuffer(viewport);
 
         this.renderTerrain(viewport, 0, 4*3, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), OPAQUE_DRAW_COUNT));
+    }
+
+    /**
+     * Render LOD opaque geometry for shadow depth into the currently-bound shadow FBO.
+     * Skips ChunkBoundRenderer, SSAO, and the final color blit — only depth is needed.
+     * The shadow terrain shader (SHADOW_PASS) omits the depth-occlusion test so every
+     * LOD section contributes to the shadow map even if vanilla terrain occludes it from
+     * the main camera's perspective.
+     */
+    @Override
+    public void renderShadow(MDICViewport viewport) {
+        if (DISABLE_SHADOW_CASTING) return;
+        if (this.geometryManager.getSectionCount() == 0) return;
+
+        this.uploadUniformBuffer(viewport);
+
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(true);
+        glDepthFunc(GL_LEQUAL);
+        this.shadowTerrainShader.bind();
+        glBindVertexArray(GlVertexArray.STATIC_VAO);
+
+        glBindBufferBase(GL_UNIFORM_BUFFER,        0, this.uniform.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getGeometryBuffer().id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.geometryManager.getMetadataBuffer().id);
+        this.modelStore.bind(3, 4, 0);
+        // Use shadow-specific position scratch (pre-built without frustum culling).
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.shadowPositionScratchBuffer.id);
+        LightMapHelper.bind(1);
+        glBindTextureUnit(2, 0); // no depth texture in SHADOW_PASS
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
+        // Shadow draw commands and count come from the shadow-specific buffers built
+        // by the shadow_cmdgen pass in buildDrawCalls — not from the camera-culled viewport buffers.
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.shadowDrawCallBuffer.id);
+        glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.shadowDrawCountBuffer.id);
+
+        // No barrier needed here — buildDrawCalls already emits GL_COMMAND_BARRIER_BIT
+        // after shadow_cmdgen, and the shadow buffers are not modified between cascades.
+        glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
+
+        // shadowDrawCount is at offset 0 in shadowDrawCountBuffer (used as parameter).
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0,
+                SHADOW_DRAW_COUNT, 0);
+
+        glEnable(GL_CULL_FACE);
+        glBindVertexArray(0);
+        glBindSampler(0, 0);
+        glBindTextureUnit(0, 0);
+        glBindSampler(1, 0);
+        glBindTextureUnit(1, 0);
     }
 
     @Override
@@ -361,6 +441,34 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
         }
 
+        if (DISABLE_SHADOW_CASTING) return;
+
+        // Generate shadow draw commands for ALL sections in the metadata buffer.
+        // Unlike the camera cmdgen above, this has no frustum or HiZ culling — every
+        // section with geometry will cast shadows regardless of camera orientation.
+        // Results are written to shadow-specific buffers and consumed by renderShadow().
+        {
+            // Use the actual high-water-mark node ID, not the full buffer capacity (1M).
+            // getMetadataScanBound() returns one past the highest node ID ever written,
+            // so we never dispatch over empty slots that were never touched.
+            int scanBound = Math.max(1, this.geometryManager.getMetadataScanBound());
+            long ptr = UploadStream.INSTANCE.upload(this.shadowDrawCountBuffer, 0, 12);
+            MemoryUtil.memPutInt(ptr,     0);          // shadowDrawCount = 0
+            MemoryUtil.memPutInt(ptr + 4, 0);          // shadowPosCount  = 0
+            MemoryUtil.memPutInt(ptr + 8, scanBound);  // totalSections
+            UploadStream.INSTANCE.commit();
+
+            this.shadowCmdgenShader.bind();
+            glBindBufferBase(GL_UNIFORM_BUFFER,         0, this.uniform.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER,  1, this.shadowDrawCallBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER,  2, this.shadowDrawCountBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER,  3, this.geometryManager.getMetadataBuffer().id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER,  5, this.shadowPositionScratchBuffer.id);
+
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+            glDispatchCompute((scanBound + 127) / 128, 1, 1);
+            glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT);
+        }
     }
 
     @Override
@@ -385,9 +493,14 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     public void free() {
         this.uniform.free();
         this.distanceCountBuffer.free();
+        this.shadowDrawCallBuffer.free();
+        this.shadowPositionScratchBuffer.free();
+        this.shadowDrawCountBuffer.free();
         this.translucentTerrainShader.free();
+        this.shadowTerrainShader.free();
         this.terrainShader.free();
         this.commandGenShader.free();
+        this.shadowCmdgenShader.free();
         this.cullShader.free();
         this.prepShader.free();
         this.translucentGenShader.free();

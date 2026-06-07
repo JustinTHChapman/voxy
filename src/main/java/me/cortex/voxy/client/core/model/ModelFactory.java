@@ -369,6 +369,19 @@ public class ModelFactory {
                     }
                 } catch (Exception ignored) {}
             }
+            // For pure fluid blocks (water, lava), use the actual fluid still-texture from the
+            // block atlas. BakedModel.getParticleIcon() for fluids often returns a grey/white
+            // placeholder or the missingno texture (fully opaque), which makes LOD water look
+            // like a solid opaque rectangle, hiding the seabed beneath it.
+            if (sprite == null && isPureFluid) {
+                try {
+                    var ext = net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions
+                            .of(state.getFluidState().getType());
+                    sprite = mc.getModelManager()
+                            .getAtlas(net.minecraft.resources.ResourceLocation.withDefaultNamespace("textures/atlas/blocks.png"))
+                            .getSprite(ext.getStillTexture());
+                } catch (Throwable ignored) {}
+            }
             // Don't fall back to particle icon for cross-plant/sprite-only models;
             // they should be invisible in LOD rather than rendered as solid cubes.
             if (sprite == null && (hasAnyDirectionalQuad || isPureFluid)) {

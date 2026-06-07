@@ -18,6 +18,8 @@ public class BasicSectionGeometryData implements IGeometryData {
 
     private final int maxSectionCount;
     private int currentSectionCount;
+    /** High water mark of node IDs written to the metadata buffer via scatterWrite. */
+    private int maxUsedNodeId = 0;
 
     public BasicSectionGeometryData(int maxSectionCount, GlBuffer geometryBuffer) {
         this.maxSectionCount = maxSectionCount;
@@ -108,6 +110,15 @@ public class BasicSectionGeometryData implements IGeometryData {
 
     public void setSectionCount(int count) {
         this.currentSectionCount = count;
+    }
+
+    public void updateMaxUsedNodeId(int nodeId) {
+        if (nodeId > this.maxUsedNodeId) this.maxUsedNodeId = nodeId;
+    }
+
+    /** One past the highest node ID ever written to the metadata buffer. Safe dispatch upper bound. */
+    public int getMetadataScanBound() {
+        return this.maxUsedNodeId + 1;
     }
 
     public int getMaxSectionCount() {

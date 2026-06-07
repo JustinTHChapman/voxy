@@ -96,12 +96,10 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             float end = viewport.fogParameters.environmentalEnd();
             if (Math.abs(end-start)>1) {
                 float invEndFogDelta = 1f / (end - start);
-                // Use the Voxy LOD render distance, not the vanilla render distance.
-                // VoxyRenderSystem.getRenderDistance() returns vanilla distance; fog must span to LOD edge.
                 float voxyMaxDist = VoxyConfig.CONFIG.sectionRenderDistance * 32f * 16f;
                 float endDistance = Math.max(voxyMaxDist, 20*16) * (float)Math.sqrt(3);
                 float startDelta = -start * invEndFogDelta;
-                glUniform4f(4, invEndFogDelta, startDelta, Math.clamp(endDistance*invEndFogDelta+startDelta, 0, 1),0);//
+                glUniform4f(4, invEndFogDelta, startDelta, Math.clamp(endDistance*invEndFogDelta+startDelta, 0, 1),0);
                 glUniform4f(5, viewport.fogParameters.red(), viewport.fogParameters.green(), viewport.fogParameters.blue(), viewport.fogParameters.alpha());
             } else {
                 glUniform4f(4, 0, 0, 0, 0);

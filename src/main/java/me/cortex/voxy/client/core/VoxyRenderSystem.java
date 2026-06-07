@@ -184,6 +184,51 @@ public class VoxyRenderSystem {
     }
 
 
+    /**
+     * Render LOD geometry for shadow depth into Iris's currently-bound shadow framebuffer.
+     *
+     * Uses the shadow camera matrices from Iris's callback directly — no near/far adjustment,
+     * no SSAO, no color blit.  The player camera position anchors the geometry coordinate
+     * system so section-relative positions resolve correctly from the sun's viewpoint.
+     */
+    public void renderShadow(Matrix4fc shadowProj, Matrix4fc shadowModelView, int width, int height,
+                             double camX, double camY, double camZ) {
+        var viewport = this.viewportSelector.getViewport();
+        if (viewport == null) return;
+        if (width <= 0 || height <= 0) return;
+
+        try {
+            viewport
+                    .setVanillaProjection(shadowProj)
+                    .setProjection(new org.joml.Matrix4f(shadowProj))
+                    .setModelView(new org.joml.Matrix4f(shadowModelView))
+                    .setCamera(camX, camY, camZ)
+                    .setScreenSize(width, height)
+                    .setFogParameters(new VoxyFogParameters(0, 0, 0, Float.MAX_VALUE, Float.MAX_VALUE, 0))
+                    .update();
+
+            this.pipeline.runShadowPipeline(viewport);
+        } finally {
+            glUseProgram(0);
+            glDisable(GL11.GL_STENCIL_TEST);
+            glEnable(GL_DEPTH_TEST);
+            GlStateManager._glBindVertexArray(0);
+
+            for (int i = 0; i < 4; i++) {
+                GlStateManager._activeTexture(org.lwjgl.opengl.GL13.GL_TEXTURE0 + i);
+                GlStateManager._bindTexture(0);
+                glBindSampler(i, 0);
+            }
+
+            // Unbind SSBOs rather than restoring previous bindings — glGetIntegeri is a
+            // synchronous GPU→CPU readback that stalls the pipeline once per slot per cascade.
+            // Sodium and Iris rebind their own SSBOs unconditionally, so zeroing is safe.
+            for (int i = 0; i < 10; i++) {
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, i, 0);
+            }
+        }
+    }
+
     public Viewport<?> setupViewport(Matrix4fc vanillaProjection, Matrix4fc modelView, VoxyFogParameters fogParameters, double cameraX, double cameraY, double cameraZ) {
         var viewport = this.getViewport();
         if (viewport == null) {
