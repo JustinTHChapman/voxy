@@ -27,6 +27,11 @@ Unofficial NeoForge 1.21.1 port of [Voxy](https://github.com/corvesive/voxy), a 
 - **SQLite persistence** — LOD data is stored on-disk in a compressed SQLite database and survives world restarts
 - **Multi-threaded ingest** — dedicated worker threads process incoming chunk sections in parallel; service manager balances load across ingest, save, and render-build tasks
 
+### Iris Shader Pack Support
+- **Full compatibility** — LOD terrain renders correctly alongside Iris shader packs; fog, water translucency, and sky all integrate with the active shader pack's pipeline
+- **LOD shadow casting** — LOD sections at detail level 1 and above write depth into Iris's shadow map, so distant terrain casts directional shadows; LOD 0 is skipped to avoid geometry mismatches with vanilla terrain
+- **No shader pack required** — all features work without Iris installed
+
 ### Mod Compatibility
 - **Lithium** — `LithiumHashPalette` and other mod-replaced chunk palette types are handled via generic fallback; no crash or silent data loss
 - **Embeddium / Sodium** — sprite textures are read via GL atlas fallback when the mod frees the CPU-side `NativeImage` after GPU upload (prevents pink/magenta blocks)
@@ -71,6 +76,7 @@ Unofficial NeoForge 1.21.1 port of [Voxy](https://github.com/corvesive/voxy), a 
 - Minecraft 1.21.1
 - NeoForge 21.1.230+
 - OpenGL 4.5 capable GPU
+- Iris (optional) — tested with Iris + Complementary Reimagined; other shader packs may work
 
 ---
 
