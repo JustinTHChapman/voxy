@@ -3,6 +3,7 @@ package me.cortex.voxy.client.mixin.sodium;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
+import org.lwjgl.opengl.GL11;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.generation.AutoGenerationService;
 import me.cortex.voxy.client.core.rendering.Viewport;
@@ -44,10 +45,14 @@ public abstract class MixinDefaultChunkRenderer {
     private void voxy$injectRender(ChunkRenderMatrices matrices, CommandList commandList, ChunkRenderListIterable renderLists, TerrainRenderPass renderPass, CameraTransform camera, CallbackInfo ci) {
         voxy$callCount++;
         if (renderPass != DefaultTerrainRenderPasses.CUTOUT) return;
-        // Iris calls the shadow render pass through the same Sodium pipeline.  Skip LOD
-        // rendering there — shadow map support is a future enhancement.
-        if (IrisUtil.isRenderingShadowMap()) return;
         VoxyRenderSystem renderer = ((IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer).voxy$getRenderSystem();
+        if (IrisUtil.isRenderingShadowMap()) {
+            if (renderer == null) return;
+            int[] vp = new int[4];
+            GL11.glGetIntegerv(GL11.GL_VIEWPORT, vp);
+            renderer.renderShadow(matrices.projection(), matrices.modelView(), vp[2], vp[3], camera.x, camera.y, camera.z);
+            return;
+        }
         long now = System.currentTimeMillis();
         if (now - voxy$lastDiagLog > 2000) {
             voxy$lastDiagLog = now;

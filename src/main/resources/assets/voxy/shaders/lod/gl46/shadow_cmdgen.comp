@@ -53,11 +53,6 @@ void main() {
     // same as the regular cmdgen so shared LOD faces are not rendered twice.
     ivec3 relative = ipos - (baseSectionPos >> detail);
 
-    // Skip detail-0 (finest LOD) entirely — vanilla terrain already casts shadows
-    // at that resolution, so Voxy's coarser LOD 0 sections are redundant in the
-    // shadow pass and only inflate draw count.
-    if (detail == 0u) return;
-
     // Distance cull: 5 section-widths per LOD level.
     // LOD 1 → 320m, LOD 2 → 640m, LOD 3 → 1280m — sufficient for any
     // shadow distance while avoiding the full LOD hemisphere (~km) per cascade.

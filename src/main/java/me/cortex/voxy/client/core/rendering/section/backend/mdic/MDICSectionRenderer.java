@@ -57,7 +57,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private final Shader shadowTerrainShader;
 
     // Set to true to skip LOD shadow casting entirely (for perf diagnosis).
-    private static final boolean DISABLE_SHADOW_CASTING = true;
+    private static final boolean DISABLE_SHADOW_CASTING = false;
 
     // Shadow-specific buffers, populated once per frame during buildDrawCalls.
     // renderShadow reads from these instead of the camera-frustum-culled viewport buffers.
