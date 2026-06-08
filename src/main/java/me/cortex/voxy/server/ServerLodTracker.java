@@ -22,7 +22,9 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -50,11 +52,23 @@ public class ServerLodTracker {
     /** Fraction of available tick headroom (50ms − smoothedMspt) to spend on voxelization. */
     private static final float VOXEL_HEADROOM_FRACTION = 0.30f;
 
+    /** Maximum number of chunk columns held in each dimension's section cache (LRU eviction). */
+    private static final int SECTION_CACHE_MAX = 8192;
+
     // Per-dimension state
     private static final class DimState {
         final Mapper mapper = new Mapper(new InMemoryMappingStorage());
-        /** key = (sectionY << 40 | chunkZ << 20 | chunkX) – stored serialized sections per chunk column */
-        final ConcurrentHashMap<Long, S2CLodSectionPacket[]> sectionCache = new ConcurrentHashMap<>();
+        /** LRU-bounded map: colKey → voxelized section packets. Evicts least-recently-used
+         *  entries when the map exceeds SECTION_CACHE_MAX to prevent unbounded growth on
+         *  long-running servers where players explore large areas. */
+        final Map<Long, S2CLodSectionPacket[]> sectionCache = Collections.synchronizedMap(
+            new LinkedHashMap<Long, S2CLodSectionPacket[]>(256, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Long, S2CLodSectionPacket[]> eldest) {
+                    return size() > SECTION_CACHE_MAX;
+                }
+            }
+        );
     }
 
     /** Maps dimension resource-location string → state */
@@ -94,19 +108,22 @@ public class ServerLodTracker {
         DimState state = dims.get(dimId);
         if (state == null) return;
 
-        // Collect (position, hash) for all cached sections
+        // Collect (position, hash) for all cached sections.
+        // Must hold the sectionCache monitor for the full iteration since the underlying
+        // LinkedHashMap is not safe for concurrent structural access.
         var positions = new java.util.ArrayList<Long>();
         var hashes    = new java.util.ArrayList<Integer>();
-        for (var entry : state.sectionCache.entrySet()) {
-            S2CLodSectionPacket[] pkts = entry.getValue();
-            if (pkts == null) continue;
-            for (S2CLodSectionPacket p : pkts) {
-                if (p == null) continue;
-                // Encode the section position as a WorldEngine key for the manifest
-                long posKey = me.cortex.voxy.common.world.WorldEngine.getWorldSectionId(
-                        0, p.sectionX(), p.sectionY(), p.sectionZ());
-                positions.add(posKey);
-                hashes.add(p.contentHash());
+        synchronized (state.sectionCache) {
+            for (var entry : state.sectionCache.entrySet()) {
+                S2CLodSectionPacket[] pkts = entry.getValue();
+                if (pkts == null) continue;
+                for (S2CLodSectionPacket p : pkts) {
+                    if (p == null) continue;
+                    long posKey = me.cortex.voxy.common.world.WorldEngine.getWorldSectionId(
+                            0, p.sectionX(), p.sectionY(), p.sectionZ());
+                    positions.add(posKey);
+                    hashes.add(p.contentHash());
+                }
             }
         }
 
