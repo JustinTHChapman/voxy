@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Manages server-side LOD voxelization and per-player delivery queues.
@@ -51,6 +52,14 @@ public class ServerLodTracker {
 
     /** Fraction of available tick headroom (50ms − smoothedMspt) to spend on voxelization. */
     private static final float VOXEL_HEADROOM_FRACTION = 0.30f;
+    /**
+     * Hard cap on the deferred voxelization deque.  Each entry holds a reference to a
+     * full LevelChunk (up to several MB).  Exceeding this many queued chunks — which can
+     * happen during extreme lag spikes or mass player joins — risks an OOM.  New work is
+     * dropped (with a warning) once the cap is reached; the chunk will be re-queued on
+     * the next onChunkWatch call from the server.
+     */
+    private static final int MAX_PENDING_VOXELIZATIONS = 512;
 
     /** Maximum number of chunk columns held in each dimension's section cache (LRU eviction). */
     private static final int SECTION_CACHE_MAX = 8192;
@@ -83,6 +92,9 @@ public class ServerLodTracker {
 
     /** Chunks waiting to be voxelized (FIFO, closest-watched first). */
     private final ConcurrentLinkedDeque<PendingVoxelization> pendingVoxelizations = new ConcurrentLinkedDeque<>();
+
+    /** O(1) size counter for {@link #pendingVoxelizations} (ConcurrentLinkedDeque.size() is O(n)). */
+    private final AtomicInteger pendingVoxelizationCount = new AtomicInteger();
 
     /**
      * Players waiting for a specific chunk column to finish voxelization.
@@ -194,6 +206,7 @@ public class ServerLodTracker {
         while (!pendingVoxelizations.isEmpty() && (System.nanoTime() - voxelStart) < budgetNanos) {
             PendingVoxelization pv = pendingVoxelizations.pollFirst();
             if (pv == null) break;
+            pendingVoxelizationCount.decrementAndGet();
 
             DimState state = dims.get(pv.dimId());
             List<ServerPlayer> waiters = pendingPlayers.remove(pv.colKey());
@@ -269,8 +282,15 @@ public class ServerLodTracker {
         List<ServerPlayer> waiters = new ArrayList<>();
         List<ServerPlayer> existing = pendingPlayers.putIfAbsent(colKey, waiters);
         if (existing == null) {
-            // First request for this column — schedule voxelization.
+            // First request for this column — schedule voxelization, unless the queue is full.
+            if (pendingVoxelizationCount.get() >= MAX_PENDING_VOXELIZATIONS) {
+                pendingPlayers.remove(colKey);
+                Logger.warn("[VoxyServer] Dropped chunk voxelization (queue full at "
+                        + MAX_PENDING_VOXELIZATIONS + "): " + chunk.getPos());
+                return;
+            }
             pendingVoxelizations.addLast(new PendingVoxelization(level, chunk, dimId, colKey));
+            pendingVoxelizationCount.incrementAndGet();
         } else {
             waiters = existing;
         }
