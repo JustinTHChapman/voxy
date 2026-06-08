@@ -23,12 +23,11 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import it.unimi.dsi.fastutil.longs.LongHeapPriorityQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayDeque;
-import java.util.Comparator;
 import java.util.Deque;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -56,8 +55,10 @@ public final class AutoGenerationService {
     /** Lerp factor when fog frontier needs to grow (new chunks generated). */
     private static final float FOG_LERP_GROW   = 0.05f;
 
-    private final PriorityQueue<long[]> candidateQueue =
-            new PriorityQueue<>(Comparator.comparingLong(e -> e[0]));
+    // Candidate chunks packed as a single long: (dist² << 20) | ((dx+256) << 10) | (dz+256)
+    // where dx/dz are chunk offsets from lastPlayerCX/CZ (both ±256 max → 10 bits each after bias).
+    // Natural long ordering gives closest-first (dist in high bits) with zero per-entry allocation.
+    private final LongHeapPriorityQueue candidateQueue = new LongHeapPriorityQueue();
     private final Set<Long> submitted    = new LongOpenHashSet();
     private final Set<Long> pendingLoad  = new LongOpenHashSet();   // requested from server thread, not yet back
 
@@ -247,9 +248,11 @@ public final class AutoGenerationService {
         int requested = 0;
 
         while ((generated + requested) < rate && !candidateQueue.isEmpty()) {
-            long[] entry = candidateQueue.poll();
-            int cx = (int) entry[1];
-            int cz = (int) entry[2];
+            long packed = candidateQueue.dequeueLong();
+            int dx = (int)((packed >> 10) & 0x3FF) - 256;
+            int dz = (int)(packed & 0x3FF) - 256;
+            int cx = lastPlayerCX + dx;
+            int cz = lastPlayerCZ + dz;
             long colKey = colKey(cx, cz);
 
             if (submitted.contains(colKey) || pendingLoad.contains(colKey)) continue;
@@ -272,7 +275,7 @@ public final class AutoGenerationService {
                     // Server load slots full; put this entry back and stop for this tick.
                     // The entry stays at the front of the queue (minimum distance), so it
                     // is the very next thing processed once a slot frees up.
-                    candidateQueue.add(entry);
+                    candidateQueue.enqueue(packed);
                     break;
                 }
                 pendingLoad.add(colKey);
@@ -390,7 +393,7 @@ public final class AutoGenerationService {
                 long key = colKey(cx, cz);
                 if (submitted.contains(key) || pendingLoad.contains(key)) continue;
                 if (dist < fogFrontierDistSq) fogFrontierDistSq = dist;
-                candidateQueue.add(new long[]{dist, cx, cz});
+                candidateQueue.enqueue((dist << 20) | ((long)(dx + 256) << 10) | (long)(dz + 256));
             }
         }
         this.fogFrontierChunks = (int) Math.ceil(Math.sqrt(fogFrontierDistSq));
