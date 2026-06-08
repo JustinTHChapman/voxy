@@ -177,9 +177,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         }
     }
 
-    private void uploadUniformBuffer(MDICViewport viewport) {
+    private void uploadUniformBuffer(MDICViewport viewport, float shadowExcludeRadius) {
         long ptr = UploadStream.INSTANCE.upload(this.uniform, 0, 1024);
-        
+
         var mat = new Matrix4f(viewport.MVP);
         mat.translate(-viewport.innerTranslation.x, -viewport.innerTranslation.y, -viewport.innerTranslation.z);
         mat.getToAddress(ptr); ptr += 4*4*4;
@@ -192,6 +192,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         }
         MemoryUtil.memPutInt(ptr, viewport.frameId&0x7fffffff); ptr += 4;
         viewport.innerTranslation.getToAddress(ptr); ptr += 4*3;
+        MemoryUtil.memPutFloat(ptr, shadowExcludeRadius); ptr += 4;
 
         UploadStream.INSTANCE.commit();
     }
@@ -249,7 +250,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     public void renderOpaque(MDICViewport viewport) {
         if (this.geometryManager.getSectionCount() == 0) return;
 
-        this.uploadUniformBuffer(viewport);
+        this.uploadUniformBuffer(viewport, 0.0f);
 
         this.renderTerrain(viewport, 0, 4*3, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), OPAQUE_DRAW_COUNT));
     }
@@ -266,7 +267,11 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         if (DISABLE_SHADOW_CASTING) return;
         if (this.geometryManager.getSectionCount() == 0) return;
 
-        this.uploadUniformBuffer(viewport);
+        // Clip shadow geometry within vanilla render distance so coarse LOD sections
+        // that overlap vanilla terrain don't write incorrect shadow depths.
+        float shadowExcludeRadius = (float)(Math.ceil(
+                Minecraft.getInstance().options.renderDistance().get() * 16.0 / 32.0) * 32.0);
+        this.uploadUniformBuffer(viewport, shadowExcludeRadius);
 
         glDisable(GL_CULL_FACE);
         glDisable(GL_BLEND);
@@ -339,7 +344,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     @Override
     public void buildDrawCalls(MDICViewport viewport) {
         if (this.geometryManager.getSectionCount() == 0) return;
-        this.uploadUniformBuffer(viewport);
+        this.uploadUniformBuffer(viewport, 0.0f);
         //Can do a sneeky trick, since the sectionRenderList is a list to things to render, it invokes the culler
         // which only marks visible sections
 

@@ -56,6 +56,23 @@ void main() {
 
     uint cornerId = gl_VertexID&3;
 
+#ifdef SHADOW_PASS
+    // Clip vertices whose camera-relative XZ position (Chebyshev) is within vanilla
+    // render distance.  This prevents coarse LOD geometry that overlaps vanilla-rendered
+    // terrain from writing incorrect depths into the shadow map.
+    if (shadowExcludeRadius > 0.0) {
+        vec2 cMask = vec2((cornerId>>1)&1u, cornerId&1u) * quad.lodScale;
+        vec3 pt    = quad.basePoint
+                   + swizzelDataAxis(quad.axis, vec3(quad.quadSizeAddin * cMask, 0.0));
+        vec2 camRelXZ = pt.xz - cameraSubPos.xz;
+        if (max(abs(camRelXZ.x), abs(camRelXZ.y)) < shadowExcludeRadius) {
+            gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+            interData = uvec4(0u);
+            return;
+        }
+    }
+#endif
+
     gl_Position =
     #ifdef USE_NV_JANK
     #ifdef GL_NV_gpu_shader5
