@@ -48,6 +48,8 @@ public final class AutoGenerationService {
 
     /** Rebuild the candidate queue when the player moves more than this many chunks. */
     private static final int REBUILD_THRESHOLD_CHUNKS = 4;
+    /** Movement in a single tick beyond this many chunks is treated as a teleport. */
+    private static final int TELEPORT_THRESHOLD_CHUNKS = 32;
     /** Max outstanding server-thread chunk requests. Prevents flooding the integrated server. */
     private static final int MAX_PENDING_SERVER_LOADS = 4;
 
@@ -200,9 +202,19 @@ public final class AutoGenerationService {
             // else: scan still in progress — nothing to do this tick.
         }
 
-        // Rebuild the candidate queue when the player has moved significantly
+        // Detect teleports: movement larger than TELEPORT_THRESHOLD in a single tick.
+        // Reset the loaded-radius and fog frontier so they reflect the new position,
+        // not the old one (otherwise fog lingers at the pre-teleport distance for several seconds).
         int dcx = playerCX - lastPlayerCX;
         int dcz = playerCZ - lastPlayerCZ;
+        if (lastPlayerCX != Integer.MIN_VALUE
+                && (Math.abs(dcx) > TELEPORT_THRESHOLD_CHUNKS || Math.abs(dcz) > TELEPORT_THRESHOLD_CHUNKS)) {
+            estimatedLoadedChunkRadius = 0;
+            smoothedFogFrontierBlocks  = 0f;
+            fogFrontierChunks          = 0;
+        }
+
+        // Rebuild the candidate queue when the player has moved significantly
         if (candidateQueue.isEmpty() || dcx * dcx + dcz * dcz >= REBUILD_THRESHOLD_CHUNKS * REBUILD_THRESHOLD_CHUNKS) {
             rebuildQueue(playerCX, playerCZ);
         }
