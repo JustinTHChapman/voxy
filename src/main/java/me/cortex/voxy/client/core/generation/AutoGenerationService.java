@@ -30,6 +30,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Background LOD auto-generation service.
@@ -99,7 +100,16 @@ public final class AutoGenerationService {
      */
     private volatile float smoothedFogFrontierBlocks = 0f;
 
-    /** True once submitted has been pre-populated from sections.db for the current session. */
+    /**
+     * Holds the result of the background DB scan.  Set by the scan thread when it completes;
+     * null while the scan is in flight or hasn't started yet.  Merged into {@link #submitted}
+     * on the next client tick, then cleared to null.  AtomicReference gives cheap volatile
+     * visibility without a lock — the producing thread writes once, the client thread reads once.
+     */
+    private final AtomicReference<LongOpenHashSet> dbScanResult = new AtomicReference<>(null);
+    /** Sentinel placed into dbScanResult while the background scan thread is running. */
+    private static final LongOpenHashSet DB_SCAN_IN_PROGRESS = new LongOpenHashSet(0);
+    /** True once the DB scan result has been merged into submitted. */
     private boolean dbPopulated = false;
 
     private AutoGenerationService() {}
@@ -119,6 +129,7 @@ public final class AutoGenerationService {
         smoothedFogFrontierBlocks = 0f;
         smoothedMspt = 50f;
         lastTickNano = 0;
+        dbScanResult.set(null);
         dbPopulated = false;
     }
 
@@ -130,26 +141,6 @@ public final class AutoGenerationService {
     /** Smoothed block radius to the LOD generation frontier, for use as fog end distance. */
     public float getFogFrontierBlockRadius() {
         return smoothedFogFrontierBlocks;
-    }
-
-    /**
-     * One-time population of the submitted set from sections.db so the fog frontier reflects
-     * chunks with actual stored LOD data, not just chunks ingested this session.
-     * Called on the first tick after a world join.
-     */
-    private void populateSubmittedFromDB(WorldEngine engine) {
-        // Iterate ALL stored level-0 sections so that chunks with existing LOD data are
-        // never re-generated — regardless of how far from spawn the player previously explored.
-        // Level-0 section (sx, sz) covers chunk columns (sx*2, sz*2) through (sx*2+1, sz*2+1).
-        engine.storage.iteratePositions(0, pos -> {
-            int sx = WorldEngine.getX(pos); // level-0 section x = chunkX / 2
-            int sz = WorldEngine.getZ(pos); // level-0 section z = chunkZ / 2
-            for (int dcx = 0; dcx < 2; dcx++) {
-                for (int dcz = 0; dcz < 2; dcz++) {
-                    submitted.add(colKey(sx * 2 + dcx, sz * 2 + dcz));
-                }
-            }
-        });
     }
 
     /** Raw fog distance in blocks from the frontier (distance to nearest unsubmitted chunk). */
@@ -177,11 +168,36 @@ public final class AutoGenerationService {
         currentPlayerCX = playerCX;
         currentPlayerCZ = playerCZ;
 
-        // On first tick after world join, pre-populate submitted from sections.db so the
-        // fog frontier reflects actual stored LOD data, not just chunks re-ingested this session.
+        // Non-blocking DB pre-scan: kick off a daemon thread on first tick, merge its
+        // result into submitted on a subsequent tick once it completes.  During the scan
+        // the per-chunk DB existence check in the generation loop catches any duplicates.
         if (!dbPopulated) {
-            populateSubmittedFromDB(engine);
-            dbPopulated = true;
+            LongOpenHashSet scanResult = dbScanResult.get();
+            if (scanResult == null) {
+                // First tick — launch background scan.
+                dbScanResult.set(DB_SCAN_IN_PROGRESS);
+                final WorldEngine eng = engine;
+                Thread t = new Thread(() -> {
+                    LongOpenHashSet result = new LongOpenHashSet();
+                    eng.storage.iteratePositions(0, pos -> {
+                        int sx = WorldEngine.getX(pos);
+                        int sz = WorldEngine.getZ(pos);
+                        for (int dcx = 0; dcx < 2; dcx++)
+                            for (int dcz = 0; dcz < 2; dcz++)
+                                result.add(colKey(sx * 2 + dcx, sz * 2 + dcz));
+                    });
+                    dbScanResult.set(result);
+                    Logger.info("[AutoGen] DB pre-scan complete: " + result.size() + " columns pre-submitted");
+                }, "voxy-db-scan");
+                t.setDaemon(true);
+                t.start();
+            } else if (scanResult != DB_SCAN_IN_PROGRESS) {
+                // Scan finished — merge on the client thread (single writer, no lock needed).
+                var it = scanResult.longIterator();
+                while (it.hasNext()) submitted.add(it.nextLong());
+                dbPopulated = true;
+            }
+            // else: scan still in progress — nothing to do this tick.
         }
 
         // Rebuild the candidate queue when the player has moved significantly
