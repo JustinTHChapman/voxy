@@ -56,8 +56,11 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private final Shader translucentTerrainShader;
     private final Shader shadowTerrainShader;
 
-    // Set to true to skip LOD shadow casting entirely (for perf diagnosis).
-    private static final boolean DISABLE_SHADOW_CASTING = false;
+    // LOD sections outside vanilla RD can cast long shadows back into vanilla terrain
+    // when the sun is at an angle.  Vertex clipping and cmdgen distance filtering only
+    // control which LOD geometry is drawn, not where the resulting shadows fall.
+    // Until a cascade-isolated shadow path is available, disable LOD shadow casting.
+    private static final boolean DISABLE_SHADOW_CASTING = true;
 
 
     // Shadow-specific buffers, populated once per frame during buildDrawCalls.

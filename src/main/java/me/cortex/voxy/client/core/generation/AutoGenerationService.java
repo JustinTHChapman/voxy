@@ -283,9 +283,11 @@ public final class AutoGenerationService {
                     try {
                         ServerLevel sl = iServer.getLevel(dim);
                         if (sl == null) { pendingLoad.remove(colKey(fcx, fcz)); return; }
-                        // getChunk with ChunkStatus.FULL and create=true forces the chunk to load.
-                        // On an already-generated world this is fast (just reads region file).
-                        var c = sl.getChunkSource().getChunk(fcx, fcz, ChunkStatus.FULL, true);
+                        // Non-blocking: return the chunk only if it is already loaded.
+                        // create=true would call managedBlock, which drains the server task
+                        // queue while waiting and allows reentrant setBlock → getChunk calls
+                        // that can deadlock or trigger recursive updates in other mods.
+                        var c = sl.getChunkSource().getChunk(fcx, fcz, ChunkStatus.FULL, false);
                         if (c instanceof LevelChunk lc) {
                             serverReadyChunks.addLast(lc);
                         } else {
