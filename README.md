@@ -29,7 +29,7 @@ Unofficial NeoForge 1.21.1 port of [Voxy](https://github.com/corvesive/voxy), a 
 
 ### Iris Shader Pack Support
 - **Full compatibility** — LOD terrain renders correctly alongside Iris shader packs; fog, water translucency, and sky all integrate with the active shader pack's pipeline
-- **LOD shadow casting** — LOD sections at detail level 1 and above write depth into Iris's shadow map, so distant terrain casts directional shadows; LOD 0 is skipped to avoid geometry mismatches with vanilla terrain
+- **LOD shadow casting** — currently disabled; LOD geometry outside vanilla render distance can project shadows back onto vanilla terrain at oblique sun angles, producing phantom shadow patches that shift as the player moves
 - **No shader pack required** — all features work without Iris installed
 
 ### Mod Compatibility
@@ -38,6 +38,7 @@ Unofficial NeoForge 1.21.1 port of [Voxy](https://github.com/corvesive/voxy), a 
 - **Quark (Greener Grass module)** — custom `ColorResolver` is captured and used directly for biome colour LUT generation
 - **Aether** — same resolver-capture approach covers Aether's grass colour overrides
 - **Separated Leaves** — leaf rendering uses `BlockTags.LEAVES` (not `instanceof LeavesBlock`) so modded leaf blocks are handled correctly
+- **Terrain Slabs** — thin surface blocks (snow, carpet) placed on half-height slab terrain are collapsed down one LOD voxel during ingest so they appear at the correct elevation in distant LOD rather than floating one block above the surface
 
 ### Configuration
 
