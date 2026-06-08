@@ -49,24 +49,22 @@ void main() {
     uint ptr = extractQuadStart(meta);
     uint detail = extractDetail(meta);
 
-    // Skip LOD 0 — vanilla terrain covers that range with correct-resolution shadows.
-    if (detail == 0u) return;
+    // Skip LOD 0 and LOD 1 — vanilla terrain covers those ranges.
+    if (detail < 2u) return;
 
-    ivec3 ipos = extractPosition(meta);
-    ivec3 relative = ipos - (baseSectionPos >> int(detail));
-    ivec3 absRel = abs(relative);
-
-    // Skip sections within vanilla render distance: those areas have correct vanilla shadows
-    // and the coarser LOD mesh would produce ghost/misaligned shadows on top of them.
-    // Ceiling division keeps the exclusion zone at least vanillaRD blocks in all directions.
-    uint lodUnitShift = detail;
-    int minDist = int((vanillaRDSections + (1u << lodUnitShift) - 1u) >> lodUnitShift);
-    if (absRel.x <= minDist && absRel.y <= minDist && absRel.z <= minDist) return;
-
-    // Outer limit — skip sections far beyond any reasonable shadow frustum to avoid
-    // populating thousands of draw commands that will all be clipped on the GPU.
-    // 32 LOD-level-units covers 2048 blocks at LOD 1, 4096 at LOD 2 — generous.
-    if (absRel.x > 32 || absRel.y > 32 || absRel.z > 32) return;
+    // Skip sections whose nearest XZ corner to the player falls within vanilla render
+    // distance.  Those sections overlap with vanilla-rendered terrain; their coarse LOD
+    // geometry does not match the real geometry and produces phantom shadows that shift
+    // as the player moves.  Only sections entirely outside vanilla RD should shadow.
+    {
+        ivec3 minCorner = getLoDPosition(meta.a.xy) << int(detail);
+        int   lodSize   = 1 << int(detail);                        // section width in LOD-0 units
+        ivec2 nearestXZ = clamp(baseSectionPos.xz,
+                                minCorner.xz,
+                                minCorner.xz + ivec2(lodSize));
+        ivec2 deltaXZ   = abs(nearestXZ - baseSectionPos.xz);
+        if (max(deltaXZ.x, deltaXZ.y) < int(vanillaRDSections)) return;
+    }
 
     // Allocate a unique position-buffer slot for this section.
     uint drawId = atomicAdd(shadowPosCount, 1u);
