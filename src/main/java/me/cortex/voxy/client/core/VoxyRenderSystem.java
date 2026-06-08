@@ -197,6 +197,10 @@ public class VoxyRenderSystem {
         if (viewport == null) return;
         if (width <= 0 || height <= 0) return;
 
+        // Use the shadow camera position (camX/Y/Z as provided by Iris/Sodium) so that
+        // baseSectionPos and innerTranslation are consistent with the shadow modelView.
+        // The effective vertex transform becomes: shadowProj * sunRotation * (worldPos - camPos),
+        // which matches Iris's shadow-map sampling transform for world-space geometry.
         try {
             viewport
                     .setVanillaProjection(shadowProj)

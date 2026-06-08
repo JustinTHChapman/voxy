@@ -63,7 +63,14 @@ void main() {
                                 minCorner.xz,
                                 minCorner.xz + ivec2(lodSize));
         ivec2 deltaXZ   = abs(nearestXZ - baseSectionPos.xz);
-        if (max(deltaXZ.x, deltaXZ.y) < int(vanillaRDSections)) return;
+        // Use 2× the vanilla RD as the exclusion threshold.  A section at exactly
+        // vanillaRDSections LOD-0 units away can still have its near corner as close as
+        // (vanillaRDSections - 1)*32 + 1 blocks from the camera due to the sub-section
+        // innerTranslation offset.  Doubling the threshold ensures the nearest vertex of
+        // every included section is always farther than 1× vanilla RD from the camera,
+        // so the per-vertex shadow-exclude clip in the vertex shader never fires on a
+        // partially-inside triangle (avoiding depth-precision flicker at the boundary).
+        if (max(deltaXZ.x, deltaXZ.y) < int(vanillaRDSections) * 2) return;
     }
 
     // Allocate a unique position-buffer slot for this section.
