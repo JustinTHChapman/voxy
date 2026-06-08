@@ -269,6 +269,10 @@ public class Mapper {
         return this.blockId2stateEntry.get(blockId).state;
     }
 
+    public StateEntry getStateEntry(int blockId) {
+        return this.blockId2stateEntry.get(blockId);
+    }
+
     public int getIdForBlockState(BlockState state) {
         if (state.isAir()) {
             return 0;
@@ -386,6 +390,8 @@ public class Mapper {
         public final int id;
         public final BlockState state;
         public final int opacity;
+        /** Y coordinate of the block's highest face, in [0,1].  0 = air/empty, 0.5 = half-slab, 1.0 = full block. */
+        public final float topFaceY;
         public StateEntry(int id, BlockState state) {
             this.id = id;
             this.state = state;
@@ -395,6 +401,14 @@ public class Mapper {
             } else {
                 this.opacity = state.getLightBlock(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, net.minecraft.core.BlockPos.ZERO);
             }
+            float ty = 0.0f;
+            try {
+                var shape = state.getShape(net.minecraft.world.level.EmptyBlockGetter.INSTANCE, net.minecraft.core.BlockPos.ZERO);
+                if (!shape.isEmpty()) {
+                    ty = (float) shape.max(net.minecraft.core.Direction.Axis.Y);
+                }
+            } catch (Exception ignored) {}
+            this.topFaceY = ty;
         }
 
         public byte[] serialize() {

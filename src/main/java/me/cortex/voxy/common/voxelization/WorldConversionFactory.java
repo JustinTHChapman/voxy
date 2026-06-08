@@ -331,6 +331,39 @@ public class WorldConversionFactory {
             }
         }
         section.lvl0NonAirCount = nonZeroCnt;
+
+        // Fix thin-block-on-slab height: blocks like snow placed on half-height slabs
+        // (e.g. from the Terrain Slabs mod) appear one full LOD-unit too high because the
+        // LOD has no sub-voxel Y resolution.  Collapse thin surface blocks (topFaceY < 0.3)
+        // that sit directly on partial-height blocks (0.4 < topFaceY < 0.95) down one Y
+        // level so the surface texture appears at the correct elevation.
+        // Block index encoding: i = x | (y << 8) | (z << 4)  → one Y step = +256.
+        for (int z = 0; z < 16; z++) {
+            for (int x = 0; x < 16; x++) {
+                for (int y = 0; y < 15; y++) {
+                    int idx      = x | (y << 8) | (z << 4);
+                    int idxAbove = idx + 256;
+
+                    int bId      = Mapper.getBlockId(data[idx]);
+                    int bIdAbove = Mapper.getBlockId(data[idxAbove]);
+                    if (bId == 0 || bIdAbove == 0) continue;
+
+                    var entry      = stateMapper.getStateEntry(bId);
+                    var entryAbove = stateMapper.getStateEntry(bIdAbove);
+
+                    // slab-like block below, thin surface block above
+                    if (entry.topFaceY > 0.4f && entry.topFaceY < 0.95f
+                            && entryAbove.topFaceY > 0.0f && entryAbove.topFaceY < 0.3f) {
+                        // Replace the slab voxel with the thin block's id/biome, keep slab's light.
+                        int  light  = Mapper.getLightId(data[idx]);
+                        int  biome  = Mapper.getBiomeId(data[idx]);
+                        data[idx]      = Mapper.composeMappingId((byte) light, bIdAbove, biome);
+                        data[idxAbove] = Mapper.airWithLight(Mapper.getLightId(data[idxAbove]));
+                    }
+                }
+            }
+        }
+
         return section;
     }
 
