@@ -10,5 +10,13 @@
 *.log
 *.bak
 
-# Local dev notes (not for upstream)
+# IDE / editor files
+/.eclipse/
+/.vscode/
+
+# Claude Code project files
+/.claude/
+
+# Local dev / deployment scripts
 /dev-notes/
+/deploy.ps1
