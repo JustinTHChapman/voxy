@@ -59,6 +59,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     // Set to true to skip LOD shadow casting entirely (for perf diagnosis).
     private static final boolean DISABLE_SHADOW_CASTING = false;
 
+
     // Shadow-specific buffers, populated once per frame during buildDrawCalls.
     // renderShadow reads from these instead of the camera-frustum-culled viewport buffers.
     private static final int SHADOW_DRAW_COUNT = OPAQUE_DRAW_COUNT; // cap shadow draw calls at same limit
@@ -452,10 +453,14 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             // getMetadataScanBound() returns one past the highest node ID ever written,
             // so we never dispatch over empty slots that were never touched.
             int scanBound = Math.max(1, this.geometryManager.getMetadataScanBound());
-            long ptr = UploadStream.INSTANCE.upload(this.shadowDrawCountBuffer, 0, 12);
-            MemoryUtil.memPutInt(ptr,     0);          // shadowDrawCount = 0
-            MemoryUtil.memPutInt(ptr + 4, 0);          // shadowPosCount  = 0
-            MemoryUtil.memPutInt(ptr + 8, scanBound);  // totalSections
+            // Vanilla render distance in LOD-0 section units (32 blocks/section), rounded up.
+            int vanillaRDSections = (int) Math.ceil(
+                    Minecraft.getInstance().options.renderDistance().get() * 16.0 / 32.0);
+            long ptr = UploadStream.INSTANCE.upload(this.shadowDrawCountBuffer, 0, 16);
+            MemoryUtil.memPutInt(ptr,      0);                // shadowDrawCount = 0
+            MemoryUtil.memPutInt(ptr + 4,  0);                // shadowPosCount  = 0
+            MemoryUtil.memPutInt(ptr + 8,  scanBound);        // totalSections
+            MemoryUtil.memPutInt(ptr + 12, vanillaRDSections);// vanillaRDSections
             UploadStream.INSTANCE.commit();
 
             this.shadowCmdgenShader.bind();
