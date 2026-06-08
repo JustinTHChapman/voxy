@@ -25,13 +25,16 @@ public class SectionSerializationStorage extends SectionStorage {
 
     private static final ThreadLocalMemoryBuffer MEMORY_CACHE = new ThreadLocalMemoryBuffer(BIGGEST_SERIALIZED_SECTION_SIZE + 1024);
 
-    // Standard Minecraft 1.21 world Y section range: -4 (stored as 252) to 19.
-    // Ordered surface-first to maximise early return probability.
-    private static final int[] COLUMN_PROBE_Y = {4, 5, 3, 6, 2, 7, 1, 0, -1, -2, -3, -4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
-
     @Override
-    public boolean containsColumn(int level, int sx, int sz) {
-        for (int y : COLUMN_PROBE_Y) {
+    public boolean containsColumn(int level, int sx, int sz, int minSectionY, int maxSectionY) {
+        // Probe surface-adjacent sections first (y≈4 = blocks 64-79 in the overworld) so
+        // the common case returns after 1-2 queries.  Then sweep the full range so that
+        // modded dimensions with non-standard heights are handled correctly.
+        int mid = Math.max(minSectionY, Math.min(4, maxSectionY));
+        for (int y = mid; y <= maxSectionY; y++) {
+            if (this.backend.containsSection(WorldEngine.getWorldSectionId(level, sx, y, sz))) return true;
+        }
+        for (int y = mid - 1; y >= minSectionY; y--) {
             if (this.backend.containsSection(WorldEngine.getWorldSectionId(level, sx, y, sz))) return true;
         }
         return false;

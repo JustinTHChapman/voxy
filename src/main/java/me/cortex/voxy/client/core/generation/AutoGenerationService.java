@@ -276,7 +276,8 @@ public final class AutoGenerationService {
             // Check if LOD data already exists in the DB for this column.
             // If so, mark submitted and skip server chunk request — the rendering system
             // will load the stored data on demand without needing the source chunk.
-            if (engine.storage.containsColumn(0, cx >> 1, cz >> 1)) {
+            if (engine.storage.containsColumn(0, cx >> 1, cz >> 1,
+                    mc.level.getMinSection(), mc.level.getMaxSection())) {
                 submitted.add(colKey);
                 continue;
             }

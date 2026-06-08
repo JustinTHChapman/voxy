@@ -11,10 +11,12 @@ public abstract class SectionStorage implements IMappingStorage, IStoredSectionP
 
     /**
      * Returns true if any section exists in storage for the given column
-     * (fixed LOD level and section x/z, any Y slice).
+     * (fixed LOD level and section x/z) within the given Minecraft section Y range.
+     * {@code minSectionY} and {@code maxSectionY} should come from
+     * {@code Level.getMinSection()} / {@code Level.getMaxSection()}.
      * Default: false — subclasses should override for an efficient check.
      */
-    public boolean containsColumn(int level, int sx, int sz) {
+    public boolean containsColumn(int level, int sx, int sz, int minSectionY, int maxSectionY) {
         return false;
     }
 }
