@@ -28,10 +28,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Pseudo
 @Mixin(value = DefaultChunkRenderer.class, remap = false)
 public abstract class MixinDefaultChunkRenderer {
-    private static long voxy$lastDiagLog = 0L;
-    private static long voxy$callCount = 0L;
-    private static long voxy$renderCount = 0L;
-
     @Inject(
             method = "render",
             at = @At(
@@ -43,7 +39,6 @@ public abstract class MixinDefaultChunkRenderer {
             require = 0
     )
     private void voxy$injectRender(ChunkRenderMatrices matrices, CommandList commandList, ChunkRenderListIterable renderLists, TerrainRenderPass renderPass, CameraTransform camera, CallbackInfo ci) {
-        voxy$callCount++;
         if (renderPass != DefaultTerrainRenderPasses.CUTOUT) return;
         VoxyRenderSystem renderer = ((IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer).voxy$getRenderSystem();
         if (IrisUtil.isRenderingShadowMap()) {
@@ -52,16 +47,6 @@ public abstract class MixinDefaultChunkRenderer {
             GL11.glGetIntegerv(GL11.GL_VIEWPORT, vp);
             renderer.renderShadow(matrices.projection(), matrices.modelView(), vp[2], vp[3], camera.x, camera.y, camera.z);
             return;
-        }
-        long now = System.currentTimeMillis();
-        if (now - voxy$lastDiagLog > 2000) {
-            voxy$lastDiagLog = now;
-            org.slf4j.LoggerFactory.getLogger("VoxyDiag").info("Sodium render hook: calls={} cutout-renders={} renderer={} cam=({},{},{}) iris={} HRS={} VS={} QC={}",
-                    voxy$callCount, voxy$renderCount, renderer == null ? "null" : renderer.getClass().getSimpleName(),
-                    camera.x, camera.y, camera.z, IrisUtil.irisShaderPackEnabled(),
-                    java.util.Arrays.toString(me.cortex.voxy.client.RenderStatistics.hierarchicalRenderSections),
-                    java.util.Arrays.toString(me.cortex.voxy.client.RenderStatistics.visibleSections),
-                    java.util.Arrays.toString(me.cortex.voxy.client.RenderStatistics.quadCount));
         }
         if (renderer == null) return;
 
@@ -107,6 +92,5 @@ public abstract class MixinDefaultChunkRenderer {
         var fogParams = new VoxyFogParameters(fogR, fogG, fogB, fogStart, fogEnd, 0);
         Viewport<?> viewport = renderer.setupViewport(matrices.projection(), matrices.modelView(), fogParams, camera.x, camera.y, camera.z);
         renderer.renderOpaque(viewport);
-        voxy$renderCount++;
     }
 }

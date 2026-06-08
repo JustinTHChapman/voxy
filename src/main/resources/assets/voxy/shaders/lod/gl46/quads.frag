@@ -349,10 +349,19 @@ void main() {
         tint = uint2vec4RGBA(interData.z).yzwx;
     }
 
-    // Correct face index for back-face rendering (double-sided blocks viewed from
-    // the inside flip the face direction so lighting normals remain consistent).
+    // Pass the stored face index directly to Iris. We intentionally do NOT
+    // use gl_FrontFacing to flip or discard here: XZ-plane faces (UP/DOWN) have
+    // winding that changes sign depending on the camera's horizontal direction,
+    // making gl_FrontFacing unreliable as an inside/outside discriminator for
+    // those faces. Attempting a flip or discard based on gl_FrontFacing causes
+    // visible geometry (e.g. snow tops) to disappear for certain camera angles.
+    //
+    // The practical result: section-boundary cross-section faces (interior artefacts)
+    // will be lit by their stored normal direction rather than a flipped one, so they
+    // appear dark/shadowed instead of sky-blue. This is a cosmetic limitation; a
+    // geometry-level fix (not emitting interior faces at mesh build time) is the
+    // correct long-term solution.
     uint face = getFace();
-    face ^= uint((face&1u)!=uint(gl_FrontFacing!=((face>>1)!=0u)));
 
     voxy_emitFragment(VoxyFragmentParameters(colour, tile, texPos, face, modelId, getLightmapUv(interData.y), tint, model.customId));
 
