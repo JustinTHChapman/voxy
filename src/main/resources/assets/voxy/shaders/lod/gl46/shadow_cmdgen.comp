@@ -20,9 +20,10 @@ layout(local_size_x = 128) in;
 
 // Shadow-specific count buffer (binding 2 — distinct struct from DrawCommandCountBuffer).
 layout(binding = 2, std430) restrict buffer ShadowCountBuffer {
-    uint shadowDrawCount;   // [0] draw commands emitted (read by GL_PARAMETER_BUFFER)
-    uint shadowPosCount;    // [1] position slots used   (internal)
-    uint totalSections;     // [2] metadata slots to scan (set by Java before dispatch)
+    uint shadowDrawCount;     // [0] draw commands emitted (read by GL_PARAMETER_BUFFER)
+    uint shadowPosCount;      // [1] position slots used   (internal)
+    uint totalSections;       // [2] metadata slots to scan (set by Java before dispatch)
+    uint vanillaRDSections;   // [3] vanilla render distance in LOD-0 section units (32 blocks each)
 };
 
 void writeCmd(uint idx, uint instance, uint offset, uint quadCount) {
@@ -46,32 +47,42 @@ void main() {
     if ((counts.x | counts.y | counts.z | counts.w) == 0u) return;
 
     uint ptr = extractQuadStart(meta);
-    ivec3 ipos = extractPosition(meta);
     uint detail = extractDetail(meta);
 
-    // Camera-relative section position for adjacency face culling —
-    // same as the regular cmdgen so shared LOD faces are not rendered twice.
-    ivec3 relative = ipos - (baseSectionPos >> detail);
+    // Skip LOD 0 — vanilla terrain covers that range with correct-resolution shadows.
+    if (detail == 0u) return;
 
-    // Distance cull: 5 section-widths per LOD level.
-    // LOD 1 → 320m, LOD 2 → 640m, LOD 3 → 1280m — sufficient for any
-    // shadow distance while avoiding the full LOD hemisphere (~km) per cascade.
+    ivec3 ipos = extractPosition(meta);
+    ivec3 relative = ipos - (baseSectionPos >> int(detail));
     ivec3 absRel = abs(relative);
-    if (absRel.x > 5 || absRel.y > 5 || absRel.z > 5) return;
+
+    // Skip sections within vanilla render distance: those areas have correct vanilla shadows
+    // and the coarser LOD mesh would produce ghost/misaligned shadows on top of them.
+    // Ceiling division keeps the exclusion zone at least vanillaRD blocks in all directions.
+    uint lodUnitShift = detail;
+    int minDist = int((vanillaRDSections + (1u << lodUnitShift) - 1u) >> lodUnitShift);
+    if (absRel.x <= minDist && absRel.y <= minDist && absRel.z <= minDist) return;
+
+    // Outer limit — skip sections far beyond any reasonable shadow frustum to avoid
+    // populating thousands of draw commands that will all be clipped on the GPU.
+    // 32 LOD-level-units covers 2048 blocks at LOD 1, 4096 at LOD 2 — generous.
+    if (absRel.x > 32 || absRel.y > 32 || absRel.z > 32) return;
 
     // Allocate a unique position-buffer slot for this section.
     uint drawId = atomicAdd(shadowPosCount, 1u);
     positionBuffer[drawId] = extractRawPos(meta);
 
-    // Build the same face-group mask as cmdgen.comp, minus translucents.
+    // Include all non-empty face groups — no player-relative face-direction filter.
+    // The sun direction drives shadow visibility, not the player camera, so emitting
+    // all faces avoids view-dependent popping as the player moves.
     uint msk = 0u;
-    msk |= uint(((counts.y       & 0xFFFFu) != 0u) && (relative.y > -1)) << 0; // down
-    msk |= uint((((counts.y>>16) & 0xFFFFu) != 0u) && (relative.y <  1)) << 1; // up
-    msk |= uint(((counts.z       & 0xFFFFu) != 0u) && (relative.z > -1)) << 2; // north
-    msk |= uint((((counts.z>>16) & 0xFFFFu) != 0u) && (relative.z <  1)) << 3; // south
-    msk |= uint(((counts.w       & 0xFFFFu) != 0u) && (relative.x > -1)) << 4; // west
-    msk |= uint((((counts.w>>16) & 0xFFFFu) != 0u) && (relative.x <  1)) << 5; // east
-    msk |= uint(((counts.x>>16)  & 0xFFFFu) != 0u) << 6;                       // double-sided
+    msk |= uint((counts.y        & 0xFFFFu) != 0u) << 0; // down
+    msk |= uint(((counts.y>>16)  & 0xFFFFu) != 0u) << 1; // up
+    msk |= uint((counts.z        & 0xFFFFu) != 0u) << 2; // north
+    msk |= uint(((counts.z>>16)  & 0xFFFFu) != 0u) << 3; // south
+    msk |= uint((counts.w        & 0xFFFFu) != 0u) << 4; // west
+    msk |= uint(((counts.w>>16)  & 0xFFFFu) != 0u) << 5; // east
+    msk |= uint(((counts.x>>16)  & 0xFFFFu) != 0u) << 6; // double-sided
 
     uint cmdCnt = bitCount(msk);
     if (cmdCnt == 0u) return;
