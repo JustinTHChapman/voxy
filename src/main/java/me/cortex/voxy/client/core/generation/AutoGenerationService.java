@@ -23,10 +23,11 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+
 import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.Deque;
-import java.util.HashSet;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -57,8 +58,8 @@ public final class AutoGenerationService {
 
     private final PriorityQueue<long[]> candidateQueue =
             new PriorityQueue<>(Comparator.comparingLong(e -> e[0]));
-    private final Set<Long> submitted    = new HashSet<>();
-    private final Set<Long> pendingLoad  = new HashSet<>();   // requested from server thread, not yet back
+    private final Set<Long> submitted    = new LongOpenHashSet();
+    private final Set<Long> pendingLoad  = new LongOpenHashSet();   // requested from server thread, not yet back
 
     /** Chunks loaded by the server thread and ready to ingest on the client tick. */
     private final ConcurrentLinkedDeque<LevelChunk> serverReadyChunks = new ConcurrentLinkedDeque<>();
@@ -135,26 +136,16 @@ public final class AutoGenerationService {
      * chunks with actual stored LOD data, not just chunks ingested this session.
      * Called on the first tick after a world join.
      */
-    private void populateSubmittedFromDB(WorldEngine engine, int playerCX, int playerCZ) {
-        int scanRadius = Math.min(ServerConfigOverride.INSTANCE.effectiveLodRadius(), 256);
-        long scanRadiusSq = (long) scanRadius * scanRadius;
-        // WorldEngine stores level-N sections at position chunkX >> (N+1) in each axis.
-        // Level-0 section x = chunkX / 2, so one level-0 section covers 2 chunk columns
-        // per axis (a 2×2 chunk area).  Multiply back by 2 to recover chunk coordinates.
-        // Without this correction, the submitted keys were at half the chunk scale and
-        // never matched the colKey(chunkX, chunkZ) entries checked in rebuildQueue.
+    private void populateSubmittedFromDB(WorldEngine engine) {
+        // Iterate ALL stored level-0 sections so that chunks with existing LOD data are
+        // never re-generated — regardless of how far from spawn the player previously explored.
+        // Level-0 section (sx, sz) covers chunk columns (sx*2, sz*2) through (sx*2+1, sz*2+1).
         engine.storage.iteratePositions(0, pos -> {
-            int sx = WorldEngine.getX(pos); // level-0 section x  = chunkX / 2
-            int sz = WorldEngine.getZ(pos); // level-0 section z  = chunkZ / 2
+            int sx = WorldEngine.getX(pos); // level-0 section x = chunkX / 2
+            int sz = WorldEngine.getZ(pos); // level-0 section z = chunkZ / 2
             for (int dcx = 0; dcx < 2; dcx++) {
                 for (int dcz = 0; dcz < 2; dcz++) {
-                    int cx = sx * 2 + dcx;
-                    int cz = sz * 2 + dcz;
-                    long dx = cx - playerCX;
-                    long dz = cz - playerCZ;
-                    if (dx * dx + dz * dz <= scanRadiusSq) {
-                        submitted.add(colKey(cx, cz));
-                    }
+                    submitted.add(colKey(sx * 2 + dcx, sz * 2 + dcz));
                 }
             }
         });
@@ -188,7 +179,7 @@ public final class AutoGenerationService {
         // On first tick after world join, pre-populate submitted from sections.db so the
         // fog frontier reflects actual stored LOD data, not just chunks re-ingested this session.
         if (!dbPopulated) {
-            populateSubmittedFromDB(engine, playerCX, playerCZ);
+            populateSubmittedFromDB(engine);
             dbPopulated = true;
         }
 
@@ -262,6 +253,14 @@ public final class AutoGenerationService {
             long colKey = colKey(cx, cz);
 
             if (submitted.contains(colKey) || pendingLoad.contains(colKey)) continue;
+
+            // Check if LOD data already exists in the DB for this column.
+            // If so, mark submitted and skip server chunk request — the rendering system
+            // will load the stored data on demand without needing the source chunk.
+            if (engine.storage.containsColumn(0, cx >> 1, cz >> 1)) {
+                submitted.add(colKey);
+                continue;
+            }
 
             // 1. Try client chunk cache first (chunks within vanilla render distance)
             LevelChunk chunk = mc.level.getChunkSource().getChunk(cx, cz, false);

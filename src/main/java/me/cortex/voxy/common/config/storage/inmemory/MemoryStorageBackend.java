@@ -55,6 +55,14 @@ public class MemoryStorageBackend extends StorageBackend {
     }
 
     @Override
+    public boolean containsSection(long key) {
+        var map = this.getMap(key);
+        synchronized (map) {
+            return map.containsKey(key);
+        }
+    }
+
+    @Override
     public MemoryBuffer getSectionData(long key, MemoryBuffer scratch) {
         var map = this.getMap(key);
         synchronized (map) {

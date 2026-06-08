@@ -28,6 +28,7 @@ public class SQLiteStorageBackend extends StorageBackend {
     private final PreparedStatement stmtGetAllMappings;
     private final PreparedStatement stmtIterateAll;
     private final PreparedStatement stmtIterateLevel;
+    private final PreparedStatement stmtContainsSection;
 
     public SQLiteStorageBackend(String path) {
         try {
@@ -53,11 +54,13 @@ public class SQLiteStorageBackend extends StorageBackend {
             this.stmtGetMapping    = this.connection.prepareStatement("SELECT data FROM id_mappings WHERE key=?");
             this.stmtPutMapping    = this.connection.prepareStatement("INSERT OR REPLACE INTO id_mappings(key,data) VALUES(?,?)");
             this.stmtGetAllMappings= this.connection.prepareStatement("SELECT key,data FROM id_mappings");
-            this.stmtIterateAll    = this.connection.prepareStatement("SELECT key FROM world_sections");
+            this.stmtIterateAll      = this.connection.prepareStatement("SELECT key FROM world_sections");
             // Level occupies the top 4 bits (bits 60-63) of the 64-bit key
             // level range: key >= (level<<60), key < ((level+1)<<60)
-            this.stmtIterateLevel  = this.connection.prepareStatement(
+            this.stmtIterateLevel    = this.connection.prepareStatement(
                     "SELECT key FROM world_sections WHERE key >= ? AND key < ?");
+            this.stmtContainsSection = this.connection.prepareStatement(
+                    "SELECT EXISTS(SELECT 1 FROM world_sections WHERE key=?)");
 
             Logger.info("SQLiteStorageBackend opened database: " + path);
         } catch (SQLException e) {
@@ -106,6 +109,19 @@ public class SQLiteStorageBackend extends StorageBackend {
             this.stmtDeleteSection.executeUpdate();
         } catch (SQLException e) {
             Logger.error("SQLite deleteSectionData failed for key " + key, e);
+        }
+    }
+
+    @Override
+    public synchronized boolean containsSection(long key) {
+        try {
+            stmtContainsSection.setLong(1, key);
+            try (ResultSet rs = stmtContainsSection.executeQuery()) {
+                return rs.next() && rs.getInt(1) == 1;
+            }
+        } catch (SQLException e) {
+            Logger.error("SQLite containsSection failed for key " + key, e);
+            return false;
         }
     }
 
@@ -182,6 +198,7 @@ public class SQLiteStorageBackend extends StorageBackend {
             this.stmtGetAllMappings.close();
             this.stmtIterateAll.close();
             this.stmtIterateLevel.close();
+            this.stmtContainsSection.close();
             this.connection.close();
         } catch (SQLException e) {
             Logger.error("SQLite close failed", e);

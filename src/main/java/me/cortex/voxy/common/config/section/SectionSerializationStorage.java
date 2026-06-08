@@ -7,6 +7,7 @@ import me.cortex.voxy.common.config.storage.StorageBackend;
 import me.cortex.voxy.common.config.storage.StorageConfig;
 import me.cortex.voxy.common.util.ThreadLocalMemoryBuffer;
 import me.cortex.voxy.common.world.SaveLoadSystem3;
+import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 
@@ -23,6 +24,18 @@ public class SectionSerializationStorage extends SectionStorage {
     }
 
     private static final ThreadLocalMemoryBuffer MEMORY_CACHE = new ThreadLocalMemoryBuffer(BIGGEST_SERIALIZED_SECTION_SIZE + 1024);
+
+    // Standard Minecraft 1.21 world Y section range: -4 (stored as 252) to 19.
+    // Ordered surface-first to maximise early return probability.
+    private static final int[] COLUMN_PROBE_Y = {4, 5, 3, 6, 2, 7, 1, 0, -1, -2, -3, -4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+
+    @Override
+    public boolean containsColumn(int level, int sx, int sz) {
+        for (int y : COLUMN_PROBE_Y) {
+            if (this.backend.containsSection(WorldEngine.getWorldSectionId(level, sx, y, sz))) return true;
+        }
+        return false;
+    }
 
     public int loadSection(WorldSection into) {
         var data = this.backend.getSectionData(into.key, MEMORY_CACHE.get().createUntrackedUnfreeableReference());

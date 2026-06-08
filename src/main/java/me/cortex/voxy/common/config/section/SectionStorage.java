@@ -8,4 +8,13 @@ public abstract class SectionStorage implements IMappingStorage, IStoredSectionP
     public abstract int loadSection(WorldSection into);
 
     public abstract void saveSection(WorldSection section);
+
+    /**
+     * Returns true if any section exists in storage for the given column
+     * (fixed LOD level and section x/z, any Y slice).
+     * Default: false — subclasses should override for an efficient check.
+     */
+    public boolean containsColumn(int level, int sx, int sz) {
+        return false;
+    }
 }

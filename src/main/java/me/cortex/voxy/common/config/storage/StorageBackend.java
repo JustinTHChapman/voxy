@@ -20,6 +20,15 @@ public abstract class StorageBackend implements IMappingStorage, IStoredSectionP
 
     public abstract void close();
 
+    /**
+     * Returns true if a section with the given key exists in storage without loading its data.
+     * Default: false — concrete backends should override this with an efficient existence check.
+     * A false negative (returning false when the key exists) is safe: it causes redundant generation.
+     */
+    public boolean containsSection(long key) {
+        return false;
+    }
+
     public List<StorageBackend> getChildBackends() {
         return List.of();
     }
