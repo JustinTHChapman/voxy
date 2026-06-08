@@ -21,9 +21,12 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * Manages server-side LOD voxelization and per-player delivery queues.
@@ -32,12 +35,20 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@link Mapper} (backed by in-memory storage so no on-disk persistence is required
  * server-side).  The resulting mipmapped {@link VoxelizedSection}s are queued for each
  * connected player and delivered at a rate-limited N-sections-per-tick.</p>
+ *
+ * <p>Voxelization is deferred: {@link #onChunkWatch} enqueues chunks into a pending
+ * queue, and {@link #onServerTick} drains that queue up to a dynamically-computed
+ * time budget per tick.  This prevents MSPT spikes when many chunks become visible
+ * simultaneously (e.g. on player join or teleport).</p>
  */
 public class ServerLodTracker {
 
     private static int sectionsPerTick() {
         return VoxyCommonConfig.LOD_CHUNKS_PER_TICK.get();
     }
+
+    /** Fraction of available tick headroom (50ms − smoothedMspt) to spend on voxelization. */
+    private static final float VOXEL_HEADROOM_FRACTION = 0.30f;
 
     // Per-dimension state
     private static final class DimState {
@@ -51,6 +62,25 @@ public class ServerLodTracker {
 
     /** Per-player delivery queue: packets waiting to be flushed */
     private final ConcurrentHashMap<ServerPlayer, Deque<S2CLodSectionPacket>> playerQueues = new ConcurrentHashMap<>();
+
+    // ---- deferred voxelization ----------------------------------------
+
+    private record PendingVoxelization(ServerLevel level, LevelChunk chunk, String dimId, long colKey) {}
+
+    /** Chunks waiting to be voxelized (FIFO, closest-watched first). */
+    private final ConcurrentLinkedDeque<PendingVoxelization> pendingVoxelizations = new ConcurrentLinkedDeque<>();
+
+    /**
+     * Players waiting for a specific chunk column to finish voxelization.
+     * Keyed by the same colKey used in {@link DimState#sectionCache}.
+     * Entry is removed once voxelization completes (or fails).
+     */
+    private final ConcurrentHashMap<Long, List<ServerPlayer>> pendingPlayers = new ConcurrentHashMap<>();
+
+    /** EWMA-smoothed server tick duration (ms). Seed at 20 ms (a healthy server). */
+    private float smoothedServerMspt = 20f;
+    /** Nanotime of the start of the previous server tick, for EWMA update. */
+    private long lastServerTickNano = 0;
 
     // ---- public API -------------------------------------------------
 
@@ -127,8 +157,55 @@ public class ServerLodTracker {
         playerQueues.remove(player);
     }
 
-    /** Called once per server tick to send queued packets. */
+    /** Called once per server tick to send queued packets and drain deferred voxelizations. */
     public void onServerTick() {
+        // ── 1. Update smoothed server MSPT (EWMA α = 0.1, ~10 tick window) ──────────
+        long now = System.nanoTime();
+        if (lastServerTickNano > 0) {
+            float tickMs = Math.min((now - lastServerTickNano) / 1_000_000f, 200f);
+            smoothedServerMspt = 0.9f * smoothedServerMspt + 0.1f * tickMs;
+        }
+        lastServerTickNano = now;
+
+        // ── 2. Drain deferred voxelizations within a dynamic time budget ───────────
+        // Budget = VOXEL_HEADROOM_FRACTION × (50 ms tick target − smoothed MSPT).
+        // Clamped to [1 ms, 15 ms] so we always make progress but never starve the server.
+        float headroomMs = Math.max(1f, 50f - smoothedServerMspt);
+        long budgetNanos = (long)(Math.min(headroomMs * VOXEL_HEADROOM_FRACTION, 15f) * 1_000_000L);
+        long voxelStart = System.nanoTime();
+        int voxelized = 0;
+        while (!pendingVoxelizations.isEmpty() && (System.nanoTime() - voxelStart) < budgetNanos) {
+            PendingVoxelization pv = pendingVoxelizations.pollFirst();
+            if (pv == null) break;
+
+            DimState state = dims.get(pv.dimId());
+            List<ServerPlayer> waiters = pendingPlayers.remove(pv.colKey());
+
+            if (state != null) {
+                S2CLodSectionPacket[] pkts = voxelizeChunk(pv.level(), pv.chunk(), state.mapper, pv.dimId());
+                if (pkts != null) {
+                    state.sectionCache.put(pv.colKey(), pkts);
+                    if (waiters != null) {
+                        for (ServerPlayer p : waiters) {
+                            Deque<S2CLodSectionPacket> q = playerQueues.get(p);
+                            if (q != null) {
+                                for (S2CLodSectionPacket pkt : pkts) {
+                                    if (pkt != null) q.addLast(pkt);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            voxelized++;
+        }
+        if (voxelized > 0 && !pendingVoxelizations.isEmpty()) {
+            Logger.info("[VoxyServer] Voxelized " + voxelized + " chunk(s) this tick ("
+                    + pendingVoxelizations.size() + " remaining, smoothed MSPT "
+                    + String.format("%.1f", smoothedServerMspt) + " ms)");
+        }
+
+        // ── 3. Send queued LOD packets to each player ──────────────────────────────
         for (Map.Entry<ServerPlayer, Deque<S2CLodSectionPacket>> entry : playerQueues.entrySet()) {
             ServerPlayer player = entry.getKey();
             Deque<S2CLodSectionPacket> queue = entry.getValue();
@@ -144,8 +221,11 @@ public class ServerLodTracker {
     }
 
     /**
-     * Voxelizes the given chunk and enqueues resulting LOD section packets for all
-     * currently-tracked players in the same dimension.
+     * Called when the server sends a chunk to a player.  If the chunk has already been
+     * voxelized, the cached packets are queued for this player immediately.  Otherwise
+     * the chunk is enqueued for deferred voxelization (processed in {@link #onServerTick}
+     * up to a dynamically-computed time budget) so that many simultaneous chunk-watch
+     * events (e.g. on player join / teleport) do not spike server MSPT.
      */
     public void onChunkWatch(ServerLevel level, LevelChunk chunk, ServerPlayer player) {
         String dimId = level.dimension().location().toString();
@@ -153,23 +233,31 @@ public class ServerLodTracker {
 
         long colKey = columnKey(chunk.getPos().x, chunk.getPos().z);
 
-        // Only voxelize once per chunk column; cache and re-use
         S2CLodSectionPacket[] cached = state.sectionCache.get(colKey);
-        if (cached == null) {
-            cached = voxelizeChunk(level, chunk, state.mapper, dimId);
-            if (cached != null) {
-                state.sectionCache.put(colKey, cached);
-            }
-        }
-
         if (cached != null) {
+            // Fast path: already voxelized, just queue for this player.
             Deque<S2CLodSectionPacket> q = playerQueues.get(player);
             if (q != null) {
                 for (S2CLodSectionPacket p : cached) {
                     if (p != null) q.addLast(p);
                 }
             }
+            return;
         }
+
+        // Slow path: not yet voxelized — schedule deferred work.
+        // putIfAbsent returns null only on the FIRST call for this colKey, meaning we
+        // add the chunk to pendingVoxelizations exactly once even when many players watch
+        // the same not-yet-voxelized chunk simultaneously.
+        List<ServerPlayer> waiters = new ArrayList<>();
+        List<ServerPlayer> existing = pendingPlayers.putIfAbsent(colKey, waiters);
+        if (existing == null) {
+            // First request for this column — schedule voxelization.
+            pendingVoxelizations.addLast(new PendingVoxelization(level, chunk, dimId, colKey));
+        } else {
+            waiters = existing;
+        }
+        waiters.add(player);
     }
 
     // ---- internals --------------------------------------------------
