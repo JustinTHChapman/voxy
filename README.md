@@ -45,9 +45,8 @@ Unofficial NeoForge 1.21.1 port of [Voxy](https://github.com/corvesive/voxy), a 
 **Client** (`config/voxy-config.json`):
 | Option | Default | Description |
 |---|---|---|
-| `enabled` | `true` | Master toggle |
-| `enable_rendering` | `true` | Toggle LOD rendering independently of ingest |
-| `ingest_enabled` | `true` | Toggle chunk ingest |
+| `draw_lods` | `true` | Draw stored LODs. Off = ingest-only (build the LOD database without rendering it) |
+| `generate_chunks` | `true` | Capture/voxelize loaded chunks into the LOD store. Off = render-only (freeze the stored world) |
 | `section_render_distance` | `16` | Section render distance |
 | `service_threads` | auto | Worker thread count (defaults to ~⅔ CPU cores) |
 | `use_environmental_fog` | `true` | Blend LOD with vanilla fog |

@@ -1,7 +1,6 @@
 package me.cortex.voxy.client;
 
 import me.cortex.voxy.client.config.ServerConfigOverride;
-import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.generation.AutoGenerationService;
 import me.cortex.voxy.client.sync.ManifestSyncHandler;
 import me.cortex.voxy.commonImpl.VoxyCommon;
@@ -17,9 +16,7 @@ public class ClientSessionEvents {
         if (VoxyCommon.getInstance() != null) throw new IllegalStateException();
 
         if (VoxyCommon.isAvailable()) {
-            if (VoxyConfig.CONFIG.enabled) {
-                VoxyCommon.createInstance();
-            }
+            VoxyCommon.createInstance();
         }
     }
 

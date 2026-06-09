@@ -63,7 +63,7 @@ public abstract class MixinClientLevel {
         // block removal
         if (!updated.isAir()) return;
         if (VoxyCommon.getInstance()==null) return;
-        if (!VoxyConfig.CONFIG.ingestEnabled) return;//Only ingest if setting enabled
+        if (!VoxyConfig.CONFIG.generateChunks) return;//Only ingest if setting enabled
 
         var self = (Level)(Object)this;
         var wi = WorldIdentifier.of(self);

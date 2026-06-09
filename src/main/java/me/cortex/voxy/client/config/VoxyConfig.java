@@ -28,9 +28,24 @@ public class VoxyConfig {
 
     public static VoxyConfig CONFIG = loadOrCreate();
 
-    public boolean enabled = true;
-    public boolean enableRendering = true;
-    public boolean ingestEnabled = true;
+    /**
+     * Draw Voxy's stored LOD geometry. When false, Voxy still {@link #generateChunks
+     * ingests and stores} LOD data but never renders it — e.g. for background/headless
+     * world pre-generation. Config key: {@code draw_lods}.
+     */
+    public boolean drawLods = true;
+
+    /**
+     * Capture and voxelize the chunks the player loads into Voxy's LOD store. When false,
+     * Voxy still {@link #drawLods draws} existing LODs but stops writing new data, so the
+     * stored world is effectively frozen. Config key: {@code generate_chunks}.
+     *
+     * <p>Note: this is the passive "capture what you load" path. The proactive background
+     * generation that fills in chunks you have not visited is the separate
+     * {@code auto_generation_enabled} NeoForge setting.
+     */
+    public boolean generateChunks = true;
+
     public float sectionRenderDistance = 16;
     public int serviceThreads = (int) Math.max(CpuLayout.getCoreCount()/1.5, 1);
     public float subDivisionSize = 64;
@@ -62,6 +77,11 @@ public class VoxyConfig {
                     // ensures every field gets its intended value.
                     JsonObject fileJson = GSON.fromJson(reader, JsonObject.class);
                     if (fileJson != null) {
+                        // Migrate keys renamed in newer versions, then drop removed ones.
+                        migrateKey(fileJson, "enable_rendering", "draw_lods");
+                        migrateKey(fileJson, "ingest_enabled", "generate_chunks");
+                        fileJson.remove("enabled"); // removed: master toggle — disable Voxy via the mod loader instead
+
                         JsonObject merged = GSON.toJsonTree(new VoxyConfig()).getAsJsonObject();
                         for (var entry : fileJson.entrySet()) {
                             merged.add(entry.getKey(), entry.getValue());
@@ -86,8 +106,7 @@ public class VoxyConfig {
             return config;
         } else {
             var config = new VoxyConfig();
-            config.enabled = false;
-            config.enableRendering = false;
+            config.drawLods = false;
             return config;
         }
     }
@@ -105,11 +124,21 @@ public class VoxyConfig {
         }
     }
 
+    /** Copy {@code oldKey}'s value to {@code newKey} (unless already present), then drop {@code oldKey}. */
+    private static void migrateKey(JsonObject json, String oldKey, String newKey) {
+        if (json.has(oldKey)) {
+            if (!json.has(newKey)) {
+                json.add(newKey, json.get(oldKey));
+            }
+            json.remove(oldKey);
+        }
+    }
+
     private static Path getConfigPath() {
         return FMLPaths.CONFIGDIR.get().resolve("voxy-config.json");
     }
 
     public boolean isRenderingEnabled() {
-        return VoxyCommon.isAvailable() && this.enabled && this.enableRendering;
+        return VoxyCommon.isAvailable() && this.drawLods;
     }
 }

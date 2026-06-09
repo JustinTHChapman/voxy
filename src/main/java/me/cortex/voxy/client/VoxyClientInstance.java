@@ -81,7 +81,7 @@ public class VoxyClientInstance extends VoxyInstance {
 
     @Override
     public boolean isIngestEnabled(WorldIdentifier worldId) {
-        return (!this.noIngestOverride) && VoxyConfig.CONFIG.ingestEnabled;
+        return (!this.noIngestOverride) && VoxyConfig.CONFIG.generateChunks;
     }
 
     @Override

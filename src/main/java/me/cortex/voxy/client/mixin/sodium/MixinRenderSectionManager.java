@@ -31,7 +31,7 @@ public class MixinRenderSectionManager {
     @Inject(method = "onChunkAdded", at = @At("HEAD"), remap = false, require = 0)
     private void voxy$ingestOnAdd(int x, int z, CallbackInfo ci) {
         voxy$ingestCallCount++;
-        if (!VoxyConfig.CONFIG.ingestEnabled) return;
+        if (!VoxyConfig.CONFIG.generateChunks) return;
         if (this.level == null) return;
         ChunkAccess chunk = this.level.getChunkSource().getChunk(x, z, ChunkStatus.FULL, false);
         boolean queued = false;
