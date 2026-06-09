@@ -402,6 +402,14 @@ public final class AutoGenerationService {
         lastPlayerCX = playerCX;
         lastPlayerCZ = playerCZ;
 
+        // Trim the submitted set when a user-configured limit is exceeded.
+        // The set is only a performance cache (avoids DB round-trips for known-generated
+        // columns); clearing it is safe — containsColumn() re-validates at dequeue time.
+        int submittedLimit = VoxyCommonConfig.AUTO_GEN_SUBMITTED_LIMIT.get();
+        if (submittedLimit > 0 && submitted.size() > submittedLimit) {
+            submitted.clear();
+        }
+
         int radius = ServerConfigOverride.INSTANCE.effectiveLodRadius();
         // Clamp scan radius to avoid extremely large queues
         int scanRadius = Math.min(radius, 256);
