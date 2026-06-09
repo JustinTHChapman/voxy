@@ -13,10 +13,12 @@ public class MixinFogRenderer {
             at = @At("HEAD"), argsOnly = true, index = 2)
     private static float voxy$extendFarPlane(float farPlaneDistance) {
         if (IGetVoxyRenderSystem.getNullable() == null) return farPlaneDistance;
-        // Extend vanilla fog to the LOD generation frontier so the sky shows fog
-        // colour (not clear sky) where LOD hasn't loaded yet.  When nothing has
-        // been generated yet (radius == 0) we leave vanilla fog unchanged.
-        float loaded = AutoGenerationService.INSTANCE.getEstimatedLoadedBlockRadius();
+        // Extend vanilla fog to the LOD frontier so the sky shows fog colour (not clear sky)
+        // where LOD hasn't loaded yet. Use the frontier (derived from the LOD data actually in
+        // the file) rather than the voxelization radius, which only tracks source chunks this
+        // session and would leave the sky fog hugging the player while file LODs render far out.
+        // When nothing is loaded yet (radius == 0) we leave vanilla fog unchanged.
+        float loaded = AutoGenerationService.INSTANCE.getFogFrontierBlockRadius();
         return loaded > 0 ? Math.max(farPlaneDistance, loaded) : farPlaneDistance;
     }
 }

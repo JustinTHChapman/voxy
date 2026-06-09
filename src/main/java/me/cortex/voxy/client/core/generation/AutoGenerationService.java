@@ -83,9 +83,6 @@ public final class AutoGenerationService {
     private int lastPlayerCX = Integer.MIN_VALUE;
     private int lastPlayerCZ = Integer.MIN_VALUE;
 
-    /** Chebyshev chunk radius of farthest successfully submitted chunk. */
-    private volatile int estimatedLoadedChunkRadius = 0;
-
     /**
      * Euclidean chunk radius to the nearest unsubmitted chunk as of the last rebuildQueue call.
      * Shrinks as the player approaches the LOD edge, grows as new chunks are generated.
@@ -130,7 +127,6 @@ public final class AutoGenerationService {
         uploadQueue.clear();
         lastPlayerCX = Integer.MIN_VALUE;
         lastPlayerCZ = Integer.MIN_VALUE;
-        estimatedLoadedChunkRadius = 0;
         fogFrontierChunks = 0;
         currentPlayerCX = 0;
         currentPlayerCZ = 0;
@@ -141,11 +137,6 @@ public final class AutoGenerationService {
         dbScanResult.set(null);
         dbPopulated = false;
         lastDimension = null;
-    }
-
-    /** Block radius (in world units) of the farthest successfully generated chunk from the player. */
-    public float getEstimatedLoadedBlockRadius() {
-        return estimatedLoadedChunkRadius * 16f;
     }
 
     /** Smoothed block radius to the LOD generation frontier, for use as fog end distance. */
@@ -228,18 +219,21 @@ public final class AutoGenerationService {
                 var it = scanResult.longIterator();
                 while (it.hasNext()) submitted.add(it.nextLong());
                 dbPopulated = true;
+                // The frontier is only recomputed by rebuildQueue (on movement / empty queue), so the
+                // file LODs we just merged wouldn't reach the fog until the player moves. Rebuild now so
+                // the fog snaps out to the file-LOD edge immediately instead of hugging the player.
+                rebuildQueue(playerCX, playerCZ);
             }
             // else: scan still in progress — nothing to do this tick.
         }
 
         // Detect teleports: movement larger than TELEPORT_THRESHOLD in a single tick.
-        // Reset the loaded-radius and fog frontier so they reflect the new position,
-        // not the old one (otherwise fog lingers at the pre-teleport distance for several seconds).
+        // Reset the fog frontier so it reflects the new position, not the old one
+        // (otherwise fog lingers at the pre-teleport distance for several seconds).
         int dcx = playerCX - lastPlayerCX;
         int dcz = playerCZ - lastPlayerCZ;
         if (lastPlayerCX != Integer.MIN_VALUE
                 && (Math.abs(dcx) > TELEPORT_THRESHOLD_CHUNKS || Math.abs(dcz) > TELEPORT_THRESHOLD_CHUNKS)) {
-            estimatedLoadedChunkRadius = 0;
             smoothedFogFrontierBlocks  = 0f;
             fogFrontierChunks          = 0;
         }
@@ -275,8 +269,6 @@ public final class AutoGenerationService {
                     submitted.add(k);
                     uploadQueue.addLast(ready);
                     drained++;
-                    int d = Math.max(Math.abs(ready.getPos().x - playerCX), Math.abs(ready.getPos().z - playerCZ));
-                    if (d > estimatedLoadedChunkRadius) estimatedLoadedChunkRadius = d;
                 }
             }
         }
@@ -369,8 +361,6 @@ public final class AutoGenerationService {
                 submitted.add(colKey);
                 generated++;
                 uploadQueue.addLast(chunk);
-                int d = Math.max(Math.abs(cx - playerCX), Math.abs(cz - playerCZ));
-                if (d > estimatedLoadedChunkRadius) estimatedLoadedChunkRadius = d;
             }
             // If enqueueIngest returns false (lighting not ready), the entry is dropped
             // from the queue.  It will be re-added on the next rebuildQueue() call when
