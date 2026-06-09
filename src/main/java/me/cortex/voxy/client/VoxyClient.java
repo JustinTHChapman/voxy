@@ -64,6 +64,7 @@ public class VoxyClient {
     }
 
     public static void initVoxyClient() {
+        Logger.DEBUG = VoxyCommonConfig.DEBUG_LOGGING.get();
         Capabilities.init();
 
         if (Capabilities.INSTANCE.hasBrokenDepthSampler) {

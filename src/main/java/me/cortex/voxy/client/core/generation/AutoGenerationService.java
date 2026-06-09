@@ -189,7 +189,7 @@ public final class AutoGenerationService {
                                 result.add(colKey(sx * 2 + dcx, sz * 2 + dcz));
                     });
                     dbScanResult.set(result);
-                    Logger.info("[AutoGen] DB pre-scan complete: " + result.size() + " columns pre-submitted");
+                    Logger.debug("[AutoGen] DB pre-scan complete: " + result.size() + " columns pre-submitted");
                 }, "voxy-db-scan");
                 t.setDaemon(true);
                 t.start();
@@ -251,7 +251,7 @@ public final class AutoGenerationService {
             }
         }
         if (drained > 0) {
-            Logger.info("[AutoGen] Ingested " + drained + " server-loaded chunk(s) near (" + playerCX + "," + playerCZ + ")");
+            Logger.debug("[AutoGen] Ingested " + drained + " server-loaded chunk(s) near (" + playerCX + "," + playerCZ + ")");
         }
 
         // Integrated-server reference (null on dedicated server or when not yet ready)

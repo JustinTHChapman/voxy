@@ -50,6 +50,16 @@ public class VoxyCommonConfig {
     /** LOD render radius in world-sections (server may cap this lower). */
     public static final ModConfigSpec.IntValue LOD_RADIUS;
 
+    /** Enable verbose debug logging via {@link me.cortex.voxy.common.Logger#debug}. */
+    public static final ModConfigSpec.BooleanValue DEBUG_LOGGING;
+
+    /**
+     * Maximum chunk columns retained in the auto-generation submitted set.
+     * 0 = no limit (default). When exceeded the set is cleared and re-populated
+     * from the database on the next rebuild cycle.
+     */
+    public static final ModConfigSpec.IntValue AUTO_GEN_SUBMITTED_LIMIT;
+
     static {
         // ── build SERVER spec ─────────────────────────────────────────────
         var sb = new ModConfigSpec.Builder();
@@ -97,6 +107,15 @@ public class VoxyCommonConfig {
         LOD_RADIUS = cb
                 .comment("LOD render radius in sections. Server may enforce a lower maximum.")
                 .defineInRange("lod_radius", 256, 8, 8192);
+
+        DEBUG_LOGGING = cb
+                .comment("Enable verbose debug logging for Voxy. Requires DEBUG log level in log4j config to appear in the log file.")
+                .define("debug_logging", false);
+
+        AUTO_GEN_SUBMITTED_LIMIT = cb
+                .comment("Maximum chunk columns tracked in the auto-generation submitted set. 0 = no limit (default).",
+                         "When the limit is exceeded the set is cleared and re-populated from the database on the next rebuild cycle.")
+                .defineInRange("auto_gen_submitted_limit", 0, 0, Integer.MAX_VALUE);
 
         cb.pop();
         CLIENT_SPEC = cb.build();

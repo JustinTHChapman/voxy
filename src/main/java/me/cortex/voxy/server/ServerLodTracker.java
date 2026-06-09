@@ -230,7 +230,7 @@ public class ServerLodTracker {
             voxelized++;
         }
         if (voxelized > 0 && !pendingVoxelizations.isEmpty()) {
-            Logger.info("[VoxyServer] Voxelized " + voxelized + " chunk(s) this tick ("
+            Logger.debug("[VoxyServer] Voxelized " + voxelized + " chunk(s) this tick ("
                     + pendingVoxelizations.size() + " remaining, smoothed MSPT "
                     + String.format("%.1f", smoothedServerMspt) + " ms)");
         }

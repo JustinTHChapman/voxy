@@ -13,6 +13,8 @@ public class Logger {
     public static boolean INSERT_CLASS = true;
     public static boolean SHUTUP = false;
     public static boolean SHUTUP_INFO = false;
+    /** Set to true (via {@code VoxyCommonConfig.DEBUG_LOGGING}) to enable verbose debug-level output. */
+    public static boolean DEBUG = false;
     private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger("Voxy");
 
 
@@ -93,6 +95,15 @@ public class Logger {
         var val = (INSERT_CLASS?("["+callClsName()+"]: "):"") + Stream.of(args).map(Logger::objToString).collect(Collectors.joining(" "));
         LOGGER.info(val, throwable);
         return val;
+    }
+
+    public static void debug(Object... args) {
+        if (SHUTUP || !DEBUG) return;
+        Throwable throwable = null;
+        for (var i : args) {
+            if (i instanceof Throwable) throwable = (Throwable) i;
+        }
+        LOGGER.debug((INSERT_CLASS ? ("[" + callClsName() + "]: ") : "") + Stream.of(args).map(Logger::objToString).collect(Collectors.joining(" ")), throwable);
     }
 
     private static String objToString(Object obj) {
