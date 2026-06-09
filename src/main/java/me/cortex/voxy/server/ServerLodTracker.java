@@ -20,6 +20,9 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -120,11 +123,12 @@ public class ServerLodTracker {
         DimState state = dims.get(dimId);
         if (state == null) return;
 
-        // Collect (position, hash) for all cached sections.
+        // Collect (position, hash) for all cached sections using primitive fastutil lists
+        // to avoid boxing one Long/Integer per entry (up to 8192 * sections-per-column).
         // Must hold the sectionCache monitor for the full iteration since the underlying
         // LinkedHashMap is not safe for concurrent structural access.
-        var positions = new java.util.ArrayList<Long>();
-        var hashes    = new java.util.ArrayList<Integer>();
+        var positions = new LongArrayList();
+        var hashes    = new IntArrayList();
         synchronized (state.sectionCache) {
             for (var entry : state.sectionCache.entrySet()) {
                 S2CLodSectionPacket[] pkts = entry.getValue();
@@ -147,8 +151,8 @@ public class ServerLodTracker {
             long[] posArr  = new long[end - start];
             int[]  hashArr = new int[end - start];
             for (int i = 0; i < posArr.length; i++) {
-                posArr[i]  = positions.get(start + i);
-                hashArr[i] = hashes.get(start + i);
+                posArr[i]  = positions.getLong(start + i);
+                hashArr[i] = hashes.getInt(start + i);
             }
             PacketDistributor.sendToPlayer(player, new S2CManifestPacket(fin, posArr, hashArr));
             if (fin) break;
@@ -294,7 +298,11 @@ public class ServerLodTracker {
         } else {
             waiters = existing;
         }
-        waiters.add(player);
+        // Guard against double-add: the same player can re-watch a chunk (e.g. at chunk
+        // boundaries) before voxelization completes, which would deliver duplicate packets.
+        if (!waiters.contains(player)) {
+            waiters.add(player);
+        }
     }
 
     // ---- internals --------------------------------------------------
