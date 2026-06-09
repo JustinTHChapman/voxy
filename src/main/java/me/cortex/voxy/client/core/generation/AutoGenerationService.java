@@ -103,16 +103,22 @@ public final class AutoGenerationService {
     private volatile float smoothedFogFrontierBlocks = 0f;
 
     /**
-     * Holds the result of the background DB scan.  Set by the scan thread when it completes;
-     * null while the scan is in flight or hasn't started yet.  Merged into {@link #submitted}
-     * on the next client tick, then cleared to null.  AtomicReference gives cheap volatile
-     * visibility without a lock — the producing thread writes once, the client thread reads once.
+     * Holds the result of the background DB scan.  Null = not started / reset.
+     * While a scan is running this holds the per-launch sentinel object; once
+     * the scan thread completes it replaces the sentinel with the real result via
+     * compareAndSet so stale results from a previous session cannot corrupt a new one.
      */
     private final AtomicReference<LongOpenHashSet> dbScanResult = new AtomicReference<>(null);
-    /** Sentinel placed into dbScanResult while the background scan thread is running. */
-    private static final LongOpenHashSet DB_SCAN_IN_PROGRESS = new LongOpenHashSet(0);
-    /** True once the DB scan result has been merged into submitted. */
+    /**
+     * The sentinel object used for the currently active DB scan.  Each launch
+     * creates a fresh instance so that a lingering scan thread from a previous
+     * session can detect (via compareAndSet) that its result is stale.
+     */
+    private volatile LongOpenHashSet activeScanSentinel = null;
+    /** True once the DB scan result has been merged into {@link #submitted}. */
     private boolean dbPopulated = false;
+    /** Dimension resource-location string as of the last tick, for dimension-change detection. */
+    private String lastDimension = null;
 
     private AutoGenerationService() {}
 
@@ -131,8 +137,10 @@ public final class AutoGenerationService {
         smoothedFogFrontierBlocks = 0f;
         smoothedMspt = 50f;
         lastTickNano = 0;
+        activeScanSentinel = null;
         dbScanResult.set(null);
         dbPopulated = false;
+        lastDimension = null;
     }
 
     /** Block radius (in world units) of the farthest successfully generated chunk from the player. */
@@ -170,31 +178,53 @@ public final class AutoGenerationService {
         currentPlayerCX = playerCX;
         currentPlayerCZ = playerCZ;
 
-        // Non-blocking DB pre-scan: kick off a daemon thread on first tick, merge its
-        // result into submitted on a subsequent tick once it completes.  During the scan
-        // the per-chunk DB existence check in the generation loop catches any duplicates.
+        // Dimension-change detection: reset DB scan state and submitted cache so we
+        // don't carry over column keys from the previous dimension (e.g. after portals).
+        String dimId = mc.level.dimension().location().toString();
+        if (!dimId.equals(lastDimension)) {
+            lastDimension = dimId;
+            activeScanSentinel = null;      // invalidate any in-flight scan from the old dimension
+            dbScanResult.set(null);
+            dbPopulated = false;
+            submitted.clear();
+            pendingLoad.clear();
+            candidateQueue.clear();
+            lastPlayerCX = Integer.MIN_VALUE;
+        }
+
+        // Non-blocking DB pre-scan: kick off a daemon thread on first tick (per dimension),
+        // merge its result into submitted on a subsequent tick once it completes.
+        // A per-launch sentinel object (activeScanSentinel) lets the scan thread detect
+        // via compareAndSet that its result is stale if a reset or dimension change occurred
+        // while it was running — preventing old results from corrupting a new session.
         if (!dbPopulated) {
             LongOpenHashSet scanResult = dbScanResult.get();
             if (scanResult == null) {
-                // First tick — launch background scan.
-                dbScanResult.set(DB_SCAN_IN_PROGRESS);
+                // First tick for this dimension — launch a background scan.
+                LongOpenHashSet sentinel = new LongOpenHashSet(0);
+                activeScanSentinel = sentinel;
+                dbScanResult.set(sentinel);
                 final WorldEngine eng = engine;
                 Thread t = new Thread(() -> {
                     LongOpenHashSet result = new LongOpenHashSet();
                     eng.storage.iteratePositions(0, pos -> {
+                        if (dbScanResult.get() != sentinel) return; // aborted by reset/dimension change
                         int sx = WorldEngine.getX(pos);
                         int sz = WorldEngine.getZ(pos);
                         for (int dcx = 0; dcx < 2; dcx++)
                             for (int dcz = 0; dcz < 2; dcz++)
                                 result.add(colKey(sx * 2 + dcx, sz * 2 + dcz));
                     });
-                    dbScanResult.set(result);
-                    Logger.debug("[AutoGen] DB pre-scan complete: " + result.size() + " columns pre-submitted");
+                    // Only publish the result if our sentinel is still the active one;
+                    // a concurrent reset or dimension change will have replaced it with null.
+                    if (dbScanResult.compareAndSet(sentinel, result)) {
+                        Logger.debug("[AutoGen] DB pre-scan complete: " + result.size() + " columns pre-submitted");
+                    }
                 }, "voxy-db-scan");
                 t.setDaemon(true);
                 t.start();
-            } else if (scanResult != DB_SCAN_IN_PROGRESS) {
-                // Scan finished — merge on the client thread (single writer, no lock needed).
+            } else if (scanResult != activeScanSentinel) {
+                // Scan finished (result is not the sentinel) — merge on the client thread.
                 var it = scanResult.longIterator();
                 while (it.hasNext()) submitted.add(it.nextLong());
                 dbPopulated = true;
