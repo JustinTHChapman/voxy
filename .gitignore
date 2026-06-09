@@ -20,3 +20,4 @@
 # Local dev / deployment scripts
 /dev-notes/
 /deploy.ps1
+/deploy-local.gradle

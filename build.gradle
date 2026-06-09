@@ -155,23 +155,12 @@ test {
     }
 }
 
-// Copies the built jar into a local mod-loader instance's mods folder.
-// Usage: ./gradlew deployLocal -Pprism_instance_mods="<path to your instance's mods folder>"
-// Tip: set prism_instance_mods in ~/.gradle/gradle.properties to avoid passing it each time.
-tasks.register('deployLocal', Copy) {
-    def modsDir = project.findProperty('prism_instance_mods')
-    dependsOn jar
-    from(jar.archiveFile)
-    into(modsDir ?: layout.buildDirectory.dir('deployLocal'))
-    rename { 'voxy.jar' }
-    doFirst {
-        if (modsDir == null) {
-            throw new GradleException("deployLocal requires -Pprism_instance_mods=<path to your instance's mods folder> (or set it in ~/.gradle/gradle.properties).")
-        }
-    }
-    doLast {
-        println "Deployed to: ${modsDir}/voxy.jar"
-    }
+// Optional local deploy lives in `deploy-local.gradle`, which is gitignored because
+// it holds personal, machine-specific paths. When that file exists it registers a
+// `deployLocal` task. Everyone else just doesn't get the task — the build is unaffected.
+def deployLocalScript = file('deploy-local.gradle')
+if (deployLocalScript.exists()) {
+    apply from: deployLocalScript
 }
 
 tasks.withType(JavaCompile).configureEach {
