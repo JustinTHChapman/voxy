@@ -111,6 +111,7 @@ uvec3 makeRemainingAttributes(const in BlockModel model, const in Quad quad, uin
         encodedData |= face;
         encodedData |= (lodLevel<<3);
         encodedData |= uint(hasAO)<<6;
+        encodedData |= (1u<<7); // bit 7: "this pixel has LOD geometry" — used by SSAO to skip cleared/vanilla pixels
         addin = encodedData;
     }
 

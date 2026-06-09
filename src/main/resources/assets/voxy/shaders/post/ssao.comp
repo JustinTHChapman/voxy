@@ -49,7 +49,7 @@ vec4 reDeProject(vec3 pos) {
     }
 
     uint meta = uint(255.0f*texture(colourTex, view.xy).w);
-    if ((meta>>6)==0) {
+    if ((meta>>7)==0) {
         return vec4(-1.0f);
     }
 
@@ -202,7 +202,7 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
             offset_view = rev3d(sourceInvProj, vec3(sample_uv, depth));
         } else {
             uint meta = uint(255.0f*texture(colourTex, sample_uv).w);
-            if ((meta&(1<<6))==0) {
+            if ((meta&(1u<<7))==0u) {
                 continue;
             }
             offset_view = rev3d(invProj, vec3(sample_uv, depth));
@@ -252,25 +252,22 @@ void main() {
     scale = vec2(1.0f)/size;
     vec2 point = vec2(vec2(gl_GlobalInvocationID.xy)+0.5f)*scale;//Offset to the center of the textile
     float depth = texture(depthTex, point).r;
+    vec4 colour = texture(colourTex, point);
+    uint metadata = uint(colour.w*255.0f);
     vec4 ocolour = vec4(0);
-    if (depth!=NEAR && depth!=FAR) {
-        vec4 colour = texture(colourTex, point);
-        if (colour == vec4(0.0f, 0.0f, 0.0f, 0.0f)) {
-            ocolour = vec4(1.0f, 0.0f, 0.0f, 1.0f);
-        } else {
-            uint metadata = uint(colour.w*255.0f);
-            uint face = metadata&7u;
-            uint lod = (metadata>>3)&7u;
-            bool hasAO = (metadata&(1<<6))!=0;
+    // bit 7 of the alpha metadata byte is the "LOD geometry present" flag set by makeRemainingAttributes.
+    // Cleared pixels (alpha=0) and vanilla-terrain pixels (stale from depth copy) have bit7=0 → skip.
+    if ((metadata>>7)!=0u) {
+        uint face = metadata&7u;
+        uint lod = (metadata>>3)&7u;
+        bool hasAO = (metadata&(1u<<6))!=0u;
 
+        ocolour = colour;
+        ocolour.w = 1.0f;
 
-            ocolour = colour;
-            ocolour.w = 1.0f;
-
-            if (hasAO) {
-                vec3 worldNormal = face2norm(face);
-                ocolour.rgb *= computeAO(vec3(point, depth), worldNormal);
-            }
+        if (hasAO) {
+            vec3 worldNormal = face2norm(face);
+            ocolour.rgb *= computeAO(vec3(point, depth), worldNormal);
         }
     }
     imageStore(colourTexOut, ivec2(gl_GlobalInvocationID.xy), ocolour);

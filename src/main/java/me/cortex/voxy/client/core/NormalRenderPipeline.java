@@ -23,12 +23,14 @@ import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glBindImageTexture;
 import static org.lwjgl.opengl.GL30.GL_DEPTH_ATTACHMENT;
 import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME;
+import static org.lwjgl.opengl.GL11C.GL_COLOR;
 import static org.lwjgl.opengl.GL30C.*;
 import static org.lwjgl.opengl.GL33C.*;
 import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
 import static org.lwjgl.opengl.GL45.glGetNamedFramebufferAttachmentParameteri;
 import static org.lwjgl.opengl.GL45C.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45C.glTextureParameterf;
+import static org.lwjgl.opengl.GL45C.glClearNamedFramebufferfv;
 
 public class NormalRenderPipeline extends AbstractRenderPipeline {
     private GlTexture colourTex;
@@ -74,6 +76,14 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
         }
 
         this.initDepthStencil(sourceFB, this.fb.framebuffer.id, viewport.width, viewport.height, viewport.width, viewport.height);
+
+        // Clear the LOD colour buffer each frame so stale colours from previous frames don't bleed
+        // through for pixels where vanilla terrain now occupies the depth (stencil=0) but LOD
+        // never wrote fresh colour data.  SSAO gates on bit 7 of the alpha metadata byte, so
+        // cleared pixels (alpha=0) are silently skipped.
+        try (var stack = MemoryStack.stackPush()) {
+            glClearNamedFramebufferfv(this.fb.framebuffer.id, GL_COLOR, 0, stack.floats(0.0f, 0.0f, 0.0f, 0.0f));
+        }
 
         return this.fb.getDepthTex().id;
     }
