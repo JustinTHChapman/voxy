@@ -6,7 +6,6 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,14 +67,5 @@ public record S2CManifestPacket(
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {
         return TYPE;
-    }
-
-    /**
-     * Client-side handler — accumulated by {@link me.cortex.voxy.client.sync.ManifestSyncHandler}.
-     * Registered in VoxyClient.
-     */
-    public static void handle(S2CManifestPacket pkt, IPayloadContext ctx) {
-        ctx.enqueueWork(() ->
-                me.cortex.voxy.client.sync.ManifestSyncHandler.INSTANCE.onManifestPacket(pkt));
     }
 }

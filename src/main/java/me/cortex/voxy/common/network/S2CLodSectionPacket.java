@@ -1,27 +1,16 @@
 package me.cortex.voxy.common.network;
 
-import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
-import me.cortex.voxy.commonImpl.VoxyCommon;
-import me.cortex.voxy.commonImpl.WorldIdentifier;
-import net.minecraft.client.Minecraft;
-import net.minecraft.core.Holder;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.biome.Biome;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -176,58 +165,8 @@ public record S2CLodSectionPacket(
         return new S2CLodSectionPacket(dimensionId, vs.x, vs.y, vs.z, hash, (short) lutSize, vsIds, brls, lts, indices);
     }
 
-    // ---- handler (client-side) ------------------------------------------
-
-    public static void handle(S2CLodSectionPacket pkt, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> {
-            var instance = VoxyCommon.getInstance();
-            if (instance == null) return;
-
-            var level = Minecraft.getInstance().level;
-            if (level == null) return;
-
-            // Use the currently-active world engine for the client's current dimension
-            var worldId = WorldIdentifier.of(level);
-            if (worldId == null) return;
-            var worldEngine = instance.getOrCreate(worldId);
-            if (worldEngine == null) return;
-
-            var clientMapper = worldEngine.getMapper();
-            var biomeRegistry = level.registryAccess().registryOrThrow(Registries.BIOME);
-
-            // Build client-local LUT from vanilla IDs → client Mapper IDs
-            int sz = pkt.lutSize() & 0xFFFF;
-            long[] clientLUT = new long[sz];
-            for (int i = 0; i < sz; i++) {
-                BlockState blockState = Block.BLOCK_STATE_REGISTRY.byId(pkt.vanillaBlockStateIds()[i]);
-                if (blockState == null) blockState = Blocks.AIR.defaultBlockState();
-
-                int clientBlockId = blockState.isAir() ? 0 : clientMapper.getIdForBlockState(blockState);
-
-                Holder<Biome> biomeHolder = null;
-                try {
-                    var biomeKey = ResourceKey.create(Registries.BIOME, ResourceLocation.parse(pkt.biomeRls()[i]));
-                    biomeHolder = biomeRegistry.getHolder(biomeKey).orElse(null);
-                } catch (Exception ignored) {}
-                int clientBiomeId = (biomeHolder != null) ? clientMapper.getIdForBiome(biomeHolder) : 0;
-
-                clientLUT[i] = Mapper.composeMappingId(pkt.lights()[i], clientBlockId, clientBiomeId);
-            }
-
-            // Reconstruct VoxelizedSection with client-local IDs
-            VoxelizedSection vs = VoxelizedSection.createEmpty().setPosition(pkt.sectionX(), pkt.sectionY(), pkt.sectionZ());
-            for (int i = 0; i < DATA_SIZE; i++) {
-                vs.section[i] = clientLUT[pkt.indices()[i] & 0xFFFF];
-            }
-            int nonAir = 0;
-            for (int i = 0; i < 16 * 16 * 16; i++) {
-                if (!Mapper.isAir(vs.section[i])) nonAir++;
-            }
-            vs.lvl0NonAirCount = nonAir;
-
-            WorldUpdater.insertUpdate(worldEngine, vs);
-        });
-    }
+    // Client-side handling lives in me.cortex.voxy.client.network.ClientPacketHandlers
+    // (a client-only class) so this common record stays loadable on a dedicated server.
 
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {

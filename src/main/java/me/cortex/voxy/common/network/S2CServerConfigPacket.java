@@ -1,18 +1,17 @@
 package me.cortex.voxy.common.network;
 
-import me.cortex.voxy.client.config.ServerConfigOverride;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * Server → Client: pushes the server's rate/radius config limits to the connecting client.
  *
  * Sent once on player join, before any LOD data.  The client stores these values in
- * {@link ServerConfigOverride} and uses them to clamp its own auto-generation rate and
- * LOD radius for the duration of the session.
+ * {@code ServerConfigOverride} and uses them to clamp its own auto-generation rate and
+ * LOD radius for the duration of the session. Client-side handling lives in
+ * {@code me.cortex.voxy.client.network.ClientPacketHandlers}.
  */
 public record S2CServerConfigPacket(
         int lodsPerTick,
@@ -45,10 +44,5 @@ public record S2CServerConfigPacket(
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {
         return TYPE;
-    }
-
-    /** Client-side handler — stores the received limits in {@link ServerConfigOverride}. */
-    public static void handle(S2CServerConfigPacket pkt, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> ServerConfigOverride.INSTANCE.apply(pkt));
     }
 }

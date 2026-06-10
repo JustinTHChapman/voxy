@@ -1,6 +1,7 @@
 package me.cortex.voxy.client;
 
 import me.cortex.voxy.client.core.generation.AutoGenerationService;
+import me.cortex.voxy.client.network.ClientPacketHandlers;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.common.Logger;
@@ -48,11 +49,11 @@ public class VoxyClient {
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
         final PayloadRegistrar registrar = event.registrar("voxy");
         registrar.playToClient(S2CLodSectionPacket.TYPE, S2CLodSectionPacket.STREAM_CODEC,
-                S2CLodSectionPacket::handle);
+                ClientPacketHandlers::handleLodSection);
         registrar.playToClient(S2CServerConfigPacket.TYPE, S2CServerConfigPacket.STREAM_CODEC,
-                S2CServerConfigPacket::handle);
+                ClientPacketHandlers::handleServerConfig);
         registrar.playToClient(S2CManifestPacket.TYPE, S2CManifestPacket.STREAM_CODEC,
-                S2CManifestPacket::handle);
+                ClientPacketHandlers::handleManifest);
         registrar.playToServer(C2SRequestSectionsPacket.TYPE, C2SRequestSectionsPacket.STREAM_CODEC,
                 (pkt, ctx) -> { /* clients never receive this packet */ });
         registrar.playToServer(C2SLodSectionPacket.TYPE, C2SLodSectionPacket.STREAM_CODEC,

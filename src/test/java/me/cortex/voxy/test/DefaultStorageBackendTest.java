@@ -27,11 +27,12 @@ class DefaultStorageBackendTest {
 
     @Test
     void defaultBackendIsAlwaysAvailable() {
-        // LMDB is the only currently-available embedded backend in the build.
+        // SQLite is the default embedded backend (bundled via jarJar); Memory and LMDB
+        // are the other always-loadable options. RocksDB's native dep is excluded.
         var cfg = StorageConfigUtil.createDefaultSerializer();
         String json = serializeNoNulls(cfg);
-        assertTrue(json.contains("\"LMDB\"") || json.contains("\"Memory\"") || json.contains("\"Sqlite\""),
-            "Default storage backend should be one of {LMDB, Memory, Sqlite}. Config was:\n" + json);
+        assertTrue(json.contains("\"LMDB\"") || json.contains("\"Memory\"") || json.contains("\"SQLite\""),
+            "Default storage backend should be one of {LMDB, Memory, SQLite}. Config was:\n" + json);
     }
 
     private static String serializeNoNulls(Object o) {
