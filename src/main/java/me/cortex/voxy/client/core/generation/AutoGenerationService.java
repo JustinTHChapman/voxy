@@ -68,6 +68,9 @@ public final class AutoGenerationService {
     /** Chunks loaded by the server thread and ready to ingest on the client tick. */
     private final ConcurrentLinkedDeque<LevelChunk> serverReadyChunks = new ConcurrentLinkedDeque<>();
 
+    /** Column keys whose async server load failed; drained on the client tick to free pendingLoad slots. */
+    private final ConcurrentLinkedDeque<Long> failedServerLoads = new ConcurrentLinkedDeque<>();
+
     /** Chunks pending upload to server after local generation. */
     private final Deque<LevelChunk> uploadQueue = new ArrayDeque<>();
 
@@ -124,6 +127,7 @@ public final class AutoGenerationService {
         submitted.clear();
         pendingLoad.clear();
         serverReadyChunks.clear();
+        failedServerLoads.clear();
         uploadQueue.clear();
         lastPlayerCX = Integer.MIN_VALUE;
         lastPlayerCZ = Integer.MIN_VALUE;
@@ -254,6 +258,12 @@ public final class AutoGenerationService {
             smoothedFogFrontierBlocks = rawFrontier;
         }
 
+        // Free pending-load slots for async server loads that failed (couldn't load/generate).
+        Long failedKey;
+        while ((failedKey = failedServerLoads.poll()) != null) {
+            pendingLoad.remove(failedKey.longValue());
+        }
+
         // Drain any chunks the server thread has finished loading
         int drained = 0;
         LevelChunk ready;
@@ -335,19 +345,24 @@ public final class AutoGenerationService {
                 iServer.execute(() -> {
                     try {
                         ServerLevel sl = iServer.getLevel(dim);
-                        if (sl == null) { pendingLoad.remove(colKey(fcx, fcz)); return; }
-                        // Non-blocking: return the chunk only if it is already loaded.
-                        // create=true would call managedBlock, which drains the server task
-                        // queue while waiting and allows reentrant setBlock → getChunk calls
-                        // that can deadlock or trigger recursive updates in other mods.
-                        var c = sl.getChunkSource().getChunk(fcx, fcz, ChunkStatus.FULL, false);
-                        if (c instanceof LevelChunk lc) {
-                            serverReadyChunks.addLast(lc);
-                        } else {
-                            pendingLoad.remove(colKey(fcx, fcz));
-                        }
+                        if (sl == null) { failedServerLoads.addLast(colKey(fcx, fcz)); return; }
+                        // Async force-load: getChunkFuture(create=true) schedules the chunk to
+                        // load/generate and returns immediately. Unlike the blocking
+                        // getChunk(create=true), it never calls managedBlock, so it cannot drain
+                        // the server task queue and trigger the reentrant setBlock → getChunk
+                        // recursion that previously crashed. The transient UNKNOWN ticket it adds
+                        // expires on its own, so the chunk unloads naturally after we voxelize it.
+                        sl.getChunkSource().getChunkFuture(fcx, fcz, ChunkStatus.FULL, true)
+                            .whenComplete((result, err) -> {
+                                var loaded = (err == null && result != null) ? result.orElse(null) : null;
+                                if (loaded instanceof LevelChunk lc) {
+                                    serverReadyChunks.addLast(lc);
+                                } else {
+                                    failedServerLoads.addLast(colKey(fcx, fcz));
+                                }
+                            });
                     } catch (Exception e) {
-                        pendingLoad.remove(colKey(fcx, fcz));
+                        failedServerLoads.addLast(colKey(fcx, fcz));
                     }
                 });
                 requested++;
