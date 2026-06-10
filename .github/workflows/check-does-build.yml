@@ -1,6 +1,15 @@
-﻿name: check-does-build
+name: build-check
 
-on: [ push ]
+# Full CI (compile/test/build/artifact/release) for neoforge-rewrite lives in
+# build.yml. This lightweight build check covers every OTHER branch — and PRs
+# not targeting neoforge-rewrite — so feature branches still get a build signal
+# without double-building neoforge-rewrite.
+on:
+  push:
+    branches-ignore: [neoforge-rewrite]
+  pull_request:
+    branches-ignore: [neoforge-rewrite]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,8 +27,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: false
-          cache-cleanup: never
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Gradle build
         run: ./gradlew build --no-daemon
