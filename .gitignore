@@ -10,6 +10,10 @@
 *.log
 *.bak
 
+# Never commit jars (build artifacts) — except the Gradle wrapper bootstrap
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
 # IDE / editor files
 /.eclipse/
 /.vscode/
