@@ -204,11 +204,9 @@ public final class AutoGenerationService {
                     LongOpenHashSet result = new LongOpenHashSet();
                     eng.storage.iteratePositions(0, pos -> {
                         if (dbScanResult.get() != sentinel) return; // aborted by reset/dimension change
-                        int sx = WorldEngine.getX(pos);
-                        int sz = WorldEngine.getZ(pos);
-                        for (int dcx = 0; dcx < 2; dcx++)
-                            for (int dcz = 0; dcz < 2; dcz++)
-                                result.add(colKey(sx * 2 + dcx, sz * 2 + dcz));
+                        // LOD0 storage is keyed by raw chunk coords (one section = one chunk),
+                        // so a stored position maps directly to one candidate column.
+                        result.add(colKey(WorldEngine.getX(pos), WorldEngine.getZ(pos)));
                     });
                     // Only publish the result if our sentinel is still the active one;
                     // a concurrent reset or dimension change will have replaced it with null.
@@ -320,7 +318,7 @@ public final class AutoGenerationService {
             // Check if LOD data already exists in the DB for this column.
             // If so, mark submitted and skip server chunk request — the rendering system
             // will load the stored data on demand without needing the source chunk.
-            if (engine.storage.containsColumn(0, cx >> 1, cz >> 1,
+            if (engine.storage.containsColumn(0, cx, cz,
                     mc.level.getMinSection(), mc.level.getMaxSection())) {
                 submitted.add(colKey);
                 continue;
