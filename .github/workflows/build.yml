@@ -95,10 +95,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # ---- Push jar directly to .minecraft repo via SSH deploy key ----
+      # Best-effort: this is a personal mod-pack deploy, so a hiccup here (e.g. the
+      # .minecraft repo's Git LFS budget being exhausted) must not fail the CI checks.
       - name: Push jar to .minecraft
         if: github.event_name == 'push' && github.ref == 'refs/heads/neoforge-rewrite'
+        continue-on-error: true
         env:
           MINECRAFT_DEPLOY_KEY: ${{ secrets.MINECRAFT_DEPLOY_KEY }}
+          # We only swap the voxy jar, so don't download every other mod's LFS content on clone.
+          GIT_LFS_SKIP_SMUDGE: "1"
         run: |
           set -euo pipefail
 
