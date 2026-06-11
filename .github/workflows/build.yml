@@ -1,4 +1,4 @@
-name: Build, Test, Publish
+name: Build & Test
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # needed to create/update the rolling Release
+  contents: read
   checks: write     # needed to post JUnit test results
 
 concurrency:
@@ -69,30 +69,11 @@ jobs:
           GRADLE_OPTS: "-Xmx2g"
           CI: "true"
 
-      - name: Upload jar artifact
-        uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: voxy-neoforge-${{ github.sha }}
-          path: build/libs/*.jar
-          retention-days: 30
-
-      # ---- Publish a rolling "latest" Release on pushes to neoforge-rewrite ----
-      - name: Update rolling latest Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/neoforge-rewrite'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest-neoforge-rewrite
-          name: "Latest neoforge-rewrite build"
-          body: |
-            Automatic build from commit ${{ github.sha }}.
-
-            **This is an automated rolling release. Do not link to it as a stable version.**
-          prerelease: true
-          files: |
-            build/libs/*.jar
-          fail_on_unmatched_files: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+      # NOTE: The mod jar is intentionally NOT published as a public artifact or
+      # GitHub Release. The license (LICENSE.md) is "All rights reserved. Do not
+      # redistribute.", and on a public repo both build artifacts and Releases are
+      # publicly downloadable. The only deploy below targets the PRIVATE .minecraft
+      # repo for personal mod-pack use, which is not public redistribution.
 
       # ---- Push jar directly to .minecraft repo via SSH deploy key ----
       # Best-effort: this is a personal mod-pack deploy, so a hiccup here (e.g. the
