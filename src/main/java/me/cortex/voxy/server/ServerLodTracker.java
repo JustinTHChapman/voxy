@@ -154,7 +154,7 @@ public class ServerLodTracker {
                 posArr[i]  = positions.getLong(start + i);
                 hashArr[i] = hashes.getInt(start + i);
             }
-            PacketDistributor.sendToPlayer(player, new S2CManifestPacket(fin, posArr, hashArr));
+            PacketDistributor.sendToPlayer(player, new S2CManifestPacket(dimId, fin, posArr, hashArr));
             if (fin) break;
         }
         Logger.info("[VoxyServer] Sent manifest of " + total + " sections to " + player.getGameProfile().getName());

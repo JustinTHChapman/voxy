@@ -53,6 +53,11 @@ public final class ClientPacketHandlers {
             var level = Minecraft.getInstance().level;
             if (level == null) return;
 
+            // Drop sections for a different dimension than the one we're in — prevents old-dimension
+            // LOD leaking into the new engine after a portal switch. The server re-sends via the
+            // join manifest, so a dropped section is not lost.
+            if (!pkt.dimensionId().equals(level.dimension().location().toString())) return;
+
             // Use the currently-active world engine for the client's current dimension
             var worldId = WorldIdentifier.of(level);
             if (worldId == null) return;

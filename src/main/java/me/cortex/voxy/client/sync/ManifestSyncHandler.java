@@ -37,6 +37,15 @@ public final class ManifestSyncHandler {
 
     /** Called on the main client thread for each received manifest packet. */
     public void onManifestPacket(S2CManifestPacket pkt) {
+        Minecraft mc = Minecraft.getInstance();
+        // Drop manifests for a dimension other than the one we're currently in (e.g. an overworld
+        // manifest that arrives just after a nether portal). Clear any partial accumulation so a
+        // stale prefix can't merge into a later valid sequence.
+        if (mc.level == null || !pkt.dimensionId().equals(mc.level.dimension().location().toString())) {
+            pendingPositions.clear();
+            pendingHashes.clear();
+            return;
+        }
         long[] positions = pkt.sectionPositions();
         int[]  hashes    = pkt.contentHashes();
         for (int i = 0; i < positions.length; i++) {

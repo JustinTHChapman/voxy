@@ -29,6 +29,7 @@ import java.util.List;
  * </pre>
  */
 public record S2CManifestPacket(
+        String  dimensionId,
         boolean isFinal,
         long[]  sectionPositions,
         int[]   contentHashes
@@ -44,6 +45,7 @@ public record S2CManifestPacket(
             StreamCodec.of(S2CManifestPacket::encode, S2CManifestPacket::decode);
 
     private static void encode(FriendlyByteBuf buf, S2CManifestPacket pkt) {
+        buf.writeUtf(pkt.dimensionId(), 96);
         buf.writeBoolean(pkt.isFinal());
         buf.writeVarInt(pkt.sectionPositions().length);
         for (int i = 0; i < pkt.sectionPositions().length; i++) {
@@ -53,6 +55,7 @@ public record S2CManifestPacket(
     }
 
     private static S2CManifestPacket decode(FriendlyByteBuf buf) {
+        String dimId = buf.readUtf(96);
         boolean isFinal = buf.readBoolean();
         int count = buf.readVarInt();
         long[] positions = new long[count];
@@ -61,7 +64,7 @@ public record S2CManifestPacket(
             positions[i] = buf.readLong();
             hashes[i]    = buf.readInt();
         }
-        return new S2CManifestPacket(isFinal, positions, hashes);
+        return new S2CManifestPacket(dimId, isFinal, positions, hashes);
     }
 
     @Override

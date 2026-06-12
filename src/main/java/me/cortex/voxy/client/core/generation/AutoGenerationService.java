@@ -214,6 +214,11 @@ public final class AutoGenerationService {
             submitted.clear();
             pendingLoad.clear();
             candidateQueue.clear();
+            // Drop any old-dimension work still queued across ticks so it can't be ingested
+            // into the new dimension's engine.
+            serverReadyChunks.clear();
+            uploadQueue.clear();
+            failedServerLoads.clear();
             lastPlayerCX = Integer.MIN_VALUE;
         }
 
@@ -295,6 +300,10 @@ public final class AutoGenerationService {
         while ((ready = serverReadyChunks.poll()) != null) {
             long k = colKey(ready.getPos().x, ready.getPos().z);
             pendingLoad.remove(k);
+            // Discard chunks from a different dimension — a late async getChunkFuture callback can
+            // fire after a portal switch. Compare by dimension location, NOT WorldIdentifier:
+            // biomeSeed can differ between the integrated-server level and the client level.
+            if (!ready.getLevel().dimension().location().toString().equals(dimId)) continue;
             if (!submitted.contains(k)) {
                 // Use enqueueIngestServer: bypasses the LIGHT_AND_DATA gate that
                 // causes server-side chunks to be silently dropped when accessed
@@ -423,6 +432,8 @@ public final class AutoGenerationService {
         while (uploaded < MAX_UPLOADS_PER_TICK && !uploadQueue.isEmpty()) {
             LevelChunk chunk = uploadQueue.pollFirst();
             if (chunk == null) continue;
+            // Skip chunks not belonging to the current dimension (stale across a portal switch).
+            if (!chunk.getLevel().dimension().location().toString().equals(dimId)) continue;
             try {
                 var lightEngine = mc.level.getLightEngine();
                 int sectionIdx = chunk.getMinSection() - 1;
