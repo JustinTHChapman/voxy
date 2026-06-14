@@ -14,7 +14,6 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.util.datafix.fixes.References;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -27,7 +26,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -157,16 +155,14 @@ public class Mapper {
 
         if (!sentryErrors.isEmpty()) {
             forceResave[0] |= true;
-            //Insert garbage types into the mapping for those blocks, TODO:FIXME: Need to upgrade the type or have a solution to error blocks
-            var rand = new Random();
+            // The block's identity is unrecoverable (corrupt/incompatible NBT). Map each failed id to
+            // a FIXED placeholder rather than a RANDOM block: a random replacement scrambles the
+            // rendered terrain (e.g. every netherrack in old LODs becoming some unrelated block).
+            // We deliberately do NOT register the placeholder in block2stateEntry, so the real
+            // placeholder block can still claim its own id when genuinely ingested. It must be
+            // non-air — air ids are treated as errors (see above) and would be re-flagged each load.
             for (var error : sentryErrors) {
-                while (true) {
-                    var state = new StateEntry(error.right(), Block.BLOCK_STATE_REGISTRY.byId(rand.nextInt(Block.BLOCK_STATE_REGISTRY.size() - 1)));
-                    if (this.block2stateEntry.put(state.state, state) == null) {
-                        sentries.add(state);
-                        break;
-                    }
-                }
+                sentries.add(new StateEntry(error.right(), Blocks.STONE.defaultBlockState()));
             }
         }
 
