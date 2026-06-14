@@ -503,6 +503,11 @@ public class ModelFactory {
             if (facePresent[i] && !faceAllOpaque[i]) { anyFaceTransparent = true; break; }
         }
         if (state.is(BlockTags.LEAVES)) anyFaceTransparent = false;
+        // Ice (ice / packed / blue / frosted) is semi-transparent but visually near-opaque at LOD
+        // scale. Routing it to the alpha-blend translucent pass made it overlap the water beneath it
+        // in frozen oceans — two unsorted translucent surfaces produce order-dependent blending that
+        // flickers/stripes as the camera moves. Render ice opaque instead (stable, looks fine at LOD).
+        if (state.is(BlockTags.ICE)) anyFaceTransparent = false;
         if (anyFaceTransparent) modelFlags |= 0b00000010; // isTranslucent
 
         // Detect if this block uses different sprites for different face directions.
