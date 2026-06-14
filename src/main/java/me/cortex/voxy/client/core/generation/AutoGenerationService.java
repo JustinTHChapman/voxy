@@ -17,7 +17,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
@@ -90,6 +89,8 @@ public final class AutoGenerationService {
 
     /** Max C2S section uploads per tick (separate budget from generation). */
     private static final int MAX_UPLOADS_PER_TICK = 4;
+    /** Hard cap on the upload backlog so it can never pin LevelChunk references unbounded. */
+    private static final int MAX_UPLOAD_QUEUE = 256;
 
     // Dynamic throttle: reduce generation when the game is struggling.
     // Measures wall-clock time between successive tick() calls and smooths it
@@ -364,12 +365,14 @@ public final class AutoGenerationService {
             LevelChunk chunk = mc.level.getChunkSource().getChunk(cx, cz, false);
 
             if (chunk == null && iServer != null) {
-                // 2. Singleplayer: request the chunk from the integrated server asynchronously.
-                //    Cap outstanding requests so we don't flood the server thread with disk I/O.
+                // 2. Singleplayer: take the chunk from the integrated server ONLY if it already has
+                //    it loaded (getChunkNow). We must NEVER force-load here — both getChunk and
+                //    getChunkFuture with create=true block the server thread via managedBlock
+                //    (pumping the task queue until the chunk generates), which saturates the server
+                //    thread (~90% in profiling) and pins cold chunks in memory. Cold chunks are
+                //    skipped and retried once the server loads them naturally (sim/view distance).
                 if (pendingLoad.size() >= MAX_PENDING_SERVER_LOADS) {
                     // Server load slots full; put this entry back and stop for this tick.
-                    // The entry stays at the front of the queue (minimum distance), so it
-                    // is the very next thing processed once a slot frees up.
                     candidateQueue.enqueue(packed);
                     break;
                 }
@@ -380,21 +383,14 @@ public final class AutoGenerationService {
                     try {
                         ServerLevel sl = iServer.getLevel(dim);
                         if (sl == null) { failedServerLoads.addLast(colKey(fcx, fcz)); return; }
-                        // Async force-load: getChunkFuture(create=true) schedules the chunk to
-                        // load/generate and returns immediately. Unlike the blocking
-                        // getChunk(create=true), it never calls managedBlock, so it cannot drain
-                        // the server task queue and trigger the reentrant setBlock → getChunk
-                        // recursion that previously crashed. The transient UNKNOWN ticket it adds
-                        // expires on its own, so the chunk unloads naturally after we voxelize it.
-                        sl.getChunkSource().getChunkFuture(fcx, fcz, ChunkStatus.FULL, true)
-                            .whenComplete((result, err) -> {
-                                var loaded = (err == null && result != null) ? result.orElse(null) : null;
-                                if (loaded instanceof LevelChunk lc) {
-                                    serverReadyChunks.addLast(lc);
-                                } else {
-                                    failedServerLoads.addLast(colKey(fcx, fcz));
-                                }
-                            });
+                        // Non-blocking: returns the chunk only if already loaded, else null. No
+                        // managedBlock, no disk I/O, no generation — cannot jam the server thread.
+                        LevelChunk lc = sl.getChunkSource().getChunkNow(fcx, fcz);
+                        if (lc != null) {
+                            serverReadyChunks.addLast(lc);
+                        } else {
+                            failedServerLoads.addLast(colKey(fcx, fcz));
+                        }
                     } catch (Exception e) {
                         failedServerLoads.addLast(colKey(fcx, fcz));
                     }
@@ -416,6 +412,8 @@ public final class AutoGenerationService {
             // the player moves or the current batch empties.
         }
 
+        // Bound the upload backlog so it can never pin LevelChunks unbounded (defensive).
+        while (uploadQueue.size() > MAX_UPLOAD_QUEUE) uploadQueue.pollFirst();
         // Upload client-generated sections to server (rate-limited)
         if (!uploadQueue.isEmpty() && ServerConfigOverride.INSTANCE.autoGenerationEnabled()) {
             drainUploads(mc, engine);
