@@ -15,20 +15,28 @@ import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.SectionPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongHeapPriorityQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayDeque;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -49,8 +57,11 @@ public final class AutoGenerationService {
     private static final int REBUILD_THRESHOLD_CHUNKS = 4;
     /** Movement in a single tick beyond this many chunks is treated as a teleport. */
     private static final int TELEPORT_THRESHOLD_CHUNKS = 32;
-    /** Max outstanding server-thread chunk requests. Prevents flooding the integrated server. */
-    private static final int MAX_PENDING_SERVER_LOADS = 4;
+    /** Auto-expiring chunk-load ticket: triggers async loading without blocking; self-cleans once we stop refreshing it. */
+    private static final TicketType<ChunkPos> VOXY_LOAD_TICKET =
+            TicketType.create("voxy_autogen_load", Comparator.comparingLong(ChunkPos::toLong), 60);
+    /** Give up force-loading a chunk that hasn't reached FULL within this long (nanoseconds). */
+    private static final long LOAD_TIMEOUT_NANOS = 30_000_000_000L; // 30s
 
     /** Lerp factor when fog frontier needs to shrink (player approaching edge). */
     private static final float FOG_LERP_SHRINK = 0.15f;
@@ -84,13 +95,18 @@ public final class AutoGenerationService {
     /** Column keys whose async server load failed; drained on the client tick to free pendingLoad slots. */
     private final ConcurrentLinkedDeque<Long> failedServerLoads = new ConcurrentLinkedDeque<>();
 
+    /** Client→server handoff of columns to force-load (drained on the integrated-server thread). */
+    private final ConcurrentLinkedQueue<Long> loadRequests = new ConcurrentLinkedQueue<>();
+    /** Server-thread-only: columns we currently hold a load ticket for → request time (nanos), for timeout. */
+    private final Long2LongOpenHashMap ticketed = new Long2LongOpenHashMap();
+    /** Server-thread-only: dimension of the last server poll, to detect dimension changes. */
+    private ResourceKey<Level> serverPollDim = null;
+
     /** Chunks pending upload to server after local generation. */
     private final Deque<LevelChunk> uploadQueue = new ArrayDeque<>();
 
     /** Max C2S section uploads per tick (separate budget from generation). */
     private static final int MAX_UPLOADS_PER_TICK = 4;
-    /** Hard cap on the upload backlog so it can never pin LevelChunk references unbounded. */
-    private static final int MAX_UPLOAD_QUEUE = 256;
 
     // Dynamic throttle: reduce generation when the game is struggling.
     // Measures wall-clock time between successive tick() calls and smooths it
@@ -137,6 +153,7 @@ public final class AutoGenerationService {
         pendingLoad.clear();
         serverReadyChunks.clear();
         failedServerLoads.clear();
+        loadRequests.clear();
         uploadQueue.clear();
         lastPlayerCX = Integer.MIN_VALUE;
         lastPlayerCZ = Integer.MIN_VALUE;
@@ -220,6 +237,7 @@ public final class AutoGenerationService {
             serverReadyChunks.clear();
             uploadQueue.clear();
             failedServerLoads.clear();
+            loadRequests.clear();
             lastPlayerCX = Integer.MIN_VALUE;
         }
 
@@ -341,6 +359,7 @@ public final class AutoGenerationService {
         int rate = Math.max(1, Math.round(ServerConfigOverride.INSTANCE.effectiveGenerationRate() * throttle));
         int generated = 0;
         int requested = 0;
+        int maxPending = VoxyCommonConfig.AUTO_GEN_MAX_PENDING_LOADS.get();
 
         while ((generated + requested) < rate && !candidateQueue.isEmpty()) {
             long packed = candidateQueue.dequeueLong();
@@ -365,36 +384,18 @@ public final class AutoGenerationService {
             LevelChunk chunk = mc.level.getChunkSource().getChunk(cx, cz, false);
 
             if (chunk == null && iServer != null) {
-                // 2. Singleplayer: take the chunk from the integrated server ONLY if it already has
-                //    it loaded (getChunkNow). We must NEVER force-load here — both getChunk and
-                //    getChunkFuture with create=true block the server thread via managedBlock
-                //    (pumping the task queue until the chunk generates), which saturates the server
-                //    thread (~90% in profiling) and pins cold chunks in memory. Cold chunks are
-                //    skipped and retried once the server loads them naturally (sim/view distance).
-                if (pendingLoad.size() >= MAX_PENDING_SERVER_LOADS) {
-                    // Server load slots full; put this entry back and stop for this tick.
+                // 2. Singleplayer: register the column for an async force-load. serverPoll() (on the
+                //    integrated-server thread) adds a transient auto-expiring ticket so the server
+                //    loads/generates it over the next ticks, then we pick it up via getChunkNow once
+                //    ready — NEVER calling getChunk/getChunkFuture(create=true) on the server thread,
+                //    which would block it via managedBlock. Concurrent loads are capped by config.
+                if (pendingLoad.size() >= maxPending) {
+                    // At the concurrent-load cap; put this entry back and stop for this tick.
                     candidateQueue.enqueue(packed);
                     break;
                 }
                 pendingLoad.add(colKey);
-                final int fcx = cx, fcz = cz;
-                final var dim = mc.level.dimension();
-                iServer.execute(() -> {
-                    try {
-                        ServerLevel sl = iServer.getLevel(dim);
-                        if (sl == null) { failedServerLoads.addLast(colKey(fcx, fcz)); return; }
-                        // Non-blocking: returns the chunk only if already loaded, else null. No
-                        // managedBlock, no disk I/O, no generation — cannot jam the server thread.
-                        LevelChunk lc = sl.getChunkSource().getChunkNow(fcx, fcz);
-                        if (lc != null) {
-                            serverReadyChunks.addLast(lc);
-                        } else {
-                            failedServerLoads.addLast(colKey(fcx, fcz));
-                        }
-                    } catch (Exception e) {
-                        failedServerLoads.addLast(colKey(fcx, fcz));
-                    }
-                });
+                loadRequests.add(colKey);
                 requested++;
                 continue;
             }
@@ -412,11 +413,65 @@ public final class AutoGenerationService {
             // the player moves or the current batch empties.
         }
 
-        // Bound the upload backlog so it can never pin LevelChunks unbounded (defensive).
-        while (uploadQueue.size() > MAX_UPLOAD_QUEUE) uploadQueue.pollFirst();
+        // Bound the upload backlog so it can never pin LevelChunks unbounded.
+        int maxUpload = VoxyCommonConfig.AUTO_GEN_MAX_UPLOAD_QUEUE.get();
+        while (uploadQueue.size() > maxUpload) uploadQueue.pollFirst();
         // Upload client-generated sections to server (rate-limited)
         if (!uploadQueue.isEmpty() && ServerConfigOverride.INSTANCE.autoGenerationEnabled()) {
             drainUploads(mc, engine);
+        }
+
+        // Drive the async chunk-load tickets on the integrated-server thread (non-blocking):
+        // intake new requests, (re)add load tickets, and hand back any chunks now loaded.
+        if (iServer != null && !pendingLoad.isEmpty()) {
+            final MinecraftServer server = iServer;
+            final ResourceKey<Level> pollDim = mc.level.dimension();
+            iServer.execute(() -> serverPoll(server, pollDim));
+        }
+    }
+
+    /**
+     * Runs on the integrated-server thread once per client tick. Adds a transient, auto-expiring
+     * load ticket for each outstanding column so the server loads/generates it asynchronously, and
+     * hands back any chunk that has reached FULL. Never blocks — no managedBlock, no join. Tickets
+     * we stop refreshing (loaded / failed / dimension change) expire on their own, so chunks unload.
+     */
+    private void serverPoll(MinecraftServer server, ResourceKey<Level> dim) {
+        ServerLevel sl = server.getLevel(dim);
+        if (sl == null) return;
+        // Dimension changed since the last poll: abandon old tickets (they auto-expire on the old
+        // level) so we never add tickets for old-dimension columns onto the new level.
+        if (!dim.equals(serverPollDim)) {
+            ticketed.clear();
+            serverPollDim = dim;
+        }
+        var cc = sl.getChunkSource();
+
+        // Intake newly-requested columns.
+        Long req;
+        while ((req = loadRequests.poll()) != null) {
+            ticketed.putIfAbsent(req.longValue(), System.nanoTime());
+        }
+
+        // (Re)add a load ticket for each outstanding column and collect any that are ready.
+        long pollNow = System.nanoTime();
+        var it = ticketed.long2LongEntrySet().iterator();
+        while (it.hasNext()) {
+            var e = it.next();
+            long ck = e.getLongKey();
+            int ccx = (int) (ck >> 32);
+            int ccz = (int) ck;
+            ChunkPos cp = new ChunkPos(ccx, ccz);
+            // radius 0 → ticket level 33 (FULL); triggers async load over subsequent server ticks.
+            cc.addRegionTicket(VOXY_LOAD_TICKET, cp, 0, cp);
+            LevelChunk lc = cc.getChunkNow(ccx, ccz);
+            if (lc != null) {
+                serverReadyChunks.addLast(lc);
+                it.remove();
+            } else if (pollNow - e.getLongValue() > LOAD_TIMEOUT_NANOS) {
+                failedServerLoads.addLast(ck);
+                it.remove();
+            }
         }
     }
 

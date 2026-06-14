@@ -60,6 +60,12 @@ public class VoxyCommonConfig {
      */
     public static final ModConfigSpec.IntValue AUTO_GEN_SUBMITTED_LIMIT;
 
+    /** Max chunks force-loaded from the integrated server at once for LOD auto-generation. */
+    public static final ModConfigSpec.IntValue AUTO_GEN_MAX_PENDING_LOADS;
+
+    /** Max LOD upload backlog (generated chunks awaiting upload) before the oldest are dropped. */
+    public static final ModConfigSpec.IntValue AUTO_GEN_MAX_UPLOAD_QUEUE;
+
     static {
         // ── build SERVER spec ─────────────────────────────────────────────
         var sb = new ModConfigSpec.Builder();
@@ -116,6 +122,16 @@ public class VoxyCommonConfig {
                 .comment("Maximum chunk columns tracked in the auto-generation submitted set. 0 = no limit (default).",
                          "When the limit is exceeded the set is cleared and re-populated from the database on the next rebuild cycle.")
                 .defineInRange("auto_gen_submitted_limit", 0, 0, Integer.MAX_VALUE);
+
+        AUTO_GEN_MAX_PENDING_LOADS = cb
+                .comment("Max chunks being force-loaded from the integrated server at once for LOD generation.",
+                         "Higher = faster distant generation but more server load.")
+                .defineInRange("auto_gen_max_pending_loads", 4, 1, 64);
+
+        AUTO_GEN_MAX_UPLOAD_QUEUE = cb
+                .comment("Max LOD upload backlog (generated chunks awaiting upload) before the oldest are dropped.",
+                         "Bounds memory; does not affect generation rate.")
+                .defineInRange("auto_gen_max_upload_queue", 256, 16, 8192);
 
         cb.pop();
         CLIENT_SPEC = cb.build();
