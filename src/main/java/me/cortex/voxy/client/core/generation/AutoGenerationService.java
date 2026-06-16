@@ -465,7 +465,11 @@ public final class AutoGenerationService {
             // radius 0 → ticket level 33 (FULL); triggers async load over subsequent server ticks.
             cc.addRegionTicket(VOXY_LOAD_TICKET, cp, 0, cp);
             LevelChunk lc = cc.getChunkNow(ccx, ccz);
-            if (lc != null) {
+            // Only hand the chunk back once it is FULL *and* the threaded light engine has finished
+            // lighting it. getChunkNow can return a FULL chunk whose lighting is still in flight
+            // (isLightCorrect() == false); voxelizing it then bakes a DARK LOD. Keep refreshing the
+            // ticket and re-poll until the light is ready (or we time out).
+            if (lc != null && lc.isLightCorrect()) {
                 serverReadyChunks.addLast(lc);
                 it.remove();
             } else if (pollNow - e.getLongValue() > LOAD_TIMEOUT_NANOS) {
