@@ -19,4 +19,11 @@ public abstract class SectionStorage implements IMappingStorage, IStoredSectionP
     public boolean containsColumn(int level, int sx, int sz, int minSectionY, int maxSectionY) {
         return false;
     }
+
+    /**
+     * Delete the stored section with the given key (see {@code WorldEngine.getWorldSectionId}).
+     * Default: no-op — subclasses backed by real storage should override.
+     */
+    public void deleteSection(long key) {
+    }
 }
