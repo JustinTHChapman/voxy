@@ -6,6 +6,7 @@ import me.cortex.voxy.common.config.VoxyCommonConfig;
 import me.cortex.voxy.common.network.C2SLodSectionPacket;
 import me.cortex.voxy.common.network.S2CLodSectionPacket;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
+import me.cortex.voxy.common.voxelization.LodLighting;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.voxelization.WorldVoxilizedSectionMipper;
@@ -14,17 +15,16 @@ import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.SectionPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
@@ -493,15 +493,13 @@ public final class AutoGenerationService {
             // Skip chunks not belonging to the current dimension (stale across a portal switch).
             if (!chunk.getLevel().dimension().location().toString().equals(dimId)) continue;
             try {
-                var lightEngine = mc.level.getLightEngine();
+                var heightmap = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.MOTION_BLOCKING);
                 int sectionIdx = chunk.getMinSection() - 1;
                 for (LevelChunkSection sec : chunk.getSections()) {
                     sectionIdx++;
                     if (sec == null) continue;
-                    var spos = SectionPos.of(chunk.getPos(), sectionIdx);
-                    DataLayer blData = lightEngine.getLayerListener(LightLayer.BLOCK).getDataLayerData(spos);
-                    DataLayer slData = lightEngine.getLayerListener(LightLayer.SKY).getDataLayerData(spos);
-                    ILightingSupplier light = buildLight(blData, slData);
+                    var lr = LodLighting.compute(sec, sectionIdx, heightmap);
+                    ILightingSupplier light = buildLight(lr.blockLight(), lr.skyLight());
                     VoxelizedSection vs = VS_CACHE.get().setPosition(chunk.getPos().x, sectionIdx, chunk.getPos().z);
                     vs = WorldConversionFactory.convert(vs, mapper, sec.getStates(), sec.getBiomes(), light);
                     WorldVoxilizedSectionMipper.mipSection(vs, mapper);

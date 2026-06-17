@@ -3,8 +3,8 @@ package me.cortex.voxy.common.world.service;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.Service;
 import me.cortex.voxy.common.thread.ServiceManager;
-import me.cortex.voxy.common.voxelization.FallbackLighting;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
+import me.cortex.voxy.common.voxelization.LodLighting;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.voxelization.WorldVoxilizedSectionMipper;
@@ -12,13 +12,10 @@ import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
-import net.minecraft.core.SectionPos;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.lighting.LayerLightSectionStorage;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -126,81 +123,27 @@ public class VoxelIngestService {
 
         engine.markActive();
 
-        var lightingProvider = chunk.getLevel().getLightEngine();
-        boolean gotLighting = false;
+        // Voxy computes its own LOD light (LodLighting) from block data + heightmap, independent of
+        // the chunk's light-engine state, so there is no LIGHT_AND_DATA gate and ingest never has to
+        // wait for / retry lighting. Air-only sections are handled cheaply inside LodLighting.compute.
+        var heightmap = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.MOTION_BLOCKING);
 
         int i = chunk.getMinSection() - 1;
-        boolean allEmpty = true;
         for (var section : chunk.getSections()) {
             i++;
             if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
-            allEmpty&=section.hasOnlyAir();
-            //if (section.isEmpty()) continue;
-            var pos = SectionPos.of(chunk.getPos(), i);
-            if (lightingProvider.getDebugSectionType(LightLayer.SKY, pos) != LayerLightSectionStorage.SectionType.LIGHT_AND_DATA && lightingProvider.getDebugSectionType(LightLayer.BLOCK, pos) != LayerLightSectionStorage.SectionType.LIGHT_AND_DATA)
-                continue;
-            gotLighting = true;
-        }
-
-        if (allEmpty&&!gotLighting) {
-            diag$enqueueAllEmpty++;
-            //Special case all empty chunk columns, we need to clear it out
-            i = chunk.getMinSection() - 1;
-            for (var section : chunk.getSections()) {
-                i++;
-                if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
-                engine.markActive();
-                this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, null, null));
-                try {
-                    this.service.execute();
-                } catch (Exception e) {
-                    Logger.error("Executing had an error: assume shutting down, aborting",e);
-                    break;
-                }
-            }
-        }
-
-        if (!gotLighting) {
-            diag$enqueueNoLighting++;
-            return false;
-        }
-        diag$enqueueOk++;
-
-        var blp = lightingProvider.getLayerListener(LightLayer.BLOCK);
-        var slp = lightingProvider.getLayerListener(LightLayer.SKY);
-
-
-        i = chunk.getMinSection() - 1;
-        for (var section : chunk.getSections()) {
-            i++;
-            if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
-            //if (section.isEmpty()) continue;
-            var pos = SectionPos.of(chunk.getPos(), i);
-
-            var bl = blp.getDataLayerData(pos);
-            if (bl != null) {
-                bl = bl.copy();
-            }
-
-            var sl = slp.getDataLayerData(pos);
-            if (sl != null) {
-                sl = sl.copy();
-            }
-
-            //If its null for either, assume failure to obtain lighting and ignore section
-            //if (blNone && slNone) {
-            //    continue;
-            //}
+            var lr = LodLighting.compute(section, i, heightmap);
             engine.markActive();
             diag$sectionsQueued++;
-            this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));//TODO: fixme, this is technically not safe todo on the chunk load ingest, we need to copy the section data so it cant be modified while being read
+            this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, lr.blockLight(), lr.skyLight()));
             try {
                 this.service.execute();
             } catch (Exception e) {
-                Logger.error("Executing had an error: assume shutting down, aborting",e);
+                Logger.error("Executing had an error: assume shutting down, aborting", e);
                 break;
             }
         }
+        diag$enqueueOk++;
         return true;
     }
 
@@ -217,31 +160,19 @@ public class VoxelIngestService {
         if (!engine.isLive()) throw new IllegalStateException("Tried inserting chunk into WorldEngine that was not alive");
         engine.markActive();
 
-        var blp = chunk.getLevel().getLightEngine().getLayerListener(LightLayer.BLOCK);
-        var slp = chunk.getLevel().getLightEngine().getLayerListener(LightLayer.SKY);
-        // Heightmap for the sky-light fallback below (read once per chunk, on the calling thread).
+        // Voxy computes its own LOD light from block data + heightmap (see LodLighting), independent
+        // of the chunk's light state. This is essential here: distant chunks are force-loaded at the
+        // non-ticking FULL border and returned before the server light engine finalizes them, so the
+        // engine's nibbles are null and the LOD would otherwise bake black.
         var heightmap = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.MOTION_BLOCKING);
 
         int i = chunk.getMinSection() - 1;
         for (var section : chunk.getSections()) {
             i++;
             if (section == null) continue;
-            var pos = SectionPos.of(chunk.getPos(), i);
-            DataLayer bl = blp.getDataLayerData(pos);
-            DataLayer sl = slp.getDataLayerData(pos);
-            if (bl != null) bl = bl.copy();
-            if (sl != null) sl = sl.copy();
-            // Distant chunks are force-loaded at the non-ticking FULL border and returned before the
-            // server light engine finalizes them, so these layers are null and the LOD would bake
-            // BLACK. For sections with geometry, synthesize a never-dark fallback (skylight from the
-            // heightmap, blocklight from emissive blocks) rather than leaving it dark. Real nibbles
-            // are still used whenever present; air-only sections keep the null/empty fast path.
-            if (!section.hasOnlyAir()) {
-                if (sl == null) sl = FallbackLighting.skyLightFromHeightmap(i, heightmap);
-                if (bl == null) bl = FallbackLighting.blockLightFromEmission(section);
-            }
+            var lr = LodLighting.compute(section, i, heightmap);
             engine.markActive();
-            this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));
+            this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, lr.blockLight(), lr.skyLight()));
             try {
                 this.service.execute();
             } catch (Exception e) {
