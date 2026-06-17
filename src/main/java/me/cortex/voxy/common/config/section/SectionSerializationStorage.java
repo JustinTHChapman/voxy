@@ -93,11 +93,6 @@ public class SectionSerializationStorage extends SectionStorage {
         this.backend.iteratePositions(level, consumer);
     }
 
-    @Override
-    public void deleteSection(long key) {
-        this.backend.deleteSectionData(key);
-    }
-
     public static class Config extends SectionStorageConfig {
         public StorageConfig storage;
 

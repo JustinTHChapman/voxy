@@ -21,7 +21,6 @@ import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
-import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
@@ -41,15 +40,10 @@ public class VoxyClient {
         modBus.addListener(this::onClientSetup);
         modBus.addListener(VoxyClient::registerPayloads);
         NeoForge.EVENT_BUS.addListener(VoxyClient::onClientTick);
-        NeoForge.EVENT_BUS.addListener(VoxyClient::onRegisterClientCommands);
     }
 
     private static void onClientTick(ClientTickEvent.Post event) {
         AutoGenerationService.INSTANCE.tick();
-    }
-
-    private static void onRegisterClientCommands(RegisterClientCommandsEvent event) {
-        me.cortex.voxy.client.command.VoxyCommands.register(event.getDispatcher());
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {

@@ -7,17 +7,17 @@ import me.cortex.voxy.common.network.C2SLodSectionPacket;
 import me.cortex.voxy.common.network.S2CLodSectionPacket;
 import me.cortex.voxy.common.network.S2CManifestPacket;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
-import me.cortex.voxy.common.voxelization.LodLighting;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.voxelization.WorldVoxilizedSectionMipper;
 import me.cortex.voxy.common.world.other.Mapper;
+import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -317,19 +317,21 @@ public class ServerLodTracker {
     /** Returns one S2CLodSectionPacket per non-empty section in the chunk column, or null on failure. */
     private static S2CLodSectionPacket[] voxelizeChunk(ServerLevel level, LevelChunk chunk, Mapper mapper, String dimId) {
         try {
+            var lightEngine = level.getLightEngine();
             var sections = chunk.getSections();
             var packets = new java.util.ArrayList<S2CLodSectionPacket>(sections.length);
-            var heightmap = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.MOTION_BLOCKING);
 
             int sectionIdx = chunk.getMinSection() - 1;
             for (LevelChunkSection section : sections) {
                 sectionIdx++;
                 if (section == null) continue;
 
-                // Compute LOD light ourselves (LodLighting) from block data + heightmap rather than the
-                // server light engine, so it is consistent and never dark regardless of chunk-load state.
-                var lr = LodLighting.compute(section, sectionIdx, heightmap);
-                ILightingSupplier lightSupplier = buildLightSupplier(lr.blockLight(), lr.skyLight());
+                var sectionPos = SectionPos.of(chunk.getPos(), sectionIdx);
+
+                DataLayer blockLightData = lightEngine.getLayerListener(LightLayer.BLOCK).getDataLayerData(sectionPos);
+                DataLayer skyLightData  = lightEngine.getLayerListener(LightLayer.SKY).getDataLayerData(sectionPos);
+
+                ILightingSupplier lightSupplier = buildLightSupplier(blockLightData, skyLightData);
 
                 VoxelizedSection vs = SECTION_CACHE.get().setPosition(chunk.getPos().x, sectionIdx, chunk.getPos().z);
                 vs = WorldConversionFactory.convert(vs, mapper, section.getStates(), section.getBiomes(), lightSupplier);
