@@ -145,7 +145,23 @@ public final class AutoGenerationService {
     /** Dimension resource-location string as of the last tick, for dimension-change detection. */
     private String lastDimension = null;
 
+    /**
+     * Set while {@code /voxy regen} is wiping storage off-thread. {@link #tick()} short-circuits so
+     * generation does not run — and, crucially, so the background DB pre-scan does not launch and read
+     * the half-wiped table, which would re-mark every about-to-be-deleted column as {@link #submitted}
+     * and stop it ever regenerating. Cleared by {@link #reset()} once the wipe has fully completed.
+     */
+    private volatile boolean wiping = false;
+
     private AutoGenerationService() {}
+
+    /**
+     * Pause auto-generation while {@code /voxy regen} wipes storage off-thread. Must be paired with a
+     * {@link #reset()} once the wipe completes (reset clears the pause and re-scans the now-empty DB).
+     */
+    public void beginWipe() {
+        this.wiping = true;
+    }
 
     public void reset() {
         candidateQueue.clear();
@@ -166,6 +182,9 @@ public final class AutoGenerationService {
         dbScanResult.set(null);
         dbPopulated = false;
         lastDimension = null;
+        // Resume generation: a fresh DB pre-scan will run next tick. When reset() follows a regen wipe
+        // the table is now empty, so the scan finds nothing pre-submitted and the world regenerates.
+        wiping = false;
     }
 
     /** Smoothed block radius to the LOD generation frontier, for use as fog end distance. */
@@ -203,6 +222,10 @@ public final class AutoGenerationService {
 
     /** Called once per client tick from the NeoForge ClientTickEvent listener. */
     public void tick() {
+        // A regen wipe is deleting storage off-thread; do nothing (and don't launch the DB pre-scan)
+        // until reset() clears this once the wipe has finished. Prevents the pre-scan from reading the
+        // half-wiped table and re-marking wiped columns as already generated.
+        if (this.wiping) return;
         if (!VoxyCommonConfig.AUTO_GENERATION_ENABLED_CLIENT.get()) return;
         if (!ServerConfigOverride.INSTANCE.autoGenerationEnabled()) return;
 
