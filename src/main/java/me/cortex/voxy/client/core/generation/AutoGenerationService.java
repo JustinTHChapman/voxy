@@ -470,6 +470,12 @@ public final class AutoGenerationService {
             // (isLightCorrect() == false); voxelizing it then bakes a DARK LOD. Keep refreshing the
             // ticket and re-poll until the light is ready (or we time out).
             if (lc != null && lc.isLightCorrect()) {
+                // Voxy only force-loaded this chunk to voxelize it into an LOD; it must NOT bloat or
+                // slow (or hang) Minecraft's world save. Mark it not-to-save so it never enters the
+                // chunk-save path. The LOD is kept in voxy's own storage, and the source chunk
+                // regenerates deterministically (same seed) if the player ever actually visits.
+                // These are distant chunks outside the client's render distance — no player edits.
+                lc.setUnsaved(false);
                 serverReadyChunks.addLast(lc);
                 it.remove();
             } else if (pollNow - e.getLongValue() > LOAD_TIMEOUT_NANOS) {
