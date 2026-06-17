@@ -3,6 +3,7 @@ package me.cortex.voxy.common.world.service;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.Service;
 import me.cortex.voxy.common.thread.ServiceManager;
+import me.cortex.voxy.common.voxelization.FallbackLighting;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
@@ -16,6 +17,7 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.lighting.LayerLightSectionStorage;
 import org.jetbrains.annotations.NotNull;
 
@@ -217,6 +219,8 @@ public class VoxelIngestService {
 
         var blp = chunk.getLevel().getLightEngine().getLayerListener(LightLayer.BLOCK);
         var slp = chunk.getLevel().getLightEngine().getLayerListener(LightLayer.SKY);
+        // Heightmap for the sky-light fallback below (read once per chunk, on the calling thread).
+        var heightmap = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.MOTION_BLOCKING);
 
         int i = chunk.getMinSection() - 1;
         for (var section : chunk.getSections()) {
@@ -227,6 +231,15 @@ public class VoxelIngestService {
             DataLayer sl = slp.getDataLayerData(pos);
             if (bl != null) bl = bl.copy();
             if (sl != null) sl = sl.copy();
+            // Distant chunks are force-loaded at the non-ticking FULL border and returned before the
+            // server light engine finalizes them, so these layers are null and the LOD would bake
+            // BLACK. For sections with geometry, synthesize a never-dark fallback (skylight from the
+            // heightmap, blocklight from emissive blocks) rather than leaving it dark. Real nibbles
+            // are still used whenever present; air-only sections keep the null/empty fast path.
+            if (!section.hasOnlyAir()) {
+                if (sl == null) sl = FallbackLighting.skyLightFromHeightmap(i, heightmap);
+                if (bl == null) bl = FallbackLighting.blockLightFromEmission(section);
+            }
             engine.markActive();
             this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));
             try {

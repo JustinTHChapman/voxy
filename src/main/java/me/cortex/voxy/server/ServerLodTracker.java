@@ -6,6 +6,7 @@ import me.cortex.voxy.common.config.VoxyCommonConfig;
 import me.cortex.voxy.common.network.C2SLodSectionPacket;
 import me.cortex.voxy.common.network.S2CLodSectionPacket;
 import me.cortex.voxy.common.network.S2CManifestPacket;
+import me.cortex.voxy.common.voxelization.FallbackLighting;
 import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
@@ -18,6 +19,7 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -320,6 +322,7 @@ public class ServerLodTracker {
             var lightEngine = level.getLightEngine();
             var sections = chunk.getSections();
             var packets = new java.util.ArrayList<S2CLodSectionPacket>(sections.length);
+            var heightmap = chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.MOTION_BLOCKING);
 
             int sectionIdx = chunk.getMinSection() - 1;
             for (LevelChunkSection section : sections) {
@@ -330,6 +333,13 @@ public class ServerLodTracker {
 
                 DataLayer blockLightData = lightEngine.getLayerListener(LightLayer.BLOCK).getDataLayerData(sectionPos);
                 DataLayer skyLightData  = lightEngine.getLayerListener(LightLayer.SKY).getDataLayerData(sectionPos);
+
+                // Never bake black if the chunk's light isn't available yet — synthesize a fallback
+                // (skylight from heightmap, blocklight from emissive blocks) for sections with geometry.
+                if (!section.hasOnlyAir()) {
+                    if (skyLightData == null)   skyLightData   = FallbackLighting.skyLightFromHeightmap(sectionIdx, heightmap);
+                    if (blockLightData == null) blockLightData = FallbackLighting.blockLightFromEmission(section);
+                }
 
                 ILightingSupplier lightSupplier = buildLightSupplier(blockLightData, skyLightData);
 
