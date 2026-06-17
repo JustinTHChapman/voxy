@@ -465,11 +465,12 @@ public final class AutoGenerationService {
             // radius 0 → ticket level 33 (FULL); triggers async load over subsequent server ticks.
             cc.addRegionTicket(VOXY_LOAD_TICKET, cp, 0, cp);
             LevelChunk lc = cc.getChunkNow(ccx, ccz);
-            // Only hand the chunk back once it is FULL *and* the threaded light engine has finished
-            // lighting it. getChunkNow can return a FULL chunk whose lighting is still in flight
-            // (isLightCorrect() == false); voxelizing it then bakes a DARK LOD. Keep refreshing the
-            // ticket and re-poll until the light is ready (or we time out).
-            if (lc != null && lc.isLightCorrect()) {
+            // Hand the chunk back as soon as it's loaded. (An earlier attempt also required
+            // lc.isLightCorrect() to avoid dark LODs, but in some modded worlds that flag never
+            // flips on these border-loaded chunks, so every distant load stalled and generation
+            // stopped. Accept on load — a possibly-dark distant LOD beats no generation, and it
+            // re-bakes lit when the player gets near or via /voxy regen.)
+            if (lc != null) {
                 serverReadyChunks.addLast(lc);
                 it.remove();
             } else if (pollNow - e.getLongValue() > LOAD_TIMEOUT_NANOS) {
