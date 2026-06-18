@@ -488,20 +488,27 @@ public final class AutoGenerationService {
             // radius 0 → ticket level 33 (FULL); triggers async load over subsequent server ticks.
             cc.addRegionTicket(VOXY_LOAD_TICKET, cp, 0, cp);
             LevelChunk lc = cc.getChunkNow(ccx, ccz);
-            // Only hand the chunk back once it is FULL *and* the threaded light engine has finished
-            // lighting it. getChunkNow can return a FULL chunk whose lighting is still in flight
-            // (isLightCorrect() == false); voxelizing it then bakes a DARK LOD. Keep refreshing the
-            // ticket and re-poll until the light is ready (or we time out).
-            if (lc != null && lc.isLightCorrect()) {
-                // Voxy only force-loaded this chunk to voxelize it into an LOD; it must NOT bloat or
-                // slow (or hang) Minecraft's world save. Mark it not-to-save so it never enters the
-                // chunk-save path. The LOD is kept in voxy's own storage, and the source chunk
-                // regenerates deterministically (same seed) if the player ever actually visits.
-                // These are distant chunks outside the client's render distance — no player edits.
+            // Prefer to hand the chunk back once it is FULL *and* the threaded light engine has
+            // finished lighting it: getChunkNow can return a FULL chunk whose lighting is still in
+            // flight (isLightCorrect() == false), and voxelizing it then bakes a DARK LOD. So we keep
+            // refreshing the ticket and re-poll until the light is ready — but only up to a timeout.
+            boolean timedOut = pollNow - e.getLongValue() > LOAD_TIMEOUT_NANOS;
+            if (lc != null && (lc.isLightCorrect() || timedOut)) {
+                // Hand it back when the light is correct, OR once we've waited LOAD_TIMEOUT_NANOS for it.
+                // The timeout fallback is important: in some modded worlds isLightCorrect() NEVER flips
+                // true on these non-ticking border chunks, so without it the column would fail forever —
+                // a permanent LOD gap that also pins the fog frontier. A possibly-dark LOD beats a hole;
+                // it re-bakes correctly when the player gets near or via /voxy regen.
+                //
+                // setUnsaved(false): voxy only force-loaded this chunk to voxelize it; it must NOT enter
+                // Minecraft's chunk-save path (bloats/hangs the save). The LOD lives in voxy's storage
+                // and the source chunk regenerates deterministically if the player ever visits. These
+                // are distant chunks outside the client render distance, so no player edits are at stake.
                 lc.setUnsaved(false);
                 serverReadyChunks.addLast(lc);
                 it.remove();
-            } else if (pollNow - e.getLongValue() > LOAD_TIMEOUT_NANOS) {
+            } else if (timedOut) {
+                // Never even reached FULL within the timeout (lc == null) — give up, free the slot.
                 failedServerLoads.addLast(ck);
                 it.remove();
             }
