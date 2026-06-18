@@ -62,6 +62,13 @@ public final class AutoGenerationService {
             TicketType.create("voxy_autogen_load", Comparator.comparingLong(ChunkPos::toLong), 60);
     /** Give up force-loading a chunk that hasn't reached FULL within this long (nanoseconds). */
     private static final long LOAD_TIMEOUT_NANOS = 30_000_000_000L; // 30s
+    /**
+     * STOPGAP (time-based): once a chunk is FULL but its lighting still isn't correct, wait at most
+     * this long before voxelizing it anyway, so a never-settling {@code isLightCorrect()} can't leave
+     * a permanent LOD gap. To be replaced by a deterministic light-ready signal (drive the MC light
+     * engine, or compute light ourselves) on branch {@code lightengine-driven-lod}.
+     */
+    private static final long LIGHT_FALLBACK_NANOS = 2_000_000_000L; // 2s
 
     /** Lerp factor when fog frontier needs to shrink (player approaching edge). */
     private static final float FOG_LERP_SHRINK = 0.15f;
@@ -491,14 +498,19 @@ public final class AutoGenerationService {
             // Prefer to hand the chunk back once it is FULL *and* the threaded light engine has
             // finished lighting it: getChunkNow can return a FULL chunk whose lighting is still in
             // flight (isLightCorrect() == false), and voxelizing it then bakes a DARK LOD. So we keep
-            // refreshing the ticket and re-poll until the light is ready — but only up to a timeout.
-            boolean timedOut = pollNow - e.getLongValue() > LOAD_TIMEOUT_NANOS;
-            if (lc != null && (lc.isLightCorrect() || timedOut)) {
-                // Hand it back when the light is correct, OR once we've waited LOAD_TIMEOUT_NANOS for it.
-                // The timeout fallback is important: in some modded worlds isLightCorrect() NEVER flips
-                // true on these non-ticking border chunks, so without it the column would fail forever —
-                // a permanent LOD gap that also pins the fog frontier. A possibly-dark LOD beats a hole;
-                // it re-bakes correctly when the player gets near or via /voxy regen.
+            // refreshing the ticket and re-poll until the light is ready — but only up to a fallback.
+            //
+            // TODO(stopgap): these time-based fallbacks are a hack. The proper fix is to determine LOD
+            // light deterministically — drive MC's light engine to a real completion signal (or compute
+            // light ourselves) rather than waiting a fixed duration. Planned on branch
+            // `lightengine-driven-lod`. Until then, the fallbacks below just prevent permanent gaps.
+            long age = pollNow - e.getLongValue();
+            if (lc != null && (lc.isLightCorrect() || age > LIGHT_FALLBACK_NANOS)) {
+                // Hand it back when the light is correct, OR after a short fallback wait. The fallback
+                // matters: in some modded worlds isLightCorrect() NEVER flips true on these non-ticking
+                // border chunks, so without it the column would fail forever — a permanent LOD gap that
+                // also pins the fog frontier. A possibly-dark LOD beats a hole; it re-bakes correctly
+                // when the player gets near or via /voxy regen.
                 //
                 // setUnsaved(false): voxy only force-loaded this chunk to voxelize it; it must NOT enter
                 // Minecraft's chunk-save path (bloats/hangs the save). The LOD lives in voxy's storage
@@ -507,8 +519,9 @@ public final class AutoGenerationService {
                 lc.setUnsaved(false);
                 serverReadyChunks.addLast(lc);
                 it.remove();
-            } else if (timedOut) {
-                // Never even reached FULL within the timeout (lc == null) — give up, free the slot.
+            } else if (lc == null && age > LOAD_TIMEOUT_NANOS) {
+                // Never even reached FULL within the (longer) load timeout — give up, free the slot.
+                // Kept long so slow distant worldgen isn't dropped while it's still generating.
                 failedServerLoads.addLast(ck);
                 it.remove();
             }
