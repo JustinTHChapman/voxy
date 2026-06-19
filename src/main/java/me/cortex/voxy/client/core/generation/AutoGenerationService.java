@@ -128,6 +128,23 @@ public final class AutoGenerationService {
     private float smoothedMspt = 50f;  // starts at 50 ms (20 TPS) — no pre-throttle before data arrives
     private long lastTickNano = 0;
 
+    // ── force-load coverage diagnostics ─────────────────────────────────────────
+    // Investigating columns the distant force-loader never fills (visible only after the player
+    // physically visits). flEmptyChunks counts force-loaded chunks that came back all-air (would
+    // voxelize to an empty/missing LOD) — the prime suspect.
+    private static final org.slf4j.Logger AUTOGEN_DIAG = org.slf4j.LoggerFactory.getLogger("VoxyDiag");
+    private volatile long diag$flLoaded = 0, diag$flEmpty = 0, diag$drained = 0, diag$generated = 0, diag$requested = 0;
+    private long diag$lastLog = 0;
+    private void diag$maybeLog() {
+        long now = System.currentTimeMillis();
+        if (now - diag$lastLog > 2000) {
+            diag$lastLog = now;
+            AUTOGEN_DIAG.info("AutoGen: candQ={} pending={} submitted={} | gen={} req={} drained={} flLoaded={} flEmptyChunks={}",
+                    candidateQueue.size(), pendingLoad.size(), submitted.size(),
+                    diag$generated, diag$requested, diag$drained, diag$flLoaded, diag$flEmpty);
+        }
+    }
+
     private int lastPlayerCX = Integer.MIN_VALUE;
     private int lastPlayerCZ = Integer.MIN_VALUE;
 
@@ -257,6 +274,7 @@ public final class AutoGenerationService {
 
         currentPlayerCX = playerCX;
         currentPlayerCZ = playerCZ;
+        diag$maybeLog();
 
         // Dimension-change detection: reset DB scan state and submitted cache so we
         // don't carry over column keys from the previous dimension (e.g. after portals).
@@ -364,6 +382,13 @@ public final class AutoGenerationService {
             // biomeSeed can differ between the integrated-server level and the client level.
             if (!ready.getLevel().dimension().location().toString().equals(dimId)) continue;
             if (!submitted.contains(k)) {
+                // DIAG: did the force-loaded chunk come back with no block data? If so it voxelizes to
+                // an empty/missing LOD — the suspected cause of regions that only appear once visited.
+                boolean allAir = true;
+                for (var sec : ready.getSections()) {
+                    if (sec != null && !sec.hasOnlyAir()) { allAir = false; break; }
+                }
+                if (allAir) diag$flEmpty++;
                 // Use enqueueIngestServer: bypasses the LIGHT_AND_DATA gate that
                 // causes server-side chunks to be silently dropped when accessed
                 // from the client thread.
@@ -372,6 +397,7 @@ public final class AutoGenerationService {
                     submitted.add(k);
                     uploadQueue.addLast(ready);
                     drained++;
+                    diag$drained++;
                 }
             }
         }
@@ -437,6 +463,7 @@ public final class AutoGenerationService {
                 pendingLoad.add(colKey);
                 loadRequests.add(colKey);
                 requested++;
+                diag$requested++;
                 continue;
             }
 
@@ -446,6 +473,7 @@ public final class AutoGenerationService {
             if (ok) {
                 submitted.add(colKey);
                 generated++;
+                diag$generated++;
                 uploadQueue.addLast(chunk);
             }
             // If enqueueIngest returns false (lighting not ready), the entry is dropped
@@ -545,6 +573,7 @@ public final class AutoGenerationService {
                 // are distant chunks outside the client render distance, so no player edits are at stake.
                 lc.setUnsaved(false);
                 serverReadyChunks.addLast(lc);
+                diag$flLoaded++;
                 stuckWarned.remove(ck);
                 it.remove();
             } else if (lc == null && age > STUCK_DIAG_NANOS && stuckWarned.add(ck)) {
