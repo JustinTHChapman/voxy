@@ -139,8 +139,8 @@ public final class AutoGenerationService {
         long now = System.currentTimeMillis();
         if (now - diag$lastLog > 2000) {
             diag$lastLog = now;
-            AUTOGEN_DIAG.info("AutoGen: candQ={} pending={} submitted={} | gen={} req={} drained={} flLoaded={} flEmptyChunks={}",
-                    candidateQueue.size(), pendingLoad.size(), submitted.size(),
+            AUTOGEN_DIAG.info("AutoGen: candQ={} pending={} submitted={} fogFrontier={} | gen={} req={} drained={} flLoaded={} flEmptyChunks={}",
+                    candidateQueue.size(), pendingLoad.size(), submitted.size(), (int) smoothedFogFrontierBlocks,
                     diag$generated, diag$requested, diag$drained, diag$flLoaded, diag$flEmpty);
         }
     }
