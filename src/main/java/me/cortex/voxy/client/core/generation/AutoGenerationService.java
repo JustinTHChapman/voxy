@@ -60,8 +60,6 @@ public final class AutoGenerationService {
     /** Auto-expiring chunk-load ticket: triggers async loading without blocking; self-cleans once we stop refreshing it. */
     private static final TicketType<ChunkPos> VOXY_LOAD_TICKET =
             TicketType.create("voxy_autogen_load", Comparator.comparingLong(ChunkPos::toLong), 60);
-    /** Give up force-loading a chunk that hasn't reached FULL within this long (nanoseconds). */
-    private static final long LOAD_TIMEOUT_NANOS = 30_000_000_000L; // 30s
     /**
      * STOPGAP (time-based): once a chunk is FULL but its lighting still isn't correct, wait at most
      * this long before voxelizing it anyway, so a never-settling {@code isLightCorrect()} can't leave
@@ -332,7 +330,10 @@ public final class AutoGenerationService {
         // it (faster when shrinking than growing) so the fog grows and shrinks smoothly instead
         // of snapping at discrete queue rebuilds.
         int fogScanRadius = Math.min(ServerConfigOverride.INSTANCE.effectiveLodRadius(), 256);
-        float rawFrontier = computeFrontierChunks(playerCX, playerCZ, fogScanRadius) * 16f;
+        // Pull the fog in by one chunk: the frontier estimate sits at the first empty column, i.e. one
+        // chunk past the last column that actually has data, so without this the fog ends one chunk
+        // beyond the real LOD edge and you can see the hard cutoff.
+        float rawFrontier = Math.max(0f, computeFrontierChunks(playerCX, playerCZ, fogScanRadius) - 1f) * 16f;
         float current = smoothedFogFrontierBlocks;
         float lerp = (rawFrontier < current) ? FOG_LERP_SHRINK : FOG_LERP_GROW;
         smoothedFogFrontierBlocks = current + (rawFrontier - current) * lerp;
@@ -519,12 +520,11 @@ public final class AutoGenerationService {
                 lc.setUnsaved(false);
                 serverReadyChunks.addLast(lc);
                 it.remove();
-            } else if (lc == null && age > LOAD_TIMEOUT_NANOS) {
-                // Never even reached FULL within the (longer) load timeout — give up, free the slot.
-                // Kept long so slow distant worldgen isn't dropped while it's still generating.
-                failedServerLoads.addLast(ck);
-                it.remove();
             }
+            // NO load timeout: if the chunk hasn't reached FULL yet, we just keep refreshing the ticket
+            // and re-poll next tick. A column is NEVER skipped/dropped — slow distant worldgen (heavy
+            // modpacks) can legitimately take a long time, and dropping it leaves a permanent gap that
+            // also breaks neighbour face-culling at the hole's edges. It stays pending until it loads.
         }
     }
 
