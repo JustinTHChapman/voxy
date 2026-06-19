@@ -18,7 +18,7 @@ issueTrackerURL = "https://github.com/MCRcortex/voxy/issues"
 [[dependencies.voxy]]
     modId = "neoforge"
     type = "required"
-    versionRange = "[21.1,)"
+    versionRange = "[21.1.230,21.2)"
     ordering = "NONE"
     side = "BOTH"
 
@@ -29,10 +29,12 @@ issueTrackerURL = "https://github.com/MCRcortex/voxy/issues"
     ordering = "NONE"
     side = "BOTH"
 
+# Sodium is required on the client: voxy's renderer mixes into Sodium's chunk renderer.
+# The mixins target Sodium 0.6.13 internals; 0.7+ changes them, so it is excluded until rewritten.
 [[dependencies.voxy]]
     modId = "sodium"
     type = "required"
-    versionRange = "[0.6,)"
+    versionRange = "[0.6.13,0.7)"
     ordering = "BEFORE"
     side = "CLIENT"
 

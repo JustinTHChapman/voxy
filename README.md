@@ -26,6 +26,10 @@ Unofficial NeoForge 1.21.1 port of [Voxy](https://github.com/corvesive/voxy), a 
 - **Client-to-server upload** — client-generated LOD data is uploaded back to the server so other players benefit without regenerating
 - **SQLite persistence** — LOD data is stored on-disk in a compressed SQLite database and survives world restarts
 - **Multi-threaded ingest** — dedicated worker threads process incoming chunk sections in parallel; service manager balances load across ingest, save, and render-build tasks
+- **Distant force-loading** (singleplayer) — columns beyond render distance are force-loaded via transient, auto-expiring tickets (non-blocking — never `managedBlock`) so the world generates far past vanilla render distance; concurrent loads are capped by config
+- **Never skips a column** — a column that hasn't finished generating keeps retrying until it loads; it is never silently dropped (which would leave permanent gaps and break neighbour face-culling at the hole edges). A column that genuinely can't load (outside the world border) or is stuck far past normal worldgen logs an **error** so the failure is visible and reportable, not hidden
+- **Correct distant lighting** — force-loaded chunks are voxelized once their lighting has settled, so distant LODs aren't baked dark (with a short fallback so a never-settling light state can't leave a gap; a deterministic light path is planned)
+- **Save-safe generation** — chunks force-loaded purely to build LODs are marked not-to-save, so distant generation never bloats or hangs the world save; the LOD lives in voxy's own store and the source chunk regenerates deterministically if the player ever visits
 
 ### Iris Shader Pack Support
 - **Full compatibility** — LOD terrain renders correctly alongside Iris shader packs; fog, water translucency, and sky all integrate with the active shader pack's pipeline
@@ -71,12 +75,39 @@ Unofficial NeoForge 1.21.1 port of [Voxy](https://github.com/corvesive/voxy), a 
 
 ---
 
+## Commands
+
+| Command | Description |
+|---|---|
+| `/voxy regen` | Wipe and regenerate all stored LODs for the current dimension. Use it to clear dark / stale / corrupt LODs baked into the database — regeneration overwrites them. Race-free: auto-generation is paused for the duration of the off-thread wipe so the background DB scan can't re-mark the wiped columns as already-generated. |
+
+---
+
 ## Requirements
 
-- Minecraft 1.21.1
-- NeoForge 21.1.230+
-- OpenGL 4.5 capable GPU
-- Iris (optional) — tested with Iris + Complementary Reimagined; other shader packs may work
+- **Minecraft** 1.21.1
+- **NeoForge** 21.1.230 or newer
+- **Sodium** 0.6.13 (0.6.x) — **required** on the client. Voxy's renderer mixes into Sodium's chunk
+  renderer; the mixins target 0.6.x internals, so Sodium **0.7+ is not supported** (excluded until the
+  mixins are rewritten). Reese's Sodium Options and other Sodium add-ons are fine.
+- **OpenGL 4.5** capable GPU
+- **Iris** 1.8+ (optional) — when installed, LODs render through the active shader pack (detected via
+  the reflective IrisApi v0); without Iris everything still works. Tested with Iris + Complementary
+  Reimagined; other shader packs may work.
+
+These minimums are enforced by the mod's dependency metadata — launching with an incompatible
+NeoForge/Sodium version produces a clear NeoForge error rather than a crash.
+
+---
+
+## Recent Changes (this fork)
+
+- **No terrain scramble** — unreadable stored block-state mappings map to a fixed STONE placeholder instead of a random block, so one corrupt entry can't remap large areas of stored LODs (previously seen as scrambled nether terrain)
+- **No dark distant LODs** — force-loaded chunks are voxelized only after their lighting has settled (with a short fallback so a never-settling light state can't leave a gap; a deterministic light path is planned)
+- **`/voxy regen` command** — wipe + regenerate the current dimension's LODs, race-free
+- **Save-safe distant generation** — chunks force-loaded only to build LODs are never written to the world save, so distant generation can't bloat or hang it
+- **No silently-skipped columns** — a column is never dropped; genuine load failures (outside the world border, or stuck far past normal worldgen) are logged as errors so they're visible and reportable
+- **Fog edge fix** — environmental fog is pulled in one chunk so the hard LOD edge stays hidden
 
 ---
 
