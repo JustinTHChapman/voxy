@@ -67,6 +67,13 @@ public final class AutoGenerationService {
      * engine, or compute light ourselves) on branch {@code lightengine-driven-lod}.
      */
     private static final long LIGHT_FALLBACK_NANOS = 2_000_000_000L; // 2s
+    /**
+     * DIAGNOSTIC threshold only (never a skip): if an in-bounds column hasn't reached FULL after this
+     * long it is almost certainly stuck rather than merely slow. We keep retrying it forever — a column
+     * is never skipped — but log an error ONCE so a genuine chunk-loading failure is visible and can be
+     * reported/fixed instead of being silently retried.
+     */
+    private static final long STUCK_DIAG_NANOS = 60_000_000_000L; // 60s
 
     /** Lerp factor when fog frontier needs to shrink (player approaching edge). */
     private static final float FOG_LERP_SHRINK = 0.15f;
@@ -102,8 +109,10 @@ public final class AutoGenerationService {
 
     /** Client→server handoff of columns to force-load (drained on the integrated-server thread). */
     private final ConcurrentLinkedQueue<Long> loadRequests = new ConcurrentLinkedQueue<>();
-    /** Server-thread-only: columns we currently hold a load ticket for → request time (nanos), for timeout. */
+    /** Server-thread-only: columns we currently hold a load ticket for → request time (nanos). */
     private final Long2LongOpenHashMap ticketed = new Long2LongOpenHashMap();
+    /** Server-thread-only: columns we've already logged a stuck/out-of-border error for (so we log once). */
+    private final LongOpenHashSet stuckWarned = new LongOpenHashSet();
     /** Server-thread-only: dimension of the last server poll, to detect dimension changes. */
     private ResourceKey<Level> serverPollDim = null;
 
@@ -474,6 +483,7 @@ public final class AutoGenerationService {
         // level) so we never add tickets for old-dimension columns onto the new level.
         if (!dim.equals(serverPollDim)) {
             ticketed.clear();
+            stuckWarned.clear();
             serverPollDim = dim;
         }
         var cc = sl.getChunkSource();
@@ -506,6 +516,22 @@ public final class AutoGenerationService {
             // light ourselves) rather than waiting a fixed duration. Planned on branch
             // `lightengine-driven-lod`. Until then, the fallbacks below just prevent permanent gaps.
             long age = pollNow - e.getLongValue();
+
+            // Deterministic "can never load" case: a column outside the world border will never reach
+            // FULL. Retrying forever is pointless and would pin a load slot, so flag it (it points to a
+            // candidate-selection bug) and free the slot. This is a definite error, not a heuristic.
+            if (!sl.getWorldBorder().isWithinBounds(cp)) {
+                if (stuckWarned.add(ck)) {
+                    Logger.error("[Voxy AutoGen] Column (" + ccx + ", " + ccz + ") in " + dim.location()
+                            + " is outside the world border and can never load — dropping it. This is a"
+                            + " generation bug worth reporting.");
+                }
+                stuckWarned.remove(ck);
+                failedServerLoads.addLast(ck); // free the client-side pending-load slot
+                it.remove();
+                continue;
+            }
+
             if (lc != null && (lc.isLightCorrect() || age > LIGHT_FALLBACK_NANOS)) {
                 // Hand it back when the light is correct, OR after a short fallback wait. The fallback
                 // matters: in some modded worlds isLightCorrect() NEVER flips true on these non-ticking
@@ -519,12 +545,20 @@ public final class AutoGenerationService {
                 // are distant chunks outside the client render distance, so no player edits are at stake.
                 lc.setUnsaved(false);
                 serverReadyChunks.addLast(lc);
+                stuckWarned.remove(ck);
                 it.remove();
+            } else if (lc == null && age > STUCK_DIAG_NANOS && stuckWarned.add(ck)) {
+                // NOT skipped — we keep retrying — but a column that hasn't reached FULL after this long
+                // is almost certainly stuck rather than merely slow. Flag it ONCE so a real chunk-loading
+                // failure is visible and reportable instead of being silently retried forever.
+                Logger.error("[Voxy AutoGen] Column (" + ccx + ", " + ccz + ") in " + dim.location()
+                        + " has not reached FULL after " + (age / 1_000_000_000L) + "s — still retrying,"
+                        + " NOT skipped. This likely indicates a chunk-loading/worldgen problem; please report it.");
             }
-            // NO load timeout: if the chunk hasn't reached FULL yet, we just keep refreshing the ticket
-            // and re-poll next tick. A column is NEVER skipped/dropped — slow distant worldgen (heavy
-            // modpacks) can legitimately take a long time, and dropping it leaves a permanent gap that
-            // also breaks neighbour face-culling at the hole's edges. It stays pending until it loads.
+            // No load timeout: an in-bounds column that hasn't loaded yet keeps its ticket refreshed and
+            // is re-polled next tick. It is NEVER skipped — slow distant worldgen can legitimately take
+            // time, and dropping it would leave a permanent gap that also breaks neighbour face-culling
+            // at the hole's edges. The STUCK_DIAG_NANOS error above surfaces a genuine load failure.
         }
     }
 
