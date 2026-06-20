@@ -10,7 +10,6 @@
     "minecraft.MixinClientLevel",
     "minecraft.MixinClientPacketListener",
     "minecraft.MixinFogRenderer",
-    "minecraft.MixinGameRenderer",
     "minecraft.MixinGPUSelect",
     "minecraft.MixinLevelRenderer",
     "minecraft.MixinMinecraft"

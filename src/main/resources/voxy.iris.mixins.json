@@ -1,0 +1,12 @@
+{
+  "required": false,
+  "package": "me.cortex.voxy.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "client": [
+    "iris.MixinDHCompat"
+  ],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}

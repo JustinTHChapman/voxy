@@ -50,5 +50,9 @@ issueTrackerURL = "https://github.com/MCRcortex/voxy/issues"
 [[mixins]]
     config = "voxy.compat.sodium.mixins.json"
 
+# Optional Iris integration (no-op when Iris is absent — config is non-required).
+[[mixins]]
+    config = "voxy.iris.mixins.json"
+
 [[accessTransformers]]
     file = "META-INF/accesstransformer.cfg"
