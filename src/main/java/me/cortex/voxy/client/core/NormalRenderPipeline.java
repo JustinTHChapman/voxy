@@ -12,7 +12,6 @@ import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
 import me.cortex.voxy.client.core.rendering.post.FullscreenBlit;
 import me.cortex.voxy.client.core.rendering.util.DepthFramebuffer;
 import me.cortex.voxy.client.core.util.GPUTiming;
-import me.cortex.voxy.client.core.util.IrisUtil;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
@@ -103,24 +102,15 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
         boolean fogCoversAllRendering = viewport.fogParameters.environmentalEnd()<VoxyRenderSystem.getRenderDistance();
 
         if (this.useEnvFog) {
-            // When an Iris shader pack is active, Iris applies fog in its own composite passes. Applying
-            // Voxy's fog to the LOD blit on top of that double-fogs the LODs into a heavy whiteout, so we
-            // skip it under Iris. Zero the uniforms even when skipping — GL uniforms persist across frames,
-            // so stale values from before Iris was enabled would otherwise keep fogging.
-            if (!IrisUtil.irisShaderPackEnabled()) {
-                float start = viewport.fogParameters.environmentalStart();
-                float end = viewport.fogParameters.environmentalEnd();
-                if (Math.abs(end-start)>1) {
-                    float invEndFogDelta = 1f / (end - start);
-                    float voxyMaxDist = VoxyConfig.CONFIG.sectionRenderDistance * 32f * 16f;
-                    float endDistance = Math.max(voxyMaxDist, 20*16) * (float)Math.sqrt(3);
-                    float startDelta = -start * invEndFogDelta;
-                    glUniform4f(4, invEndFogDelta, startDelta, Math.clamp(endDistance*invEndFogDelta+startDelta, 0, 1),0);
-                    glUniform4f(5, viewport.fogParameters.red(), viewport.fogParameters.green(), viewport.fogParameters.blue(), viewport.fogParameters.alpha());
-                } else {
-                    glUniform4f(4, 0, 0, 0, 0);
-                    glUniform4f(5, 0, 0, 0, 0);
-                }
+            float start = viewport.fogParameters.environmentalStart();
+            float end = viewport.fogParameters.environmentalEnd();
+            if (Math.abs(end-start)>1) {
+                float invEndFogDelta = 1f / (end - start);
+                float voxyMaxDist = VoxyConfig.CONFIG.sectionRenderDistance * 32f * 16f;
+                float endDistance = Math.max(voxyMaxDist, 20*16) * (float)Math.sqrt(3);
+                float startDelta = -start * invEndFogDelta;
+                glUniform4f(4, invEndFogDelta, startDelta, Math.clamp(endDistance*invEndFogDelta+startDelta, 0, 1),0);
+                glUniform4f(5, viewport.fogParameters.red(), viewport.fogParameters.green(), viewport.fogParameters.blue(), viewport.fogParameters.alpha());
             } else {
                 glUniform4f(4, 0, 0, 0, 0);
                 glUniform4f(5, 0, 0, 0, 0);
