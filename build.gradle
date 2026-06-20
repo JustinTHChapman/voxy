@@ -116,9 +116,11 @@ dependencies {
     implementation 'org.rocksdb:rocksdbjni:9.7.3'
 
     // ---- Sodium for NeoForge 1.21.1 (compile-only; runtime via user pack) ----
-    // Voxy's Sodium mixins target the 0.7+ API but only 0.6.13 is stable here —
-    // the mixins will need rewriting; for now compileOnly so the rest of the
-    // codebase can build.
+    // Compiled against the OLDEST supported Sodium (0.6.13) on purpose: its modern net.caffeinemc API
+    // (DefaultChunkRenderer.render, ShaderChunkRenderer.end, SodiumWorldRenderer.initRenderer,
+    // RenderSectionManager.onChunkAdded/level) is unchanged through 0.8.x, so bytecode built here runs
+    // on 0.6.13 through 0.8.x alike. Building against the floor guarantees we never reference a
+    // newer-only member and silently break backwards compat. Runtime range: neoforge.mods.toml.
     compileOnly 'maven.modrinth:sodium:mc1.21.1-0.6.13-neoforge'
 
     // SQLite for LOD section caching (still used by our fork's storage backend)

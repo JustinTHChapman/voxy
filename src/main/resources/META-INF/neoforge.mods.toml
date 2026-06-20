@@ -30,11 +30,14 @@ issueTrackerURL = "https://github.com/MCRcortex/voxy/issues"
     side = "BOTH"
 
 # Sodium is required on the client: voxy's renderer mixes into Sodium's chunk renderer.
-# The mixins target Sodium 0.6.13 internals; 0.7+ changes them, so it is excluded until rewritten.
+# The mixins use the modern net.caffeinemc Sodium API, which is stable from 0.6 through 0.8: the
+# render / end / initRenderer / onChunkAdded injection points and RenderSectionManager.level are
+# byte-identical in 0.6.13 and 0.8.12 (verified). They also use require=0, so any future drift
+# degrades to a no-op instead of crashing. Range spans 0.6.13 (backwards compat) up to 0.9.
 [[dependencies.voxy]]
     modId = "sodium"
     type = "required"
-    versionRange = "[0.6.13,0.7)"
+    versionRange = "[0.6.13,0.9)"
     ordering = "BEFORE"
     side = "CLIENT"
 
