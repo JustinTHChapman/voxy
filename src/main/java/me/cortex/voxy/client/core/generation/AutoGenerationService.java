@@ -109,6 +109,10 @@ public final class AutoGenerationService {
 
     /** Client→server handoff of columns to force-load (drained on the integrated-server thread). */
     private final ConcurrentLinkedQueue<Long> loadRequests = new ConcurrentLinkedQueue<>();
+    /** Client→server: columns whose chunk has been ingested (light copied, section referenced) so their
+     *  force-load ticket can be released NOW — the chunk then unloads promptly instead of lingering for
+     *  the ticket's 60-tick expiry, keeping the loaded-chunk count (and memory / save iteration) low. */
+    private final ConcurrentLinkedQueue<Long> releaseRequests = new ConcurrentLinkedQueue<>();
     /** Server-thread-only: columns we currently hold a load ticket for → request time (nanos). */
     private final Long2LongOpenHashMap ticketed = new Long2LongOpenHashMap();
     /** Server-thread-only: columns we've already logged a stuck/out-of-border error for (so we log once). */
@@ -201,6 +205,7 @@ public final class AutoGenerationService {
         serverReadyChunks.clear();
         failedServerLoads.clear();
         loadRequests.clear();
+        releaseRequests.clear();
         uploadQueue.clear();
         lastPlayerCX = Integer.MIN_VALUE;
         lastPlayerCZ = Integer.MIN_VALUE;
@@ -293,6 +298,7 @@ public final class AutoGenerationService {
             uploadQueue.clear();
             failedServerLoads.clear();
             loadRequests.clear();
+            releaseRequests.clear();
             lastPlayerCX = Integer.MIN_VALUE;
         }
 
@@ -398,6 +404,10 @@ public final class AutoGenerationService {
                     uploadQueue.addLast(ready);
                     drained++;
                     diag$drained++;
+                    // Chunk is ingested (its light was copied, its sections are referenced by the ingest
+                    // queue); ask the server thread to drop the force-load ticket so the chunk can unload
+                    // now instead of lingering until the 60-tick ticket expiry.
+                    releaseRequests.add(k);
                 }
             }
         }
@@ -515,6 +525,16 @@ public final class AutoGenerationService {
             serverPollDim = dim;
         }
         var cc = sl.getChunkSource();
+
+        // Release force-load tickets for columns the client has finished ingesting, so those chunks can
+        // unload promptly rather than lingering until the 60-tick ticket expiry (less memory + smaller
+        // save iteration). Done first so a released column can be immediately re-requested if needed.
+        Long rel;
+        while ((rel = releaseRequests.poll()) != null) {
+            long rk = rel;
+            ChunkPos rp = new ChunkPos((int) (rk >> 32), (int) rk);
+            cc.removeRegionTicket(VOXY_LOAD_TICKET, rp, 0, rp);
+        }
 
         // Intake newly-requested columns.
         Long req;
