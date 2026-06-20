@@ -113,6 +113,14 @@ public final class AutoGenerationService {
      *  force-load ticket can be released NOW — the chunk then unloads promptly instead of lingering for
      *  the ticket's 60-tick expiry, keeping the loaded-chunk count (and memory / save iteration) low. */
     private final ConcurrentLinkedQueue<Long> releaseRequests = new ConcurrentLinkedQueue<>();
+    /** Columns flagged stuck (never reached FULL) and parked: skipped by the generator so a few
+     *  un-generatable columns can't hog every force-load slot and stall all generation. They are NOT
+     *  permanently skipped — when the candidate queue drains (all other work done) the park set is
+     *  cleared and they are retried. Client-thread-only. */
+    private final Set<Long> parked = new LongOpenHashSet();
+    /** Server→client: columns the server thread has parked; drained on the client tick to drop them from
+     *  pendingLoad (freeing the slot) and add them to {@link #parked}. */
+    private final ConcurrentLinkedQueue<Long> parkRequests = new ConcurrentLinkedQueue<>();
     /** Server-thread-only: columns we currently hold a load ticket for → request time (nanos). */
     private final Long2LongOpenHashMap ticketed = new Long2LongOpenHashMap();
     /** Server-thread-only: columns we've already logged a stuck/out-of-border error for (so we log once). */
@@ -143,8 +151,8 @@ public final class AutoGenerationService {
         long now = System.currentTimeMillis();
         if (now - diag$lastLog > 2000) {
             diag$lastLog = now;
-            AUTOGEN_DIAG.info("AutoGen: candQ={} pending={} submitted={} fogFrontier={} | gen={} req={} drained={} flLoaded={} flEmptyChunks={}",
-                    candidateQueue.size(), pendingLoad.size(), submitted.size(), (int) smoothedFogFrontierBlocks,
+            AUTOGEN_DIAG.info("AutoGen: candQ={} pending={} parked={} submitted={} fogFrontier={} | gen={} req={} drained={} flLoaded={} flEmptyChunks={}",
+                    candidateQueue.size(), pendingLoad.size(), parked.size(), submitted.size(), (int) smoothedFogFrontierBlocks,
                     diag$generated, diag$requested, diag$drained, diag$flLoaded, diag$flEmpty);
         }
     }
@@ -206,6 +214,8 @@ public final class AutoGenerationService {
         failedServerLoads.clear();
         loadRequests.clear();
         releaseRequests.clear();
+        parkRequests.clear();
+        parked.clear();
         uploadQueue.clear();
         lastPlayerCX = Integer.MIN_VALUE;
         lastPlayerCZ = Integer.MIN_VALUE;
@@ -299,6 +309,8 @@ public final class AutoGenerationService {
             failedServerLoads.clear();
             loadRequests.clear();
             releaseRequests.clear();
+            parkRequests.clear();
+            parked.clear();
             lastPlayerCX = Integer.MIN_VALUE;
         }
 
@@ -356,6 +368,10 @@ public final class AutoGenerationService {
 
         // Rebuild the candidate queue when the player has moved significantly
         if (candidateQueue.isEmpty() || dcx * dcx + dcz * dcz >= REBUILD_THRESHOLD_CHUNKS * REBUILD_THRESHOLD_CHUNKS) {
+            // When the queue has fully drained, every other column is done — un-park the stuck columns so
+            // they get retried. This is deterministic (tied to the queue emptying, not a timer): stuck
+            // columns are retried only once they are the last work left, so they never block the rest.
+            if (candidateQueue.isEmpty()) parked.clear();
             rebuildQueue(playerCX, playerCZ);
         }
 
@@ -375,6 +391,15 @@ public final class AutoGenerationService {
         Long failedKey;
         while ((failedKey = failedServerLoads.poll()) != null) {
             pendingLoad.remove(failedKey.longValue());
+        }
+
+        // Park columns the server flagged stuck: free their slot and add them to the skip set so a few
+        // un-generatable columns can't hold every force-load slot. Retried when the queue drains (above).
+        Long parkKey;
+        while ((parkKey = parkRequests.poll()) != null) {
+            long pk = parkKey;
+            pendingLoad.remove(pk);
+            parked.add(pk);
         }
 
         // Drain any chunks the server thread has finished loading
@@ -445,7 +470,7 @@ public final class AutoGenerationService {
             int cz = lastPlayerCZ + dz;
             long colKey = colKey(cx, cz);
 
-            if (submitted.contains(colKey) || pendingLoad.contains(colKey)) continue;
+            if (submitted.contains(colKey) || pendingLoad.contains(colKey) || parked.contains(colKey)) continue;
 
             // Check if LOD data already exists in the DB for this column.
             // If so, mark submitted and skip server chunk request — the rendering system
@@ -596,13 +621,20 @@ public final class AutoGenerationService {
                 diag$flLoaded++;
                 stuckWarned.remove(ck);
                 it.remove();
-            } else if (lc == null && age > STUCK_DIAG_NANOS && stuckWarned.add(ck)) {
-                // NOT skipped — we keep retrying — but a column that hasn't reached FULL after this long
-                // is almost certainly stuck rather than merely slow. Flag it ONCE so a real chunk-loading
-                // failure is visible and reportable instead of being silently retried forever.
-                Logger.error("[Voxy AutoGen] Column (" + ccx + ", " + ccz + ") in " + dim.location()
-                        + " has not reached FULL after " + (age / 1_000_000_000L) + "s — still retrying,"
-                        + " NOT skipped. This likely indicates a chunk-loading/worldgen problem; please report it.");
+            } else if (lc == null && age > STUCK_DIAG_NANOS) {
+                // A column that hasn't reached FULL after this long is almost certainly stuck rather than
+                // merely slow. Flag it ONCE so a real chunk-loading failure is visible and reportable.
+                if (stuckWarned.add(ck)) {
+                    Logger.error("[Voxy AutoGen] Column (" + ccx + ", " + ccz + ") in " + dim.location()
+                            + " has not reached FULL after " + (age / 1_000_000_000L) + "s — parking it so it"
+                            + " stops blocking a load slot; it is retried later, NOT skipped. This likely"
+                            + " indicates a chunk-loading/worldgen problem; please report it.");
+                }
+                // Park it: drop its ticket here and have the client free the slot + deprioritise it, so a
+                // few un-generatable columns can't hog every force-load slot and stall all other generation.
+                // It is re-tried (un-parked) once the candidate queue drains — never permanently skipped.
+                parkRequests.add(ck);
+                it.remove();
             }
             // No load timeout: an in-bounds column that hasn't loaded yet keeps its ticket refreshed and
             // is re-polled next tick. It is NEVER skipped — slow distant worldgen can legitimately take
@@ -685,7 +717,7 @@ public final class AutoGenerationService {
                 int cx = playerCX + dx;
                 int cz = playerCZ + dz;
                 long key = colKey(cx, cz);
-                if (submitted.contains(key) || pendingLoad.contains(key)) continue;
+                if (submitted.contains(key) || pendingLoad.contains(key) || parked.contains(key)) continue;
                 candidateQueue.enqueue((dist << 20) | ((long)(dx + 256) << 10) | (long)(dz + 256));
             }
         }
