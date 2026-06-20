@@ -9,10 +9,9 @@ import me.cortex.voxy.client.core.generation.AutoGenerationService;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.VoxyFogParameters;
 import me.cortex.voxy.client.core.util.IrisUtil;
-import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import com.llamalad7.mixinextras.sugar.Local;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.caffeinemc.mods.sodium.client.render.chunk.DefaultChunkRenderer;
-import net.caffeinemc.mods.sodium.client.render.chunk.lists.ChunkRenderListIterable;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
@@ -28,6 +27,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Pseudo
 @Mixin(value = DefaultChunkRenderer.class, remap = false)
 public abstract class MixinDefaultChunkRenderer {
+    // Capture the args we need (matrices/renderPass/camera) by TYPE via @Local rather than positionally,
+    // so this applies across Sodium versions whose render() signature differs. 0.8.x added a trailing
+    // boolean to render(); positional capture broke on it (InvalidInjectionException), but @Local(argsOnly)
+    // matches each by its unique type and ignores the extra arg — works on 0.6.13 through 0.8.x alike.
     @Inject(
             method = "render",
             at = @At(
@@ -38,7 +41,10 @@ public abstract class MixinDefaultChunkRenderer {
             remap = false,
             require = 0
     )
-    private void voxy$injectRender(ChunkRenderMatrices matrices, CommandList commandList, ChunkRenderListIterable renderLists, TerrainRenderPass renderPass, CameraTransform camera, CallbackInfo ci) {
+    private void voxy$injectRender(CallbackInfo ci,
+                                   @Local(argsOnly = true) ChunkRenderMatrices matrices,
+                                   @Local(argsOnly = true) TerrainRenderPass renderPass,
+                                   @Local(argsOnly = true) CameraTransform camera) {
         if (renderPass != DefaultTerrainRenderPasses.CUTOUT) return;
         VoxyRenderSystem renderer = ((IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer).voxy$getRenderSystem();
         if (IrisUtil.isRenderingShadowMap()) {
