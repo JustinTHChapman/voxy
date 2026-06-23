@@ -72,6 +72,11 @@ public class VoxyClient {
 
     public static void initVoxyClient() {
         Logger.DEBUG = VoxyCommonConfig.DEBUG_LOGGING.get();
+        // The verbose "VoxyDiag" logger (RDT / ModelFactory / AutoGen / node-manager counters) is INFO
+        // spam used while debugging. Mute it unless debug logging is on; set the logger to INFO to restore.
+        if (!Logger.DEBUG) {
+            org.apache.logging.log4j.core.config.Configurator.setLevel("VoxyDiag", org.apache.logging.log4j.Level.WARN);
+        }
         Capabilities.init();
 
         if (Capabilities.INSTANCE.hasBrokenDepthSampler) {
