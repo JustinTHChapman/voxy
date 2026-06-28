@@ -426,7 +426,11 @@ public final class AutoGenerationService {
                 boolean ok = instance.getIngestService().enqueueIngestServer(engine, ready);
                 if (ok) {
                     submitted.add(k);
-                    uploadQueue.addLast(ready);
+                    // Do NOT add to uploadQueue here. drainUploads() uses mc.level.getLightEngine()
+                    // (the CLIENT light engine), which has no data for these distant force-loaded
+                    // chunks → buildLight returns all-zero → dark LOD overwrites the correctly-lit
+                    // version already written to WorldEngine by enqueueIngestServer above.
+                    // drainUploads is only needed for client-visible chunks going to a dedicated server.
                     drained++;
                     diag$drained++;
                     // Chunk is ingested (its light was copied, its sections are referenced by the ingest
