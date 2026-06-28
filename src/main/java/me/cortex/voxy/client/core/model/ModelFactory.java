@@ -13,6 +13,8 @@ import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ColorResolver;
+import net.minecraft.world.level.EmptyBlockGetter;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.lighting.LevelLightEngine;
@@ -469,21 +471,38 @@ public class ModelFactory {
             }
         }
 
-        // Partial-height blocks (snow layers, slabs, etc.) must not occlude adjacent faces.
-        // Detect via the UP/DOWN face depth values already computed above.
-        float blockTopY    = facePresent[1] ? (1.0f - faceDepths[1]) : 1.0f;
-        float blockBottomY = facePresent[0] ? faceDepths[0]          : 0.0f;
-        boolean isPartialHeight = (blockTopY < 0.999f || blockBottomY > 0.001f);
-        if (isPartialHeight) {
-            // Clear bit0 (occludes neighbor) for every face so faceOccludes() returns false.
-            for (int fi = 0; fi < 6; fi++) {
-                meta &= ~(1L << (fi * 8));
+        // Per-face occlusion from the block's actual occlusion shape: a face may only cull its
+        // neighbour if the block geometrically fills that whole voxel face. The old height-only
+        // heuristic (UP/DOWN depth) caught slabs/snow but MISSED full-height-but-thin blocks —
+        // fences, bamboo, walls, panes — so their faces wrongly culled neighbours (e.g. the face
+        // under a fence post, or the sides of a slab seen at LOD). isFaceFull() resolves it per
+        // direction: a bottom slab still occludes DOWN, a fence post occludes nothing.
+        boolean isFullCube = false;
+        if (canOcclude) {
+            try {
+                VoxelShape occ = state.getOcclusionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
+                isFullCube = Block.isShapeFullBlock(occ);
+                if (!isFullCube) {
+                    for (int fi = 0; fi < 6; fi++) {
+                        // Clear bit0 (occludes neighbour) for any face the shape doesn't fully cover.
+                        if (!Block.isFaceFull(occ, FACE_DIRS[fi])) {
+                            meta &= ~(1L << (fi * 8));
+                        }
+                    }
+                }
+            } catch (Throwable t) {
+                // Fall back to the height heuristic if the occlusion shape can't be queried.
+                float blockTopY    = facePresent[1] ? (1.0f - faceDepths[1]) : 1.0f;
+                float blockBottomY = facePresent[0] ? faceDepths[0]          : 0.0f;
+                if (blockTopY < 0.999f || blockBottomY > 0.001f) {
+                    for (int fi = 0; fi < 6; fi++) meta &= ~(1L << (fi * 8));
+                }
             }
         }
 
         int modelFlags = 0;
-        if (canOcclude && !isPartialHeight) modelFlags |= 0b01100000; // fullyOpaque + cullsSame
-        else if (canOcclude)                modelFlags |= 0b00100000; // cullsSame only
+        if (canOcclude && isFullCube) modelFlags |= 0b01100000; // fullyOpaque + cullsSame
+        else if (canOcclude)          modelFlags |= 0b00100000; // cullsSame only
         if (anyTinted)  modelFlags |= 0b00000001; // biomeColoured (we don't have a LUT; just const tint)
 
         // Fluid detection: pure fluid block (water, lava) vs waterlogged / water-immersed block.
