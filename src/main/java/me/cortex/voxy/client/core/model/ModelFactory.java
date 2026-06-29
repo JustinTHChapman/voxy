@@ -384,13 +384,14 @@ public class ModelFactory {
                             .getSprite(ext.getStillTexture());
                 } catch (Throwable ignored) {}
             }
-            // Fall back to the particle icon for any face still missing a sprite — INCLUDING
-            // cross-plant / sprite-only models (flowers, grass, sugar cane, sprite torches). They
-            // render as alpha-cutout sprite voxels (see the translucency override below) so they
-            // appear at LOD instead of being dropped. Being non-full + transparent, they don't cull
-            // neighbours. (Directional blocks already reached this fallback; this only adds the
-            // sprite-only ones, so normal blocks are unaffected.)
-            if (sprite == null) {
+            // Fall back to the particle icon for any face still missing a sprite. Directional blocks
+            // and fluids cover genuinely-missing faces as before. For cross-plant / sprite-only models
+            // (flowers, grass, sugar cane, sprite torches) we apply it to the SIDE faces only
+            // (faceIdx >= 2 = N/S/E/W), leaving UP/DOWN blank — so they render as a 4-sided sprite
+            // billboard like the real cross model instead of a solid cube with a top/bottom. They go
+            // through the opaque-pass alpha-CUTOUT discard (below) and, being non-full + transparent,
+            // don't cull neighbours.
+            if (sprite == null && (hasAnyDirectionalQuad || isPureFluid || faceIdx >= 2)) {
                 try { sprite = model.getParticleIcon(); } catch (Throwable ignored) {}
             }
 
