@@ -384,9 +384,13 @@ public class ModelFactory {
                             .getSprite(ext.getStillTexture());
                 } catch (Throwable ignored) {}
             }
-            // Don't fall back to particle icon for cross-plant/sprite-only models;
-            // they should be invisible in LOD rather than rendered as solid cubes.
-            if (sprite == null && (hasAnyDirectionalQuad || isPureFluid)) {
+            // Fall back to the particle icon for any face still missing a sprite — INCLUDING
+            // cross-plant / sprite-only models (flowers, grass, sugar cane, sprite torches). They
+            // render as alpha-cutout sprite voxels (see the translucency override below) so they
+            // appear at LOD instead of being dropped. Being non-full + transparent, they don't cull
+            // neighbours. (Directional blocks already reached this fallback; this only adds the
+            // sprite-only ones, so normal blocks are unaffected.)
+            if (sprite == null) {
                 try { sprite = model.getParticleIcon(); } catch (Throwable ignored) {}
             }
 
@@ -522,6 +526,10 @@ public class ModelFactory {
             if (facePresent[i] && !faceAllOpaque[i]) { anyFaceTransparent = true; break; }
         }
         if (state.is(BlockTags.LEAVES)) anyFaceTransparent = false;
+        // Sprite-only / cross-plant models (flowers, grass, sugar cane, sprite torches) render via the
+        // particle-icon fallback above; route them through the opaque-pass alpha-CUTOUT discard like
+        // leaves rather than the alpha-blend translucent pass, so they read crisply instead of ghostly.
+        if (!hasAnyDirectionalQuad) anyFaceTransparent = false;
         // Ice (ice / packed / blue / frosted) is semi-transparent but visually near-opaque at LOD
         // scale. Routing it to the alpha-blend translucent pass made it overlap the water beneath it
         // in frozen oceans — two unsorted translucent surfaces produce order-dependent blending that
