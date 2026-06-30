@@ -297,6 +297,15 @@ public class ModelFactory {
 
         BlockState state = this.mapper.getBlockStateFromBlockId(blockId);
 
+        // Treat any WATERLOGGED block as plain water at LOD: bake it with water's appearance so oceans
+        // stay opaque and consistent instead of showing the immersed block (kelp, seagrass, and any
+        // waterlogged solid). The block's own geometry is lost at LOD distance — the intended trade,
+        // since the dominant underwater visual is the water itself; it also stops immersed plants from
+        // punching transparent holes in the ocean surface.
+        if (!(state.getBlock() instanceof LiquidBlock) && state.getFluidState().is(FluidTags.WATER)) {
+            state = Blocks.WATER.defaultBlockState();
+        }
+
         Minecraft mc = Minecraft.getInstance();
         BlockModelShaper shaper = mc.getBlockRenderer().getBlockModelShaper();
         BakedModel model = shaper.getBlockModel(state);
