@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.generation;
 
 import me.cortex.voxy.client.config.ServerConfigOverride;
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.VoxyCommonConfig;
 import me.cortex.voxy.common.network.C2SLodSectionPacket;
@@ -84,6 +85,9 @@ public final class AutoGenerationService {
     private static final int FOG_DIRECTIONS = 16;
     /** Consecutive empty columns along a ray that mark the true LOD edge (ignores small interior holes). */
     private static final int FOG_EDGE_EMPTY_RUN = 3;
+    /** Pull the fog in this many chunks inside the LOD edge so it reaches full opacity BEFORE the edge
+     *  and covers the hard cutoff, instead of ending exactly on it. */
+    private static final int FOG_EDGE_PULLIN_CHUNKS = 2;
     private static final float[] FOG_DIR_X = new float[FOG_DIRECTIONS];
     private static final float[] FOG_DIR_Z = new float[FOG_DIRECTIONS];
     static {
@@ -378,11 +382,17 @@ public final class AutoGenerationService {
         // Live fog frontier: estimate the LOD edge around the player every tick and lerp toward
         // it (faster when shrinking than growing) so the fog grows and shrinks smoothly instead
         // of snapping at discrete queue rebuilds.
-        int fogScanRadius = Math.min(ServerConfigOverride.INSTANCE.effectiveLodRadius(), 256);
-        // Pull the fog in by one chunk: the frontier estimate sits at the first empty column, i.e. one
-        // chunk past the last column that actually has data, so without this the fog ends one chunk
-        // beyond the real LOD edge and you can see the hard cutoff.
-        float rawFrontier = Math.max(0f, computeFrontierChunks(playerCX, playerCZ, fogScanRadius) - 1f) * 16f;
+        // Scan out to the LOD RENDER edge, not the generation radius. The per-frame draw cull renders
+        // LODs out to sectionRenderDistance*512 blocks (= *32 chunks — see HierarchicalOcclusionTraverser);
+        // scanning only the generation radius (≤256) left the fog short of the rendered terrain, so the
+        // LOD edge had no fog on it. Tying it to the SAME sectionRenderDistance the cull uses keeps the
+        // fog and the render edge locked together — change the render distance and the fog follows.
+        // (Capped so a huge render distance can't make the per-tick 16-direction scan unbounded.)
+        int renderChunks = (int) (VoxyConfig.CONFIG.sectionRenderDistance * 32f);
+        int fogScanRadius = Math.min(Math.max(renderChunks, 16), 1024);
+        // Pull the fog in a couple of chunks so it reaches full opacity just inside the LOD edge and
+        // covers the hard cutoff, rather than ending exactly on it.
+        float rawFrontier = Math.max(0f, computeFrontierChunks(playerCX, playerCZ, fogScanRadius) - FOG_EDGE_PULLIN_CHUNKS) * 16f;
         float current = smoothedFogFrontierBlocks;
         float lerp = (rawFrontier < current) ? FOG_LERP_SHRINK : FOG_LERP_GROW;
         smoothedFogFrontierBlocks = current + (rawFrontier - current) * lerp;
