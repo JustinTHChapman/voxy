@@ -243,14 +243,20 @@ public final class AutoGenerationService {
     }
 
     /**
-     * Estimate the generated-LOD frontier radius (in chunks) around the player by walking
-     * outward along {@link #FOG_DIRECTIONS} compass directions and finding where the data runs
-     * out. A run of {@link #FOG_EDGE_EMPTY_RUN} consecutive empty columns marks the real edge,
-     * so isolated interior holes don't collapse the frontier. Averaged across directions for a
-     * smooth, isotropic radius. Cheap enough to call every tick.
+     * Estimate the generated-LOD frontier radius (in chunks) around the player by walking outward
+     * along {@link #FOG_DIRECTIONS} compass directions and finding where the data runs out. A run of
+     * {@link #FOG_EDGE_EMPTY_RUN} consecutive empty columns marks the real edge, so isolated interior
+     * holes don't collapse the frontier.
+     *
+     * <p>Returns the NEAREST edge (min across directions), not the average. Averaging is inverted: a
+     * point ON the data boundary has a LARGER average than the centre, because inward rays reach across
+     * the whole blob (up to its diameter), so the fog pushed OUT at the edge and IN at the centre. The
+     * minimum makes the fog hug the closest cutoff — it closes in as you approach the frontier and opens
+     * out in dense terrain, which is the correct direction. The {@code FOG_EDGE_EMPTY_RUN} filter keeps a
+     * single small gap from collapsing it.</p>
      */
     private float computeFrontierChunks(int pcx, int pcz, int scanRadius) {
-        float sum = 0f;
+        int minFrontier = scanRadius;
         for (int d = 0; d < FOG_DIRECTIONS; d++) {
             float ex = FOG_DIR_X[d];
             float ez = FOG_DIR_Z[d];
@@ -265,9 +271,9 @@ public final class AutoGenerationService {
                     break;
                 }
             }
-            sum += frontier;
+            if (frontier < minFrontier) minFrontier = frontier;
         }
-        return sum / FOG_DIRECTIONS;
+        return minFrontier;
     }
 
     /** Called once per client tick from the NeoForge ClientTickEvent listener. */
