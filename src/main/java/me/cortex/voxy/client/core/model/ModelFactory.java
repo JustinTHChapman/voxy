@@ -322,6 +322,21 @@ public class ModelFactory {
         // Fluid detection needed before the face loop for sprite-selection guards.
         boolean isPureFluid = state.getBlock() instanceof LiquidBlock;
 
+        // Thin columns (bamboo, sugar cane, torches, thin posts): their horizontal footprint is far
+        // smaller than the voxel, so a full-16×16 top/bottom CAP renders much larger than the thin
+        // sides — and a stacked bamboo column becomes a chain of caps (the zig-zag). Detect via the
+        // block's shape bounds so we can drop those UP/DOWN faces below and render sides only.
+        boolean thinColumn = false;
+        if (!isPureFluid) {
+            try {
+                VoxelShape sh = state.getShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
+                if (!sh.isEmpty()) {
+                    net.minecraft.world.phys.AABB b = sh.bounds();
+                    thinColumn = (b.maxX - b.minX) < 0.4 && (b.maxZ - b.minZ) < 0.4;
+                }
+            } catch (Throwable ignored) {}
+        }
+
         // Pre-scan: does this model have ANY directional (face-culled) quads?
         // Cross-plant / sprite-only models (flowers, short grass, etc.) have none.
         // Those must not be rendered as solid cubes — all faces must be marked missing.
@@ -403,6 +418,10 @@ public class ModelFactory {
             if (sprite == null && (hasAnyDirectionalQuad || isPureFluid || faceIdx >= 2)) {
                 try { sprite = model.getParticleIcon(); } catch (Throwable ignored) {}
             }
+
+            // Thin columns render sides only — drop the UP/DOWN faces (0=DOWN, 1=UP) so bamboo/cane/etc.
+            // don't cap each segment with a full-size top/bottom that dwarfs the thin sides (the zig-zag).
+            if (thinColumn && faceIdx <= 1) sprite = null;
 
             int faceByte;
             if (sprite == null) {
