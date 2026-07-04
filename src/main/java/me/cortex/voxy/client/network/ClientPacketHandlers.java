@@ -100,4 +100,16 @@ public final class ClientPacketHandlers {
             WorldUpdater.insertUpdate(worldEngine, vs);
         });
     }
+
+    /**
+     * Whether the server we're connected to has voxy (its network channels were negotiated).
+     * True in singleplayer (the integrated server always has them). False on vanilla servers and
+     * NeoForge servers without voxy — every client→server send MUST be gated on this, since sending
+     * an un-negotiated payload throws. Voxy's channels are registered optional, so joining such
+     * servers works; server-assisted features (LOD streaming, manifest sync, uploads) just turn off.
+     */
+    public static boolean serverHasVoxy() {
+        var conn = Minecraft.getInstance().getConnection();
+        return conn != null && conn.hasChannel(me.cortex.voxy.common.network.C2SLodSectionPacket.TYPE);
+    }
 }

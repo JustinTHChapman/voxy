@@ -667,6 +667,12 @@ public final class AutoGenerationService {
             ThreadLocal.withInitial(VoxelizedSection::createEmpty);
 
     private void drainUploads(Minecraft mc, WorldEngine engine) {
+        // Server without voxy (vanilla or non-voxy NeoForge): the C2S channel was never negotiated, so
+        // sending would throw. Drop the backlog too, so queued LevelChunks don't pin memory for nothing.
+        if (!me.cortex.voxy.client.network.ClientPacketHandlers.serverHasVoxy()) {
+            uploadQueue.clear();
+            return;
+        }
         Mapper mapper = engine.getMapper();
         String dimId = mc.level.dimension().location().toString();
         int uploaded = 0;

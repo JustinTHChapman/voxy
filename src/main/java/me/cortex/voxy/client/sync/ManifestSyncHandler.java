@@ -104,6 +104,10 @@ public final class ManifestSyncHandler {
 
         Logger.info("[VoxyManifest] Requesting " + needed.size() + " sections from server.");
 
+        // Defensive: a manifest only ever comes from a voxy server, but re-check the channel before
+        // sending in case the connection changed — an un-negotiated payload send throws.
+        if (!me.cortex.voxy.client.network.ClientPacketHandlers.serverHasVoxy()) return;
+
         // Send in batches to avoid oversized packets
         for (int start = 0; start < needed.size(); start += MAX_REQUEST_BATCH) {
             int end   = Math.min(start + MAX_REQUEST_BATCH, needed.size());

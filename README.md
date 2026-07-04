@@ -24,6 +24,7 @@ Unofficial NeoForge 1.21.1 port of [Voxy](https://github.com/corvesive/voxy), a 
 - **Background auto-generation** — client scans for un-generated sections within the LOD radius and builds them in closest-first order without blocking gameplay; throttles automatically when the server is under load (MSPT-based rate limiter)
 - **Server-to-client streaming** — server pushes LOD section data to connecting clients; delta-sync via manifest (only sections with changed content are transferred)
 - **Client-to-server upload** — client-generated LOD data is uploaded back to the server so other players benefit without regenerating
+- **Server installation is optional** — voxy's network channels are negotiated as optional, so a voxy client can join **vanilla servers and servers without voxy**. LODs still build from the chunks the client receives normally as you explore; only the server-assisted features (LOD streaming, manifest delta-sync, upload, distant auto-generation) are unavailable. Likewise, clients **without** voxy can join a voxy server — they simply play without LODs
 - **SQLite persistence** — LOD data is stored on-disk in a compressed SQLite database and survives world restarts
 - **Multi-threaded ingest** — dedicated worker threads process incoming chunk sections in parallel; service manager balances load across ingest, save, and render-build tasks
 - **Distant force-loading** (singleplayer) — columns beyond render distance are force-loaded via transient, auto-expiring tickets (non-blocking — never `managedBlock`) so the world generates far past vanilla render distance; concurrent loads are capped by config
@@ -87,9 +88,10 @@ Unofficial NeoForge 1.21.1 port of [Voxy](https://github.com/corvesive/voxy), a 
 
 - **Minecraft** 1.21.1
 - **NeoForge** 21.1.230 or newer
-- **Sodium** 0.6.13 (0.6.x) — **required** on the client. Voxy's renderer mixes into Sodium's chunk
-  renderer; the mixins target 0.6.x internals, so Sodium **0.7+ is not supported** (excluded until the
-  mixins are rewritten). Reese's Sodium Options and other Sodium add-ons are fine.
+- **Sodium** 0.6.13 – 0.8.x — **required** on the client (accepted range `[0.6.13, 0.9)`). Voxy's
+  renderer mixes into Sodium's chunk renderer; the injection points are stable across 0.6.13→0.8.x and
+  the render hook captures arguments by type, so one jar covers the whole range. Note that *other*
+  Sodium add-ons in a pack may not support 0.8.x betas yet. Reese's Sodium Options etc. are fine.
 - **OpenGL 4.5** capable GPU
 - **Iris** 1.8+ (optional) — when installed, LODs render through the active shader pack (detected via
   the reflective IrisApi v0); without Iris everything still works. Tested with Iris + Complementary
@@ -106,8 +108,12 @@ NeoForge/Sodium version produces a clear NeoForge error rather than a crash.
 - **No dark distant LODs** — force-loaded chunks are voxelized only after their lighting has settled (with a short fallback so a never-settling light state can't leave a gap; a deterministic light path is planned)
 - **`/voxy regen` command** — wipe + regenerate the current dimension's LODs, race-free
 - **Save-safe distant generation** — chunks force-loaded only to build LODs are never written to the world save, so distant generation can't bloat or hang it
-- **No silently-skipped columns** — a column is never dropped; genuine load failures (outside the world border, or stuck far past normal worldgen) are logged as errors so they're visible and reportable
-- **Fog edge fix** — environmental fog is pulled in one chunk so the hard LOD edge stays hidden
+- **No silently-skipped columns** — a column is never dropped; genuine load failures (outside the world border, or stuck far past normal worldgen) are logged as errors so they're visible and reportable. Stuck columns are **parked** (slot freed, retried once all other work drains) so a few un-generatable columns can't stall generation
+- **Server-optional networking (0.2.1)** — join vanilla / non-voxy servers with voxy installed client-side; LODs build from normally-received chunks (no distant auto-generation). Vanilla clients can join voxy servers
+- **Sodium 0.6.13–0.8.x support** — render hook made signature-independent; one jar covers the range
+- **Iris fog tracking** — the shader fog `far` follows the LOD frontier on both Iris 1.8.12 (`DHCompat`) and 1.8.14 (`CameraUniforms`); vanilla near-fog's 96-block clamp is dropped while voxy's environmental fog is active
+- **Fog frontier fixes** — frontier uses the *nearest* data edge (the average was inverted at the boundary), scans out to the LOD render distance so it tracks the rendered edge, and is pulled in 2 chunks so the hard cutoff stays covered
+- **Plant/thin-block rendering** — cross-plants (flowers, grass, cane) render as 4-sided cutout billboards; thin columns (bamboo, cane) drop their oversized top/bottom caps; per-face occlusion comes from the real occlusion shape so fences/doors/walls/slabs no longer cull neighbouring faces wrongly; waterlogged blocks bake as water so oceans stay consistent
 
 ---
 

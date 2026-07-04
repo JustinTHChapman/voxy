@@ -48,7 +48,9 @@ public class VoxyServer {
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("voxy");
+        // optional(): clients without voxy can join a voxy server — they simply never negotiate the
+        // channels, and ServerLodTracker only sends to players whose connection has them.
+        final PayloadRegistrar registrar = event.registrar("voxy").optional();
         registrar.playToClient(S2CLodSectionPacket.TYPE, S2CLodSectionPacket.STREAM_CODEC,
                 (pkt, ctx) -> { /* server never receives this packet */ });
         registrar.playToClient(S2CServerConfigPacket.TYPE, S2CServerConfigPacket.STREAM_CODEC,
@@ -69,7 +71,14 @@ public class VoxyServer {
                 });
     }
 
+    /** Whether this player's client has voxy (channels negotiated). Vanilla clients don't. */
+    private static boolean playerHasVoxy(ServerPlayer sp) {
+        return sp.connection != null && sp.connection.hasChannel(S2CLodSectionPacket.TYPE);
+    }
+
     private static void onChunkSent(ChunkWatchEvent.Sent event) {
+        // Skip voxelization/queueing for clients without voxy — they can't receive the packets.
+        if (!playerHasVoxy(event.getPlayer())) return;
         TRACKER.onChunkWatch(event.getLevel(), event.getChunk(), event.getPlayer());
     }
 
@@ -79,6 +88,9 @@ public class VoxyServer {
 
     private static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer sp) {
+            // Voxy is optional client-side too: vanilla clients never negotiated the channels, and
+            // sending an un-negotiated payload throws. They just play without LODs.
+            if (!playerHasVoxy(sp)) return;
             PacketDistributor.sendToPlayer(sp, new S2CServerConfigPacket(
                     VoxyCommonConfig.LOD_CHUNKS_PER_TICK.get(),
                     VoxyCommonConfig.LOD_GENERATION_RATE_CAP.get(),

@@ -243,6 +243,12 @@ public class ServerLodTracker {
         for (Map.Entry<ServerPlayer, Deque<S2CLodSectionPacket>> entry : playerQueues.entrySet()) {
             ServerPlayer player = entry.getKey();
             Deque<S2CLodSectionPacket> queue = entry.getValue();
+            // Belt-and-braces: never send to a client without voxy's channels (throws). Join/watch
+            // are already gated in VoxyServer, so this queue should be empty for such players.
+            if (player.connection == null || !player.connection.hasChannel(S2CLodSectionPacket.TYPE)) {
+                queue.clear();
+                continue;
+            }
             int sent = 0;
             while (sent < sectionsPerTick() && !queue.isEmpty()) {
                 S2CLodSectionPacket pkt = queue.pollFirst();

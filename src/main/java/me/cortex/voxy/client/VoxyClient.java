@@ -53,7 +53,13 @@ public class VoxyClient {
     }
 
     private static void registerPayloads(RegisterPayloadHandlersEvent event) {
-        final PayloadRegistrar registrar = event.registrar("voxy");
+        // optional(): voxy on the server is NOT required. Without it, a client with required payloads
+        // is refused by any NeoForge server that lacks voxy ("mismatched mod channel list"). Optional
+        // channels negotiate as absent instead, so a voxy client can join vanilla / non-voxy servers —
+        // LODs still build from normally-received chunks; only server-assisted features (LOD streaming,
+        // manifest sync, distant auto-generation) are unavailable. Sends are guarded by
+        // ClientPacketHandlers.serverHasVoxy().
+        final PayloadRegistrar registrar = event.registrar("voxy").optional();
         registrar.playToClient(S2CLodSectionPacket.TYPE, S2CLodSectionPacket.STREAM_CODEC,
                 ClientPacketHandlers::handleLodSection);
         registrar.playToClient(S2CServerConfigPacket.TYPE, S2CServerConfigPacket.STREAM_CODEC,
