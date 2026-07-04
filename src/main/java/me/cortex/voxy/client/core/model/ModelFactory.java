@@ -558,7 +558,10 @@ public class ModelFactory {
         // Sprite-only / cross-plant models (flowers, grass, sugar cane, sprite torches) render via the
         // particle-icon fallback above; route them through the opaque-pass alpha-CUTOUT discard like
         // leaves rather than the alpha-blend translucent pass, so they read crisply instead of ghostly.
-        if (!hasAnyDirectionalQuad) anyFaceTransparent = false;
+        // Fluids are excluded: water/lava models also have no directional quads, but water MUST stay in
+        // the translucent pass — without this exclusion oceans lost their translucency (rendered as
+        // opaque cutout), which was the "ocean opacity disappeared" regression.
+        if (!hasAnyDirectionalQuad && !isPureFluid) anyFaceTransparent = false;
         // Ice (ice / packed / blue / frosted) is semi-transparent but visually near-opaque at LOD
         // scale. Routing it to the alpha-blend translucent pass made it overlap the water beneath it
         // in frozen oceans — two unsorted translucent surfaces produce order-dependent blending that
