@@ -29,13 +29,11 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
-import it.unimi.dsi.fastutil.longs.LongHeapPriorityQueue;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 
 import java.util.ArrayDeque;
 import java.util.Comparator;
 import java.util.Deque;
-import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
@@ -54,7 +52,7 @@ public final class AutoGenerationService {
 
     public static final AutoGenerationService INSTANCE = new AutoGenerationService();
 
-    /** Rebuild the candidate queue when the player moves more than this many chunks. */
+    /** Re-center the candidate spiral when the player moves more than this many chunks. */
     private static final int REBUILD_THRESHOLD_CHUNKS = 4;
     /** Movement in a single tick beyond this many chunks is treated as a teleport. */
     private static final int TELEPORT_THRESHOLD_CHUNKS = 32;
@@ -98,12 +96,27 @@ public final class AutoGenerationService {
         }
     }
 
-    // Candidate chunks packed as a single long: (dist² << 20) | ((dx+256) << 10) | (dz+256)
-    // where dx/dz are chunk offsets from lastPlayerCX/CZ (both ±256 max → 10 bits each after bias).
-    // Natural long ordering gives closest-first (dist in high bits) with zero per-entry allocation.
-    private final LongHeapPriorityQueue candidateQueue = new LongHeapPriorityQueue();
-    private final Set<Long> submitted    = new LongOpenHashSet();
-    private final Set<Long> pendingLoad  = new LongOpenHashSet();   // requested from server thread, not yet back
+    // Candidate scan: a precomputed closest-first "spiral" — every (dx,dz) offset within the max
+    // radius, packed as ((dx+256)<<10)|(dz+256) and sorted ascending by dist², built ONCE statically.
+    // Instead of materializing a ~206k-entry priority queue (and rebuilding it on every 4-chunk move —
+    // and, when the radius was fully generated and the queue stayed empty, EVERY TICK), we walk this
+    // table with a persistent cursor and check eligibility (submitted/pending/parked) live. A move just
+    // resets the cursor (O(1)); a completed sweep idles at zero cost until movement or a retry signal.
+    private static final int[] SPIRAL_OFFSETS = buildSpiralOffsets();
+    /** Max spiral entries examined per tick, so a sweep over a fully-generated region is spread across
+     *  ticks (bounded per-tick cost) instead of scanning the whole table at once. */
+    private static final int SPIRAL_EXAMINE_BUDGET = 4096;
+    /** Cursor into {@link #SPIRAL_OFFSETS}; offsets are relative to lastPlayerCX/CZ (the spiral center). */
+    private int spiralCursor = 0;
+    /** Set when a column was dropped and must be retried (async load failed, or lighting wasn't ready at
+     *  ingest). The finished sweep rewinds once — deterministic, event-driven, no timers. */
+    private boolean spiralRewindRequested = false;
+
+    // Concrete LongOpenHashSet (not Set<Long>): these are the hottest lookups in the mod — the fog scan
+    // and the spiral walk hit them thousands of times per tick — and the interface would autobox every
+    // contains/add into a heap-allocated Long. The concrete type binds the primitive overloads.
+    private final LongOpenHashSet submitted   = new LongOpenHashSet();
+    private final LongOpenHashSet pendingLoad = new LongOpenHashSet();   // requested from server thread, not yet back
 
     /** Chunks loaded by the server thread and ready to ingest on the client tick. */
     private final ConcurrentLinkedDeque<LevelChunk> serverReadyChunks = new ConcurrentLinkedDeque<>();
@@ -121,7 +134,7 @@ public final class AutoGenerationService {
      *  un-generatable columns can't hog every force-load slot and stall all generation. They are NOT
      *  permanently skipped — when the candidate queue drains (all other work done) the park set is
      *  cleared and they are retried. Client-thread-only. */
-    private final Set<Long> parked = new LongOpenHashSet();
+    private final LongOpenHashSet parked = new LongOpenHashSet();
     /** Server→client: columns the server thread has parked; drained on the client tick to drop them from
      *  pendingLoad (freeing the slot) and add them to {@link #parked}. */
     private final ConcurrentLinkedQueue<Long> parkRequests = new ConcurrentLinkedQueue<>();
@@ -155,8 +168,8 @@ public final class AutoGenerationService {
         long now = System.currentTimeMillis();
         if (now - diag$lastLog > 2000) {
             diag$lastLog = now;
-            AUTOGEN_DIAG.info("AutoGen: candQ={} pending={} parked={} submitted={} fogFrontier={} | gen={} req={} drained={} flLoaded={} flEmptyChunks={}",
-                    candidateQueue.size(), pendingLoad.size(), parked.size(), submitted.size(), (int) smoothedFogFrontierBlocks,
+            AUTOGEN_DIAG.info("AutoGen: spiralRemain={} pending={} parked={} submitted={} fogFrontier={} | gen={} req={} drained={} flLoaded={} flEmptyChunks={}",
+                    SPIRAL_OFFSETS.length - spiralCursor, pendingLoad.size(), parked.size(), submitted.size(), (int) smoothedFogFrontierBlocks,
                     diag$generated, diag$requested, diag$drained, diag$flLoaded, diag$flEmpty);
         }
     }
@@ -211,7 +224,8 @@ public final class AutoGenerationService {
     }
 
     public void reset() {
-        candidateQueue.clear();
+        spiralCursor = 0;
+        spiralRewindRequested = false;
         submitted.clear();
         pendingLoad.clear();
         serverReadyChunks.clear();
@@ -318,7 +332,8 @@ public final class AutoGenerationService {
             dbPopulated = false;
             submitted.clear();
             pendingLoad.clear();
-            candidateQueue.clear();
+            spiralCursor = 0;
+            spiralRewindRequested = false;
             // Drop any old-dimension work still queued across ticks so it can't be ingested
             // into the new dimension's engine.
             serverReadyChunks.clear();
@@ -361,14 +376,13 @@ public final class AutoGenerationService {
                 t.setDaemon(true);
                 t.start();
             } else if (scanResult != activeScanSentinel) {
-                // Scan finished (result is not the sentinel) — merge on the client thread.
+                // Scan finished (result is not the sentinel) — merge on the client thread. No spiral
+                // reset needed: the cursor walk and the per-tick fog scan both consult `submitted`
+                // LIVE, so the merged file-LODs take effect immediately (the fog snaps out to the
+                // file-LOD edge, and the walk skips the merged columns as it reaches them).
                 var it = scanResult.longIterator();
                 while (it.hasNext()) submitted.add(it.nextLong());
                 dbPopulated = true;
-                // The frontier is only recomputed by rebuildQueue (on movement / empty queue), so the
-                // file LODs we just merged wouldn't reach the fog until the player moves. Rebuild now so
-                // the fog snaps out to the file-LOD edge immediately instead of hugging the player.
-                rebuildQueue(playerCX, playerCZ);
             }
             // else: scan still in progress — nothing to do this tick.
         }
@@ -383,13 +397,17 @@ public final class AutoGenerationService {
             smoothedFogFrontierBlocks = 0f;
         }
 
-        // Rebuild the candidate queue when the player has moved significantly
-        if (candidateQueue.isEmpty() || dcx * dcx + dcz * dcz >= REBUILD_THRESHOLD_CHUNKS * REBUILD_THRESHOLD_CHUNKS) {
-            // When the queue has fully drained, every other column is done — un-park the stuck columns so
-            // they get retried. This is deterministic (tied to the queue emptying, not a timer): stuck
-            // columns are retried only once they are the last work left, so they never block the rest.
-            if (candidateQueue.isEmpty()) parked.clear();
-            rebuildQueue(playerCX, playerCZ);
+        // Re-center the candidate spiral when the player has moved significantly (or on the first
+        // tick). O(1): just moves the center and rewinds the cursor — eligibility is checked live
+        // during the walk, so no queue materialization. (Un-parking happens when a sweep completes —
+        // see the exhaustion handling in the walk below — preserving the old "retry stuck columns only
+        // once all other work is done" semantic, still deterministic, still no timers.)
+        if (lastPlayerCX == Integer.MIN_VALUE
+                || (long) dcx * dcx + (long) dcz * dcz >= (long) REBUILD_THRESHOLD_CHUNKS * REBUILD_THRESHOLD_CHUNKS) {
+            // long math: dcx² overflows int on dimension-scale teleports (~50k+ chunks), which would
+            // make the sum negative and silently skip the re-center. The old code masked this with its
+            // every-tick empty-queue rebuild; the spiral has no such fallback, so this must be exact.
+            resetSpiral(playerCX, playerCZ);
         }
 
         // Live fog frontier: estimate the LOD edge around the player every tick and lerp toward
@@ -414,6 +432,9 @@ public final class AutoGenerationService {
         Long failedKey;
         while ((failedKey = failedServerLoads.poll()) != null) {
             pendingLoad.remove(failedKey.longValue());
+            // The column is eligible again but the spiral cursor is already past it — request a
+            // rewind when the current sweep completes so it gets retried.
+            spiralRewindRequested = true;
         }
 
         // Park columns the server flagged stuck: free their slot and add them to the skip set so a few
@@ -489,15 +510,49 @@ public final class AutoGenerationService {
         int requested = 0;
         int maxPending = VoxyCommonConfig.AUTO_GEN_MAX_PENDING_LOADS.get();
 
-        while ((generated + requested) < rate && !candidateQueue.isEmpty()) {
-            long packed = candidateQueue.dequeueLong();
-            int dx = (int)((packed >> 10) & 0x3FF) - 256;
-            int dz = (int)(packed & 0x3FF) - 256;
+        // Walk the closest-first spiral from the persistent cursor. Bounded per tick by BOTH the
+        // generation rate (candidates consumed) and the examination budget (offsets looked at), so a
+        // sweep across an already-generated region costs a fixed slice per tick instead of one big scan.
+        int radius = Math.min(ServerConfigOverride.INSTANCE.effectiveLodRadius(), 256);
+        long radiusSq = (long) radius * radius;
+        int examined = 0;
+        boolean rewound = false; // at most one sweep-completion rewind per tick
+        while ((generated + requested) < rate && examined < SPIRAL_EXAMINE_BUDGET) {
+            // Sweep complete? (Past the table, or past the configured radius — the table is
+            // distance-sorted, so the first offset beyond the radius means all the rest are too.)
+            int dx, dz;
+            boolean exhausted = spiralCursor >= SPIRAL_OFFSETS.length;
+            if (!exhausted) {
+                int packed = SPIRAL_OFFSETS[spiralCursor];
+                dx = ((packed >> 10) & 0x3FF) - 256;
+                dz = (packed & 0x3FF) - 256;
+                exhausted = ((long) dx * dx + (long) dz * dz) > radiusSq;
+            } else {
+                dx = dz = 0;
+            }
+            if (exhausted) {
+                // Everything reachable was examined. Un-park stuck columns and rewind ONCE if there is
+                // deterministic evidence of work left (parked columns to retry, or a column was dropped
+                // because its async load failed / lighting wasn't ready). Otherwise idle at ZERO cost
+                // until the player moves — the old code rebuilt the whole queue every tick here.
+                if (!rewound && (!parked.isEmpty() || spiralRewindRequested)) {
+                    parked.clear();
+                    spiralRewindRequested = false;
+                    spiralCursor = 0;
+                    rewound = true;
+                    continue;
+                }
+                break;
+            }
+            examined++;
             int cx = lastPlayerCX + dx;
             int cz = lastPlayerCZ + dz;
             long colKey = colKey(cx, cz);
 
-            if (submitted.contains(colKey) || pendingLoad.contains(colKey) || parked.contains(colKey)) continue;
+            if (submitted.contains(colKey) || pendingLoad.contains(colKey) || parked.contains(colKey)) {
+                spiralCursor++;
+                continue;
+            }
 
             // Check if LOD data already exists in the DB for this column.
             // If so, mark submitted and skip server chunk request — the rendering system
@@ -505,6 +560,7 @@ public final class AutoGenerationService {
             if (engine.storage.containsColumn(0, cx, cz,
                     mc.level.getMinSection(), mc.level.getMaxSection())) {
                 submitted.add(colKey);
+                spiralCursor++;
                 continue;
             }
 
@@ -518,18 +574,19 @@ public final class AutoGenerationService {
                 //    ready — NEVER calling getChunk/getChunkFuture(create=true) on the server thread,
                 //    which would block it via managedBlock. Concurrent loads are capped by config.
                 if (pendingLoad.size() >= maxPending) {
-                    // At the concurrent-load cap; put this entry back and stop for this tick.
-                    candidateQueue.enqueue(packed);
+                    // At the concurrent-load cap; leave the cursor ON this candidate and stop for
+                    // this tick — next tick resumes exactly here.
                     break;
                 }
                 pendingLoad.add(colKey);
                 loadRequests.add(colKey);
                 requested++;
                 diag$requested++;
+                spiralCursor++;
                 continue;
             }
 
-            if (chunk == null) continue; // dedicated server — nothing we can do client-side
+            if (chunk == null) { spiralCursor++; continue; } // dedicated server — nothing we can do client-side
 
             boolean ok = instance.getIngestService().enqueueIngest(engine, chunk);
             if (ok) {
@@ -541,10 +598,12 @@ public final class AutoGenerationService {
                 // locally), so uploading would voxelize + packet-encode every chunk a second time for
                 // nothing — measured as the single largest avoidable cost of generation.
                 if (iServer == null) uploadQueue.addLast(chunk);
+            } else {
+                // Lighting not ready — the cursor moves past it, so request a rewind when the sweep
+                // completes so it is retried (deterministic replacement for the old every-tick rebuild).
+                spiralRewindRequested = true;
             }
-            // If enqueueIngest returns false (lighting not ready), the entry is dropped
-            // from the queue.  It will be re-added on the next rebuildQueue() call when
-            // the player moves or the current batch empties.
+            spiralCursor++;
         }
 
         // Bound the upload backlog so it can never pin LevelChunks unbounded.
@@ -730,41 +789,52 @@ public final class AutoGenerationService {
 
     // ── internals ─────────────────────────────────────────────────────────────
 
-    private void rebuildQueue(int playerCX, int playerCZ) {
-        candidateQueue.clear();
+    /**
+     * Re-centers the candidate spiral on the player and rewinds the cursor. O(1) — the replacement
+     * for the old rebuildQueue(), which re-scanned the full radius (~206k columns) into a priority
+     * queue on every 4-chunk move, and every single tick once the radius was fully generated.
+     * Eligibility is instead checked live as the cursor walks (closest-first is baked into the
+     * pre-sorted offset table), so there is nothing to materialize here.
+     */
+    private void resetSpiral(int playerCX, int playerCZ) {
+        spiralCursor = 0;
         lastPlayerCX = playerCX;
         lastPlayerCZ = playerCZ;
 
         // Trim the submitted set when a user-configured limit is exceeded.
         // The set is only a performance cache (avoids DB round-trips for known-generated
-        // columns); clearing it is safe — containsColumn() re-validates at dequeue time.
+        // columns); clearing it is safe — containsColumn() re-validates during the walk.
         int submittedLimit = VoxyCommonConfig.AUTO_GEN_SUBMITTED_LIMIT.get();
         if (submittedLimit > 0 && submitted.size() > submittedLimit) {
             submitted.clear();
-        }
-
-        int radius = ServerConfigOverride.INSTANCE.effectiveLodRadius();
-        // Clamp scan radius to avoid extremely large queues
-        int scanRadius = Math.min(radius, 256);
-
-        // Scan the full radius in one pass. The priority queue sorts by Euclidean
-        // distance squared so chunks are popped closest-first, giving a circular
-        // generation front rather than the square front that a Chebyshev-ordered
-        // scan would produce. (The fog frontier is computed separately, per-tick.)
-        for (int dx = -scanRadius; dx <= scanRadius; dx++) {
-            for (int dz = -scanRadius; dz <= scanRadius; dz++) {
-                long dist = (long) dx * dx + (long) dz * dz;
-                if (dist > (long) scanRadius * scanRadius) continue; // circular clip
-                int cx = playerCX + dx;
-                int cz = playerCZ + dz;
-                long key = colKey(cx, cz);
-                if (submitted.contains(key) || pendingLoad.contains(key) || parked.contains(key)) continue;
-                candidateQueue.enqueue((dist << 20) | ((long)(dx + 256) << 10) | (long)(dz + 256));
-            }
         }
     }
 
     private static long colKey(int cx, int cz) {
         return ((long) cx << 32) | (cz & 0xFFFFFFFFL);
+    }
+
+    /**
+     * Builds the closest-first candidate offset table: every (dx,dz) within a 256-chunk circle, sorted
+     * ascending by dist², packed as ((dx+256)<<10)|(dz+256). ~206k entries (~820KB), built once at
+     * class load (~tens of ms). Distance ordering is implicit in the array position, which is what
+     * lets a plain cursor replace the per-rebuild priority queue.
+     */
+    private static int[] buildSpiralOffsets() {
+        final int r = 256;
+        final long r2 = (long) r * r;
+        long[] buf = new long[(2 * r + 1) * (2 * r + 1)];
+        int n = 0;
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                long d2 = (long) dx * dx + (long) dz * dz;
+                if (d2 > r2) continue; // circular clip
+                buf[n++] = (d2 << 20) | ((long) (dx + 256) << 10) | (dz + 256);
+            }
+        }
+        java.util.Arrays.sort(buf, 0, n);
+        int[] out = new int[n];
+        for (int i = 0; i < n; i++) out[i] = (int) (buf[i] & 0xFFFFF);
+        return out;
     }
 }
