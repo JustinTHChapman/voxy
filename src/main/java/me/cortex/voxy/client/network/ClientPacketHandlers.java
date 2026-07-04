@@ -101,15 +101,27 @@ public final class ClientPacketHandlers {
         });
     }
 
+    // Memoized per connection: channel negotiation is fixed for a connection's lifetime, so the result
+    // can't change until a NEW connection object exists. Keying the cache on the connection instance
+    // makes invalidation automatic (reconnect → different instance → recompute) — no disconnect hooks.
+    private static Object cachedConnForVoxyCheck = null;
+    private static boolean cachedServerHasVoxy = false;
+
     /**
      * Whether the server we're connected to has voxy (its network channels were negotiated).
      * True in singleplayer (the integrated server always has them). False on vanilla servers and
      * NeoForge servers without voxy — every client→server send MUST be gated on this, since sending
      * an un-negotiated payload throws. Voxy's channels are registered optional, so joining such
      * servers works; server-assisted features (LOD streaming, manifest sync, uploads) just turn off.
+     * Resolved once per connection (memoized); subsequent calls are a reference compare.
      */
     public static boolean serverHasVoxy() {
         var conn = Minecraft.getInstance().getConnection();
-        return conn != null && conn.hasChannel(me.cortex.voxy.common.network.C2SLodSectionPacket.TYPE);
+        if (conn == null) return false;
+        if (conn != cachedConnForVoxyCheck) {
+            cachedServerHasVoxy = conn.hasChannel(me.cortex.voxy.common.network.C2SLodSectionPacket.TYPE);
+            cachedConnForVoxyCheck = conn;
+        }
+        return cachedServerHasVoxy;
     }
 }

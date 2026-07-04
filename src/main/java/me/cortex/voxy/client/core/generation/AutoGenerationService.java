@@ -262,7 +262,13 @@ public final class AutoGenerationService {
             float ez = FOG_DIR_Z[d];
             int frontier = scanRadius;
             int emptyRun = 0;
-            for (int r = 1; r <= scanRadius; r++) {
+            // Because the result is the MIN across rays, a ray only matters up to where it could still
+            // beat the best-so-far: an empty run completing at r yields frontier = r-RUN+1, so past
+            // r = minFrontier+RUN-1 it can only produce frontier >= minFrontier. Bounding each ray by
+            // the current best cuts the per-tick scan from 16×scanRadius lookups (up to ~16k at large
+            // render distances) down to roughly 16×frontier — the closest edge caps all later rays.
+            int limit = Math.min(scanRadius, minFrontier + FOG_EDGE_EMPTY_RUN - 1);
+            for (int r = 1; r <= limit; r++) {
                 long key = colKey(pcx + Math.round(ex * r), pcz + Math.round(ez * r));
                 if (submitted.contains(key) || pendingLoad.contains(key)) {
                     emptyRun = 0;
@@ -271,6 +277,7 @@ public final class AutoGenerationService {
                     break;
                 }
             }
+            // No break within the limit → this ray's frontier is >= minFrontier; it can't lower the min.
             if (frontier < minFrontier) minFrontier = frontier;
         }
         return minFrontier;
@@ -529,7 +536,11 @@ public final class AutoGenerationService {
                 submitted.add(colKey);
                 generated++;
                 diag$generated++;
-                uploadQueue.addLast(chunk);
+                // Queue for upload only on a REMOTE voxy server. In singleplayer the C2S handler is a
+                // no-op (the integrated server shares this process and the section was just ingested
+                // locally), so uploading would voxelize + packet-encode every chunk a second time for
+                // nothing — measured as the single largest avoidable cost of generation.
+                if (iServer == null) uploadQueue.addLast(chunk);
             }
             // If enqueueIngest returns false (lighting not ready), the entry is dropped
             // from the queue.  It will be re-added on the next rebuildQueue() call when
@@ -667,9 +678,13 @@ public final class AutoGenerationService {
             ThreadLocal.withInitial(VoxelizedSection::createEmpty);
 
     private void drainUploads(Minecraft mc, WorldEngine engine) {
-        // Server without voxy (vanilla or non-voxy NeoForge): the C2S channel was never negotiated, so
-        // sending would throw. Drop the backlog too, so queued LevelChunks don't pin memory for nothing.
-        if (!me.cortex.voxy.client.network.ClientPacketHandlers.serverHasVoxy()) {
+        // Uploads only make sense on a REMOTE voxy server:
+        //  - singleplayer: the C2S handler is a no-op (section already ingested in-process) — uploading
+        //    would just voxelize + encode every chunk a second time;
+        //  - server without voxy: the channel was never negotiated, so sending would throw.
+        // In both cases drop the backlog so queued LevelChunks don't pin memory.
+        if (mc.getSingleplayerServer() != null
+                || !me.cortex.voxy.client.network.ClientPacketHandlers.serverHasVoxy()) {
             uploadQueue.clear();
             return;
         }
