@@ -6,6 +6,7 @@ import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.BlockModelShaper;
 import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.renderer.texture.MissingTextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
@@ -75,6 +76,8 @@ import static org.lwjgl.opengl.GL45C.glNamedBufferSubData;
 public class ModelFactory {
     public static final int MODEL_TEXTURE_SIZE = 16;
     public static final int LAYERS = Integer.numberOfTrailingZeros(MODEL_TEXTURE_SIZE);
+    /** Pixels in one baked face tile; extractFaceTexture returning this count means fully opaque. */
+    private static final int FACE_PIXELS = MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE;
 
     private static final Direction[] FACE_DIRS = {
             Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
@@ -359,22 +362,44 @@ public class ModelFactory {
             TextureAtlasSprite sprite = null;
             BakedQuad picked = null;
 
+            // Gather candidate quads for this face (capped at 4). Many models have MORE than one quad
+            // per face: resource packs like Reimagined add a mostly-transparent decorative OVERLAY quad
+            // on top of the base texture, and BE-rendered machines (e.g. Create's water wheel) carry
+            // missingno placeholder quads. Blindly taking quad 0 baked whichever came first — the
+            // overlay (face alpha-discards to pinholes in solid stone) or the placeholder (magenta).
+            java.util.ArrayList<BakedQuad> candidates = new java.util.ArrayList<>(4);
             this.random.setSeed(42L);
             List<BakedQuad> faceQuads = model.getQuads(state, dir, this.random);
-            if (faceQuads != null && !faceQuads.isEmpty()) {
-                picked = faceQuads.get(0);
-            } else {
+            if (faceQuads != null) {
+                for (BakedQuad q : faceQuads) { candidates.add(q); if (candidates.size() == 4) break; }
+            }
+            if (candidates.isEmpty()) {
                 this.random.setSeed(42L);
                 List<BakedQuad> nullQuads = model.getQuads(state, null, this.random);
                 if (nullQuads != null) {
                     for (BakedQuad q : nullQuads) {
-                        if (q.getDirection() == dir) { picked = q; break; }
+                        if (q.getDirection() == dir) { candidates.add(q); if (candidates.size() == 4) break; }
                     }
                     // Only fall back to the first null quad for non-cross-plant models.
                     // Cross-plant quads have N/S/E/W directions but no UP/DOWN, so those
                     // faces end up blank naturally — exactly what we want (sides show, top doesn't).
-                    if (picked == null && !nullQuads.isEmpty() && (hasAnyDirectionalQuad || isPureFluid))
-                        picked = nullQuads.get(0);
+                    if (candidates.isEmpty() && !nullQuads.isEmpty() && (hasAnyDirectionalQuad || isPureFluid))
+                        candidates.add(nullQuads.get(0));
+                }
+            }
+            // Reject missingno sprites outright, then pick the candidate whose tile has the MOST opaque
+            // pixels — the base texture beats a decorative overlay, real textures beat placeholders.
+            // (Extraction cost is bake-time only; single-candidate faces skip the comparison entirely.)
+            int bestOpaque = -1;
+            for (BakedQuad q : candidates) {
+                TextureAtlasSprite s;
+                try { s = q.getSprite(); } catch (Throwable t) { continue; }
+                if (s == null || MissingTextureAtlasSprite.getLocation().equals(s.contents().name())) continue;
+                if (candidates.size() == 1) { picked = q; sprite = s; break; }
+                int cnt = extractFaceTexture(s, q);
+                if (cnt > bestOpaque) {
+                    bestOpaque = cnt; picked = q; sprite = s;
+                    if (cnt == FACE_PIXELS) break; // fully opaque — can't do better
                 }
             }
 
@@ -416,7 +441,14 @@ public class ModelFactory {
             // through the opaque-pass alpha-CUTOUT discard (below) and, being non-full + transparent,
             // don't cull neighbours.
             if (sprite == null && (hasAnyDirectionalQuad || isPureFluid || faceIdx >= 2)) {
-                try { sprite = model.getParticleIcon(); } catch (Throwable ignored) {}
+                try {
+                    var p = model.getParticleIcon();
+                    // Never bake the missingno placeholder (magenta/black) — a face we can't texture is
+                    // better rendered as missing (e.g. BE-rendered machines like Create's water wheel).
+                    if (p != null && !MissingTextureAtlasSprite.getLocation().equals(p.contents().name())) {
+                        sprite = p;
+                    }
+                } catch (Throwable ignored) {}
             }
 
             // Thin columns render sides only — drop the UP/DOWN faces (0=DOWN, 1=UP) so bamboo/cane/etc.
@@ -424,13 +456,18 @@ public class ModelFactory {
             if (thinColumn && faceIdx <= 1) sprite = null;
 
             int faceByte;
-            if (sprite == null) {
+            // Final extraction of the chosen sprite/quad into faceBuf (the candidate comparison above
+            // may have left a different tile in the buffer), then upload. A failed extraction (-1)
+            // marks the face missing instead of uploading a stale/garbage tile.
+            int opaquePixels = (sprite != null) ? extractFaceTexture(sprite, picked) : -1;
+            if (opaquePixels < 0) {
                 // no geometry on this face; mark face missing
                 writeBlankFace(modelId, faceIdx);
                 faceByte = 0xFF;
                 facePresent[faceIdx] = false;
             } else {
-                boolean opaque = uploadFaceTexture(modelId, faceIdx, sprite, picked);
+                uploadFaceBuffer(modelId, faceIdx);
+                boolean opaque = opaquePixels == FACE_PIXELS;
                 // bit0 = occludes neighbor face; bit2 = can be occluded by neighbor.
                 faceByte = (opaque && canOcclude) ? 0b00000101 : 0b00000100;
                 facePresent[faceIdx] = true;
@@ -774,15 +811,15 @@ public class ModelFactory {
      * @return true if all sampled pixels are fully opaque (a ≥ 250), false if semi-transparent.
      *         The return value controls whether the face sets the 'occludes' metadata bit.
      */
-    private boolean uploadFaceTexture(int modelId, int faceIdx, TextureAtlasSprite sprite, BakedQuad quad) {
+    private int extractFaceTexture(TextureAtlasSprite sprite, BakedQuad quad) {
         int sw, sh;
         try {
             sw = sprite.contents().width();
             sh = sprite.contents().height();
         } catch (Throwable t) {
-            return false;
+            return -1;
         }
-        if (sw <= 0 || sh <= 0) return false;
+        if (sw <= 0 || sh <= 0) return -1;
 
         // Some resource packs use composite "atlas" sprites wider than 16px (e.g. Reimagined's
         // birch_log_side_atlas is 48x48 — three 16x16 variants side by side). Each model variant
@@ -819,10 +856,10 @@ public class ModelFactory {
         boolean cpuAccessible = true;
         try { sprite.getPixelRGBA(0, 0, 0); } catch (Throwable t) { cpuAccessible = false; }
         if (!cpuAccessible) {
-            return uploadFaceTextureFromAtlas(modelId, faceIdx, sprite, sw, sh, px0, py0, pxW, pyH);
+            return extractFaceTextureFromAtlas(sprite, sw, sh, px0, py0, pxW, pyH);
         }
 
-        boolean allOpaque = true;
+        int opaquePixels = 0;
         this.faceBuf.clear();
         for (int y = 0; y < MODEL_TEXTURE_SIZE; y++) {
             // Y-flip: Minecraft's sprite has row 0 at the top; the voxy atlas is uploaded
@@ -840,12 +877,11 @@ public class ModelFactory {
                 }
                 // ABGR int (A high) -> little-endian bytes R,G,B,A which GL_RGBA/UBYTE expects.
                 this.faceBuf.putInt(abgr);
-                if (((abgr >>> 24) & 0xFF) < 250) allOpaque = false;
+                if (((abgr >>> 24) & 0xFF) >= 250) opaquePixels++;
             }
         }
         this.faceBuf.flip();
-        uploadFaceBuffer(modelId, faceIdx);
-        return allOpaque;
+        return opaquePixels;
     }
 
     // Cached atlas GL texture id and pixel dimensions (populated lazily on first fallback call).
@@ -879,7 +915,7 @@ public class ModelFactory {
      * @param sw  Sprite frame width  (from sprite.contents().width())
      * @param sh  Sprite frame height (from sprite.contents().height())
      */
-    private boolean uploadFaceTextureFromAtlas(int modelId, int faceIdx, TextureAtlasSprite sprite, int sw, int sh, int px0, int py0, int pxW, int pyH) {
+    private int extractFaceTextureFromAtlas(TextureAtlasSprite sprite, int sw, int sh, int px0, int py0, int pxW, int pyH) {
         try {
             if (cachedAtlasId < 0) {
                 var atlas = (TextureAtlas) Minecraft.getInstance().getTextureManager()
@@ -900,7 +936,7 @@ public class ModelFactory {
                             + " size=" + cachedAtlasW + "x" + cachedAtlasH);
                 }
             }
-            if (cachedAtlasW <= 0 || cachedAtlasH <= 0) return false;
+            if (cachedAtlasW <= 0 || cachedAtlasH <= 0) return -1;
 
             // Compute the sprite's pixel rectangle in the atlas.
             // sprite.getU0/V0 are normalized [0,1] coords for the sprite's top-left corner.
@@ -918,7 +954,7 @@ public class ModelFactory {
                 // zoffset=0 and depth=1 work for both GL_TEXTURE_2D and the first layer of
                 // GL_TEXTURE_2D_ARRAY (Sodium may use array textures for atlas storage).
                 glGetTextureSubImage(cachedAtlasId, 0, sprX, sprY, 0, sprW, sprH, 1, GL_RGBA, GL_UNSIGNED_BYTE, atlasPix);
-                boolean allOpaque = true;
+                int opaquePixels = 0;
                 this.faceBuf.clear();
                 for (int y = 0; y < MODEL_TEXTURE_SIZE; y++) {
                     // Same Y-flip as the CPU path: the atlas data has visual top at low GL y
@@ -938,18 +974,17 @@ public class ModelFactory {
                         // layout that GL_RGBA / GL_UNSIGNED_BYTE expects on upload.
                         int abgr = (a << 24) | (b << 16) | (g << 8) | r;
                         this.faceBuf.putInt(abgr);
-                        if (a < 250) allOpaque = false;
+                        if (a >= 250) opaquePixels++;
                     }
                 }
                 this.faceBuf.flip();
-                uploadFaceBuffer(modelId, faceIdx);
-                return allOpaque;
+                return opaquePixels;
             } finally {
                 MemoryUtil.memFree(atlasPix);
             }
         } catch (Throwable t) {
-            Logger.warn("Sprite GL-atlas fallback failed for face " + faceIdx + ": " + t);
-            return false;
+            Logger.warn("Sprite GL-atlas fallback failed: " + t);
+            return -1;
         }
     }
 
