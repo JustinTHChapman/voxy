@@ -103,9 +103,13 @@ public final class AutoGenerationService {
     // table with a persistent cursor and check eligibility (submitted/pending/parked) live. A move just
     // resets the cursor (O(1)); a completed sweep idles at zero cost until movement or a retry signal.
     private static final int[] SPIRAL_OFFSETS = buildSpiralOffsets();
-    /** Max spiral entries examined per tick, so a sweep over a fully-generated region is spread across
-     *  ticks (bounded per-tick cost) instead of scanning the whole table at once. */
+    /** Max candidates doing REAL work (DB check / chunk fetch / request) examined per tick. */
     private static final int SPIRAL_EXAMINE_BUDGET = 4096;
+    /** Max cheap skips (set-membership hits on known columns) per tick. Large on purpose: a skip is a
+     *  primitive hash lookup (~ns), and the cursor must cross the whole already-generated interior in a
+     *  few ticks after each move-rewind or generation never reaches the frontier (seen as massive gaps).
+     *  Worst case ≈ 65k lookups ≈ well under 1 ms, and only while a sweep is in progress. */
+    private static final int SPIRAL_SKIP_BUDGET = 65536;
     /** Cursor into {@link #SPIRAL_OFFSETS}; offsets are relative to lastPlayerCX/CZ (the spiral center). */
     private int spiralCursor = 0;
     /** Set when a column was dropped and must be retried (async load failed, or lighting wasn't ready at
@@ -510,14 +514,19 @@ public final class AutoGenerationService {
         int requested = 0;
         int maxPending = VoxyCommonConfig.AUTO_GEN_MAX_PENDING_LOADS.get();
 
-        // Walk the closest-first spiral from the persistent cursor. Bounded per tick by BOTH the
-        // generation rate (candidates consumed) and the examination budget (offsets looked at), so a
-        // sweep across an already-generated region costs a fixed slice per tick instead of one big scan.
+        // Walk the closest-first spiral from the persistent cursor, with SPLIT per-tick budgets:
+        //  - skips over known columns (a primitive hash contains, ~ns) get a large budget, so the
+        //    sweep crosses a fully-generated region in a few ticks — this is what lets the cursor
+        //    actually REACH the un-generated frontier between player moves (each ≥4-chunk move rewinds
+        //    the cursor; a single small budget stalled generation beyond the near field: massive gaps);
+        //  - real work per candidate (DB containsColumn, chunk fetch, ingest/request) keeps the small
+        //    budget, bounding the expensive part of a tick.
         int radius = Math.min(ServerConfigOverride.INSTANCE.effectiveLodRadius(), 256);
         long radiusSq = (long) radius * radius;
         int examined = 0;
+        int skipped = 0;
         boolean rewound = false; // at most one sweep-completion rewind per tick
-        while ((generated + requested) < rate && examined < SPIRAL_EXAMINE_BUDGET) {
+        while ((generated + requested) < rate && examined < SPIRAL_EXAMINE_BUDGET && skipped < SPIRAL_SKIP_BUDGET) {
             // Sweep complete? (Past the table, or past the configured radius — the table is
             // distance-sorted, so the first offset beyond the radius means all the rest are too.)
             int dx, dz;
@@ -544,15 +553,16 @@ public final class AutoGenerationService {
                 }
                 break;
             }
-            examined++;
             int cx = lastPlayerCX + dx;
             int cz = lastPlayerCZ + dz;
             long colKey = colKey(cx, cz);
 
             if (submitted.contains(colKey) || pendingLoad.contains(colKey) || parked.contains(colKey)) {
                 spiralCursor++;
+                skipped++;
                 continue;
             }
+            examined++;
 
             // Check if LOD data already exists in the DB for this column.
             // If so, mark submitted and skip server chunk request — the rendering system
