@@ -114,6 +114,8 @@ NeoForge/Sodium version produces a clear NeoForge error rather than a crash.
 - **Iris fog tracking** — the shader fog `far` follows the LOD frontier on both Iris 1.8.12 (`DHCompat`) and 1.8.14 (`CameraUniforms`); vanilla near-fog's 96-block clamp is dropped while voxy's environmental fog is active
 - **Fog frontier fixes** — frontier uses the *nearest* data edge (the average was inverted at the boundary), scans out to the LOD render distance so it tracks the rendered edge, and is pulled in 2 chunks so the hard cutoff stays covered
 - **Plant/thin-block rendering** — cross-plants (flowers, grass, cane) render as 4-sided cutout billboards; thin columns (bamboo, cane) drop their oversized top/bottom caps; per-face occlusion comes from the real occlusion shape so fences/doors/walls/slabs no longer cull neighbouring faces wrongly; waterlogged blocks bake as water so oceans stay consistent
+- **Best-quad texture baking** — faces with multiple quads (resource-pack decorative overlays, e.g. Reimagined; missingno placeholders on block-entity-rendered machines like Create's water wheel) bake the most-opaque non-missingno quad instead of blindly taking the first. Fixes see-through pinholes in solid terrain and magenta LOD machines; a face that can't be textured renders as missing rather than a garbage tile
+- **Generation performance overhaul** — the candidate priority queue (re-scanned ~206k columns on every 4-chunk move, and every tick once the radius was fully generated) is replaced by a static closest-first spiral walked by a persistent cursor: O(1) re-centering, zero steady-state cost, bounded per-tick work, with deterministic retry of dropped/stuck columns. Singleplayer no longer voxelizes every generated chunk twice (uploads only go to remote voxy servers); hot-path column sets use primitive hashing (no autoboxing); the server-has-voxy check is resolved once per connection
 
 ---
 
@@ -123,3 +125,4 @@ NeoForge/Sodium version produces a clear NeoForge error rather than a crash.
 - LOD data is not generated for dimensions other than the one the player is currently in
 - Biome zoom smoothing at LOD level boundaries is not yet implemented (stub)
 - Some highly modded block models may fall back to the particle icon texture in LOD
+- Blocks drawn by block-entity renderers (e.g. Create's water wheel) have no usable static model, so they render as missing at LOD distance rather than a placeholder texture

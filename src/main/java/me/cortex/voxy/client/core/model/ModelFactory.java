@@ -404,7 +404,6 @@ public class ModelFactory {
             }
 
             if (picked != null) {
-                sprite = picked.getSprite();
                 // Extract face depth from vertex positions (for partial-height blocks like snow/slabs).
                 // DefaultVertexFormat.BLOCK: 8 ints/vertex, position at offsets 0(x),1(y),2(z).
                 try {
